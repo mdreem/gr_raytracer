@@ -1,0 +1,117 @@
+use crate::four_vector::FourVector;
+use nalgebra::Vector4;
+
+pub struct Camera {
+    alpha: f64,
+    rows: i64,
+    columns: i64,
+    position: Vector4<f64>,
+}
+
+impl Camera {
+    pub fn new(position: Vector4<f64>, alpha: f64, rows: i64, columns: i64) -> Camera {
+        Self {
+            position,
+            alpha,
+            rows,
+            columns,
+        }
+    }
+
+    // vertical wrt. camera. -> x_2 = X
+    fn tetrad_x(&self) -> FourVector {
+        // TODO Lorentz transform
+        // TODO rotate
+
+        FourVector::new(0.0, 0.0, 1.0, 0.0)
+    }
+
+    // horizontal wrt. camera. -> x_3 = Y
+    fn tetrad_y(&self) -> FourVector {
+        // TODO Lorentz transform
+        // TODO rotate
+
+        FourVector::new(0.0, 0.0, 0.0, 1.0)
+    }
+
+    // away from camera. -> x_1 = Z
+    fn tetrad_z(&self) -> FourVector {
+        // TODO Lorentz transform
+        // TODO rotate
+
+        FourVector::new(0.0, 1.0, 0.0, 0.0)
+    }
+
+    // time
+    fn tetrad_a(&self) -> FourVector {
+        // TODO Lorentz transform
+        // TODO rotate
+
+        FourVector::new(1.0, 0.0, 0.0, 0.0)
+    }
+
+    // row, column range from 1..R, 1..C
+    pub fn get_direction_for(&self, row: i64, column: i64) -> FourVector {
+        let i_prime = (2.0 * f64::tan(self.alpha / 2.0) / (self.columns as f64))
+            * (column as f64 - (self.columns as f64 + 1.0) / 2.0);
+        let j_prime = (2.0 * f64::tan(self.alpha / 2.0) / (self.rows as f64))
+            * (row as f64 - (self.rows as f64 + 1.0) / 2.0);
+
+        let w = self.tetrad_z() + i_prime * self.tetrad_x() + j_prime * self.tetrad_y();
+        let w_squared = -1.0 - i_prime * i_prime - j_prime * j_prime;
+
+        -self.tetrad_z() + 2.0 * w / (-w_squared)
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use crate::camera::Camera;
+    use approx::assert_abs_diff_eq;
+    use nalgebra::Vector4;
+
+    #[test]
+    fn test_get_direction_for() {
+        let camera = Camera::new(
+            Vector4::new(0.0, 0.0, 0.0, 1.0),
+            std::f64::consts::PI / 2.0,
+            11,
+            11,
+        );
+
+        let top_left_corner = camera.get_direction_for(1, 1);
+        let top_right_corner = camera.get_direction_for(1, 11);
+        let middle = camera.get_direction_for(6, 6);
+        let bottom_left_corner = camera.get_direction_for(11, 1);
+        let bottom_right_corner = camera.get_direction_for(11, 11);
+
+        let corner = -0.6853582554517135;
+        let corner_z = -0.24610591900311507;
+        assert_abs_diff_eq!(
+            top_left_corner.get_as_vector(),
+            Vector4::new(0.0, corner_z, corner, corner)
+        );
+        assert_abs_diff_eq!(top_left_corner * top_left_corner, -1.0);
+
+        assert_abs_diff_eq!(
+            top_right_corner.get_as_vector(),
+            Vector4::new(0.0, corner_z, -corner, corner)
+        );
+        assert_abs_diff_eq!(top_right_corner * top_right_corner, -1.0);
+
+        assert_abs_diff_eq!(middle.get_as_vector(), Vector4::new(0.0, 1.0, 0.0, 0.0));
+        assert_abs_diff_eq!(middle * middle, -1.0);
+
+        assert_abs_diff_eq!(
+            bottom_left_corner.get_as_vector(),
+            Vector4::new(0.0, corner_z, corner, -corner)
+        );
+        assert_abs_diff_eq!(bottom_left_corner * bottom_left_corner, -1.0);
+
+        assert_abs_diff_eq!(
+            bottom_right_corner.get_as_vector(),
+            Vector4::new(0.0, corner_z, -corner, -corner)
+        );
+        assert_abs_diff_eq!(bottom_right_corner * bottom_right_corner, -1.0);
+    }
+}
