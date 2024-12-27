@@ -56,14 +56,6 @@ impl Camera {
         FourVector::new(0.0, 1.0, 0.0, 0.0)
     }
 
-    // time
-    fn tetrad_a(&self) -> FourVector {
-        // TODO Lorentz transform
-        // TODO rotate
-
-        FourVector::new(1.0, 0.0, 0.0, 0.0)
-    }
-
     // row, column range from 1..R, 1..C
     fn get_direction_for(&self, row: i64, column: i64) -> FourVector {
         let i_prime = (2.0 * f64::tan(self.alpha / 2.0) / (self.columns as f64))

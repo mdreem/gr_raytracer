@@ -14,7 +14,7 @@ pub struct Raytracer {
 impl Raytracer {
     pub fn new(image_width: i64, image_height: i64, scene: Scene) -> Self {
         let camera = Camera::new(
-            Vector4::new(0.0, -5.0, 0.0, 0.0),
+            Vector4::new(0.0, -7.0, 0.0, 0.3),
             std::f64::consts::PI / 2.0,
             image_height,
             image_width,
