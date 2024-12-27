@@ -1,4 +1,4 @@
-use nalgebra::Vector4;
+use nalgebra::{Vector3, Vector4};
 use std::ops::{Add, Div, Mul, Neg};
 
 #[derive(Clone, Copy, Debug)]
@@ -77,6 +77,10 @@ impl FourVector {
 
     pub fn get_as_vector(self) -> Vector4<f64> {
         self.vector
+    }
+
+    pub fn get_spacial_vector(self) -> Vector3<f64> {
+        Vector3::new(self.vector[1], self.vector[2], self.vector[3])
     }
 }
 
