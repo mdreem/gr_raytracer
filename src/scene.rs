@@ -2,6 +2,7 @@ use crate::camera::Ray;
 use crate::four_vector::FourVector;
 use crate::runge_kutta::rk4;
 use nalgebra::{Const, OVector, Vector3};
+use std::f64::consts::PI;
 
 pub struct Scene {
     max_steps: usize,
@@ -45,6 +46,17 @@ fn radial_distance_spacial_part(pos: &FourVector) -> f64 {
     v[1] * v[1] + v[2] * v[2] + v[3] * v[3]
 }
 
+fn checker_color(u: f64, v: f64, width: f64, height: f64, c1: Color, c2: Color) -> Color {
+    let ut = (u * width).floor() as usize;
+    let vt = (v * height).floor() as usize;
+
+    if (ut + vt) % 2 == 0 {
+        c1
+    } else {
+        c2
+    }
+}
+
 impl Scene {
     pub fn new(
         max_steps: usize,
@@ -70,8 +82,8 @@ impl Scene {
         // z x y
         let normal = Vector3::new(0.0, 0.0, 1.0);
         let center = Vector3::new(0.0, 0.0, 0.0);
-        let y_start_spacial = y_start.get_spacial_vector();
-        let y_end_spacial = y_end.get_spacial_vector();
+        let y_start_spacial = y_start.get_spatial_vector();
+        let y_end_spacial = y_end.get_spatial_vector();
         let direction = y_end_spacial - y_start_spacial;
 
         let p1 = (y_start_spacial - center).transpose() * normal;
@@ -93,7 +105,7 @@ impl Scene {
             && rr <= self.center_disk_outer_radius * self.center_disk_outer_radius
     }
 
-    fn intersects_with_sphere(&self, y_start: &FourVector, y_end: &FourVector) -> bool {
+    fn intersects_with_sphere(&self, y_start: &FourVector, y_end: &FourVector) -> Option<Color> {
         let r_start = radial_distance_spacial_part(&y_start);
         let r_end = radial_distance_spacial_part(&y_end);
 
@@ -102,10 +114,23 @@ impl Scene {
             || (r_start <= self.center_sphere_radius.powi(2)
                 && r_end >= self.center_sphere_radius.powi(2))
         {
-            return true;
+            let point_on_sphere = y_start.get_as_spherical(); // approximate y_start als intersection point.
+
+            let u = (PI + point_on_sphere[2]) / (2.0 * PI);
+            let v = point_on_sphere[1] / PI;
+
+            let color = checker_color(
+                u,
+                v,
+                10.0,
+                10.0,
+                Color::new(255, 0, 0),
+                Color::new(100, 0, 0),
+            );
+            return Some(color);
         }
 
-        false
+        None
     }
 
     pub fn color_of_ray(&self, ray: &Ray) -> Color {
@@ -128,12 +153,12 @@ impl Scene {
             y = rk4(&y, t, self.step_size, geodesic);
 
             if self.intersects_with_disk(&get_position(&last_y), &get_position(&y)) {
-                // println!("intersection: {:?}", last_y);
                 return Color::new(0, 0, 255);
             }
 
-            if self.intersects_with_sphere(&get_position(&last_y), &get_position(&y)) {
-                return Color::new(255, 0, 0);
+            match self.intersects_with_sphere(&get_position(&last_y), &get_position(&y)) {
+                None => {}
+                Some(c) => return c,
             }
 
             t += self.step_size;
@@ -161,7 +186,7 @@ mod tests {
 
         let color = scene.color_of_ray(&ray);
 
-        assert_eq!(color, Color::new(255, 0, 0));
+        assert_eq!(color, Color::new(100, 0, 0));
     }
 
     #[test]

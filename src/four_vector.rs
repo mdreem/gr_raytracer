@@ -79,8 +79,25 @@ impl FourVector {
         self.vector
     }
 
-    pub fn get_spacial_vector(self) -> Vector3<f64> {
+    pub fn get_spatial_vector(self) -> Vector3<f64> {
         Vector3::new(self.vector[1], self.vector[2], self.vector[3])
+    }
+
+    // THe order of the components is: (r, theta, phi)
+    pub fn get_as_spherical(self) -> Vector3<f64> {
+        let x = self.vector[2]; // TODO fix assignment of components.
+        let y = self.vector[3];
+        let z = self.vector[1];
+
+        let r = (x * x + y * y + z * z).sqrt();
+        if r == 0.0 {
+            return Vector3::new(0.0, 0.0, 0.0);
+        }
+
+        let theta = (z / r).acos();
+        let phi = y.atan2(x);
+
+        Vector3::new(r, theta, phi)
     }
 }
 
