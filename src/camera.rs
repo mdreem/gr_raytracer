@@ -1,6 +1,20 @@
 use crate::four_vector::FourVector;
 use nalgebra::Vector4;
 
+#[derive(Debug)]
+pub struct Ray {
+    pub position: Vector4<f64>,
+    pub direction: FourVector,
+}
+impl Ray {
+    pub fn new(position: Vector4<f64>, direction: FourVector) -> Self {
+        Self {
+            position,
+            direction,
+        }
+    }
+}
+
 pub struct Camera {
     alpha: f64,
     rows: i64,
@@ -51,7 +65,7 @@ impl Camera {
     }
 
     // row, column range from 1..R, 1..C
-    pub fn get_direction_for(&self, row: i64, column: i64) -> FourVector {
+    fn get_direction_for(&self, row: i64, column: i64) -> FourVector {
         let i_prime = (2.0 * f64::tan(self.alpha / 2.0) / (self.columns as f64))
             * (column as f64 - (self.columns as f64 + 1.0) / 2.0);
         let j_prime = (2.0 * f64::tan(self.alpha / 2.0) / (self.rows as f64))
@@ -61,6 +75,12 @@ impl Camera {
         let w_squared = -1.0 - i_prime * i_prime - j_prime * j_prime;
 
         -self.tetrad_z() + 2.0 * w / (-w_squared)
+    }
+
+    // row, column range from 1..R, 1..C
+    pub fn get_ray_for(&self, row: i64, column: i64) -> Ray {
+        let direction = self.get_direction_for(row, column);
+        Ray::new(self.position, direction)
     }
 }
 

@@ -2,7 +2,7 @@ use nalgebra::allocator::Allocator;
 use nalgebra::OVector;
 use nalgebra::{DefaultAllocator, Dim};
 
-fn rk4<D: Dim>(
+pub fn rk4<D: Dim>(
     x: &OVector<f64, D>,
     t: f64,
     h: f64,
@@ -55,13 +55,13 @@ mod tests {
 
         let step_size = 0.0001;
         let mut t = 0.0;
-        for i in 0..1000 {
+        for _ in 0..1000 {
             y = rk4(&y, t, step_size, simple_equation);
             t += step_size;
         }
         assert_abs_diff_eq!(y, solution_simple_equation(t), epsilon = 1e-6);
 
-        for i in 0..1000 {
+        for _ in 0..1000 {
             y = rk4(&y, t, step_size, simple_equation);
             t += step_size;
         }

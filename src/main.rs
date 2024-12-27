@@ -1,7 +1,11 @@
 mod camera;
 mod four_vector;
+mod raytracer;
 mod runge_kutta;
+mod scene;
 
 fn main() {
-    println!("Hello, world!");
+    let scene = scene::Scene::new();
+    let raytracer = raytracer::Raytracer::new(500, 500, scene);
+    raytracer.render();
 }
