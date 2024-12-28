@@ -1,18 +1,19 @@
 use crate::camera::Camera;
+use crate::geometry::Geometry;
 use crate::scene::{Scene, TextureMap};
 use nalgebra::Vector4;
 use rayon::iter::ParallelIterator;
 use std::sync::atomic::{AtomicUsize, Ordering};
 
-pub struct Raytracer<T: TextureMap> {
+pub struct Raytracer<T: TextureMap, G: Geometry> {
     camera: Camera,
-    scene: Scene<T>,
+    scene: Scene<T, G>,
     image_width: i64,
     image_height: i64,
 }
 
-impl<T: TextureMap> Raytracer<T> {
-    pub fn new(image_width: i64, image_height: i64, scene: Scene<T>) -> Self {
+impl<T: TextureMap, G: Geometry> Raytracer<T, G> {
+    pub fn new(image_width: i64, image_height: i64, scene: Scene<T, G>) -> Self {
         let camera = Camera::new(
             Vector4::new(0.0, 0.0, 0.8, -7.0),
             std::f64::consts::PI / 4.0,

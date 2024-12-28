@@ -2,10 +2,12 @@ use crate::scene::{Scene, TextureMapper};
 
 mod camera;
 mod four_vector;
+mod geometry;
 mod raytracer;
 mod runge_kutta;
 mod scene;
 
+use crate::geometry::EuclideanSpace;
 use std::env;
 
 fn main() {
@@ -28,6 +30,7 @@ fn main() {
         texture_mapper_celestial,
         texture_mapper_disk,
         texture_mapper_sphere,
+        EuclideanSpace::new(),
     );
     let raytracer = raytracer::Raytracer::new(500, 500, scene);
     raytracer.render();

@@ -1,11 +1,12 @@
 use crate::camera::Ray;
 use crate::four_vector::FourVector;
+use crate::geometry::Geometry;
 use crate::runge_kutta::rk4;
 use image::{DynamicImage, GenericImageView, ImageReader};
 use nalgebra::{Const, OVector, Vector3};
 use std::f64::consts::PI;
 
-pub struct Scene<T: TextureMap> {
+pub struct Scene<T: TextureMap, G: Geometry> {
     max_steps: usize,
     max_radius_sq: f64,
     step_size: f64,
@@ -15,6 +16,7 @@ pub struct Scene<T: TextureMap> {
     celestial_map: T,
     center_disk_map: T,
     center_sphere_map: T,
+    geometry: G,
 }
 
 #[derive(Debug, PartialEq, Copy, Clone)]
@@ -40,7 +42,7 @@ pub struct CheckerMapper {
 }
 
 impl Color {
-    pub(crate) fn new(r: u8, g: u8, b: u8) -> Color {
+    pub fn new(r: u8, g: u8, b: u8) -> Color {
         Color { r, g, b }
     }
 
@@ -49,13 +51,7 @@ impl Color {
     }
 }
 
-type EquationOfMotionState = OVector<f64, Const<8>>;
-
-fn geodesic(_: f64, y: &EquationOfMotionState) -> EquationOfMotionState {
-    let y_new =
-        EquationOfMotionState::from_column_slice(&[y[4], y[5], y[6], y[7], 0.0, 0.0, 0.0, 0.0]);
-    y_new
-}
+pub type EquationOfMotionState = OVector<f64, Const<8>>;
 
 pub fn get_position(y: &EquationOfMotionState) -> FourVector {
     FourVector::new(y[0], y[1], y[2], y[3])
@@ -112,7 +108,7 @@ impl TextureMap for CheckerMapper {
     }
 }
 
-impl<T: TextureMap> Scene<T> {
+impl<T: TextureMap, G: Geometry> Scene<T, G> {
     pub fn new(
         max_steps: usize,
         max_radius: f64,
@@ -123,7 +119,8 @@ impl<T: TextureMap> Scene<T> {
         celestial_map: T,
         center_disk_map: T,
         center_sphere_map: T,
-    ) -> Scene<T> {
+        geometry: G,
+    ) -> Scene<T, G> {
         Scene {
             max_steps,
             max_radius_sq: max_radius * max_radius,
@@ -134,6 +131,7 @@ impl<T: TextureMap> Scene<T> {
             celestial_map,
             center_disk_map,
             center_sphere_map,
+            geometry,
         }
     }
 
@@ -220,7 +218,7 @@ impl<T: TextureMap> Scene<T> {
 
         for _i in 0..self.max_steps {
             let last_y = y;
-            y = rk4(&y, t, self.step_size, geodesic);
+            y = rk4(&y, t, self.step_size, &self.geometry);
 
             match self.intersects_with_disk(&get_position(&last_y), &get_position(&y)) {
                 None => {}
@@ -235,7 +233,7 @@ impl<T: TextureMap> Scene<T> {
             t += self.step_size;
 
             // iterate until the celestial plane distance has been reached.
-            if radial_distance_spatial_part_squared(&get_position(&y)) > 10.0 * 10.0 {
+            if radial_distance_spatial_part_squared(&get_position(&y)) > self.max_radius_sq {
                 break;
             }
         }
@@ -250,6 +248,7 @@ impl<T: TextureMap> Scene<T> {
 #[cfg(test)]
 mod tests {
     use crate::camera::Camera;
+    use crate::geometry::EuclideanSpace;
     use crate::scene::{CheckerMapper, Color, Scene};
     use nalgebra::Vector4;
 
@@ -277,7 +276,7 @@ mod tests {
             11,
             11,
         );
-        let scene: Scene<CheckerMapper> = create_scene(2.0, 0.2, 0.3);
+        let scene: Scene<CheckerMapper, EuclideanSpace> = create_scene(2.0, 0.2, 0.3);
 
         let ray = camera.get_ray_for(0, 0);
         let color = scene.color_of_ray(&ray);
@@ -293,7 +292,7 @@ mod tests {
             101,
             101,
         );
-        let scene: Scene<CheckerMapper> = create_scene(1.0, 2.0, 7.0);
+        let scene: Scene<CheckerMapper, EuclideanSpace> = create_scene(1.0, 2.0, 7.0);
 
         let ray = camera.get_ray_for(43, 51);
         let color = scene.color_of_ray(&ray);
@@ -305,7 +304,7 @@ mod tests {
         center_sphere_radius: f64,
         center_disk_inner_radius: f64,
         center_disk_outer_radius: f64,
-    ) -> Scene<CheckerMapper> {
+    ) -> Scene<CheckerMapper, EuclideanSpace> {
         let texture_mapper_celestial =
             CheckerMapper::new(100.0, 100.0, Color::new(0, 255, 0), Color::new(0, 100, 0));
         let texture_mapper_disk =
@@ -322,6 +321,7 @@ mod tests {
             texture_mapper_celestial,
             texture_mapper_disk,
             texture_mapper_sphere,
+            EuclideanSpace::new(),
         );
         scene
     }
