@@ -143,7 +143,7 @@ impl<T: TextureMap> Scene<T> {
     // both coordinates.
     fn intersects_with_disk(&self, y_start: &FourVector, y_end: &FourVector) -> Option<Color> {
         // z x y
-        let normal = Vector3::new(0.0, 0.0, 1.0);
+        let normal = Vector3::new(0.0, 1.0, 0.0);
         let center = Vector3::new(0.0, 0.0, 0.0);
         let y_start_spatial = y_start.get_spatial_vector();
         let y_end_spatial = y_end.get_spatial_vector();
@@ -168,10 +168,9 @@ impl<T: TextureMap> Scene<T> {
             && rr <= self.center_disk_outer_radius * self.center_disk_outer_radius
         {
             let vector_in_plane = intersection_point - center;
-
-            let phi = vector_in_plane[0].atan2(vector_in_plane[1]);
             // TODO: properly implement finding intersection and compute the values accordingly.
 
+            let phi = vector_in_plane[2].atan2(vector_in_plane[0]); // phi in x-z plane.
             let u = (PI + phi) / (2.0 * PI);
             let v = (rr.sqrt() - self.center_disk_inner_radius)
                 / (self.center_disk_outer_radius - self.center_disk_inner_radius);
@@ -257,7 +256,7 @@ mod tests {
     #[test]
     fn test_color_of_ray_hits_sphere() {
         let camera = Camera::new(
-            Vector4::new(0.0, -10.0, 0.0, 0.0),
+            Vector4::new(0.0, 0.0, 0.0, -10.0),
             std::f64::consts::PI / 2.0,
             11,
             11,
@@ -273,7 +272,7 @@ mod tests {
     #[test]
     fn test_color_of_ray_misses_sphere() {
         let camera = Camera::new(
-            Vector4::new(0.0, -10.0, 0.0, 0.0),
+            Vector4::new(0.0, 0.0, 0.0, -10.0),
             std::f64::consts::PI / 2.0,
             11,
             11,
@@ -289,7 +288,7 @@ mod tests {
     #[test]
     fn test_intersects_with_disk() {
         let camera = Camera::new(
-            Vector4::new(0.0, -10.0, 0.0, 1.0),
+            Vector4::new(0.0, 0.0, 1.0, -10.0),
             std::f64::consts::PI / 4.0,
             101,
             101,

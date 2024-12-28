@@ -83,11 +83,11 @@ impl FourVector {
         Vector3::new(self.vector[1], self.vector[2], self.vector[3])
     }
 
-    // THe order of the components is: (r, theta, phi)
+    // The order of the components is: (r, theta, phi)
     pub fn get_as_spherical(self) -> Vector3<f64> {
-        let x = self.vector[2]; // TODO fix assignment of components.
-        let y = self.vector[3];
-        let z = self.vector[1];
+        let x = self.vector[1];
+        let y = self.vector[2];
+        let z = self.vector[3];
 
         let r = (x * x + y * y + z * z).sqrt();
         if r == 0.0 {
