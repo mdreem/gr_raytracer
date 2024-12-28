@@ -1,26 +1,45 @@
 use crate::camera::Ray;
 use crate::four_vector::FourVector;
 use crate::runge_kutta::rk4;
+use image::{DynamicImage, GenericImageView, ImageReader};
 use nalgebra::{Const, OVector, Vector3};
 use std::f64::consts::PI;
 
-pub struct Scene {
+pub struct Scene<T: TextureMap> {
     max_steps: usize,
     step_size: f64,
     center_sphere_radius: f64,
     center_disk_outer_radius: f64,
     center_disk_inner_radius: f64,
+    celestial_map: T,
+    center_disk_map: T,
+    center_sphere_map: T,
 }
 
-#[derive(Debug, PartialEq)]
+#[derive(Debug, PartialEq, Copy, Clone)]
 pub struct Color {
     r: u8,
     g: u8,
     b: u8,
 }
 
+pub trait TextureMap: Sync {
+    fn color_at_uv(&self, u: f64, v: f64) -> Color;
+}
+
+pub struct TextureMapper {
+    image: DynamicImage,
+}
+
+pub struct CheckerMapper {
+    width: f64,
+    height: f64,
+    c1: Color,
+    c2: Color,
+}
+
 impl Color {
-    fn new(r: u8, g: u8, b: u8) -> Color {
+    pub(crate) fn new(r: u8, g: u8, b: u8) -> Color {
         Color { r, g, b }
     }
 
@@ -41,36 +60,77 @@ pub fn get_position(y: &EquationOfMotionState) -> FourVector {
     FourVector::new(y[0], y[1], y[2], y[3])
 }
 
-fn radial_distance_spacial_part(pos: &FourVector) -> f64 {
+fn radial_distance_spatial_part(pos: &FourVector) -> f64 {
     let v = pos.get_as_vector();
     v[1] * v[1] + v[2] * v[2] + v[3] * v[3]
 }
 
-fn checker_color(u: f64, v: f64, width: f64, height: f64, c1: Color, c2: Color) -> Color {
-    let ut = (u * width).floor() as usize;
-    let vt = (v * height).floor() as usize;
+impl TextureMapper {
+    pub fn new(filename: String) -> TextureMapper {
+        let image = ImageReader::open(filename)
+            .expect("Failed to open image file")
+            .decode()
+            .expect("Failed to decode image");
 
-    if (ut + vt) % 2 == 0 {
-        c1
-    } else {
-        c2
+        TextureMapper { image }
     }
 }
 
-impl Scene {
+impl TextureMap for TextureMapper {
+    fn color_at_uv(&self, u: f64, v: f64) -> Color {
+        let (width, height) = self.image.dimensions();
+        let pixel = self.image.get_pixel(
+            (((width - 1) as f64) * u) as u32,
+            (((height - 1) as f64) * v) as u32,
+        );
+        Color::new(pixel[0], pixel[1], pixel[2])
+    }
+}
+
+impl CheckerMapper {
+    pub fn new(width: f64, height: f64, c1: Color, c2: Color) -> CheckerMapper {
+        CheckerMapper {
+            width,
+            height,
+            c1,
+            c2,
+        }
+    }
+}
+
+impl TextureMap for CheckerMapper {
+    fn color_at_uv(&self, u: f64, v: f64) -> Color {
+        let ut = (u * self.width).floor() as usize;
+        let vt = (v * self.height).floor() as usize;
+
+        if (ut + vt) % 2 == 0 {
+            self.c1
+        } else {
+            self.c2
+        }
+    }
+}
+
+impl<T: TextureMap> Scene<T> {
     pub fn new(
         max_steps: usize,
         step_size: f64,
         center_sphere_radius: f64,
         center_disk_inner_radius: f64,
         center_disk_outer_radius: f64,
-    ) -> Scene {
+        celestial_map: T,
+        center_disk_map: T,
+        center_sphere_map: T,
+    ) -> Scene<T> {
         Scene {
             max_steps,
             step_size,
             center_sphere_radius,
             center_disk_outer_radius,
             center_disk_inner_radius,
+            celestial_map,
+            center_disk_map,
+            center_sphere_map,
         }
     }
 
@@ -82,11 +142,11 @@ impl Scene {
         // z x y
         let normal = Vector3::new(0.0, 0.0, 1.0);
         let center = Vector3::new(0.0, 0.0, 0.0);
-        let y_start_spacial = y_start.get_spatial_vector();
-        let y_end_spacial = y_end.get_spatial_vector();
-        let direction = y_end_spacial - y_start_spacial;
+        let y_start_spatial = y_start.get_spatial_vector();
+        let y_end_spatial = y_end.get_spatial_vector();
+        let direction = y_end_spatial - y_start_spatial;
 
-        let p1 = (y_start_spacial - center).transpose() * normal;
+        let p1 = (y_start_spatial - center).transpose() * normal;
         let p2 = direction.transpose() * normal;
 
         // TODO: p2 can be 0 if parallel -> handle
@@ -96,7 +156,7 @@ impl Scene {
             return None;
         }
 
-        let intersection_point = y_start_spacial + t * direction;
+        let intersection_point = y_start_spatial + t * direction;
         let rr = intersection_point[0] * intersection_point[0]
             + intersection_point[1] * intersection_point[1]
             + intersection_point[2] * intersection_point[2];
@@ -107,19 +167,13 @@ impl Scene {
             let vector_in_plane = intersection_point - center;
 
             let phi = vector_in_plane[0].atan2(vector_in_plane[1]);
-            let r = vector_in_plane.dot(&vector_in_plane);
+            // TODO: properly implement finding intersection and compute the values accordingly.
 
             let u = (PI + phi) / (2.0 * PI);
-            let v = r / self.center_disk_outer_radius;
+            let v = (rr.sqrt() - self.center_disk_inner_radius)
+                / (self.center_disk_outer_radius - self.center_disk_inner_radius);
 
-            let color = checker_color(
-                u,
-                v,
-                200.0,
-                10.0,
-                Color::new(0, 0, 255),
-                Color::new(0, 0, 100),
-            );
+            let color = self.center_disk_map.color_at_uv(u, v);
             Some(color)
         } else {
             None
@@ -127,8 +181,8 @@ impl Scene {
     }
 
     fn intersects_with_sphere(&self, y_start: &FourVector, y_end: &FourVector) -> Option<Color> {
-        let r_start = radial_distance_spacial_part(&y_start);
-        let r_end = radial_distance_spacial_part(&y_end);
+        let r_start = radial_distance_spatial_part(&y_start);
+        let r_end = radial_distance_spatial_part(&y_end);
 
         if (r_start >= self.center_sphere_radius.powi(2)
             && r_end <= self.center_sphere_radius.powi(2))
@@ -140,14 +194,7 @@ impl Scene {
             let u = (PI + point_on_sphere[2]) / (2.0 * PI);
             let v = point_on_sphere[1] / PI;
 
-            let color = checker_color(
-                u,
-                v,
-                10.0,
-                10.0,
-                Color::new(255, 0, 0),
-                Color::new(100, 0, 0),
-            );
+            let color = self.center_sphere_map.color_at_uv(u, v);
             return Some(color);
         }
 
@@ -186,26 +233,19 @@ impl Scene {
             t += self.step_size;
         }
 
+        // TODO: Fix: this only works if the photons are at the same place. Otherwise this does not
+        // account for different directions.
         let point_on_celestial_sphere = get_position(&y).get_as_spherical();
         let u = (PI + point_on_celestial_sphere[2]) / (2.0 * PI);
         let v = point_on_celestial_sphere[1] / PI;
-
-        let color = checker_color(
-            u,
-            v,
-            100.0,
-            100.0,
-            Color::new(0, 255, 0),
-            Color::new(0, 100, 0),
-        );
-        color
+        self.celestial_map.color_at_uv(u, v)
     }
 }
 
 #[cfg(test)]
 mod tests {
     use crate::camera::Camera;
-    use crate::scene::{Color, Scene};
+    use crate::scene::{CheckerMapper, Color, Scene};
     use nalgebra::Vector4;
 
     #[test]
@@ -216,9 +256,9 @@ mod tests {
             11,
             11,
         );
-        let ray = camera.get_ray_for(6, 6);
-        let scene = Scene::new(1000, 0.01, 2.0, 0.2, 0.3);
+        let scene = create_scene(2.0, 0.2, 0.3);
 
+        let ray = camera.get_ray_for(6, 6);
         let color = scene.color_of_ray(&ray);
 
         assert_eq!(color, Color::new(100, 0, 0));
@@ -232,9 +272,9 @@ mod tests {
             11,
             11,
         );
-        let ray = camera.get_ray_for(0, 0);
-        let scene = Scene::new(1000, 0.01, 2.0, 0.2, 0.3);
+        let scene: Scene<CheckerMapper> = create_scene(2.0, 0.2, 0.3);
 
+        let ray = camera.get_ray_for(0, 0);
         let color = scene.color_of_ray(&ray);
 
         assert_eq!(color, Color::new(0, 100, 0));
@@ -248,10 +288,35 @@ mod tests {
             101,
             101,
         );
-        let ray = camera.get_ray_for(43, 51);
-        let scene = Scene::new(1000, 0.01, 1.0, 2.0, 7.0);
+        let scene: Scene<CheckerMapper> = create_scene(1.0, 2.0, 7.0);
 
+        let ray = camera.get_ray_for(43, 51);
         let color = scene.color_of_ray(&ray);
+
         assert_eq!(color, Color::new(0, 0, 255));
+    }
+
+    fn create_scene(
+        center_sphere_radius: f64,
+        center_disk_inner_radius: f64,
+        center_disk_outer_radius: f64,
+    ) -> Scene<CheckerMapper> {
+        let texture_mapper_celestial =
+            CheckerMapper::new(100.0, 100.0, Color::new(0, 255, 0), Color::new(0, 100, 0));
+        let texture_mapper_disk =
+            CheckerMapper::new(200.0, 10.0, Color::new(0, 0, 255), Color::new(0, 0, 100));
+        let texture_mapper_sphere =
+            CheckerMapper::new(10.0, 10.0, Color::new(255, 0, 0), Color::new(100, 0, 0));
+        let scene = Scene::new(
+            1000,
+            0.01,
+            center_sphere_radius,
+            center_disk_inner_radius,
+            center_disk_outer_radius,
+            texture_mapper_celestial,
+            texture_mapper_disk,
+            texture_mapper_sphere,
+        );
+        scene
     }
 }
