@@ -19,7 +19,8 @@ fn main() {
     let texture_mapper_sphere = TextureMapper::new(String::from("./resources/sphere.png"));
 
     let scene = Scene::new(
-        1000,
+        10000,
+        10.0,
         0.01,
         2.0,
         3.0,
