@@ -7,6 +7,7 @@ use std::f64::consts::PI;
 
 pub struct Scene<T: TextureMap> {
     max_steps: usize,
+    max_radius_sq: f64,
     step_size: f64,
     center_sphere_radius: f64,
     center_disk_outer_radius: f64,
@@ -60,7 +61,7 @@ pub fn get_position(y: &EquationOfMotionState) -> FourVector {
     FourVector::new(y[0], y[1], y[2], y[3])
 }
 
-fn radial_distance_spatial_part(pos: &FourVector) -> f64 {
+fn radial_distance_spatial_part_squared(pos: &FourVector) -> f64 {
     let v = pos.get_as_vector();
     v[1] * v[1] + v[2] * v[2] + v[3] * v[3]
 }
@@ -114,6 +115,7 @@ impl TextureMap for CheckerMapper {
 impl<T: TextureMap> Scene<T> {
     pub fn new(
         max_steps: usize,
+        max_radius: f64,
         step_size: f64,
         center_sphere_radius: f64,
         center_disk_inner_radius: f64,
@@ -124,6 +126,7 @@ impl<T: TextureMap> Scene<T> {
     ) -> Scene<T> {
         Scene {
             max_steps,
+            max_radius_sq: max_radius * max_radius,
             step_size,
             center_sphere_radius,
             center_disk_outer_radius,
@@ -181,8 +184,8 @@ impl<T: TextureMap> Scene<T> {
     }
 
     fn intersects_with_sphere(&self, y_start: &FourVector, y_end: &FourVector) -> Option<Color> {
-        let r_start = radial_distance_spatial_part(&y_start);
-        let r_end = radial_distance_spatial_part(&y_end);
+        let r_start = radial_distance_spatial_part_squared(&y_start);
+        let r_end = radial_distance_spatial_part_squared(&y_end);
 
         if (r_start >= self.center_sphere_radius.powi(2)
             && r_end <= self.center_sphere_radius.powi(2))
@@ -231,10 +234,13 @@ impl<T: TextureMap> Scene<T> {
             }
 
             t += self.step_size;
+
+            // iterate until the celestial plane distance has been reached.
+            if radial_distance_spatial_part_squared(&get_position(&y)) > 10.0 * 10.0 {
+                break;
+            }
         }
 
-        // TODO: Fix: this only works if the photons are at the same place. Otherwise this does not
-        // account for different directions.
         let point_on_celestial_sphere = get_position(&y).get_as_spherical();
         let u = (PI + point_on_celestial_sphere[2]) / (2.0 * PI);
         let v = point_on_celestial_sphere[1] / PI;
@@ -293,7 +299,7 @@ mod tests {
         let ray = camera.get_ray_for(43, 51);
         let color = scene.color_of_ray(&ray);
 
-        assert_eq!(color, Color::new(0, 0, 255));
+        assert_eq!(color, Color::new(0, 100, 0));
     }
 
     fn create_scene(
@@ -308,7 +314,8 @@ mod tests {
         let texture_mapper_sphere =
             CheckerMapper::new(10.0, 10.0, Color::new(255, 0, 0), Color::new(100, 0, 0));
         let scene = Scene::new(
-            1000,
+            10000,
+            10.0,
             0.01,
             center_sphere_radius,
             center_disk_inner_radius,
