@@ -185,7 +185,20 @@ impl Scene {
 
             t += self.step_size;
         }
-        Color::new(0, 0, 0)
+
+        let point_on_celestial_sphere = get_position(&y).get_as_spherical();
+        let u = (PI + point_on_celestial_sphere[2]) / (2.0 * PI);
+        let v = point_on_celestial_sphere[1] / PI;
+
+        let color = checker_color(
+            u,
+            v,
+            100.0,
+            100.0,
+            Color::new(0, 255, 0),
+            Color::new(0, 100, 0),
+        );
+        color
     }
 }
 
@@ -224,7 +237,7 @@ mod tests {
 
         let color = scene.color_of_ray(&ray);
 
-        assert_eq!(color, Color::new(0, 0, 0));
+        assert_eq!(color, Color::new(0, 100, 0));
     }
 
     #[test]
