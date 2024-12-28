@@ -78,7 +78,7 @@ impl Scene {
     // here. See with current test setup. Intersection should be at t=7.63. With z=-2.442748091.
     // The intersection should be with an interval crossing y=0. But it seems to happen near 0 with
     // both coordinates.
-    fn intersects_with_disk(&self, y_start: &FourVector, y_end: &FourVector) -> bool {
+    fn intersects_with_disk(&self, y_start: &FourVector, y_end: &FourVector) -> Option<Color> {
         // z x y
         let normal = Vector3::new(0.0, 0.0, 1.0);
         let center = Vector3::new(0.0, 0.0, 0.0);
@@ -93,7 +93,7 @@ impl Scene {
         let t = p1[0] / p2[0]; // plane intersection parameter.
 
         if !(t >= 0.0 && t <= 1.0) {
-            return false;
+            return None;
         }
 
         let intersection_point = y_start_spacial + t * direction;
@@ -101,8 +101,29 @@ impl Scene {
             + intersection_point[1] * intersection_point[1]
             + intersection_point[2] * intersection_point[2];
 
-        rr >= self.center_disk_inner_radius * self.center_disk_inner_radius
+        if rr >= self.center_disk_inner_radius * self.center_disk_inner_radius
             && rr <= self.center_disk_outer_radius * self.center_disk_outer_radius
+        {
+            let vector_in_plane = intersection_point - center;
+
+            let phi = vector_in_plane[0].atan2(vector_in_plane[1]);
+            let r = vector_in_plane.dot(&vector_in_plane);
+
+            let u = (PI + phi) / (2.0 * PI);
+            let v = r / self.center_disk_outer_radius;
+
+            let color = checker_color(
+                u,
+                v,
+                200.0,
+                10.0,
+                Color::new(0, 0, 255),
+                Color::new(0, 0, 100),
+            );
+            Some(color)
+        } else {
+            None
+        }
     }
 
     fn intersects_with_sphere(&self, y_start: &FourVector, y_end: &FourVector) -> Option<Color> {
@@ -152,8 +173,9 @@ impl Scene {
             let last_y = y;
             y = rk4(&y, t, self.step_size, geodesic);
 
-            if self.intersects_with_disk(&get_position(&last_y), &get_position(&y)) {
-                return Color::new(0, 0, 255);
+            match self.intersects_with_disk(&get_position(&last_y), &get_position(&y)) {
+                None => {}
+                Some(c) => return c,
             }
 
             match self.intersects_with_sphere(&get_position(&last_y), &get_position(&y)) {
