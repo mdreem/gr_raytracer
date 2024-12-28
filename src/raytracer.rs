@@ -14,7 +14,7 @@ pub struct Raytracer<T: TextureMap> {
 impl<T: TextureMap> Raytracer<T> {
     pub fn new(image_width: i64, image_height: i64, scene: Scene<T>) -> Self {
         let camera = Camera::new(
-            Vector4::new(0.0, -7.0, 0.0, 0.8),
+            Vector4::new(0.0, 0.0, 0.8, -7.0),
             std::f64::consts::PI / 4.0,
             image_height,
             image_width,

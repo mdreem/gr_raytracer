@@ -32,28 +32,28 @@ impl Camera {
         }
     }
 
-    // vertical wrt. camera. -> x_2 = X
+    // vertical wrt. camera. -> x_1 = X
     fn tetrad_x(&self) -> FourVector {
+        // TODO Lorentz transform
+        // TODO rotate
+
+        FourVector::new(0.0, 1.0, 0.0, 0.0)
+    }
+
+    // horizontal wrt. camera. -> x_2 = Y
+    fn tetrad_y(&self) -> FourVector {
         // TODO Lorentz transform
         // TODO rotate
 
         FourVector::new(0.0, 0.0, 1.0, 0.0)
     }
 
-    // horizontal wrt. camera. -> x_3 = Y
-    fn tetrad_y(&self) -> FourVector {
-        // TODO Lorentz transform
-        // TODO rotate
-
-        FourVector::new(0.0, 0.0, 0.0, 1.0)
-    }
-
-    // away from camera. -> x_1 = Z
+    // away from camera. -> x_3 = Z
     fn tetrad_z(&self) -> FourVector {
         // TODO Lorentz transform
         // TODO rotate
 
-        FourVector::new(0.0, 1.0, 0.0, 0.0)
+        FourVector::new(0.0, 0.0, 0.0, 1.0)
     }
 
     // row, column range from 1..R, 1..C
@@ -85,7 +85,7 @@ mod tests {
     #[test]
     fn test_get_direction_for() {
         let camera = Camera::new(
-            Vector4::new(0.0, 0.0, 0.0, 1.0),
+            Vector4::new(0.0, 0.0, 1.0, 0.0),
             std::f64::consts::PI / 2.0,
             11,
             11,
@@ -101,28 +101,28 @@ mod tests {
         let corner_z = -0.24610591900311507;
         assert_abs_diff_eq!(
             top_left_corner.get_as_vector(),
-            Vector4::new(0.0, corner_z, corner, corner)
+            Vector4::new(0.0, corner, corner, corner_z)
         );
         assert_abs_diff_eq!(top_left_corner * top_left_corner, -1.0);
 
         assert_abs_diff_eq!(
             top_right_corner.get_as_vector(),
-            Vector4::new(0.0, corner_z, -corner, corner)
+            Vector4::new(0.0, -corner, corner, corner_z)
         );
         assert_abs_diff_eq!(top_right_corner * top_right_corner, -1.0);
 
-        assert_abs_diff_eq!(middle.get_as_vector(), Vector4::new(0.0, 1.0, 0.0, 0.0));
+        assert_abs_diff_eq!(middle.get_as_vector(), Vector4::new(0.0, 0.0, 0.0, 1.0));
         assert_abs_diff_eq!(middle * middle, -1.0);
 
         assert_abs_diff_eq!(
             bottom_left_corner.get_as_vector(),
-            Vector4::new(0.0, corner_z, corner, -corner)
+            Vector4::new(0.0, corner, -corner, corner_z)
         );
         assert_abs_diff_eq!(bottom_left_corner * bottom_left_corner, -1.0);
 
         assert_abs_diff_eq!(
             bottom_right_corner.get_as_vector(),
-            Vector4::new(0.0, corner_z, -corner, -corner)
+            Vector4::new(0.0, -corner, -corner, corner_z)
         );
         assert_abs_diff_eq!(bottom_right_corner * bottom_right_corner, -1.0);
     }
