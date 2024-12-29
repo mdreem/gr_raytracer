@@ -6,7 +6,7 @@ use rayon::iter::ParallelIterator;
 use std::sync::atomic::{AtomicUsize, Ordering};
 
 pub struct Raytracer<T: TextureMap, G: Geometry> {
-    camera: Camera,
+    camera: Camera<G>,
     scene: Scene<T, G>,
     image_width: i64,
     image_height: i64,
@@ -19,6 +19,7 @@ impl<T: TextureMap, G: Geometry> Raytracer<T, G> {
             std::f64::consts::PI / 4.0,
             image_height,
             image_width,
+            scene.geometry.clone(), // TODO see how geometry can be distributed to all needed places.
         );
 
         Self {
