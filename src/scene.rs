@@ -16,7 +16,7 @@ pub struct Scene<T: TextureMap, G: Geometry> {
     celestial_map: T,
     center_disk_map: T,
     center_sphere_map: T,
-    geometry: G,
+    pub geometry: G,
 }
 
 #[derive(Debug, PartialEq, Copy, Clone)]
@@ -259,6 +259,7 @@ mod tests {
             std::f64::consts::PI / 2.0,
             11,
             11,
+            EuclideanSpace::new(),
         );
         let scene = create_scene(2.0, 0.2, 0.3);
 
@@ -275,6 +276,7 @@ mod tests {
             std::f64::consts::PI / 2.0,
             11,
             11,
+            EuclideanSpace::new(),
         );
         let scene: Scene<CheckerMapper, EuclideanSpace> = create_scene(2.0, 0.2, 0.3);
 
@@ -291,6 +293,7 @@ mod tests {
             std::f64::consts::PI / 4.0,
             101,
             101,
+            EuclideanSpace::new(),
         );
         let scene: Scene<CheckerMapper, EuclideanSpace> = create_scene(1.0, 2.0, 7.0);
 
