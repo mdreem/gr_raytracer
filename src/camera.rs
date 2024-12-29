@@ -67,7 +67,7 @@ impl<G: Geometry> Camera<G> {
 #[cfg(test)]
 mod tests {
     use crate::camera::Camera;
-    use crate::geometry::EuclideanSpace;
+    use crate::euclidean::EuclideanSpace;
     use approx::assert_abs_diff_eq;
     use nalgebra::Vector4;
 
