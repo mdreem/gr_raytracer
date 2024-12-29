@@ -248,7 +248,7 @@ impl<T: TextureMap, G: Geometry> Scene<T, G> {
 #[cfg(test)]
 mod tests {
     use crate::camera::Camera;
-    use crate::geometry::EuclideanSpace;
+    use crate::euclidean::EuclideanSpace;
     use crate::scene::{CheckerMapper, Color, Scene};
     use nalgebra::Vector4;
 

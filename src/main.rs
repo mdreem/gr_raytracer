@@ -1,13 +1,14 @@
 use crate::scene::{Scene, TextureMapper};
 
 mod camera;
+mod euclidean;
 mod four_vector;
 mod geometry;
 mod raytracer;
 mod runge_kutta;
 mod scene;
 
-use crate::geometry::EuclideanSpace;
+use crate::euclidean::EuclideanSpace;
 use std::env;
 
 fn main() {
