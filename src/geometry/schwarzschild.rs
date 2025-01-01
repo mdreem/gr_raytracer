@@ -150,7 +150,7 @@ impl Geometry for Schwarzschild {
 mod test_schwarzschild {
     use crate::geometry::four_vector::FourVector;
     use crate::geometry::schwarzschild::Schwarzschild;
-    use crate::rendering::runge_kutta::{rk4, OdeFunction};
+    use crate::rendering::runge_kutta::{rkf45, OdeFunction};
     use nalgebra::{Const, OVector, Vector2, Vector4};
 
     pub fn get_angular_momentum_from_phi(
@@ -231,9 +231,10 @@ mod test_schwarzschild {
                 du_dphi: 0.0,
             }];
 
+            let mut h = step_size;
             for _ in 1..max_steps {
-                y = rk4(&y, t, step_size, self);
-                t += step_size;
+                (y, h) = rkf45(&y, t, step_size, 1e-5, self);
+                t += h;
 
                 result.push(Step {
                     phi: t,

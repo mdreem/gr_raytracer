@@ -1,7 +1,7 @@
 use crate::geometry::geometry::Geometry;
 use crate::rendering::integrator::StopReason::{CelestialSphereReached, HorizonReached};
 use crate::rendering::ray::{IntegratedRay, Ray};
-use crate::rendering::runge_kutta::rk4;
+use crate::rendering::runge_kutta::rkf45;
 use crate::rendering::scene::{get_position, EquationOfMotionState};
 use nalgebra::Vector4;
 
@@ -98,6 +98,7 @@ impl<G: Geometry> Integrator<'_, G> {
             self.integration_configuration.max_steps * 100
         };
 
+        let mut h = self.integration_configuration.step_size;
         for i in 1..max_steps {
             let last_y = y;
 
@@ -111,8 +112,8 @@ impl<G: Geometry> Integrator<'_, G> {
                 self.integration_configuration.step_size / 100.0
             };
 
-            y = rk4(&y, t, step_size, self.geometry);
-            t += self.integration_configuration.step_size;
+            (y, h) = rkf45(&y, t, h, 1e-6, self.geometry);
+            t += h;
 
             match self.should_stop(&last_y, &y) {
                 None => {}
@@ -130,14 +131,6 @@ impl<G: Geometry> Integrator<'_, G> {
         last_y: &EquationOfMotionState,
         cur_y: &EquationOfMotionState,
     ) -> Option<StopReason> {
-        // Check if there is a big jump. This happens when crossing the horizon and is a
-        // heuristic here to mark this ray as entering the black hole.
-        // TODO: find a better way.
-        let position_jump = get_position(&(last_y - cur_y), self.geometry.coordinate_system());
-        if position_jump.get_spatial_vector().norm() > 1.0 {
-            return Some(HorizonReached);
-        }
-
         if self
             .geometry
             .inside_horizon(&Vector4::new(cur_y[0], cur_y[1], cur_y[2], cur_y[3]))
@@ -161,20 +154,19 @@ impl<G: Geometry> Integrator<'_, G> {
         y: EquationOfMotionState,
         t: f64,
     ) -> EquationOfMotionState {
-        let step_size = self
-            .integration_configuration
-            .step_size_celestial_continuation;
-
         let mut y_cur = y;
         let mut t_cur = t;
+        let mut h = self
+            .integration_configuration
+            .step_size_celestial_continuation;
 
         // integrate further until we are far out.
         for _ in 1..self
             .integration_configuration
             .max_steps_celestial_continuation
         {
-            y_cur = rk4(&y_cur, t_cur, step_size, self.geometry);
-            t_cur += step_size;
+            (y_cur, h) = rkf45(&y, t, h, 1e-6, self.geometry);
+            t_cur += h;
 
             if get_position(&y_cur, self.geometry.coordinate_system())
                 .radial_distance_spatial_part_squared()
