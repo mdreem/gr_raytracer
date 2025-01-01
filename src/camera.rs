@@ -26,6 +26,7 @@ pub struct Camera<G: Geometry> {
 }
 
 impl<G: Geometry> Camera<G> {
+    // Position is given in cartesian coordinates.
     pub fn new(
         position: Vector4<f64>,
         alpha: f64,
@@ -68,14 +69,16 @@ impl<G: Geometry> Camera<G> {
 mod tests {
     use crate::camera::Camera;
     use crate::euclidean::EuclideanSpace;
+
     use approx::assert_abs_diff_eq;
     use nalgebra::Vector4;
+    use std::f64::consts::PI;
 
     #[test]
     fn test_get_direction_for() {
         let camera = Camera::new(
             Vector4::new(0.0, 0.0, 1.0, 0.0),
-            std::f64::consts::PI / 2.0,
+            PI / 2.0,
             11,
             11,
             EuclideanSpace::new(),

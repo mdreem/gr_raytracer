@@ -1,5 +1,6 @@
-use crate::four_vector::FourVector;
-use crate::geometry::{Geometry, Tetrad};
+use crate::four_vector::CoordinateSystem::Cartesian;
+use crate::four_vector::{CoordinateSystem, FourVector};
+use crate::geometry::{Geometry, HasCoordinateSystem, Tetrad};
 use crate::runge_kutta::OdeFunction;
 use crate::scene::EquationOfMotionState;
 use nalgebra::{Const, OVector, Vector4};
@@ -20,6 +21,12 @@ impl OdeFunction<Const<8>> for EuclideanSpace {
     }
 }
 
+impl HasCoordinateSystem for EuclideanSpace {
+    fn coordinate_system(&self) -> CoordinateSystem {
+        Cartesian
+    }
+}
+
 impl Geometry for EuclideanSpace {
     fn geodesic(&self, _: f64, y: &EquationOfMotionState) -> EquationOfMotionState {
         let y_new =
@@ -32,9 +39,9 @@ impl Geometry for EuclideanSpace {
     fn get_tetrad_at(&self, position: &Vector4<f64>) -> Tetrad {
         Tetrad::new(
             position.clone(),
-            FourVector::new(0.0, 1.0, 0.0, 0.0),
-            FourVector::new(0.0, 0.0, 1.0, 0.0),
-            FourVector::new(0.0, 0.0, 0.0, 1.0),
+            FourVector::new_cartesian(0.0, 1.0, 0.0, 0.0),
+            FourVector::new_cartesian(0.0, 0.0, 1.0, 0.0),
+            FourVector::new_cartesian(0.0, 0.0, 0.0, 1.0),
         )
     }
 }

@@ -1,9 +1,10 @@
 use crate::camera::Ray;
-use crate::four_vector::FourVector;
+use crate::four_vector::{CoordinateSystem, FourVector};
 use crate::geometry::Geometry;
 use crate::runge_kutta::rk4;
+use crate::spherical_coordinates_helper::spherical_to_cartesian;
 use image::{DynamicImage, GenericImageView, ImageReader};
-use nalgebra::{Const, OVector, Vector3};
+use nalgebra::{Const, OVector, Vector3, Vector4};
 use std::f64::consts::PI;
 
 pub struct Scene<T: TextureMap, G: Geometry> {
@@ -53,8 +54,15 @@ impl Color {
 
 pub type EquationOfMotionState = OVector<f64, Const<8>>;
 
-pub fn get_position(y: &EquationOfMotionState) -> FourVector {
-    FourVector::new(y[0], y[1], y[2], y[3])
+// TODO: replace this with a more natural function, that does not need to use cartesian coordinates.
+pub fn get_position(y: &EquationOfMotionState, coordinate_system: CoordinateSystem) -> FourVector {
+    match coordinate_system {
+        CoordinateSystem::Cartesian => FourVector::new_cartesian(y[0], y[1], y[2], y[3]),
+        CoordinateSystem::Spherical => {
+            let t_vec = spherical_to_cartesian(&Vector4::new(y[0], y[1], y[2], y[3]));
+            FourVector::new_cartesian(0.0, t_vec[0], t_vec[1], t_vec[2]) // TODO: try to do all of this without this conversion.
+        }
+    }
 }
 
 fn radial_distance_spatial_part_squared(pos: &FourVector) -> f64 {
@@ -180,6 +188,7 @@ impl<T: TextureMap, G: Geometry> Scene<T, G> {
         }
     }
 
+    // TODO: handle spherical coordinates here!
     fn intersects_with_sphere(&self, y_start: &FourVector, y_end: &FourVector) -> Option<Color> {
         let r_start = radial_distance_spatial_part_squared(&y_start);
         let r_end = radial_distance_spatial_part_squared(&y_end);
@@ -220,12 +229,18 @@ impl<T: TextureMap, G: Geometry> Scene<T, G> {
             let last_y = y;
             y = rk4(&y, t, self.step_size, &self.geometry);
 
-            match self.intersects_with_disk(&get_position(&last_y), &get_position(&y)) {
+            match self.intersects_with_disk(
+                &get_position(&last_y, self.geometry.coordinate_system()),
+                &get_position(&y, self.geometry.coordinate_system()),
+            ) {
                 None => {}
                 Some(c) => return c,
             }
 
-            match self.intersects_with_sphere(&get_position(&last_y), &get_position(&y)) {
+            match self.intersects_with_sphere(
+                &get_position(&last_y, self.geometry.coordinate_system()),
+                &get_position(&y, self.geometry.coordinate_system()),
+            ) {
                 None => {}
                 Some(c) => return c,
             }
@@ -233,12 +248,17 @@ impl<T: TextureMap, G: Geometry> Scene<T, G> {
             t += self.step_size;
 
             // iterate until the celestial plane distance has been reached.
-            if radial_distance_spatial_part_squared(&get_position(&y)) > self.max_radius_sq {
+            if radial_distance_spatial_part_squared(&get_position(
+                &y,
+                self.geometry.coordinate_system(),
+            )) > self.max_radius_sq
+            {
                 break;
             }
         }
 
-        let point_on_celestial_sphere = get_position(&y).get_as_spherical();
+        let point_on_celestial_sphere =
+            get_position(&y, self.geometry.coordinate_system()).get_as_spherical();
         let u = (PI + point_on_celestial_sphere[2]) / (2.0 * PI);
         let v = point_on_celestial_sphere[1] / PI;
         self.celestial_map.color_at_uv(u, v)
@@ -249,7 +269,10 @@ impl<T: TextureMap, G: Geometry> Scene<T, G> {
 mod tests {
     use crate::camera::Camera;
     use crate::euclidean::EuclideanSpace;
+    use crate::euclidean_spherical::EuclideanSpaceSpherical;
+    use crate::geometry::Geometry;
     use crate::scene::{CheckerMapper, Color, Scene};
+    use crate::spherical_coordinates_helper::cartesian_to_spherical;
     use nalgebra::Vector4;
 
     #[test]
@@ -261,7 +284,30 @@ mod tests {
             11,
             EuclideanSpace::new(),
         );
-        let scene = create_scene(2.0, 0.2, 0.3);
+        let scene = create_scene(2.0, 0.2, 0.3, EuclideanSpace::new());
+
+        let ray = camera.get_ray_for(6, 6);
+        let color = scene.color_of_ray(&ray);
+
+        assert_eq!(color, Color::new(100, 0, 0));
+    }
+
+    #[test]
+    fn test_color_of_ray_hits_sphere_spherical() {
+        let spatial_position = cartesian_to_spherical(&Vector4::new(0.0, 0.0, 0.0, -10.0));
+        let camera = Camera::new(
+            Vector4::new(
+                0.0,
+                spatial_position[0],
+                spatial_position[1],
+                spatial_position[2],
+            ),
+            std::f64::consts::PI / 2.0,
+            11,
+            11,
+            EuclideanSpaceSpherical::new(),
+        );
+        let scene = create_scene(2.0, 0.2, 0.3, EuclideanSpaceSpherical::new());
 
         let ray = camera.get_ray_for(6, 6);
         let color = scene.color_of_ray(&ray);
@@ -278,36 +324,39 @@ mod tests {
             11,
             EuclideanSpace::new(),
         );
-        let scene: Scene<CheckerMapper, EuclideanSpace> = create_scene(2.0, 0.2, 0.3);
+        let scene: Scene<CheckerMapper, EuclideanSpace> =
+            create_scene(2.0, 0.2, 0.3, EuclideanSpace::new());
 
         let ray = camera.get_ray_for(0, 0);
         let color = scene.color_of_ray(&ray);
 
-        assert_eq!(color, Color::new(0, 100, 0));
+        assert_eq!(color, Color::new(0, 255, 0));
     }
 
     #[test]
     fn test_intersects_with_disk() {
         let camera = Camera::new(
-            Vector4::new(0.0, 0.0, 1.0, -10.0),
+            Vector4::new(0.0, 0.0, 0.8, -7.0),
             std::f64::consts::PI / 4.0,
             101,
             101,
             EuclideanSpace::new(),
         );
-        let scene: Scene<CheckerMapper, EuclideanSpace> = create_scene(1.0, 2.0, 7.0);
+        let scene: Scene<CheckerMapper, EuclideanSpace> =
+            create_scene(1.0, 2.0, 7.0, EuclideanSpace::new());
 
-        let ray = camera.get_ray_for(43, 51);
+        let ray = camera.get_ray_for(0, 51);
         let color = scene.color_of_ray(&ray);
 
-        assert_eq!(color, Color::new(0, 100, 0));
+        assert_eq!(color, Color::new(0, 0, 255));
     }
 
-    fn create_scene(
+    fn create_scene<G: Geometry>(
         center_sphere_radius: f64,
         center_disk_inner_radius: f64,
         center_disk_outer_radius: f64,
-    ) -> Scene<CheckerMapper, EuclideanSpace> {
+        geometry: G,
+    ) -> Scene<CheckerMapper, G> {
         let texture_mapper_celestial =
             CheckerMapper::new(100.0, 100.0, Color::new(0, 255, 0), Color::new(0, 100, 0));
         let texture_mapper_disk =
@@ -324,7 +373,7 @@ mod tests {
             texture_mapper_celestial,
             texture_mapper_disk,
             texture_mapper_sphere,
-            EuclideanSpace::new(),
+            geometry,
         );
         scene
     }
