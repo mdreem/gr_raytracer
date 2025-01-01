@@ -1,4 +1,5 @@
 use crate::four_vector::FourVector;
+use crate::geometry::{Geometry, Tetrad};
 use nalgebra::Vector4;
 
 #[derive(Debug)]
@@ -15,45 +16,33 @@ impl Ray {
     }
 }
 
-pub struct Camera {
+pub struct Camera<G: Geometry> {
     alpha: f64,
     rows: i64,
     columns: i64,
     position: Vector4<f64>,
+    geometry: G,
+    tetrad: Tetrad,
 }
 
-impl Camera {
-    pub fn new(position: Vector4<f64>, alpha: f64, rows: i64, columns: i64) -> Camera {
+impl<G: Geometry> Camera<G> {
+    // Position is given in cartesian coordinates.
+    pub fn new(
+        position: Vector4<f64>,
+        alpha: f64,
+        rows: i64,
+        columns: i64,
+        geometry: G,
+    ) -> Camera<G> {
+        let tetrad = geometry.get_tetrad_at(&position);
         Self {
             position,
             alpha,
             rows,
             columns,
+            geometry,
+            tetrad,
         }
-    }
-
-    // vertical wrt. camera. -> x_1 = X
-    fn tetrad_x(&self) -> FourVector {
-        // TODO Lorentz transform
-        // TODO rotate
-
-        FourVector::new(0.0, 1.0, 0.0, 0.0)
-    }
-
-    // horizontal wrt. camera. -> x_2 = Y
-    fn tetrad_y(&self) -> FourVector {
-        // TODO Lorentz transform
-        // TODO rotate
-
-        FourVector::new(0.0, 0.0, 1.0, 0.0)
-    }
-
-    // away from camera. -> x_3 = Z
-    fn tetrad_z(&self) -> FourVector {
-        // TODO Lorentz transform
-        // TODO rotate
-
-        FourVector::new(0.0, 0.0, 0.0, 1.0)
     }
 
     // row, column range from 1..R, 1..C
@@ -63,10 +52,10 @@ impl Camera {
         let j_prime = (2.0 * f64::tan(self.alpha / 2.0) / (self.rows as f64))
             * (row as f64 - (self.rows as f64 + 1.0) / 2.0);
 
-        let w = self.tetrad_z() + i_prime * self.tetrad_x() + j_prime * self.tetrad_y();
+        let w = self.tetrad.z + i_prime * self.tetrad.x + j_prime * self.tetrad.y;
         let w_squared = -1.0 - i_prime * i_prime - j_prime * j_prime;
 
-        -self.tetrad_z() + 2.0 * w / (-w_squared)
+        -self.tetrad.z + 2.0 * w / (-w_squared)
     }
 
     // row, column range from 1..R, 1..C
@@ -79,16 +68,20 @@ impl Camera {
 #[cfg(test)]
 mod tests {
     use crate::camera::Camera;
+    use crate::euclidean::EuclideanSpace;
+
     use approx::assert_abs_diff_eq;
     use nalgebra::Vector4;
+    use std::f64::consts::PI;
 
     #[test]
     fn test_get_direction_for() {
         let camera = Camera::new(
             Vector4::new(0.0, 0.0, 1.0, 0.0),
-            std::f64::consts::PI / 2.0,
+            PI / 2.0,
             11,
             11,
+            EuclideanSpace::new(),
         );
 
         let top_left_corner = camera.get_direction_for(1, 1);
