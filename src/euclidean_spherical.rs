@@ -1,0 +1,69 @@
+use crate::four_vector::CoordinateSystem::Spherical;
+use crate::four_vector::{CoordinateSystem, FourVector};
+use crate::geometry::{Geometry, HasCoordinateSystem, Tetrad};
+use crate::runge_kutta::OdeFunction;
+use crate::scene::EquationOfMotionState;
+use nalgebra::{Const, OVector, Vector4};
+
+#[derive(Clone)]
+pub struct EuclideanSpaceSpherical {}
+
+impl EuclideanSpaceSpherical {
+    pub fn new() -> Self {
+        EuclideanSpaceSpherical {}
+    }
+}
+
+impl OdeFunction<Const<8>> for EuclideanSpaceSpherical {
+    // TODO: maybe just have geodesic being used in solver. This doesn't need to be that generic here.
+    fn apply(&self, t: f64, y: &OVector<f64, Const<8>>) -> OVector<f64, Const<8>> {
+        self.geodesic(t, y)
+    }
+}
+
+impl HasCoordinateSystem for EuclideanSpaceSpherical {
+    fn coordinate_system(&self) -> CoordinateSystem {
+        Spherical
+    }
+}
+
+impl Geometry for EuclideanSpaceSpherical {
+    fn geodesic(&self, _: f64, y: &EquationOfMotionState) -> EquationOfMotionState {
+        let _t = y[0];
+        let r = y[1];
+        let theta = y[2];
+        let _phi = y[3];
+
+        let v_t = y[4];
+        let v_r = y[5];
+        let v_theta = y[6];
+        let v_phi = y[7];
+
+        // acceleration
+        let a_t = 0.0;
+        let a_r = r * (v_theta * v_theta + v_phi * v_phi * theta.sin() * theta.sin());
+        let a_theta = -(2.0 / r) * v_r * v_theta + theta.sin() * theta.cos() * v_phi * v_phi;
+        let a_phi = -(2.0 / r) * v_phi * v_r - 2.0 * theta.cos() / theta.sin() * v_theta * v_phi;
+
+        // y'
+        let y_new = EquationOfMotionState::from_column_slice(&[
+            v_t, v_r, v_theta, v_phi, a_t, a_r, a_theta, a_phi,
+        ]);
+        y_new
+    }
+
+    // TODO: take into account Lorentz transformations.
+    // TODO: take into account rotations.
+    fn get_tetrad_at(&self, position: &Vector4<f64>) -> Tetrad {
+        let r = position[1];
+        let theta = position[2];
+        let _phi = position[3];
+
+        Tetrad::new(
+            position.clone(),
+            FourVector::new_spherical(0.0, 0.0, 0.0, 1.0 / (r * theta.sin())), // Phi
+            -FourVector::new_spherical(0.0, 0.0, 1.0 / r, 0.0),                // Theta
+            -FourVector::new_spherical(0.0, 1.0, 0.0, 0.0),                    // R
+        )
+    }
+}
