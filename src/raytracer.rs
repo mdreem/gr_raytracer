@@ -3,6 +3,7 @@ use crate::geometry::Geometry;
 use crate::scene::{Scene, TextureMap};
 use nalgebra::Vector4;
 use rayon::iter::ParallelIterator;
+use std::f64::consts::PI;
 use std::sync::atomic::{AtomicUsize, Ordering};
 
 pub struct Raytracer<T: TextureMap, G: Geometry> {
@@ -13,10 +14,15 @@ pub struct Raytracer<T: TextureMap, G: Geometry> {
 }
 
 impl<T: TextureMap, G: Geometry> Raytracer<T, G> {
-    pub fn new(image_width: i64, image_height: i64, scene: Scene<T, G>) -> Self {
+    pub fn new(
+        image_width: i64,
+        image_height: i64,
+        camera_position: Vector4<f64>,
+        scene: Scene<T, G>,
+    ) -> Self {
         let camera = Camera::new(
-            Vector4::new(0.0, 0.0, 0.8, -7.0),
-            std::f64::consts::PI / 4.0,
+            camera_position,
+            PI / 4.0,
             image_height,
             image_width,
             scene.geometry.clone(), // TODO see how geometry can be distributed to all needed places.
