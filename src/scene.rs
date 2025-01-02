@@ -7,6 +7,8 @@ use crate::spherical_coordinates_helper::spherical_to_cartesian;
 use image::{DynamicImage, GenericImageView, ImageReader};
 use nalgebra::{Const, OVector, Vector3, Vector4};
 use std::f64::consts::PI;
+use std::fs::File;
+use std::io::Write;
 
 pub struct Scene<T: TextureMap, G: Geometry> {
     max_steps: usize,
@@ -19,6 +21,7 @@ pub struct Scene<T: TextureMap, G: Geometry> {
     center_disk_map: T,
     center_sphere_map: T,
     pub geometry: G,
+    save_ray_data: bool,
 }
 
 #[derive(Debug)]
@@ -141,6 +144,7 @@ impl<T: TextureMap, G: Geometry> Scene<T, G> {
         center_disk_map: T,
         center_sphere_map: T,
         geometry: G,
+        save_ray_data: bool,
     ) -> Scene<T, G> {
         Scene {
             max_steps,
@@ -153,6 +157,7 @@ impl<T: TextureMap, G: Geometry> Scene<T, G> {
             center_disk_map,
             center_sphere_map,
             geometry,
+            save_ray_data,
         }
     }
 
@@ -281,9 +286,36 @@ impl<T: TextureMap, G: Geometry> Scene<T, G> {
         (result, None)
     }
 
+    fn save_steps(&self, steps: &Vec<Step>, filename: String) {
+        let mut file = File::create(filename).expect("Unable to create file");
+
+        file.write_all(b"i,t,tau,x,y,z\n")
+            .expect("Unable to write file");
+
+        for step in steps {
+            let position = get_position(&step.y, self.geometry.coordinate_system()).get_as_vector();
+
+            file.write_all(
+                format!(
+                    "{},{},{},{},{},{}\n",
+                    step.step, step.t, position[0], position[1], position[2], position[3]
+                )
+                .as_bytes(),
+            )
+            .expect("Unable to write file");
+        }
+    }
+
     pub fn color_of_ray(&self, ray: &Ray) -> Color {
         let (steps, stop_reason) = self.integrate(&ray);
         let mut y = steps[0].y;
+
+        if self.save_ray_data {
+            self.save_steps(
+                &steps,
+                String::from(format!("ray-{}-{}.csv", ray.row, ray.col)),
+            );
+        }
 
         for step in steps.iter().skip(1) {
             let last_y = y;
@@ -511,6 +543,7 @@ mod tests {
             texture_mapper_disk,
             texture_mapper_sphere,
             geometry,
+            false,
         );
         scene
     }

@@ -36,6 +36,13 @@ impl<T: TextureMap, G: Geometry> Raytracer<T, G> {
         }
     }
 
+    pub fn render_ray_at(&self, row: i64, col: i64) {
+        let ray = self.camera.get_ray_for(row, col);
+        println!("ray: {:?}", ray);
+        let color = self.scene.color_of_ray(&ray);
+        println!("color: {:?}", color);
+    }
+
     pub fn render(&self) {
         let mut imgbuf = image::ImageBuffer::new(self.image_width as u32, self.image_width as u32);
         // TODO: maybe change image width and height types to align through the codebase

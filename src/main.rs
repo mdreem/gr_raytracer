@@ -33,6 +33,7 @@ fn render_euclidean() {
         texture_mapper_disk,
         texture_mapper_sphere,
         EuclideanSpace::new(),
+        false,
     );
     let camera_position = Vector4::new(0.0, 0.0, 0.8, -7.0);
     let raytracer = raytracer::Raytracer::new(500, 500, camera_position, scene);
@@ -55,6 +56,7 @@ fn render_euclidean_spherical() {
         texture_mapper_disk,
         texture_mapper_sphere,
         EuclideanSpaceSpherical::new(),
+        false,
     );
     let camera_position_spatial = cartesian_to_spherical(&Vector4::new(0.0, 0.0, 0.8, -7.0));
     let camera_position = Vector4::new(
@@ -83,6 +85,7 @@ fn render_schwarzschild() {
         texture_mapper_disk,
         texture_mapper_sphere,
         Schwarzschild::new(1.0),
+        false,
     );
     let camera_position_spatial = cartesian_to_spherical(&Vector4::new(0.0, 0.0, 0.8, -10.0));
     let camera_position = Vector4::new(
