@@ -14,6 +14,7 @@ mod spherical_coordinates_helper;
 
 use crate::euclidean::EuclideanSpace;
 use crate::euclidean_spherical::EuclideanSpaceSpherical;
+use crate::four_vector::FourVector;
 use crate::schwarzschild::Schwarzschild;
 use crate::spherical_coordinates_helper::cartesian_to_spherical;
 
@@ -36,7 +37,13 @@ fn render_euclidean() {
         false,
     );
     let camera_position = Vector4::new(0.0, 0.0, 0.8, -7.0);
-    let raytracer = raytracer::Raytracer::new(500, 500, camera_position, scene);
+    let raytracer = raytracer::Raytracer::new(
+        500,
+        500,
+        camera_position,
+        FourVector::new_cartesian(1.0, 0.0, 0.0, 0.0),
+        scene,
+    );
     raytracer.render();
 }
 
@@ -65,7 +72,13 @@ fn render_euclidean_spherical() {
         camera_position_spatial[1],
         camera_position_spatial[2],
     );
-    let raytracer = raytracer::Raytracer::new(500, 500, camera_position, scene);
+    let raytracer = raytracer::Raytracer::new(
+        500,
+        500,
+        camera_position,
+        FourVector::new_spherical(1.0, 0.0, 0.0, 0.0),
+        scene,
+    );
     raytracer.render();
 }
 
@@ -94,7 +107,13 @@ fn render_schwarzschild() {
         camera_position_spatial[1],
         camera_position_spatial[2],
     );
-    let raytracer = raytracer::Raytracer::new(500, 500, camera_position, scene);
+    let raytracer = raytracer::Raytracer::new(
+        500,
+        500,
+        camera_position,
+        FourVector::new_spherical(1.0, 0.0, 0.0, 0.0),
+        scene,
+    );
     raytracer.render();
 }
 
