@@ -229,12 +229,22 @@ impl<T: TextureMap, G: Geometry> Scene<T, G> {
             let last_y = y;
             y = rk4(&y, t, self.step_size, &self.geometry);
 
+            // Check if there is a big jump. This happens when crossing the horizon and is a
+            // heuristic here to mark this ray as entering the black hole.
+            // TODO: find a better way.
+            let position_jump = get_position(&(last_y - y), self.geometry.coordinate_system());
+            if position_jump.get_spatial_vector().norm() > 1.0 {
+                return Color::new(0, 0, 0);
+            }
+
             match self.intersects_with_disk(
                 &get_position(&last_y, self.geometry.coordinate_system()),
                 &get_position(&y, self.geometry.coordinate_system()),
             ) {
                 None => {}
-                Some(c) => return c,
+                Some(c) => {
+                    return c;
+                }
             }
 
             match self.intersects_with_sphere(
@@ -242,7 +252,9 @@ impl<T: TextureMap, G: Geometry> Scene<T, G> {
                 &get_position(&y, self.geometry.coordinate_system()),
             ) {
                 None => {}
-                Some(c) => return c,
+                Some(c) => {
+                    return c;
+                }
             }
 
             t += self.step_size;
@@ -253,15 +265,15 @@ impl<T: TextureMap, G: Geometry> Scene<T, G> {
                 self.geometry.coordinate_system(),
             )) > self.max_radius_sq
             {
-                break;
+                let point_on_celestial_sphere =
+                    get_position(&y, self.geometry.coordinate_system()).get_as_spherical();
+                let u = (PI + point_on_celestial_sphere[2]) / (2.0 * PI);
+                let v = point_on_celestial_sphere[1] / PI;
+                return self.celestial_map.color_at_uv(u, v);
             }
         }
 
-        let point_on_celestial_sphere =
-            get_position(&y, self.geometry.coordinate_system()).get_as_spherical();
-        let u = (PI + point_on_celestial_sphere[2]) / (2.0 * PI);
-        let v = point_on_celestial_sphere[1] / PI;
-        self.celestial_map.color_at_uv(u, v)
+        Color::new(0, 0, 0)
     }
 }
 
@@ -272,6 +284,7 @@ mod tests {
     use crate::euclidean_spherical::EuclideanSpaceSpherical;
     use crate::geometry::Geometry;
     use crate::scene::{CheckerMapper, Color, Scene};
+    use crate::schwarzschild::Schwarzschild;
     use crate::spherical_coordinates_helper::cartesian_to_spherical;
     use nalgebra::Vector4;
 
@@ -315,6 +328,30 @@ mod tests {
         assert_eq!(color, Color::new(100, 0, 0));
     }
 
+    // TODO: Euclidean -> Schwarzschild
+    #[test]
+    fn test_color_of_ray_hits_sphere_schwarzschild() {
+        let spatial_position = cartesian_to_spherical(&Vector4::new(0.0, 0.0, 0.0, -10.0));
+        let camera = Camera::new(
+            Vector4::new(
+                0.0,
+                spatial_position[0],
+                spatial_position[1],
+                spatial_position[2],
+            ),
+            std::f64::consts::PI / 2.0,
+            11,
+            11,
+            Schwarzschild::new(1.0),
+        );
+        let scene = create_scene(2.0, 0.2, 0.3, EuclideanSpaceSpherical::new());
+
+        let ray = camera.get_ray_for(6, 6);
+        let color = scene.color_of_ray(&ray);
+
+        assert_eq!(color, Color::new(100, 0, 0));
+    }
+
     #[test]
     fn test_color_of_ray_misses_sphere() {
         let camera = Camera::new(
@@ -330,7 +367,55 @@ mod tests {
         let ray = camera.get_ray_for(0, 0);
         let color = scene.color_of_ray(&ray);
 
+        assert_eq!(color, Color::new(0, 100, 0));
+    }
+
+    #[test]
+    fn test_color_of_ray_misses_sphere_schwarzschild() {
+        let spatial_position = cartesian_to_spherical(&Vector4::new(0.0, 0.0, 0.0, -10.0));
+
+        let camera = Camera::new(
+            Vector4::new(
+                0.0,
+                spatial_position[0],
+                spatial_position[1],
+                spatial_position[2],
+            ),
+            std::f64::consts::PI / 2.0,
+            11,
+            11,
+            Schwarzschild::new(2.0),
+        );
+        let scene = create_scene(2.0, 0.2, 0.3, Schwarzschild::new(2.0));
+
+        let ray = camera.get_ray_for(0, 0);
+        let color = scene.color_of_ray(&ray);
+
         assert_eq!(color, Color::new(0, 255, 0));
+    }
+
+    #[test]
+    fn test_color_of_ray_hits_horizon_schwarzschild() {
+        let spatial_position = cartesian_to_spherical(&Vector4::new(0.0, 0.0, 0.0, -10.0));
+
+        let camera = Camera::new(
+            Vector4::new(
+                0.0,
+                spatial_position[0],
+                spatial_position[1],
+                spatial_position[2],
+            ),
+            std::f64::consts::PI / 2.0,
+            11,
+            11,
+            Schwarzschild::new(2.0),
+        );
+        let scene = create_scene(2.0, 0.2, 0.3, Schwarzschild::new(2.0));
+
+        let ray = camera.get_ray_for(6, 6);
+        let color = scene.color_of_ray(&ray);
+
+        assert_eq!(color, Color::new(0, 0, 0));
     }
 
     #[test]
@@ -365,7 +450,7 @@ mod tests {
             CheckerMapper::new(10.0, 10.0, Color::new(255, 0, 0), Color::new(100, 0, 0));
         let scene = Scene::new(
             10000,
-            10.0,
+            15.0,
             0.01,
             center_sphere_radius,
             center_disk_inner_radius,
