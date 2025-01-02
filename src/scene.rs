@@ -2,6 +2,7 @@ use crate::camera::Ray;
 use crate::four_vector::{CoordinateSystem, FourVector};
 use crate::geometry::Geometry;
 use crate::runge_kutta::rk4;
+use crate::scene::StopReason::{CelestialSphereReached, HorizonReached};
 use crate::spherical_coordinates_helper::spherical_to_cartesian;
 use image::{DynamicImage, GenericImageView, ImageReader};
 use nalgebra::{Const, OVector, Vector3, Vector4};
@@ -18,6 +19,18 @@ pub struct Scene<T: TextureMap, G: Geometry> {
     center_disk_map: T,
     center_sphere_map: T,
     pub geometry: G,
+}
+
+#[derive(Debug)]
+struct Step {
+    y: EquationOfMotionState,
+    t: f64,
+    step: usize,
+}
+
+enum StopReason {
+    HorizonReached,
+    CelestialSphereReached,
 }
 
 #[derive(Debug, PartialEq, Copy, Clone)]
@@ -210,9 +223,33 @@ impl<T: TextureMap, G: Geometry> Scene<T, G> {
         None
     }
 
-    pub fn color_of_ray(&self, ray: &Ray) -> Color {
-        let mut t = 0.0;
+    fn should_stop(
+        &self,
+        last_y: &EquationOfMotionState,
+        cur_y: &EquationOfMotionState,
+    ) -> Option<StopReason> {
+        // Check if there is a big jump. This happens when crossing the horizon and is a
+        // heuristic here to mark this ray as entering the black hole.
+        // TODO: find a better way.
+        let position_jump = get_position(&(last_y - cur_y), self.geometry.coordinate_system());
+        if position_jump.get_spatial_vector().norm() > 1.0 {
+            return Some(HorizonReached);
+        }
 
+        // iterate until the celestial plane distance has been reached.
+        if radial_distance_spatial_part_squared(&get_position(
+            &cur_y,
+            self.geometry.coordinate_system(),
+        )) > self.max_radius_sq
+        {
+            return Some(CelestialSphereReached);
+        }
+
+        None
+    }
+
+    fn integrate(&self, ray: &Ray) -> (Vec<Step>, Option<StopReason>) {
+        let mut t = 0.0;
         let direction = ray.direction.get_as_vector();
         let mut y = EquationOfMotionState::from_column_slice(&[
             ray.position[0],
@@ -225,17 +262,32 @@ impl<T: TextureMap, G: Geometry> Scene<T, G> {
             direction[3],
         ]);
 
-        for _i in 0..self.max_steps {
+        let mut result: Vec<Step> = Vec::new();
+        result.push(Step { y, t, step: 0 });
+
+        for i in 1..self.max_steps {
             let last_y = y;
             y = rk4(&y, t, self.step_size, &self.geometry);
+            t += self.step_size;
 
-            // Check if there is a big jump. This happens when crossing the horizon and is a
-            // heuristic here to mark this ray as entering the black hole.
-            // TODO: find a better way.
-            let position_jump = get_position(&(last_y - y), self.geometry.coordinate_system());
-            if position_jump.get_spatial_vector().norm() > 1.0 {
-                return Color::new(0, 0, 0);
+            match self.should_stop(&last_y, &y) {
+                None => {}
+                Some(r) => return (result, Some(r)),
             }
+
+            result.push(Step { y, t, step: i });
+        }
+
+        (result, None)
+    }
+
+    pub fn color_of_ray(&self, ray: &Ray) -> Color {
+        let (steps, stop_reason) = self.integrate(&ray);
+        let mut y = steps[0].y;
+
+        for step in steps.iter().skip(1) {
+            let last_y = y;
+            y = step.y;
 
             match self.intersects_with_disk(
                 &get_position(&last_y, self.geometry.coordinate_system()),
@@ -256,23 +308,23 @@ impl<T: TextureMap, G: Geometry> Scene<T, G> {
                     return c;
                 }
             }
-
-            t += self.step_size;
-
-            // iterate until the celestial plane distance has been reached.
-            if radial_distance_spatial_part_squared(&get_position(
-                &y,
-                self.geometry.coordinate_system(),
-            )) > self.max_radius_sq
-            {
-                let point_on_celestial_sphere =
-                    get_position(&y, self.geometry.coordinate_system()).get_as_spherical();
-                let u = (PI + point_on_celestial_sphere[2]) / (2.0 * PI);
-                let v = point_on_celestial_sphere[1] / PI;
-                return self.celestial_map.color_at_uv(u, v);
-            }
         }
 
+        if let Some(reason) = stop_reason {
+            match reason {
+                HorizonReached => {
+                    return Color::new(0, 0, 0);
+                }
+                CelestialSphereReached => {
+                    let y = steps.last().unwrap().y;
+                    let point_on_celestial_sphere =
+                        get_position(&y, self.geometry.coordinate_system()).get_as_spherical();
+                    let u = (PI + point_on_celestial_sphere[2]) / (2.0 * PI);
+                    let v = point_on_celestial_sphere[1] / PI;
+                    return self.celestial_map.color_at_uv(u, v);
+                }
+            }
+        }
         Color::new(0, 0, 0)
     }
 }
