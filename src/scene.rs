@@ -366,6 +366,7 @@ mod tests {
     use crate::camera::Camera;
     use crate::euclidean::EuclideanSpace;
     use crate::euclidean_spherical::EuclideanSpaceSpherical;
+    use crate::four_vector::FourVector;
     use crate::geometry::Geometry;
     use crate::scene::{CheckerMapper, Color, Scene};
     use crate::schwarzschild::Schwarzschild;
@@ -376,6 +377,7 @@ mod tests {
     fn test_color_of_ray_hits_sphere() {
         let camera = Camera::new(
             Vector4::new(0.0, 0.0, 0.0, -10.0),
+            FourVector::new_cartesian(1.0, 0.0, 0.0, 0.0),
             std::f64::consts::PI / 2.0,
             11,
             11,
@@ -399,6 +401,7 @@ mod tests {
                 spatial_position[1],
                 spatial_position[2],
             ),
+            FourVector::new_spherical(1.0, 0.0, 0.0, 0.0),
             std::f64::consts::PI / 2.0,
             11,
             11,
@@ -412,7 +415,6 @@ mod tests {
         assert_eq!(color, Color::new(100, 0, 0));
     }
 
-    // TODO: Euclidean -> Schwarzschild
     #[test]
     fn test_color_of_ray_hits_sphere_schwarzschild() {
         let spatial_position = cartesian_to_spherical(&Vector4::new(0.0, 0.0, 0.0, -10.0));
@@ -423,6 +425,7 @@ mod tests {
                 spatial_position[1],
                 spatial_position[2],
             ),
+            FourVector::new_spherical(1.0, 0.0, 0.0, 0.0),
             std::f64::consts::PI / 2.0,
             11,
             11,
@@ -440,6 +443,7 @@ mod tests {
     fn test_color_of_ray_misses_sphere() {
         let camera = Camera::new(
             Vector4::new(0.0, 0.0, 0.0, -10.0),
+            FourVector::new_spherical(1.0, 0.0, 0.0, 0.0),
             std::f64::consts::PI / 2.0,
             11,
             11,
@@ -465,6 +469,7 @@ mod tests {
                 spatial_position[1],
                 spatial_position[2],
             ),
+            FourVector::new_spherical(1.0, 0.0, 0.0, 0.0),
             std::f64::consts::PI / 2.0,
             11,
             11,
@@ -489,6 +494,7 @@ mod tests {
                 spatial_position[1],
                 spatial_position[2],
             ),
+            FourVector::new_spherical(1.0, 0.0, 0.0, 0.0),
             std::f64::consts::PI / 2.0,
             11,
             11,
@@ -506,6 +512,7 @@ mod tests {
     fn test_intersects_with_disk() {
         let camera = Camera::new(
             Vector4::new(0.0, 0.0, 0.8, -7.0),
+            FourVector::new_cartesian(1.0, 0.0, 0.0, 0.0),
             std::f64::consts::PI / 4.0,
             101,
             101,

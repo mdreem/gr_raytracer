@@ -25,22 +25,52 @@ pub struct Camera<G: Geometry> {
     rows: i64,
     columns: i64,
     position: Vector4<f64>,
+    velocity: FourVector,
     geometry: G,
     tetrad: Tetrad,
+}
+
+fn lorentz_transform_tetrad<G: Geometry>(
+    geometry: &G,
+    tetrad: &Tetrad,
+    position: &Vector4<f64>,
+    velocity: &FourVector,
+) -> Tetrad {
+    let lorentz = geometry.lorentz_transformation(position, velocity);
+
+    println!("lorentz: {:?}", lorentz);
+
+    let t_vec = lorentz * tetrad.t.get_as_vector();
+    let x_vec = lorentz * tetrad.x.get_as_vector();
+    let y_vec = lorentz * tetrad.y.get_as_vector();
+    let z_vec = lorentz * tetrad.z.get_as_vector();
+
+    Tetrad::new(
+        position.clone(),
+        FourVector::new_cartesian(t_vec[0], t_vec[1], t_vec[2], t_vec[3]),
+        FourVector::new_cartesian(x_vec[0], x_vec[1], x_vec[2], x_vec[3]),
+        FourVector::new_cartesian(y_vec[0], y_vec[1], y_vec[2], y_vec[3]),
+        FourVector::new_cartesian(z_vec[0], z_vec[1], z_vec[2], z_vec[3]),
+    )
 }
 
 impl<G: Geometry> Camera<G> {
     // Position is given in cartesian coordinates.
     pub fn new(
         position: Vector4<f64>,
+        velocity: FourVector,
         alpha: f64,
         rows: i64,
         columns: i64,
         geometry: G,
     ) -> Camera<G> {
-        let tetrad = geometry.get_tetrad_at(&position);
+        let original_tetrad = geometry.get_tetrad_at(&position);
+        println!("original_tetrad: {:?}", original_tetrad);
+        let tetrad = lorentz_transform_tetrad(&geometry, &original_tetrad, &position, &velocity);
+        println!("tetrad: {:?}", tetrad);
         Self {
             position,
+            velocity,
             alpha,
             rows,
             columns,
@@ -74,6 +104,7 @@ mod tests {
     use crate::camera::Camera;
     use crate::euclidean::EuclideanSpace;
 
+    use crate::four_vector::FourVector;
     use approx::assert_abs_diff_eq;
     use nalgebra::Vector4;
     use std::f64::consts::PI;
@@ -82,6 +113,7 @@ mod tests {
     fn test_get_direction_for() {
         let camera = Camera::new(
             Vector4::new(0.0, 0.0, 1.0, 0.0),
+            FourVector::new_cartesian(1.0, 0.0, 0.0, 0.0),
             PI / 2.0,
             11,
             11,

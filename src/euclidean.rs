@@ -3,7 +3,7 @@ use crate::four_vector::{CoordinateSystem, FourVector};
 use crate::geometry::{Geometry, HasCoordinateSystem, Tetrad};
 use crate::runge_kutta::OdeFunction;
 use crate::scene::EquationOfMotionState;
-use nalgebra::{Const, OVector, Vector4};
+use nalgebra::{Const, Matrix4, OVector, Vector4};
 
 #[derive(Clone)]
 pub struct EuclideanSpace {}
@@ -39,9 +39,52 @@ impl Geometry for EuclideanSpace {
     fn get_tetrad_at(&self, position: &Vector4<f64>) -> Tetrad {
         Tetrad::new(
             position.clone(),
+            FourVector::new_cartesian(1.0, 0.0, 0.0, 0.0),
             FourVector::new_cartesian(0.0, 1.0, 0.0, 0.0),
             FourVector::new_cartesian(0.0, 0.0, 1.0, 0.0),
             FourVector::new_cartesian(0.0, 0.0, 0.0, 1.0),
         )
+    }
+
+    fn lorentz_transformation(
+        &self,
+        position: &Vector4<f64>,
+        t_velocity: &FourVector,
+    ) -> Matrix4<f64> {
+        let t_tetrad = self.get_tetrad_at(position).t.get_as_vector();
+
+        let velocity = t_velocity.get_as_vector(); // TODO: add indexing to FourVector.
+        let gamma = t_tetrad[0] * velocity[0]
+            - t_tetrad[1] * velocity[1]
+            - t_tetrad[2] * velocity[2]
+            - t_tetrad[3] * velocity[3];
+
+        let mut matrix = Matrix4::zeros();
+
+        for i in 0..4 {
+            for j in 0..4 {
+                let mut res = 0.0;
+                if i == j {
+                    res = 1.0;
+                }
+
+                let g;
+                if j == 0 {
+                    g = 1.0;
+                } else {
+                    g = -1.0;
+                }
+
+                let a = -1.0 / (1.0 + gamma);
+                let b = t_tetrad[i] + velocity[i];
+                let c = g * (t_tetrad[j] + velocity[j]);
+                res += a * b * c;
+
+                res += 2.0 * g * t_tetrad[i] * velocity[j];
+
+                matrix[(i, j)] = res;
+            }
+        }
+        matrix
     }
 }
