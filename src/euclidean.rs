@@ -34,7 +34,6 @@ impl Geometry for EuclideanSpace {
         y_new
     }
 
-    // TODO: take into account Lorentz transformations.
     // TODO: take into account rotations.
     fn get_tetrad_at(&self, position: &Vector4<f64>) -> Tetrad {
         Tetrad::new(
@@ -86,5 +85,12 @@ impl Geometry for EuclideanSpace {
             }
         }
         matrix
+    }
+
+    fn mul(&self, _position: &Vector4<f64>, v: &FourVector, w: &FourVector) -> f64 {
+        1.0 * v.vector[0] * w.vector[0]
+            + (-1.0) * v.vector[1] * w.vector[1]
+            + (-1.0) * v.vector[2] * w.vector[2]
+            + (-1.0) * v.vector[3] * w.vector[3]
     }
 }

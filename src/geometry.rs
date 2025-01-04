@@ -38,6 +38,7 @@ pub trait Geometry: Clone + Sync + OdeFunction<Const<8>> + HasCoordinateSystem {
         position: &Vector4<f64>,
         velocity: &FourVector,
     ) -> Matrix4<f64>;
+    fn mul(&self, position: &Vector4<f64>, v: &FourVector, w: &FourVector) -> f64;
 }
 
 pub trait HasCoordinateSystem {

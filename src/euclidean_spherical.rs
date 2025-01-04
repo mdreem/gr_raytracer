@@ -52,7 +52,6 @@ impl Geometry for EuclideanSpaceSpherical {
         y_new
     }
 
-    // TODO: take into account Lorentz transformations.
     // TODO: take into account rotations.
     fn get_tetrad_at(&self, position: &Vector4<f64>) -> Tetrad {
         let r = position[1];
@@ -80,5 +79,16 @@ impl Geometry for EuclideanSpaceSpherical {
         matrix[(3, 3)] = 1.0;
 
         matrix
+    }
+
+    fn mul(&self, position: &Vector4<f64>, v: &FourVector, w: &FourVector) -> f64 {
+        let r = position[1];
+        let theta = position[2];
+        let _phi = position[3];
+
+        1.0 * v.vector[0] * w.vector[0]
+            - v.vector[1] * w.vector[1]
+            - r * r * v.vector[2] * w.vector[2]
+            - r * r * theta.sin() * theta.sin() * v.vector[3] * w.vector[3]
     }
 }
