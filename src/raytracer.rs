@@ -1,4 +1,5 @@
 use crate::camera::Camera;
+use crate::four_vector::FourVector;
 use crate::geometry::Geometry;
 use crate::scene::{Scene, TextureMap};
 use nalgebra::Vector4;
@@ -18,10 +19,12 @@ impl<T: TextureMap, G: Geometry> Raytracer<T, G> {
         image_width: i64,
         image_height: i64,
         camera_position: Vector4<f64>,
+        velocity: FourVector,
         scene: Scene<T, G>,
     ) -> Self {
         let camera = Camera::new(
             camera_position,
+            velocity,
             PI / 4.0,
             image_height,
             image_width,

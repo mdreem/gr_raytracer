@@ -14,6 +14,7 @@ mod spherical_coordinates_helper;
 
 use crate::euclidean::EuclideanSpace;
 use crate::euclidean_spherical::EuclideanSpaceSpherical;
+use crate::four_vector::FourVector;
 use crate::schwarzschild::Schwarzschild;
 use crate::spherical_coordinates_helper::cartesian_to_spherical;
 
@@ -36,7 +37,13 @@ fn render_euclidean() {
         false,
     );
     let camera_position = Vector4::new(0.0, 0.0, 0.8, -7.0);
-    let raytracer = raytracer::Raytracer::new(500, 500, camera_position, scene);
+    let raytracer = raytracer::Raytracer::new(
+        500,
+        500,
+        camera_position,
+        FourVector::new_cartesian(1.0, 0.0, 0.0, 0.0),
+        scene,
+    );
     raytracer.render();
 }
 
@@ -58,14 +65,14 @@ fn render_euclidean_spherical() {
         EuclideanSpaceSpherical::new(),
         false,
     );
-    let camera_position_spatial = cartesian_to_spherical(&Vector4::new(0.0, 0.0, 0.8, -7.0));
-    let camera_position = Vector4::new(
-        0.0,
-        camera_position_spatial[0],
-        camera_position_spatial[1],
-        camera_position_spatial[2],
+    let camera_position = cartesian_to_spherical(&Vector4::new(0.0, 0.0, 0.8, -7.0));
+    let raytracer = raytracer::Raytracer::new(
+        500,
+        500,
+        camera_position,
+        FourVector::new_spherical(1.0, 0.0, 0.0, 0.0),
+        scene,
     );
-    let raytracer = raytracer::Raytracer::new(500, 500, camera_position, scene);
     raytracer.render();
 }
 
@@ -74,6 +81,7 @@ fn render_schwarzschild() {
     let texture_mapper_disk = TextureMapper::new(String::from("./resources/disk.png"));
     let texture_mapper_sphere = TextureMapper::new(String::from("./resources/sphere.png"));
 
+    let radius = 1.0;
     let scene = Scene::new(
         15000,
         20.0,
@@ -84,17 +92,16 @@ fn render_schwarzschild() {
         texture_mapper_celestial,
         texture_mapper_disk,
         texture_mapper_sphere,
-        Schwarzschild::new(1.0),
+        Schwarzschild::new(radius),
         false,
     );
-    let camera_position_spatial = cartesian_to_spherical(&Vector4::new(0.0, 0.0, 0.8, -10.0));
-    let camera_position = Vector4::new(
-        0.0,
-        camera_position_spatial[0],
-        camera_position_spatial[1],
-        camera_position_spatial[2],
-    );
-    let raytracer = raytracer::Raytracer::new(500, 500, camera_position, scene);
+    let camera_position = cartesian_to_spherical(&Vector4::new(0.0, 0.0, 0.8, -10.0));
+
+    let r = camera_position[1];
+    let a = 1.0 - radius / r;
+    let velocity = FourVector::new_spherical(1.0 / a, -(radius / r).sqrt(), 0.0, 0.0); // we have a freely falling observer here.
+
+    let raytracer = raytracer::Raytracer::new(500, 500, camera_position, velocity, scene);
     raytracer.render();
 }
 

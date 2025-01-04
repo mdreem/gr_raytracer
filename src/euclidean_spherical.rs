@@ -3,7 +3,7 @@ use crate::four_vector::{CoordinateSystem, FourVector};
 use crate::geometry::{Geometry, HasCoordinateSystem, Tetrad};
 use crate::runge_kutta::OdeFunction;
 use crate::scene::EquationOfMotionState;
-use nalgebra::{Const, OVector, Vector4};
+use nalgebra::{Const, Matrix4, OVector, Vector4};
 
 #[derive(Clone)]
 pub struct EuclideanSpaceSpherical {}
@@ -52,7 +52,6 @@ impl Geometry for EuclideanSpaceSpherical {
         y_new
     }
 
-    // TODO: take into account Lorentz transformations.
     // TODO: take into account rotations.
     fn get_tetrad_at(&self, position: &Vector4<f64>) -> Tetrad {
         let r = position[1];
@@ -61,9 +60,35 @@ impl Geometry for EuclideanSpaceSpherical {
 
         Tetrad::new(
             position.clone(),
+            FourVector::new_spherical(1.0, 0.0, 0.0, 0.0),
             FourVector::new_spherical(0.0, 0.0, 0.0, 1.0 / (r * theta.sin())), // Phi
             -FourVector::new_spherical(0.0, 0.0, 1.0 / r, 0.0),                // Theta
             -FourVector::new_spherical(0.0, 1.0, 0.0, 0.0),                    // R
         )
+    }
+
+    fn lorentz_transformation(
+        &self,
+        _position: &Vector4<f64>,
+        _velocity: &FourVector,
+    ) -> Matrix4<f64> {
+        let mut matrix = Matrix4::zeros();
+        matrix[(0, 0)] = 1.0;
+        matrix[(1, 1)] = 1.0;
+        matrix[(2, 2)] = 1.0;
+        matrix[(3, 3)] = 1.0;
+
+        matrix
+    }
+
+    fn mul(&self, position: &Vector4<f64>, v: &FourVector, w: &FourVector) -> f64 {
+        let r = position[1];
+        let theta = position[2];
+        let _phi = position[3];
+
+        1.0 * v.vector[0] * w.vector[0]
+            - v.vector[1] * w.vector[1]
+            - r * r * v.vector[2] * w.vector[2]
+            - r * r * theta.sin() * theta.sin() * v.vector[3] * w.vector[3]
     }
 }
