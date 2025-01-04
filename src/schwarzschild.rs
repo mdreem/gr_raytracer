@@ -3,9 +3,9 @@ use crate::four_vector::{CoordinateSystem, FourVector};
 use crate::geometry::{Geometry, HasCoordinateSystem, Tetrad};
 use crate::runge_kutta::OdeFunction;
 use crate::scene::EquationOfMotionState;
-use nalgebra::{Const, OVector, Vector4};
+use nalgebra::{Const, Matrix4, OVector, Vector4};
 
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 pub struct Schwarzschild {
     radius: f64,
 }
@@ -60,7 +60,6 @@ impl Geometry for Schwarzschild {
         y_new
     }
 
-    // TODO: take into account Lorentz transformations.
     // TODO: take into account rotations.
     fn get_tetrad_at(&self, position: &Vector4<f64>) -> Tetrad {
         let r = position[1];
@@ -68,12 +67,166 @@ impl Geometry for Schwarzschild {
         let _phi = position[3];
 
         let rr0 = self.radius / r;
+        let a = 1.0 - rr0;
 
         Tetrad::new(
             position.clone(),
+            FourVector::new_spherical(1.0 / a, -rr0.sqrt(), 0.0, 0.0),
             FourVector::new_spherical(0.0, 0.0, 0.0, 1.0 / (r * theta.sin())), // Phi
             -FourVector::new_spherical(0.0, 0.0, 1.0 / r, 0.0),                // Theta
-            -FourVector::new_spherical(-rr0.sqrt() / (1.0 - rr0), 1.0, 0.0, 0.0), // R
+            -FourVector::new_spherical(-rr0.sqrt() / a, 1.0, 0.0, 0.0),        // R
         )
+    }
+
+    fn lorentz_transformation(
+        &self,
+        position: &Vector4<f64>,
+        velocity: &FourVector,
+    ) -> Matrix4<f64> {
+        let mut matrix = Matrix4::zeros();
+        let tetrad_t = self.get_tetrad_at(&position).t;
+
+        let r = position[1];
+        let theta = position[2];
+        let _phi = position[3];
+
+        let a = 1.0 - self.radius / r;
+
+        let metric_diag = Vector4::new(a, -1.0 / a, -r * r, -r * r * theta.sin() * theta.sin());
+
+        let mut gamma = 0.0;
+        for i in 0..4 {
+            gamma += metric_diag[i] * velocity.vector[i] * tetrad_t.vector[i];
+        }
+        for mu in 0..4 {
+            for nu in 0..4 {
+                let mut res = 0.0;
+                if mu == nu {
+                    res = 1.0;
+                }
+
+                let a = 1.0 / (1.0 + gamma);
+                let b = tetrad_t.vector[mu] + velocity.vector[mu];
+                let c = metric_diag[nu] * (tetrad_t.vector[nu] + velocity.vector[nu]);
+                res -= a * b * c;
+
+                res += 2.0 * metric_diag[nu] * tetrad_t.vector[nu] * velocity.vector[mu];
+
+                matrix[(mu, nu)] = res;
+            }
+        }
+        matrix
+    }
+
+    fn mul(&self, position: &Vector4<f64>, v: &FourVector, w: &FourVector) -> f64 {
+        let r = position[1];
+        let theta = position[2];
+        let _phi = position[3];
+
+        let a = 1.0 - self.radius / r;
+
+        a * v.vector[0] * w.vector[0]
+            - v.vector[1] * w.vector[1] / a
+            - r * r * v.vector[2] * w.vector[2]
+            - r * r * theta.sin() * theta.sin() * v.vector[3] * w.vector[3]
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use crate::camera::Camera;
+    use crate::four_vector::FourVector;
+    use crate::geometry::Geometry;
+    use crate::schwarzschild::Schwarzschild;
+    use crate::spherical_coordinates_helper::cartesian_to_spherical;
+    use approx::assert_abs_diff_eq;
+    use nalgebra::Vector4;
+    use std::f64::consts::PI;
+
+    #[test]
+    fn test_tetrad_orthonormal() {
+        let position = cartesian_to_spherical(&Vector4::new(2.0, 3.0, 4.0, 5.0));
+        let geometry = Schwarzschild::new(2.0);
+
+        let tetrad = geometry.get_tetrad_at(&position);
+
+        let k = tetrad.t + (-tetrad.z);
+        let s = geometry.mul(&position, &k, &k);
+        assert_abs_diff_eq!(s, 0.0);
+
+        assert_abs_diff_eq!(geometry.mul(&position, &tetrad.t, &tetrad.t), 1.0);
+        assert_abs_diff_eq!(geometry.mul(&position, &tetrad.x, &tetrad.x), -1.0);
+        assert_abs_diff_eq!(geometry.mul(&position, &tetrad.y, &tetrad.y), -1.0);
+        assert_abs_diff_eq!(geometry.mul(&position, &tetrad.z, &tetrad.z), -1.0);
+
+        assert_abs_diff_eq!(geometry.mul(&position, &tetrad.t, &tetrad.x), 0.0);
+        assert_abs_diff_eq!(geometry.mul(&position, &tetrad.t, &tetrad.y), 0.0);
+        assert_abs_diff_eq!(geometry.mul(&position, &tetrad.t, &tetrad.z), 0.0);
+
+        assert_abs_diff_eq!(geometry.mul(&position, &tetrad.x, &tetrad.y), 0.0);
+        assert_abs_diff_eq!(geometry.mul(&position, &tetrad.x, &tetrad.z), 0.0);
+
+        assert_abs_diff_eq!(geometry.mul(&position, &tetrad.y, &tetrad.z), 0.0);
+    }
+
+    #[test]
+    fn test_lorentz_transformed_tetrad_orthonormal() {
+        let position = cartesian_to_spherical(&Vector4::new(2.0, 3.0, 4.0, 5.0));
+        let radius = 2.0;
+        let r = position[1];
+        let a = 1.0 - radius / position[1];
+
+        let geometry = Schwarzschild::new(radius);
+
+        let velocity = FourVector::new_spherical(1.0 / a, -(radius / r).sqrt(), 0.0, 0.0); // we have a freely falling observer here.
+
+        let original_tetrad = geometry.get_tetrad_at(&position);
+        let tetrad = crate::camera::lorentz_transform_tetrad(
+            &geometry,
+            &original_tetrad,
+            &position,
+            &velocity,
+        );
+
+        let k = tetrad.t + (-tetrad.z);
+        let s = geometry.mul(&position, &k, &k);
+        assert_abs_diff_eq!(s, 0.0);
+
+        assert_abs_diff_eq!(
+            tetrad.t.get_as_vector(),
+            velocity.get_as_vector(),
+            epsilon = 1e-6
+        );
+
+        assert_abs_diff_eq!(geometry.mul(&position, &tetrad.t, &tetrad.x), 0.0);
+        assert_abs_diff_eq!(geometry.mul(&position, &tetrad.t, &tetrad.y), 0.0);
+        assert_abs_diff_eq!(geometry.mul(&position, &tetrad.t, &tetrad.z), 0.0);
+
+        assert_abs_diff_eq!(geometry.mul(&position, &tetrad.x, &tetrad.y), 0.0);
+        assert_abs_diff_eq!(geometry.mul(&position, &tetrad.x, &tetrad.z), 0.0);
+
+        assert_abs_diff_eq!(geometry.mul(&position, &tetrad.y, &tetrad.z), 0.0);
+    }
+
+    #[test]
+    fn test_schwarzschild_ray() {
+        let position = cartesian_to_spherical(&Vector4::new(2.0, 3.0, 4.0, 5.0));
+        let radius = 2.0;
+        let geometry = Schwarzschild::new(radius);
+        let r = position[1];
+        let a = 1.0 - radius / r;
+        let velocity = FourVector::new_spherical(1.0 / a, -(radius / r).sqrt(), 0.0, 0.0); // we have a freely falling observer here.
+        let camera = Camera::new(
+            position,
+            velocity,
+            PI / 2.0,
+            11,
+            11,
+            Schwarzschild::new(2.0),
+        );
+
+        let ray = camera.get_ray_for(6, 6);
+        // This is a space-like vector and therefore should be -1.
+        assert_abs_diff_eq!(geometry.mul(&position, &ray.direction, &ray.direction), -1.0);
     }
 }
