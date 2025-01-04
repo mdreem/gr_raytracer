@@ -10,8 +10,8 @@ pub enum CoordinateSystem {
 
 #[derive(Clone, Copy, Debug)]
 pub struct FourVector {
-    coordinate_system: CoordinateSystem,
-    vector: Vector4<f64>,
+    pub coordinate_system: CoordinateSystem,
+    pub vector: Vector4<f64>,
 }
 
 impl Neg for FourVector {
@@ -69,19 +69,20 @@ impl Div<f64> for FourVector {
     }
 }
 
-impl Mul<FourVector> for FourVector {
-    type Output = f64;
-
-    // Scalar multiplication with metric. For now with a flat metric and signature (+---)
-    fn mul(self, v: Self) -> f64 {
-        1.0 * self.vector[0] * v.vector[0]
-            + (-1.0) * self.vector[1] * v.vector[1]
-            + (-1.0) * self.vector[2] * v.vector[2]
-            + (-1.0) * self.vector[3] * v.vector[3]
-    }
-}
-
 impl FourVector {
+    pub fn new(
+        x0: f64,
+        x1: f64,
+        x2: f64,
+        x3: f64,
+        coordinate_system: CoordinateSystem,
+    ) -> FourVector {
+        FourVector {
+            coordinate_system,
+            vector: Vector4::new(x0, x1, x2, x3),
+        }
+    }
+
     pub fn new_cartesian(x0: f64, x1: f64, x2: f64, x3: f64) -> FourVector {
         FourVector {
             coordinate_system: CoordinateSystem::Cartesian,
@@ -107,7 +108,10 @@ impl FourVector {
     // The order of the components is: (r, theta, phi)
     pub fn get_as_spherical(self) -> Vector3<f64> {
         match self.coordinate_system {
-            CoordinateSystem::Cartesian => cartesian_to_spherical(&self.vector),
+            CoordinateSystem::Cartesian => {
+                let v = cartesian_to_spherical(&self.vector);
+                Vector3::new(v[1], v[2], v[3])
+            }
             CoordinateSystem::Spherical => {
                 Vector3::new(self.vector[1], self.vector[2], self.vector[3])
             }
@@ -117,20 +121,31 @@ impl FourVector {
 
 #[cfg(test)]
 mod tests {
+    use crate::euclidean::EuclideanSpace;
     use crate::four_vector::FourVector;
+    use crate::geometry::Geometry;
     use approx::assert_abs_diff_eq;
+    use nalgebra::Vector4;
 
     #[test]
     fn test_multiplication_self() {
+        let geometry = EuclideanSpace::new();
         let v1 = FourVector::new_cartesian(1.0, 2.0, 3.0, 4.0);
-        assert_abs_diff_eq!(v1 * v1, -28.0);
+        assert_abs_diff_eq!(
+            geometry.mul(&Vector4::new(0.0, 0.0, 0.0, 0.0), &v1, &v1),
+            -28.0
+        );
     }
 
     #[test]
     fn test_multiplication_different() {
+        let geometry = EuclideanSpace::new();
         let v1 = FourVector::new_cartesian(1.0, 2.0, 3.0, 4.0);
         let v2 = FourVector::new_cartesian(5.0, 6.0, 7.0, 8.0);
 
-        assert_abs_diff_eq!(v1 * v2, -60.0);
+        assert_abs_diff_eq!(
+            geometry.mul(&Vector4::new(0.0, 0.0, 0.0, 0.0), &v1, &v2),
+            -60.0
+        );
     }
 }
