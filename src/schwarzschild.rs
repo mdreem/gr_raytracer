@@ -135,6 +135,7 @@ impl Geometry for Schwarzschild {
 #[cfg(test)]
 mod tests {
     use crate::camera::Camera;
+    use crate::debug::save_rays_to_file;
     use crate::four_vector::FourVector;
     use crate::geometry::Geometry;
     use crate::schwarzschild::Schwarzschild;
@@ -206,6 +207,30 @@ mod tests {
         assert_abs_diff_eq!(geometry.mul(&position, &tetrad.x, &tetrad.z), 0.0);
 
         assert_abs_diff_eq!(geometry.mul(&position, &tetrad.y, &tetrad.z), 0.0);
+    }
+
+    #[ignore]
+    #[test]
+    fn save_camera_rays() {
+        let rows = 30;
+        let cols = 30;
+
+        let position = cartesian_to_spherical(&Vector4::new(0.0, 0.0, 0.0, -10.0));
+        let radius = 2.0;
+        let geometry = Schwarzschild::new(radius);
+        let r = position[1];
+        let a = 1.0 - radius / r;
+        let velocity = FourVector::new_spherical(1.0 / a, -(radius / r).sqrt(), 0.0, 0.0); // we have a freely falling observer here.
+        let camera = Camera::new(
+            position,
+            velocity,
+            PI / 2.0,
+            rows,
+            cols,
+            Schwarzschild::new(2.0),
+        );
+
+        save_rays_to_file(rows, cols, &position, geometry, camera);
     }
 
     #[test]
