@@ -92,3 +92,40 @@ impl Geometry for EuclideanSpaceSpherical {
             - r * r * theta.sin() * theta.sin() * v.vector[3] * w.vector[3]
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use crate::camera::Camera;
+    use crate::debug::save_rays_to_file;
+    use crate::euclidean_spherical::EuclideanSpaceSpherical;
+    use crate::four_vector::FourVector;
+    use crate::spherical_coordinates_helper::cartesian_to_spherical;
+    use nalgebra::Vector4;
+    use std::f64::consts::PI;
+
+    #[ignore]
+    #[test]
+    fn save_camera_rays() {
+        let rows = 30;
+        let cols = 30;
+
+        let position = cartesian_to_spherical(&Vector4::new(0.0, 0.0, 0.0, -10.0));
+        let velocity = FourVector::new_spherical(1.0, 0.0, 0.0, 0.0);
+        let camera = Camera::new(
+            position,
+            velocity,
+            PI / 2.0,
+            rows,
+            cols,
+            EuclideanSpaceSpherical::new(),
+        );
+
+        save_rays_to_file(
+            rows,
+            cols,
+            &position,
+            EuclideanSpaceSpherical::new(),
+            camera,
+        );
+    }
+}

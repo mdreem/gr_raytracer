@@ -94,3 +94,33 @@ impl Geometry for EuclideanSpace {
             + (-1.0) * v.vector[3] * w.vector[3]
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use crate::camera::Camera;
+    use crate::debug::save_rays_to_file;
+    use crate::euclidean::EuclideanSpace;
+    use crate::four_vector::FourVector;
+    use nalgebra::Vector4;
+    use std::f64::consts::PI;
+
+    #[ignore]
+    #[test]
+    fn save_camera_rays() {
+        let rows = 30;
+        let cols = 30;
+
+        let position = Vector4::new(0.0, 0.0, 0.0, -10.0);
+        let geometry = EuclideanSpace::new();
+        let velocity = FourVector::new_cartesian(1.0, 0.0, 0.0, 0.0);
+        let camera = Camera::new(
+            position,
+            velocity,
+            PI / 2.0,
+            rows,
+            cols,
+            EuclideanSpace::new(),
+        );
+        save_rays_to_file(rows, cols, &position, EuclideanSpace::new(), camera);
+    }
+}

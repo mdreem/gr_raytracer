@@ -6,16 +6,24 @@ use nalgebra::Vector4;
 pub struct Ray {
     pub position: Vector4<f64>,
     pub direction: FourVector,
+    pub momentum: FourVector,
     pub row: i64,
     pub col: i64,
 }
 impl Ray {
-    pub fn new(row: i64, col: i64, position: Vector4<f64>, direction: FourVector) -> Self {
+    pub fn new(
+        row: i64,
+        col: i64,
+        position: Vector4<f64>,
+        direction: FourVector,
+        momentum: FourVector,
+    ) -> Self {
         Self {
             row,
             col,
             position,
             direction,
+            momentum,
         }
     }
 }
@@ -120,7 +128,8 @@ impl<G: Geometry> Camera<G> {
     // row, column range from 1..R, 1..C
     pub fn get_ray_for(&self, row: i64, column: i64) -> Ray {
         let direction = self.get_direction_for(row, column);
-        Ray::new(row, column, self.position, direction) // TODO: velocity + direction to make this a four-momentum?
+        let momentum = direction + (self.tetrad.t); // Add T-component of the tetrad to get the momentum.
+        Ray::new(row, column, self.position, direction, momentum)
     }
 }
 
