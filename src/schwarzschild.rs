@@ -43,13 +43,13 @@ impl Geometry for Schwarzschild {
         let v_phi = y[7];
 
         let a = 1.0 - self.radius / r;
-        let a_prime = self.radius / r * r;
-        let a_div_aprime = self.radius / (r * r - self.radius * r);
+        let a_prime = self.radius / (r * r);
+        let aprime_over_a = a_prime / a;
 
         // acceleration
-        let a_t = -(a_div_aprime) * v_t * v_r;
+        let a_t = -(aprime_over_a) * v_t * v_r;
         let a_r = -0.5 * a * a_prime * v_t * v_t
-            + 0.5 * (a_div_aprime) * v_r * v_r
+            + 0.5 * (aprime_over_a) * v_r * v_r
             + a * r * (v_theta * v_theta + v_phi * v_phi * theta.sin() * theta.sin());
         let a_theta = -(2.0 / r) * v_r * v_theta + theta.sin() * theta.cos() * v_phi * v_phi;
         let a_phi = -(2.0 / r) * v_phi * v_r - 2.0 * theta.cos() / theta.sin() * v_theta * v_phi;
@@ -252,6 +252,9 @@ mod tests {
 
         let ray = camera.get_ray_for(6, 6);
         // This is a space-like vector and therefore should be -1.
-        assert_abs_diff_eq!(geometry.mul(&position, &ray.direction, &ray.direction), -1.0);
+        assert_abs_diff_eq!(
+            geometry.mul(&position, &ray.direction, &ray.direction),
+            -1.0
+        );
     }
 }
