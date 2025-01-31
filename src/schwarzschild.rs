@@ -424,11 +424,30 @@ mod tests {
     }
 
     #[test]
-    fn compare_trajectories() {
+    fn compare_trajectories_escaping() {
+        let radius = 1.0;
+
+        let e = 1.0;
+        let l = 5.0;
+
+        let matching = compute_compared_trajectories(radius, e, l);
+
+        assert_eq!(matching.len(), 204);
+    }
+
+    #[test]
+    fn compare_trajectories_towards_black_hole() {
         let radius = 1.0;
 
         let e = 1.0;
         let l = 2.0;
+
+        let matching = compute_compared_trajectories(radius, e, l);
+
+        assert_eq!(matching.len(), 202);
+    }
+
+    fn compute_compared_trajectories(radius: f64, e: f64, l: f64) -> Vec<Point> {
         let position = Vector4::new(0.0, 5.0, PI / 2.0, 0.0);
         let r = position[1];
         let a = 1.0 - radius / r;
@@ -456,7 +475,7 @@ mod tests {
             &collect_points_step(&result_geodesic_equation),
             &collect_points_test_step(&result_r_phi_equation),
         );
-        assert_eq!(matching.len(), 202);
+        matching
     }
 
     fn save_trajectory(filename: &str, trajectory: &Vec<Point>) {
