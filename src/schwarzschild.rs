@@ -424,6 +424,40 @@ mod tests {
     }
 
     #[test]
+    fn test_trajectories_equal_with_rotated_momentum() {
+        let position = cartesian_to_spherical(&Vector4::new(2.0, 0.0, 0.0, 5.0));
+        let radius = 2.0;
+        let geometry = Schwarzschild::new(radius);
+        let camera = create_camera(position, radius);
+        let scene: Scene<CheckerMapper, Schwarzschild> =
+            scene::test_scene::create_scene(1.0, 2.0, 7.0, geometry.clone());
+
+        let ray_a = camera.get_ray_for(6, 11);
+        let ray_b = camera.get_ray_for(1, 6);
+
+        // ensure rays are rotated by 90 degrees.
+        assert_abs_diff_eq!(ray_a.momentum.vector[2], ray_b.momentum.vector[3]);
+        assert_abs_diff_eq!(ray_a.momentum.vector[3], ray_b.momentum.vector[2]);
+
+        println!("ray_a: {:?}", ray_a);
+        println!("ray_b: {:?}", ray_b);
+
+        let (trajectory_a, _) = scene.integrate(&ray_a);
+        let (trajectory_b, _) = scene.integrate(&ray_b);
+        assert_eq!(trajectory_a.len(), trajectory_b.len());
+
+        for i in 0..trajectory_a.len() {
+            let step_a = &trajectory_a[i];
+            let step_b = &trajectory_b[i];
+
+            assert_abs_diff_eq!(step_a.y[0], step_b.y[0], epsilon = 1e-8);
+            assert_abs_diff_eq!(step_a.y[1], step_b.y[1], epsilon = 1e-8);
+            assert_abs_diff_eq!(step_a.y[2], step_b.y[3], epsilon = 1e-8);
+            assert_abs_diff_eq!(step_a.y[3], step_b.y[2], epsilon = 1e-8);
+        }
+    }
+
+    #[test]
     fn compare_trajectories_escaping() {
         let radius = 1.0;
 
