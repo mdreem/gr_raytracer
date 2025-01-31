@@ -133,16 +133,124 @@ impl Geometry for Schwarzschild {
 }
 
 #[cfg(test)]
+mod test_schwarzschild {
+    use crate::four_vector::FourVector;
+    use crate::runge_kutta::{rk4, OdeFunction};
+    use crate::schwarzschild::Schwarzschild;
+    use nalgebra::{Const, OVector, Vector2, Vector4};
+
+    pub fn get_angular_momentum_from_phi(
+        position: &Vector4<f64>,
+        momentum: &FourVector,
+        _geometry: &Schwarzschild,
+    ) -> f64 {
+        let r = position[1];
+        let k_phi = momentum.vector[3];
+        k_phi * r * r
+    }
+
+    pub fn get_energy_from_r(
+        position: &Vector4<f64>,
+        momentum: &FourVector,
+        geometry: &Schwarzschild,
+    ) -> f64 {
+        let l = get_angular_momentum_from_phi(position, momentum, geometry);
+        let r = position[1];
+        let a = 1.0 - geometry.radius / r;
+        let k_r = momentum.vector[1];
+        let e_squared = k_r.powi(2) + a * l * l / (r * r);
+
+        e_squared.sqrt()
+    }
+
+    pub fn get_energy_from_t(
+        position: &Vector4<f64>,
+        momentum: &FourVector,
+        geometry: &Schwarzschild,
+    ) -> f64 {
+        let r = position[1];
+        let a = 1.0 - geometry.radius / r;
+        let k_t = momentum.vector[0];
+        k_t * a
+    }
+
+    pub struct TestSchwarzschild {
+        pub radius: f64,
+    }
+
+    #[derive(Debug)]
+    pub struct Step {
+        pub phi: f64,
+        pub u: f64,
+        du_dphi: f64,
+    }
+
+    impl OdeFunction<Const<2>> for TestSchwarzschild {
+        fn apply(&self, _t: f64, y: &OVector<f64, Const<2>>) -> OVector<f64, Const<2>> {
+            let u = y[0];
+            let du_dphi = y[1];
+            let d2u_dphi2 = -u + 3.0 * (self.radius / 2.0) * u.powi(2);
+            Vector2::new(du_dphi, d2u_dphi2)
+        }
+    }
+
+    impl TestSchwarzschild {
+        pub fn compute_test_schwarzschild_trajectory(
+            &self,
+            r0: f64,
+            l: f64,
+            e: f64,
+            max_steps: usize,
+            step_size: f64,
+        ) -> Vec<Step> {
+            let u0 = 1.0 / r0;
+            let b = l / e;
+            // From energy equation before taking the second derivative.
+            let du_dphi0 = (1.0 / b.powi(2) - u0.powi(2) * (1.0 - self.radius * u0)).sqrt();
+
+            let mut y = Vector2::new(u0, du_dphi0);
+            let mut t = 0.0;
+
+            let mut result = vec![Step {
+                phi: 0.0,
+                u: u0,
+                du_dphi: 0.0,
+            }];
+
+            for _ in 1..max_steps {
+                y = rk4(&y, t, step_size, self);
+                t += step_size;
+
+                result.push(Step {
+                    phi: t,
+                    u: y[0],
+                    du_dphi: y[1],
+                });
+            }
+
+            result
+        }
+    }
+}
+
+#[cfg(test)]
 mod tests {
-    use crate::camera::Camera;
+    use crate::camera::{Camera, Ray};
     use crate::debug::save_rays_to_file;
     use crate::four_vector::FourVector;
     use crate::geometry::Geometry;
-    use crate::schwarzschild::Schwarzschild;
+    use crate::scene;
+    use crate::scene::{CheckerMapper, Scene};
+    use crate::schwarzschild::test_schwarzschild::{
+        get_energy_from_r, get_energy_from_t, TestSchwarzschild,
+    };
+    use crate::schwarzschild::{test_schwarzschild, Schwarzschild};
     use crate::spherical_coordinates_helper::cartesian_to_spherical;
     use approx::assert_abs_diff_eq;
     use nalgebra::Vector4;
     use std::f64::consts::PI;
+    use std::fs::File;
+    use std::io::Write;
 
     #[test]
     fn test_tetrad_orthonormal() {
@@ -250,11 +358,161 @@ mod tests {
             Schwarzschild::new(2.0),
         );
 
-        let ray = camera.get_ray_for(6, 6);
+        let ray = camera.get_ray_for(1, 6);
         // This is a space-like vector and therefore should be -1.
         assert_abs_diff_eq!(
             geometry.mul(&position, &ray.direction, &ray.direction),
             -1.0
         );
+        assert_abs_diff_eq!(geometry.mul(&position, &ray.momentum, &ray.momentum), 0.0);
+    }
+
+    fn create_camera(position: Vector4<f64>, radius: f64) -> Camera<Schwarzschild> {
+        let r = position[1];
+        let a = 1.0 - radius / r;
+        let velocity = FourVector::new_spherical(1.0 / a, -(radius / r).sqrt(), 0.0, 0.0); // we have a freely falling observer here.
+        let camera = Camera::new(
+            position,
+            velocity,
+            PI / 2.0,
+            11,
+            11,
+            Schwarzschild::new(radius),
+        );
+        camera
+    }
+
+    #[test]
+    fn test_ray_null_condition_momentum() {
+        let position = cartesian_to_spherical(&Vector4::new(2.0, 0.0, 0.0, 5.0));
+        let radius = 2.0;
+        let geometry = Schwarzschild::new(radius);
+        let camera = create_camera(position, radius);
+
+        for i in 1..11 {
+            let ray = camera.get_ray_for(6, i);
+            let m_s = geometry.mul(&position, &ray.momentum, &ray.momentum);
+            assert_abs_diff_eq!(m_s, 0.0, epsilon = 1e-8);
+        }
+        for i in 1..11 {
+            let ray = camera.get_ray_for(i, 6);
+            let m_s = geometry.mul(&position, &ray.momentum, &ray.momentum);
+            assert_abs_diff_eq!(m_s, 0.0, epsilon = 1e-8);
+        }
+    }
+
+    #[test]
+    fn test_ray_compare_conserved_quantities_in_equatorial_plane() {
+        let position = cartesian_to_spherical(&Vector4::new(2.0, 0.0, 0.0, 5.0));
+        let radius = 2.0;
+        let geometry = Schwarzschild::new(radius);
+        let camera = create_camera(position, radius);
+
+        for i in 1..11 {
+            let ray = camera.get_ray_for(6, i);
+            assert_abs_diff_eq!(ray.direction.vector[2], 0.0); // ensure that the ray is in the equatorial plane.
+            assert_abs_diff_eq!(ray.momentum.vector[2], 0.0); // ensure that the ray is in the equatorial plane.
+
+            let m_s = geometry.mul(&position, &ray.momentum, &ray.momentum);
+            assert_abs_diff_eq!(m_s, 0.0, epsilon = 1e-8);
+
+            let e_r = get_energy_from_r(&position, &ray.momentum, &geometry);
+            let e_t = get_energy_from_t(&position, &ray.momentum, &geometry);
+
+            assert_abs_diff_eq!(e_r, e_t);
+        }
+    }
+
+    #[test]
+    fn compare_trajectories() {
+        let radius = 1.0;
+
+        let e = 1.0;
+        let l = 2.0;
+        let position = Vector4::new(0.0, 5.0, PI / 2.0, 0.0);
+        let r = position[1];
+        let a = 1.0 - radius / r;
+
+        let geometry = Schwarzschild::new(radius);
+        let scene: Scene<CheckerMapper, Schwarzschild> =
+            scene::test_scene::create_scene(1.0, 2.0, 7.0, geometry.clone());
+
+        let momentum = FourVector::new_spherical(
+            e / a,
+            -(e * e - a * (l * l / (r * r))).sqrt(),
+            0.0,
+            l / (r * r),
+        );
+
+        let ray = Ray::new(0, 0, position, momentum, momentum);
+        assert_abs_diff_eq!(geometry.mul(&position, &ray.momentum, &ray.momentum), 0.0);
+
+        let ts = TestSchwarzschild { radius };
+
+        let (result_geodesic_equation, _) = scene.integrate(&ray);
+        let result_r_phi_equation = ts.compute_test_schwarzschild_trajectory(r, l, e, 204, 0.01);
+
+        let matching = find_matching_points(
+            &collect_points_step(&result_geodesic_equation),
+            &collect_points_test_step(&result_r_phi_equation),
+        );
+        assert_eq!(matching.len(), 202);
+    }
+
+    fn save_trajectory(filename: &str, trajectory: &Vec<Point>) {
+        let mut file = File::create(filename).expect("Unable to create file");
+        file.write_all(b"r,phi\n").expect("Unable to write file");
+        for step in trajectory {
+            file.write_all(format!("{},{}\n", step.r, step.phi).as_bytes())
+                .expect("Unable to write file");
+        }
+    }
+
+    fn collect_points_step(steps: &Vec<scene::Step>) -> Vec<Point> {
+        steps
+            .iter()
+            .map(|step| Point {
+                r: step.y[1],
+                phi: step.y[3],
+            })
+            .collect()
+    }
+
+    fn collect_points_test_step(steps: &Vec<test_schwarzschild::Step>) -> Vec<Point> {
+        steps
+            .iter()
+            .map(|step| Point {
+                r: step.u.recip(),
+                phi: step.phi,
+            })
+            .collect()
+    }
+
+    fn find_matching_points(points_a: &Vec<Point>, points_b: &Vec<Point>) -> Vec<Point> {
+        let mut result = Vec::new();
+
+        let mut pos_b = 0;
+
+        for point_a in points_a {
+            for i in pos_b..points_b.len() {
+                let point_b = &points_b[i];
+
+                if (point_a.r - point_b.r).abs() < 0.1 && (point_a.phi - point_b.phi).abs() < 0.1 {
+                    result.push(Point {
+                        r: point_a.r,
+                        phi: point_a.phi,
+                    });
+                    pos_b = i + 1;
+                    break;
+                }
+            }
+        }
+
+        result
+    }
+
+    struct Point {
+        pub r: f64,
+        pub phi: f64,
     }
 }

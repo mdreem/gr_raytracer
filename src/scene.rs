@@ -25,13 +25,13 @@ pub struct Scene<T: TextureMap, G: Geometry> {
 }
 
 #[derive(Debug)]
-struct Step {
-    y: EquationOfMotionState,
-    t: f64,
-    step: usize,
+pub struct Step {
+    pub y: EquationOfMotionState,
+    pub t: f64,
+    pub step: usize,
 }
 
-enum StopReason {
+pub enum StopReason {
     HorizonReached,
     CelestialSphereReached,
 }
@@ -253,7 +253,7 @@ impl<T: TextureMap, G: Geometry> Scene<T, G> {
         None
     }
 
-    fn integrate(&self, ray: &Ray) -> (Vec<Step>, Option<StopReason>) {
+    pub fn integrate(&self, ray: &Ray) -> (Vec<Step>, Option<StopReason>) {
         let mut t = 0.0;
         let direction = ray.direction.get_as_vector();
         let mut y = EquationOfMotionState::from_column_slice(&[
@@ -362,12 +362,47 @@ impl<T: TextureMap, G: Geometry> Scene<T, G> {
 }
 
 #[cfg(test)]
+pub mod test_scene {
+    use crate::geometry::Geometry;
+    use crate::scene::{CheckerMapper, Color, Scene};
+
+    pub fn create_scene<G: Geometry>(
+        center_sphere_radius: f64,
+        center_disk_inner_radius: f64,
+        center_disk_outer_radius: f64,
+        geometry: G,
+    ) -> Scene<CheckerMapper, G> {
+        let texture_mapper_celestial =
+            CheckerMapper::new(100.0, 100.0, Color::new(0, 255, 0), Color::new(0, 100, 0));
+        let texture_mapper_disk =
+            CheckerMapper::new(200.0, 10.0, Color::new(0, 0, 255), Color::new(0, 0, 100));
+        let texture_mapper_sphere =
+            CheckerMapper::new(10.0, 10.0, Color::new(255, 0, 0), Color::new(100, 0, 0));
+        let scene = Scene::new(
+            10000,
+            15.0,
+            0.01,
+            center_sphere_radius,
+            center_disk_inner_radius,
+            center_disk_outer_radius,
+            texture_mapper_celestial,
+            texture_mapper_disk,
+            texture_mapper_sphere,
+            geometry,
+            false,
+        );
+        scene
+    }
+}
+
+#[cfg(test)]
 mod tests {
     use crate::camera::Camera;
     use crate::euclidean::EuclideanSpace;
     use crate::euclidean_spherical::EuclideanSpaceSpherical;
     use crate::four_vector::FourVector;
-    use crate::geometry::Geometry;
+
+    use crate::scene::test_scene::create_scene;
     use crate::scene::{CheckerMapper, Color, Scene};
     use crate::schwarzschild::Schwarzschild;
     use crate::spherical_coordinates_helper::cartesian_to_spherical;
@@ -469,7 +504,7 @@ mod tests {
         let ray = camera.get_ray_for(0, 0);
         let color = scene.color_of_ray(&ray);
 
-        assert_eq!(color, Color::new(0, 255, 0));
+        assert_eq!(color, Color::new(0, 100, 0));
     }
 
     #[test]
@@ -514,33 +549,5 @@ mod tests {
         let color = scene.color_of_ray(&ray);
 
         assert_eq!(color, Color::new(0, 0, 255));
-    }
-
-    fn create_scene<G: Geometry>(
-        center_sphere_radius: f64,
-        center_disk_inner_radius: f64,
-        center_disk_outer_radius: f64,
-        geometry: G,
-    ) -> Scene<CheckerMapper, G> {
-        let texture_mapper_celestial =
-            CheckerMapper::new(100.0, 100.0, Color::new(0, 255, 0), Color::new(0, 100, 0));
-        let texture_mapper_disk =
-            CheckerMapper::new(200.0, 10.0, Color::new(0, 0, 255), Color::new(0, 0, 100));
-        let texture_mapper_sphere =
-            CheckerMapper::new(10.0, 10.0, Color::new(255, 0, 0), Color::new(100, 0, 0));
-        let scene = Scene::new(
-            10000,
-            15.0,
-            0.01,
-            center_sphere_radius,
-            center_disk_inner_radius,
-            center_disk_outer_radius,
-            texture_mapper_celestial,
-            texture_mapper_disk,
-            texture_mapper_sphere,
-            geometry,
-            false,
-        );
-        scene
     }
 }

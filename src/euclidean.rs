@@ -113,14 +113,7 @@ mod tests {
         let position = Vector4::new(0.0, 0.0, 0.0, -10.0);
         let geometry = EuclideanSpace::new();
         let velocity = FourVector::new_cartesian(1.0, 0.0, 0.0, 0.0);
-        let camera = Camera::new(
-            position,
-            velocity,
-            PI / 2.0,
-            rows,
-            cols,
-            EuclideanSpace::new(),
-        );
-        save_rays_to_file(rows, cols, &position, EuclideanSpace::new(), camera);
+        let camera = Camera::new(position, velocity, PI / 2.0, rows, cols, geometry.clone());
+        save_rays_to_file(rows, cols, &position, geometry, camera);
     }
 }
