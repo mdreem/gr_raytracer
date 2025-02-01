@@ -481,6 +481,22 @@ mod tests {
         assert_eq!(matching.len(), 202);
     }
 
+    #[test]
+    fn compare_trajectories_critical() {
+        let radius = 1.0;
+
+        let r_ph = 3.0 * radius / 2.0;
+        let a_crit: f64 =  1.0 - (radius / r_ph);
+        let b_crit = r_ph /a_crit.sqrt();
+
+        let e = 1.0;
+        let l = b_crit * e;
+
+        let matching = compute_compared_trajectories(radius, e, l);
+
+        assert_eq!(matching.len(), 204);
+    }
+
     fn compute_compared_trajectories(radius: f64, e: f64, l: f64) -> Vec<Point> {
         let position = Vector4::new(0.0, 5.0, PI / 2.0, 0.0);
         let r = position[1];
