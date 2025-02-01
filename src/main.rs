@@ -2,6 +2,7 @@ use crate::scene::{Scene, TextureMapper};
 use nalgebra::Vector4;
 
 mod camera;
+mod debug;
 mod euclidean;
 mod euclidean_spherical;
 mod four_vector;
