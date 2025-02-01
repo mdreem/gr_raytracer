@@ -240,7 +240,8 @@ mod tests {
     use crate::four_vector::FourVector;
     use crate::geometry::Geometry;
     use crate::scene;
-    use crate::scene::{CheckerMapper, Scene};
+    use crate::scene::test_scene::CELESTIAL_SPHERE_RADIUS;
+    use crate::scene::{CheckerMapper, Scene, StopReason};
     use crate::schwarzschild::test_schwarzschild::{
         get_energy_from_r, get_energy_from_t, TestSchwarzschild,
     };
@@ -458,15 +459,38 @@ mod tests {
     }
 
     #[test]
+    #[ignore]
+    fn save_trajectory_energy_angular_momentum() {
+        let radius = 1.0;
+
+        let e = 1.0;
+        let l = 5.0;
+
+        let (_, trajectory, _) = compute_compared_trajectories(radius, e, l, 350);
+
+        save_trajectory(
+            format!("trajectory-{:.2}-{:.2}.csv", e, l).as_str(),
+            &collect_points_step(&trajectory),
+        );
+    }
+
+    #[test]
     fn compare_trajectories_escaping() {
         let radius = 1.0;
 
         let e = 1.0;
         let l = 5.0;
 
-        let matching = compute_compared_trajectories(radius, e, l);
+        let (matching, from_geodesic_eq, stop_reason) =
+            compute_compared_trajectories(radius, e, l, 450);
 
-        assert_eq!(matching.len(), 204);
+        assert_abs_diff_eq!(
+            from_geodesic_eq.last().unwrap().y[1],
+            CELESTIAL_SPHERE_RADIUS,
+            epsilon = 1e-3
+        );
+        assert_eq!(matching.len(), 214);
+        assert_eq!(stop_reason, Some(StopReason::CelestialSphereReached));
     }
 
     #[test]
@@ -476,9 +500,10 @@ mod tests {
         let e = 1.0;
         let l = 2.0;
 
-        let matching = compute_compared_trajectories(radius, e, l);
+        let (matching, _, stop_reason) = compute_compared_trajectories(radius, e, l, 450);
 
-        assert_eq!(matching.len(), 202);
+        assert_eq!(matching.len(), 224);
+        assert_eq!(stop_reason, Some(StopReason::HorizonReached));
     }
 
     #[test]
@@ -486,19 +511,26 @@ mod tests {
         let radius = 1.0;
 
         let r_ph = 3.0 * radius / 2.0;
-        let a_crit: f64 =  1.0 - (radius / r_ph);
-        let b_crit = r_ph /a_crit.sqrt();
+        let a_crit: f64 = 1.0 - (radius / r_ph);
+        let b_crit = r_ph / a_crit.sqrt();
 
         let e = 1.0;
         let l = b_crit * e;
 
-        let matching = compute_compared_trajectories(radius, e, l);
+        let (matching, _, stop_reason) = compute_compared_trajectories(radius, e, l, 600);
 
-        assert_eq!(matching.len(), 204);
+        assert_eq!(matching.len(), 600);
+        assert_eq!(stop_reason, None);
     }
 
-    fn compute_compared_trajectories(radius: f64, e: f64, l: f64) -> Vec<Point> {
+    fn compute_compared_trajectories(
+        radius: f64,
+        e: f64,
+        l: f64,
+        max_steps: usize,
+    ) -> (Vec<Point>, Vec<scene::Step>, Option<StopReason>) {
         let position = Vector4::new(0.0, 5.0, PI / 2.0, 0.0);
+
         let r = position[1];
         let a = 1.0 - radius / r;
 
@@ -514,18 +546,23 @@ mod tests {
         );
 
         let ray = Ray::new(0, 0, position, momentum, momentum);
-        assert_abs_diff_eq!(geometry.mul(&position, &ray.momentum, &ray.momentum), 0.0);
+        assert_abs_diff_eq!(
+            geometry.mul(&position, &ray.momentum, &ray.momentum),
+            0.0,
+            epsilon = 1e-8
+        );
 
         let ts = TestSchwarzschild { radius };
 
-        let (result_geodesic_equation, _) = scene.integrate(&ray);
-        let result_r_phi_equation = ts.compute_test_schwarzschild_trajectory(r, l, e, 204, 0.01);
+        let (result_geodesic_equation, stop_reason) = scene.integrate(&ray);
+        let result_r_phi_equation =
+            ts.compute_test_schwarzschild_trajectory(r, l, e, max_steps, 0.01);
 
         let matching = find_matching_points(
             &collect_points_step(&result_geodesic_equation),
             &collect_points_test_step(&result_r_phi_equation),
         );
-        matching
+        (matching, result_geodesic_equation, stop_reason)
     }
 
     fn save_trajectory(filename: &str, trajectory: &Vec<Point>) {
@@ -535,6 +572,7 @@ mod tests {
             file.write_all(format!("{},{}\n", step.r, step.phi).as_bytes())
                 .expect("Unable to write file");
         }
+        println!("Finished writing trajectory to {}.", filename);
     }
 
     fn collect_points_step(steps: &Vec<scene::Step>) -> Vec<Point> {

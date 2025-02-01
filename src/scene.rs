@@ -31,6 +31,7 @@ pub struct Step {
     pub step: usize,
 }
 
+#[derive(Debug, PartialEq)]
 pub enum StopReason {
     HorizonReached,
     CelestialSphereReached,
@@ -272,6 +273,7 @@ impl<T: TextureMap, G: Geometry> Scene<T, G> {
 
         for i in 1..self.max_steps {
             let last_y = y;
+
             y = rk4(&y, t, self.step_size, &self.geometry);
             t += self.step_size;
 
@@ -298,7 +300,7 @@ impl<T: TextureMap, G: Geometry> Scene<T, G> {
             file.write_all(
                 format!(
                     "{},{},{},{},{},{}\n",
-                    step.step, step.t, position[0], position[1], position[2], position[3]
+                    step.step, step.t, position[0], position[1], position[2], position[3],
                 )
                 .as_bytes(),
             )
@@ -366,6 +368,8 @@ pub mod test_scene {
     use crate::geometry::Geometry;
     use crate::scene::{CheckerMapper, Color, Scene};
 
+    pub const CELESTIAL_SPHERE_RADIUS: f64 = 15.0;
+
     pub fn create_scene<G: Geometry>(
         center_sphere_radius: f64,
         center_disk_inner_radius: f64,
@@ -379,9 +383,9 @@ pub mod test_scene {
         let texture_mapper_sphere =
             CheckerMapper::new(10.0, 10.0, Color::new(255, 0, 0), Color::new(100, 0, 0));
         let scene = Scene::new(
-            10000,
-            15.0,
-            0.01,
+            30000,
+            CELESTIAL_SPHERE_RADIUS,
+            0.001,
             center_sphere_radius,
             center_disk_inner_radius,
             center_disk_outer_radius,
@@ -401,6 +405,7 @@ mod tests {
     use crate::euclidean::EuclideanSpace;
     use crate::euclidean_spherical::EuclideanSpaceSpherical;
     use crate::four_vector::FourVector;
+    use std::f64::consts::PI;
 
     use crate::scene::test_scene::create_scene;
     use crate::scene::{CheckerMapper, Color, Scene};
@@ -447,21 +452,21 @@ mod tests {
 
     #[test]
     fn test_color_of_ray_hits_sphere_schwarzschild() {
-        let position = cartesian_to_spherical(&Vector4::new(0.0, 0.0, 0.0, -10.0));
-        let camera = Camera::new(
-            position,
-            FourVector::new_spherical(1.0, 0.0, 0.0, 0.0),
-            std::f64::consts::PI / 2.0,
-            11,
-            11,
-            Schwarzschild::new(1.0),
-        );
-        let scene = create_scene(2.0, 0.2, 0.3, EuclideanSpaceSpherical::new());
+        let position = Vector4::new(0.0, 10.0, PI / 2.0, 0.0);
+        let radius = 1.0;
+        let r = position[1];
+        let a = 1.0 - radius / r;
+        let velocity = FourVector::new_spherical(1.0 / a, -(radius / r).sqrt(), 0.0, 0.0); // we have a freely falling observer here.
+
+        let geometry = Schwarzschild::new(radius);
+
+        let camera = Camera::new(position, velocity, PI / 2.0, 11, 11, geometry.clone());
+        let scene = create_scene(2.0, 0.2, 0.3, geometry);
 
         let ray = camera.get_ray_for(6, 6);
         let color = scene.color_of_ray(&ray);
 
-        assert_eq!(color, Color::new(100, 0, 0));
+        assert_eq!(color, Color::new(255, 0, 0));
     }
 
     #[test]
