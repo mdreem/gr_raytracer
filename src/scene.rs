@@ -255,7 +255,7 @@ impl<T: TextureMap, G: Geometry> Scene<T, G> {
 
     pub fn integrate(&self, ray: &Ray) -> (Vec<Step>, Option<StopReason>) {
         let mut t = 0.0;
-        let direction = ray.direction.get_as_vector();
+        let direction = ray.momentum.get_as_vector();
         let mut y = EquationOfMotionState::from_column_slice(&[
             ray.position[0],
             ray.position[1],
