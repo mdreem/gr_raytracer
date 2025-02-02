@@ -12,9 +12,7 @@ use std::fs::File;
 use std::io::Write;
 
 pub struct Scene<T: TextureMap, G: Geometry> {
-    max_steps: usize,
-    max_radius_sq: f64,
-    step_size: f64,
+    integration_configuration: IntegrationConfiguration,
     center_sphere_radius: f64,
     center_disk_outer_radius: f64,
     center_disk_inner_radius: f64,
@@ -83,6 +81,36 @@ impl TextureMapper {
     }
 }
 
+pub struct IntegrationConfiguration {
+    max_steps: usize,
+    max_radius_sq: f64,
+    step_size: f64,
+    max_steps_celestial_continuation: usize,
+    max_radius_celestial_continuation_sq: f64,
+    step_size_celestial_continuation: f64,
+}
+
+impl IntegrationConfiguration {
+    pub fn new(
+        max_steps: usize,
+        max_radius: f64,
+        step_size: f64,
+        max_steps_celestial_continuation: usize,
+        max_radius_celestial_continuation: f64,
+        step_size_celestial_continuation: f64,
+    ) -> IntegrationConfiguration {
+        IntegrationConfiguration {
+            max_steps,
+            max_radius_sq: max_radius * max_radius,
+            step_size,
+            max_steps_celestial_continuation,
+            max_radius_celestial_continuation_sq: max_radius_celestial_continuation
+                * max_radius_celestial_continuation,
+            step_size_celestial_continuation,
+        }
+    }
+}
+
 impl TextureMap for TextureMapper {
     fn color_at_uv(&self, u: f64, v: f64) -> Color {
         let (width, height) = self.image.dimensions();
@@ -120,9 +148,7 @@ impl TextureMap for CheckerMapper {
 
 impl<T: TextureMap, G: Geometry> Scene<T, G> {
     pub fn new(
-        max_steps: usize,
-        max_radius: f64,
-        step_size: f64,
+        integration_configuration: IntegrationConfiguration,
         center_sphere_radius: f64,
         center_disk_inner_radius: f64,
         center_disk_outer_radius: f64,
@@ -134,9 +160,7 @@ impl<T: TextureMap, G: Geometry> Scene<T, G> {
         save_ray_data: bool,
     ) -> Scene<T, G> {
         Scene {
-            max_steps,
-            max_radius_sq: max_radius * max_radius,
-            step_size,
+            integration_configuration,
             center_sphere_radius,
             center_disk_outer_radius,
             center_disk_inner_radius,
@@ -235,7 +259,7 @@ impl<T: TextureMap, G: Geometry> Scene<T, G> {
         if radial_distance_spatial_part_squared(&get_position(
             &cur_y,
             self.geometry.coordinate_system(),
-        )) > self.max_radius_sq
+        )) > self.integration_configuration.max_radius_sq
         {
             return Some(CelestialSphereReached);
         }
@@ -260,11 +284,16 @@ impl<T: TextureMap, G: Geometry> Scene<T, G> {
         let mut result: Vec<Step> = Vec::new();
         result.push(Step { y, t, step: 0 });
 
-        for i in 1..self.max_steps {
+        for i in 1..self.integration_configuration.max_steps {
             let last_y = y;
 
-            y = rk4(&y, t, self.step_size, &self.geometry);
-            t += self.step_size;
+            y = rk4(
+                &y,
+                t,
+                self.integration_configuration.step_size,
+                &self.geometry,
+            );
+            t += self.integration_configuration.step_size;
 
             match self.should_stop(&last_y, &y) {
                 None => {}
@@ -350,15 +379,22 @@ impl<T: TextureMap, G: Geometry> Scene<T, G> {
                 CelestialSphereReached => {
                     let mut y = steps.last().unwrap().y;
                     let mut t = steps.last().unwrap().t;
-                    let step_size = 10.0;
-                    for _ in 1..self.max_steps {
+                    let step_size = self
+                        .integration_configuration
+                        .step_size_celestial_continuation;
+                    for _ in 1..self
+                        .integration_configuration
+                        .max_steps_celestial_continuation
+                    {
                         y = rk4(&y, t, step_size, &self.geometry);
                         t += step_size;
 
                         if radial_distance_spatial_part_squared(&get_position(
                             &y,
                             self.geometry.coordinate_system(),
-                        )) > 10000.0 * 10000.0
+                        )) > self
+                            .integration_configuration
+                            .max_radius_celestial_continuation_sq
                         {
                             break;
                         }
@@ -403,7 +439,7 @@ pub mod test_scene {
     use crate::color::Color;
     use crate::four_vector::FourVector;
     use crate::geometry::Geometry;
-    use crate::scene::{CheckerMapper, Scene};
+    use crate::scene::{CheckerMapper, IntegrationConfiguration, Scene};
     use nalgebra::Vector4;
     use std::f64::consts::PI;
 
@@ -448,10 +484,18 @@ pub mod test_scene {
             CheckerMapper::new(200.0, 10.0, Color::new(0, 0, 255), Color::new(0, 0, 100));
         let texture_mapper_sphere =
             CheckerMapper::new(10.0, 10.0, Color::new(255, 0, 0), Color::new(100, 0, 0));
-        let scene = Scene::new(
+
+        let integration_configuration = IntegrationConfiguration::new(
             30000,
             CELESTIAL_SPHERE_RADIUS,
             0.001,
+            15000,
+            10000.0,
+            1.0,
+        );
+
+        let scene = Scene::new(
+            integration_configuration,
             center_sphere_radius,
             center_disk_inner_radius,
             center_disk_outer_radius,
