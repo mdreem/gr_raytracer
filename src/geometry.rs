@@ -3,7 +3,7 @@ use crate::runge_kutta::OdeFunction;
 use crate::scene::EquationOfMotionState;
 use nalgebra::{Const, Matrix4, Vector4};
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct Tetrad {
     position: Vector4<f64>,
     pub t: FourVector,
@@ -39,6 +39,7 @@ pub trait Geometry: Clone + Sync + OdeFunction<Const<8>> + HasCoordinateSystem {
         velocity: &FourVector,
     ) -> Matrix4<f64>;
     fn mul(&self, position: &Vector4<f64>, v: &FourVector, w: &FourVector) -> f64;
+    fn get_stationary_velocity_at(&self, position: &Vector4<f64>) -> FourVector;
 }
 
 pub trait HasCoordinateSystem {

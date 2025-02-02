@@ -3,7 +3,7 @@ use crate::four_vector::{CoordinateSystem, FourVector};
 use crate::geometry::{Geometry, HasCoordinateSystem, Tetrad};
 use crate::runge_kutta::OdeFunction;
 use crate::scene::EquationOfMotionState;
-use nalgebra::{Const, Matrix4, OVector, Vector4};
+use nalgebra::{ComplexField, Const, Matrix4, OVector, Vector4};
 
 #[derive(Clone, Debug)]
 pub struct Schwarzschild {
@@ -129,6 +129,11 @@ impl Geometry for Schwarzschild {
             - v.vector[1] * w.vector[1] / a
             - r * r * v.vector[2] * w.vector[2]
             - r * r * theta.sin() * theta.sin() * v.vector[3] * w.vector[3]
+    }
+
+    fn get_stationary_velocity_at(&self, position: &Vector4<f64>) -> FourVector {
+        let a = 1.0 - self.radius / position[1];
+        FourVector::new_spherical(a.sqrt().recip(), 0.0, 0.0, 0.0)
     }
 }
 
@@ -431,10 +436,10 @@ mod tests {
         let geometry = Schwarzschild::new(radius);
         let camera = create_camera(position, radius);
         let scene: Scene<CheckerMapper, Schwarzschild> =
-            scene::test_scene::create_scene(1.0, 2.0, 7.0, geometry.clone());
+            scene::test_scene::create_scene_with_camera(1.0, 2.0, 7.0, geometry.clone(), camera);
 
-        let ray_a = camera.get_ray_for(6, 11);
-        let ray_b = camera.get_ray_for(1, 6);
+        let ray_a = scene.camera.get_ray_for(6, 11);
+        let ray_b = scene.camera.get_ray_for(1, 6);
 
         // ensure rays are rotated by 90 degrees.
         assert_abs_diff_eq!(ray_a.momentum.vector[2], ray_b.momentum.vector[3]);
@@ -534,9 +539,10 @@ mod tests {
         let r = position[1];
         let a = 1.0 - radius / r;
 
+        let velocity = FourVector::new_spherical(a.sqrt().recip(), 0.0, 0.0, 0.0);
         let geometry = Schwarzschild::new(radius);
         let scene: Scene<CheckerMapper, Schwarzschild> =
-            scene::test_scene::create_scene(1.0, 2.0, 7.0, geometry.clone());
+            scene::test_scene::create_scene(1.0, 2.0, 7.0, geometry.clone(), position, velocity);
 
         let momentum = FourVector::new_spherical(
             e / a,
