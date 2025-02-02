@@ -91,6 +91,10 @@ impl Geometry for EuclideanSpaceSpherical {
             - r * r * v.vector[2] * w.vector[2]
             - r * r * theta.sin() * theta.sin() * v.vector[3] * w.vector[3]
     }
+
+    fn get_stationary_velocity_at(&self, _position: &Vector4<f64>) -> FourVector {
+        FourVector::new_spherical(1.0, 0.0, 0.0, 0.0)
+    }
 }
 
 #[cfg(test)]
