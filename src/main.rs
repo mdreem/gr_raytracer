@@ -4,6 +4,7 @@ use nalgebra::Vector4;
 use std::f64::consts::PI;
 
 mod camera;
+mod color;
 mod debug;
 mod euclidean;
 mod euclidean_spherical;
