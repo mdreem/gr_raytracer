@@ -1,4 +1,5 @@
-use crate::camera::Ray;
+use crate::camera::{Camera, Ray};
+use crate::color::{wavelength_to_rgb, Color};
 use crate::four_vector::{CoordinateSystem, FourVector};
 use crate::geometry::Geometry;
 use crate::runge_kutta::rk4;
@@ -21,6 +22,7 @@ pub struct Scene<T: TextureMap, G: Geometry> {
     center_disk_map: T,
     center_sphere_map: T,
     pub geometry: G,
+    pub camera: Camera<G>,
     save_ray_data: bool,
 }
 
@@ -37,13 +39,6 @@ pub enum StopReason {
     CelestialSphereReached,
 }
 
-#[derive(Debug, PartialEq, Copy, Clone)]
-pub struct Color {
-    r: u8,
-    g: u8,
-    b: u8,
-}
-
 pub trait TextureMap: Sync {
     fn color_at_uv(&self, u: f64, v: f64) -> Color;
 }
@@ -57,16 +52,6 @@ pub struct CheckerMapper {
     height: f64,
     c1: Color,
     c2: Color,
-}
-
-impl Color {
-    pub fn new(r: u8, g: u8, b: u8) -> Color {
-        Color { r, g, b }
-    }
-
-    pub fn get_as_array(&self) -> [u8; 3] {
-        [self.r, self.g, self.b]
-    }
 }
 
 pub type EquationOfMotionState = OVector<f64, Const<8>>;
@@ -145,6 +130,7 @@ impl<T: TextureMap, G: Geometry> Scene<T, G> {
         center_disk_map: T,
         center_sphere_map: T,
         geometry: G,
+        camera: Camera<G>,
         save_ray_data: bool,
     ) -> Scene<T, G> {
         Scene {
@@ -158,6 +144,7 @@ impl<T: TextureMap, G: Geometry> Scene<T, G> {
             center_disk_map,
             center_sphere_map,
             geometry,
+            camera,
             save_ray_data,
         }
     }
@@ -308,7 +295,7 @@ impl<T: TextureMap, G: Geometry> Scene<T, G> {
         }
     }
 
-    pub fn color_of_ray(&self, ray: &Ray) -> Color {
+    pub fn color_of_ray(&self, ray: &Ray) -> (Color, Option<f64>) {
         let (steps, stop_reason) = self.integrate(&ray);
         let mut y = steps[0].y;
 
@@ -318,6 +305,9 @@ impl<T: TextureMap, G: Geometry> Scene<T, G> {
                 String::from(format!("ray-{}-{}.csv", ray.row, ray.col)),
             );
         }
+
+        let velocity = self.camera.velocity;
+        let observer_energy = self.geometry.mul(&ray.position, &velocity, &ray.momentum);
 
         for step in steps.iter().skip(1) {
             let last_y = y;
@@ -329,7 +319,12 @@ impl<T: TextureMap, G: Geometry> Scene<T, G> {
             ) {
                 None => {}
                 Some(c) => {
-                    return c;
+                    let redshift = self.compute_redshift(y, observer_energy);
+                    let tune_redshift = 1.0;
+                    let redshift = (redshift - 1.0) * tune_redshift + 1.0;
+                    let wavelength = 400.0 * redshift;
+                    let c = wavelength_to_rgb(wavelength);
+                    return (c, Some(redshift));
                 }
             }
 
@@ -339,7 +334,8 @@ impl<T: TextureMap, G: Geometry> Scene<T, G> {
             ) {
                 None => {}
                 Some(c) => {
-                    return c;
+                    let redshift = self.compute_redshift(y, observer_energy);
+                    return (c, Some(redshift));
                 }
             }
         }
@@ -347,7 +343,7 @@ impl<T: TextureMap, G: Geometry> Scene<T, G> {
         if let Some(reason) = stop_reason {
             match reason {
                 HorizonReached => {
-                    return Color::new(0, 0, 0);
+                    return (Color::new(0, 0, 0), None);
                 }
                 CelestialSphereReached => {
                     let y = steps.last().unwrap().y;
@@ -355,18 +351,39 @@ impl<T: TextureMap, G: Geometry> Scene<T, G> {
                         get_position(&y, self.geometry.coordinate_system()).get_as_spherical();
                     let u = (PI + point_on_celestial_sphere[2]) / (2.0 * PI);
                     let v = point_on_celestial_sphere[1] / PI;
-                    return self.celestial_map.color_at_uv(u, v);
+
+                    let redshift = self.compute_redshift(y, observer_energy);
+                    return (self.celestial_map.color_at_uv(u, v), Some(redshift));
                 }
             }
         }
-        Color::new(0, 0, 0)
+        (Color::new(0, 0, 0), None)
+    }
+
+    fn compute_redshift(&self, y: EquationOfMotionState, observer_energy: f64) -> f64 {
+        let emitter_energy = self.energy_of_stationary_emitter(y);
+        let shift = emitter_energy / observer_energy;
+        shift
+    }
+
+    fn energy_of_stationary_emitter(&self, y: EquationOfMotionState) -> f64 {
+        let position = Vector4::new(y[0], y[1], y[2], y[3]);
+        let velocity = self.geometry.get_stationary_velocity_at(&position);
+        let momentum = FourVector::new(y[4], y[5], y[6], y[7], self.geometry.coordinate_system());
+        let energy = self.geometry.mul(&position, &velocity, &momentum);
+        energy
     }
 }
 
 #[cfg(test)]
 pub mod test_scene {
+    use crate::camera::Camera;
+    use crate::color::Color;
+    use crate::four_vector::FourVector;
     use crate::geometry::Geometry;
-    use crate::scene::{CheckerMapper, Color, Scene};
+    use crate::scene::{CheckerMapper, Scene};
+    use nalgebra::Vector4;
+    use std::f64::consts::PI;
 
     pub const CELESTIAL_SPHERE_RADIUS: f64 = 15.0;
 
@@ -375,6 +392,33 @@ pub mod test_scene {
         center_disk_inner_radius: f64,
         center_disk_outer_radius: f64,
         geometry: G,
+        camera_position: Vector4<f64>,
+        camera_velocity: FourVector,
+    ) -> Scene<CheckerMapper, G> {
+        let camera = Camera::new(
+            camera_position,
+            camera_velocity,
+            PI / 4.0,
+            500,
+            500,
+            geometry.clone(), // TODO see how geometry can be distributed to all needed places.
+        );
+
+        create_scene_with_camera(
+            center_sphere_radius,
+            center_disk_inner_radius,
+            center_disk_outer_radius,
+            geometry,
+            camera,
+        )
+    }
+
+    pub fn create_scene_with_camera<G: Geometry>(
+        center_sphere_radius: f64,
+        center_disk_inner_radius: f64,
+        center_disk_outer_radius: f64,
+        geometry: G,
+        camera: Camera<G>,
     ) -> Scene<CheckerMapper, G> {
         let texture_mapper_celestial =
             CheckerMapper::new(100.0, 100.0, Color::new(0, 255, 0), Color::new(0, 100, 0));
@@ -393,6 +437,7 @@ pub mod test_scene {
             texture_mapper_disk,
             texture_mapper_sphere,
             geometry,
+            camera,
             false,
         );
         scene
@@ -405,13 +450,13 @@ mod tests {
     use crate::euclidean::EuclideanSpace;
     use crate::euclidean_spherical::EuclideanSpaceSpherical;
     use crate::four_vector::FourVector;
-    use std::f64::consts::PI;
-
-    use crate::scene::test_scene::create_scene;
+    use crate::scene::test_scene::create_scene_with_camera;
     use crate::scene::{CheckerMapper, Color, Scene};
     use crate::schwarzschild::Schwarzschild;
     use crate::spherical_coordinates_helper::cartesian_to_spherical;
-    use nalgebra::Vector4;
+    use approx::assert_abs_diff_eq;
+    use nalgebra::{ComplexField, Vector4};
+    use std::f64::consts::PI;
 
     #[test]
     fn test_color_of_ray_hits_sphere() {
@@ -423,10 +468,10 @@ mod tests {
             11,
             EuclideanSpace::new(),
         );
-        let scene = create_scene(2.0, 0.2, 0.3, EuclideanSpace::new());
+        let scene = create_scene_with_camera(2.0, 0.2, 0.3, EuclideanSpace::new(), camera);
 
-        let ray = camera.get_ray_for(6, 6);
-        let color = scene.color_of_ray(&ray);
+        let ray = scene.camera.get_ray_for(6, 6);
+        let (color, _) = scene.color_of_ray(&ray);
 
         assert_eq!(color, Color::new(100, 0, 0));
     }
@@ -442,10 +487,10 @@ mod tests {
             11,
             EuclideanSpaceSpherical::new(),
         );
-        let scene = create_scene(2.0, 0.2, 0.3, EuclideanSpaceSpherical::new());
+        let scene = create_scene_with_camera(2.0, 0.2, 0.3, EuclideanSpaceSpherical::new(), camera);
 
-        let ray = camera.get_ray_for(6, 6);
-        let color = scene.color_of_ray(&ray);
+        let ray = scene.camera.get_ray_for(6, 6);
+        let (color, _) = scene.color_of_ray(&ray);
 
         assert_eq!(color, Color::new(100, 0, 0));
     }
@@ -461,11 +506,39 @@ mod tests {
         let geometry = Schwarzschild::new(radius);
 
         let camera = Camera::new(position, velocity, PI / 2.0, 11, 11, geometry.clone());
-        let scene = create_scene(2.0, 0.2, 0.3, geometry);
+        let scene = create_scene_with_camera(2.0, 0.2, 0.3, geometry, camera);
 
-        let ray = camera.get_ray_for(6, 6);
-        let color = scene.color_of_ray(&ray);
+        let ray = scene.camera.get_ray_for(6, 6);
+        let (color, Some(redshift)) = scene.color_of_ray(&ray) else {
+            panic!("No redshift found");
+        };
 
+        assert_eq!(color, Color::new(255, 0, 0));
+    }
+
+    #[test]
+    fn test_color_of_ray_hits_sphere_schwarzschild_stationary_observer() {
+        let position = Vector4::new(0.0, 10.0, PI / 2.0, 0.0);
+        let radius = 1.0;
+        let sphere_radius = 2.0;
+        let r = position[1];
+        let a = 1.0 - radius / r;
+        let velocity = FourVector::new_spherical(a.sqrt().recip(), 0.0, 0.0, 0.0); // we have a freely falling observer here.
+
+        let geometry = Schwarzschild::new(radius);
+
+        let camera = Camera::new(position, velocity, PI / 2.0, 11, 11, geometry.clone());
+        let scene = create_scene_with_camera(sphere_radius, 0.2, 0.3, geometry, camera);
+
+        let ray = scene.camera.get_ray_for(6, 6);
+        let (color, Some(redshift)) = scene.color_of_ray(&ray) else {
+            panic!("No redshift found");
+        };
+
+        let a_emitter = 1.0 - radius / sphere_radius;
+        let expected_redshift = (a / a_emitter).sqrt();
+
+        assert_abs_diff_eq!(redshift, expected_redshift, epsilon = 1e-3);
         assert_eq!(color, Color::new(255, 0, 0));
     }
 
@@ -474,16 +547,16 @@ mod tests {
         let camera = Camera::new(
             Vector4::new(0.0, 0.0, 0.0, -10.0),
             FourVector::new_spherical(1.0, 0.0, 0.0, 0.0),
-            std::f64::consts::PI / 2.0,
+            PI / 2.0,
             11,
             11,
             EuclideanSpace::new(),
         );
         let scene: Scene<CheckerMapper, EuclideanSpace> =
-            create_scene(2.0, 0.2, 0.3, EuclideanSpace::new());
+            create_scene_with_camera(2.0, 0.2, 0.3, EuclideanSpace::new(), camera);
 
-        let ray = camera.get_ray_for(0, 0);
-        let color = scene.color_of_ray(&ray);
+        let ray = scene.camera.get_ray_for(0, 0);
+        let (color, _) = scene.color_of_ray(&ray);
 
         assert_eq!(color, Color::new(0, 100, 0));
     }
@@ -499,15 +572,15 @@ mod tests {
         let camera = Camera::new(
             position,
             velocity,
-            std::f64::consts::PI / 2.0,
+            PI / 2.0,
             11,
             11,
             Schwarzschild::new(radius),
         );
-        let scene = create_scene(2.0, 0.2, 0.3, Schwarzschild::new(radius));
+        let scene = create_scene_with_camera(2.0, 0.2, 0.3, Schwarzschild::new(radius), camera);
 
-        let ray = camera.get_ray_for(0, 0);
-        let color = scene.color_of_ray(&ray);
+        let ray = scene.camera.get_ray_for(0, 0);
+        let (color, _) = scene.color_of_ray(&ray);
 
         assert_eq!(color, Color::new(0, 100, 0));
     }
@@ -524,15 +597,15 @@ mod tests {
                 spatial_position[2],
             ),
             FourVector::new_spherical(1.0, 0.0, 0.0, 0.0),
-            std::f64::consts::PI / 2.0,
+            PI / 2.0,
             11,
             11,
             Schwarzschild::new(2.0),
         );
-        let scene = create_scene(2.0, 0.2, 0.3, Schwarzschild::new(2.0));
+        let scene = create_scene_with_camera(2.0, 0.2, 0.3, Schwarzschild::new(2.0), camera);
 
-        let ray = camera.get_ray_for(6, 6);
-        let color = scene.color_of_ray(&ray);
+        let ray = scene.camera.get_ray_for(6, 6);
+        let (color, _) = scene.color_of_ray(&ray);
 
         assert_eq!(color, Color::new(0, 0, 0));
     }
@@ -542,17 +615,18 @@ mod tests {
         let camera = Camera::new(
             Vector4::new(0.0, 0.0, 0.8, -7.0),
             FourVector::new_cartesian(1.0, 0.0, 0.0, 0.0),
-            std::f64::consts::PI / 4.0,
+            PI / 4.0,
             101,
             101,
             EuclideanSpace::new(),
         );
         let scene: Scene<CheckerMapper, EuclideanSpace> =
-            create_scene(1.0, 2.0, 7.0, EuclideanSpace::new());
+            create_scene_with_camera(1.0, 2.0, 7.0, EuclideanSpace::new(), camera);
 
-        let ray = camera.get_ray_for(0, 51);
-        let color = scene.color_of_ray(&ray);
+        let ray = scene.camera.get_ray_for(0, 51);
+        let (color, redshift) = scene.color_of_ray(&ray);
 
-        assert_eq!(color, Color::new(0, 0, 255));
+        assert_eq!(redshift, Some(1.0));
+        assert_eq!(color, Color::new(1, 0, 16));
     }
 }
