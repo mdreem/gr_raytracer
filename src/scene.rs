@@ -624,8 +624,9 @@ mod tests {
             create_scene_with_camera(1.0, 2.0, 7.0, EuclideanSpace::new(), camera);
 
         let ray = scene.camera.get_ray_for(0, 51);
-        let (color, _) = scene.color_of_ray(&ray);
+        let (color, redshift) = scene.color_of_ray(&ray);
 
-        assert_eq!(color, Color::new(0, 0, 255));
+        assert_eq!(redshift, Some(1.0));
+        assert_eq!(color, Color::new(1, 0, 16));
     }
 }
