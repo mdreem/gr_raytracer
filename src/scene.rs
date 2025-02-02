@@ -372,7 +372,10 @@ impl<T: TextureMap, G: Geometry> Scene<T, G> {
                     let v = theta / PI;
 
                     let redshift = self.compute_redshift(y, observer_energy);
-                    return (self.celestial_map.color_at_uv(u, v), Some(redshift));
+                    return (
+                        self.celestial_map.color_at_uv(1.0 - u, 1.0 - v),
+                        Some(redshift),
+                    );
                 }
             }
         }
