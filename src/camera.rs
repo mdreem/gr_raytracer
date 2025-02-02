@@ -28,13 +28,13 @@ impl Ray {
     }
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct Camera<G: Geometry> {
     alpha: f64,
-    rows: i64,
-    columns: i64,
+    pub rows: i64,
+    pub columns: i64,
     position: Vector4<f64>,
-    velocity: FourVector,
+    pub velocity: FourVector,
     geometry: G,
     tetrad: Tetrad,
 }

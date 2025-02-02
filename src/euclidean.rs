@@ -93,6 +93,10 @@ impl Geometry for EuclideanSpace {
             + (-1.0) * v.vector[2] * w.vector[2]
             + (-1.0) * v.vector[3] * w.vector[3]
     }
+
+    fn get_stationary_velocity_at(&self, _position: &Vector4<f64>) -> FourVector {
+        FourVector::new_cartesian(1.0, 0.0, 0.0, 0.0)
+    }
 }
 
 #[cfg(test)]

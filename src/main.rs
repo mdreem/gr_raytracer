@@ -1,7 +1,10 @@
+use crate::camera::Camera;
 use crate::scene::{Scene, TextureMapper};
 use nalgebra::Vector4;
+use std::f64::consts::PI;
 
 mod camera;
+mod color;
 mod debug;
 mod euclidean;
 mod euclidean_spherical;
@@ -23,6 +26,17 @@ fn render_euclidean() {
     let texture_mapper_celestial = TextureMapper::new(String::from("./resources/celestial.png"));
     let texture_mapper_disk = TextureMapper::new(String::from("./resources/disk.png"));
     let texture_mapper_sphere = TextureMapper::new(String::from("./resources/sphere.png"));
+    let geometry = EuclideanSpace::new();
+    let camera_position = Vector4::new(0.0, 0.0, 0.8, -7.0);
+
+    let camera = Camera::new(
+        camera_position,
+        FourVector::new_cartesian(1.0, 0.0, 0.0, 0.0),
+        PI / 4.0,
+        500,
+        500,
+        geometry.clone(), // TODO see how geometry can be distributed to all needed places.
+    );
 
     let scene = Scene::new(
         10000,
@@ -34,17 +48,12 @@ fn render_euclidean() {
         texture_mapper_celestial,
         texture_mapper_disk,
         texture_mapper_sphere,
-        EuclideanSpace::new(),
+        geometry,
+        camera,
         false,
     );
-    let camera_position = Vector4::new(0.0, 0.0, 0.8, -7.0);
-    let raytracer = raytracer::Raytracer::new(
-        500,
-        500,
-        camera_position,
-        FourVector::new_cartesian(1.0, 0.0, 0.0, 0.0),
-        scene,
-    );
+
+    let raytracer = raytracer::Raytracer::new(scene);
     raytracer.render();
 }
 
@@ -52,6 +61,17 @@ fn render_euclidean_spherical() {
     let texture_mapper_celestial = TextureMapper::new(String::from("./resources/celestial.png"));
     let texture_mapper_disk = TextureMapper::new(String::from("./resources/disk.png"));
     let texture_mapper_sphere = TextureMapper::new(String::from("./resources/sphere.png"));
+    let camera_position = cartesian_to_spherical(&Vector4::new(0.0, 0.0, 0.8, -7.0));
+    let geometry = EuclideanSpaceSpherical::new();
+
+    let camera = Camera::new(
+        camera_position,
+        FourVector::new_spherical(1.0, 0.0, 0.0, 0.0),
+        PI / 4.0,
+        500,
+        500,
+        geometry.clone(), // TODO see how geometry can be distributed to all needed places.
+    );
 
     let scene = Scene::new(
         10000,
@@ -63,17 +83,12 @@ fn render_euclidean_spherical() {
         texture_mapper_celestial,
         texture_mapper_disk,
         texture_mapper_sphere,
-        EuclideanSpaceSpherical::new(),
+        geometry,
+        camera,
         false,
     );
-    let camera_position = cartesian_to_spherical(&Vector4::new(0.0, 0.0, 0.8, -7.0));
-    let raytracer = raytracer::Raytracer::new(
-        500,
-        500,
-        camera_position,
-        FourVector::new_spherical(1.0, 0.0, 0.0, 0.0),
-        scene,
-    );
+
+    let raytracer = raytracer::Raytracer::new(scene);
     raytracer.render();
 }
 
@@ -83,6 +98,22 @@ fn render_schwarzschild() {
     let texture_mapper_sphere = TextureMapper::new(String::from("./resources/sphere.png"));
 
     let radius = 1.0;
+    let camera_position = cartesian_to_spherical(&Vector4::new(0.0, 0.0, 0.8, -10.0));
+
+    let r = camera_position[1];
+    let a = 1.0 - radius / r;
+    let velocity = FourVector::new_spherical(1.0 / a, -(radius / r).sqrt(), 0.0, 0.0); // we have a freely falling observer here.
+    let geometry = Schwarzschild::new(radius);
+
+    let camera = Camera::new(
+        camera_position,
+        velocity,
+        PI / 4.0,
+        250,
+        250,
+        geometry.clone(), // TODO see how geometry can be distributed to all needed places.
+    );
+
     let scene = Scene::new(
         15000,
         20.0,
@@ -93,16 +124,12 @@ fn render_schwarzschild() {
         texture_mapper_celestial,
         texture_mapper_disk,
         texture_mapper_sphere,
-        Schwarzschild::new(radius),
+        geometry,
+        camera,
         false,
     );
-    let camera_position = cartesian_to_spherical(&Vector4::new(0.0, 0.0, 0.8, -10.0));
 
-    let r = camera_position[1];
-    let a = 1.0 - radius / r;
-    let velocity = FourVector::new_spherical(1.0 / a, -(radius / r).sqrt(), 0.0, 0.0); // we have a freely falling observer here.
-
-    let raytracer = raytracer::Raytracer::new(500, 500, camera_position, velocity, scene);
+    let raytracer = raytracer::Raytracer::new(scene);
     raytracer.render();
 }
 
