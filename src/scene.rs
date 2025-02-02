@@ -1,4 +1,5 @@
 use crate::camera::{Camera, Ray};
+use crate::color::{wavelength_to_rgb, Color};
 use crate::four_vector::{CoordinateSystem, FourVector};
 use crate::geometry::Geometry;
 use crate::runge_kutta::rk4;
@@ -38,13 +39,6 @@ pub enum StopReason {
     CelestialSphereReached,
 }
 
-#[derive(Debug, PartialEq, Copy, Clone)]
-pub struct Color {
-    r: u8,
-    g: u8,
-    b: u8,
-}
-
 pub trait TextureMap: Sync {
     fn color_at_uv(&self, u: f64, v: f64) -> Color;
 }
@@ -58,16 +52,6 @@ pub struct CheckerMapper {
     height: f64,
     c1: Color,
     c2: Color,
-}
-
-impl Color {
-    pub fn new(r: u8, g: u8, b: u8) -> Color {
-        Color { r, g, b }
-    }
-
-    pub fn get_as_array(&self) -> [u8; 3] {
-        [self.r, self.g, self.b]
-    }
 }
 
 pub type EquationOfMotionState = OVector<f64, Const<8>>;
@@ -336,6 +320,10 @@ impl<T: TextureMap, G: Geometry> Scene<T, G> {
                 None => {}
                 Some(c) => {
                     let redshift = self.compute_redshift(y, observer_energy);
+                    let tune_redshift = 1.0;
+                    let redshift = (redshift - 1.0) * tune_redshift + 1.0;
+                    let wavelength = 400.0 * redshift;
+                    let c = wavelength_to_rgb(wavelength);
                     return (c, Some(redshift));
                 }
             }
@@ -390,9 +378,10 @@ impl<T: TextureMap, G: Geometry> Scene<T, G> {
 #[cfg(test)]
 pub mod test_scene {
     use crate::camera::Camera;
+    use crate::color::Color;
     use crate::four_vector::FourVector;
     use crate::geometry::Geometry;
-    use crate::scene::{CheckerMapper, Color, Scene};
+    use crate::scene::{CheckerMapper, Scene};
     use nalgebra::Vector4;
     use std::f64::consts::PI;
 
