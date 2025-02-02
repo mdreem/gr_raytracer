@@ -1,5 +1,5 @@
 use crate::camera::Camera;
-use crate::scene::{Scene, TextureMapper};
+use crate::scene::{IntegrationConfiguration, Scene, TextureMapper};
 use nalgebra::Vector4;
 use std::f64::consts::PI;
 
@@ -38,10 +38,11 @@ fn render_euclidean() {
         geometry.clone(), // TODO see how geometry can be distributed to all needed places.
     );
 
+    let integration_configuration =
+        IntegrationConfiguration::new(15000, 20.0, 0.01, 15000, 10000.0, 1.0);
+
     let scene = Scene::new(
-        10000,
-        10.0,
-        0.01,
+        integration_configuration,
         2.0,
         3.0,
         5.0,
@@ -73,10 +74,11 @@ fn render_euclidean_spherical() {
         geometry.clone(), // TODO see how geometry can be distributed to all needed places.
     );
 
+    let integration_configuration =
+        IntegrationConfiguration::new(15000, 20.0, 0.01, 15000, 10000.0, 1.0);
+
     let scene = Scene::new(
-        10000,
-        10.0,
-        0.01,
+        integration_configuration,
         2.0,
         3.0,
         5.0,
@@ -114,10 +116,11 @@ fn render_schwarzschild() {
         geometry.clone(), // TODO see how geometry can be distributed to all needed places.
     );
 
+    let integration_configuration =
+        IntegrationConfiguration::new(15000, 20.0, 0.01, 15000, 10000.0, 1.0);
+
     let scene = Scene::new(
-        15000,
-        20.0,
-        0.01,
+        integration_configuration,
         0.01,
         3.0,
         5.0,
