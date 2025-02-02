@@ -206,8 +206,10 @@ impl<T: TextureMap, G: Geometry> Scene<T, G> {
         {
             let point_on_sphere = y_start.get_as_spherical(); // approximate y_start als intersection point.
 
-            let u = (PI + point_on_sphere[2]) / (2.0 * PI);
-            let v = point_on_sphere[1] / PI;
+            let theta = point_on_sphere[1];
+            let phi = point_on_sphere[2];
+            let u = ((PI + phi) % (2.0 * PI)) / (2.0 * PI);
+            let v = theta / PI;
 
             let color = self.center_sphere_map.color_at_uv(u, v);
             return Some(color);
@@ -346,11 +348,28 @@ impl<T: TextureMap, G: Geometry> Scene<T, G> {
                     return (Color::new(0, 0, 0), None);
                 }
                 CelestialSphereReached => {
-                    let y = steps.last().unwrap().y;
+                    let mut y = steps.last().unwrap().y;
+                    let mut t = steps.last().unwrap().t;
+                    let step_size = 10.0;
+                    for _ in 1..self.max_steps {
+                        y = rk4(&y, t, step_size, &self.geometry);
+                        t += step_size;
+
+                        if radial_distance_spatial_part_squared(&get_position(
+                            &y,
+                            self.geometry.coordinate_system(),
+                        )) > 10000.0 * 10000.0
+                        {
+                            break;
+                        }
+                    }
+
                     let point_on_celestial_sphere =
                         get_position(&y, self.geometry.coordinate_system()).get_as_spherical();
-                    let u = (PI + point_on_celestial_sphere[2]) / (2.0 * PI);
-                    let v = point_on_celestial_sphere[1] / PI;
+                    let theta = point_on_celestial_sphere[1];
+                    let phi = point_on_celestial_sphere[2];
+                    let u = ((PI + phi) % (2.0 * PI)) / (2.0 * PI);
+                    let v = theta / PI;
 
                     let redshift = self.compute_redshift(y, observer_energy);
                     return (self.celestial_map.color_at_uv(u, v), Some(redshift));
@@ -558,7 +577,7 @@ mod tests {
         let ray = scene.camera.get_ray_for(0, 0);
         let (color, _) = scene.color_of_ray(&ray);
 
-        assert_eq!(color, Color::new(0, 100, 0));
+        assert_eq!(color, Color::new(0, 255, 0));
     }
 
     #[test]
@@ -582,7 +601,7 @@ mod tests {
         let ray = scene.camera.get_ray_for(0, 0);
         let (color, _) = scene.color_of_ray(&ray);
 
-        assert_eq!(color, Color::new(0, 100, 0));
+        assert_eq!(color, Color::new(0, 255, 0));
     }
 
     #[test]
