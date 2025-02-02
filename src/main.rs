@@ -27,7 +27,7 @@ fn render_euclidean() {
     let texture_mapper_disk = TextureMapper::new(String::from("./resources/disk.png"));
     let texture_mapper_sphere = TextureMapper::new(String::from("./resources/sphere.png"));
     let geometry = EuclideanSpace::new();
-    let camera_position = Vector4::new(0.0, 0.0, 0.8, -7.0);
+    let camera_position = Vector4::new(0.0, 0.0, 0.8, -15.0);
 
     let camera = Camera::new(
         camera_position,
@@ -39,7 +39,7 @@ fn render_euclidean() {
     );
 
     let integration_configuration =
-        IntegrationConfiguration::new(15000, 20.0, 0.01, 15000, 10000.0, 1.0);
+        IntegrationConfiguration::new(15000, 20.0, 0.01, 15000, 10000.0, 15.0);
 
     let scene = Scene::new(
         integration_configuration,
@@ -100,11 +100,11 @@ fn render_schwarzschild() {
     let texture_mapper_sphere = TextureMapper::new(String::from("./resources/sphere.png"));
 
     let radius = 1.0;
-    let camera_position = cartesian_to_spherical(&Vector4::new(0.0, 0.0, 0.8, -10.0));
+    let camera_position = cartesian_to_spherical(&Vector4::new(0.0, 0.0, 0.8, -18.0));
 
     let r = camera_position[1];
     let a = 1.0 - radius / r;
-    let velocity = FourVector::new_spherical(1.0 / a, -(radius / r).sqrt(), 0.0, 0.0); // we have a freely falling observer here.
+    let velocity = FourVector::new_spherical(1.0 / a.sqrt(), 0.0, 0.0, 0.0); // we have a freely falling observer here.
     let geometry = Schwarzschild::new(radius);
 
     let camera = Camera::new(
@@ -117,7 +117,7 @@ fn render_schwarzschild() {
     );
 
     let integration_configuration =
-        IntegrationConfiguration::new(15000, 20.0, 0.01, 15000, 10000.0, 1.0);
+        IntegrationConfiguration::new(15000, 25.0, 0.01, 15000, 10000.0, 15.0);
 
     let scene = Scene::new(
         integration_configuration,
