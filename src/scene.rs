@@ -247,11 +247,20 @@ impl<T: TextureMap, G: Geometry> Scene<T, G> {
         last_y: &EquationOfMotionState,
         cur_y: &EquationOfMotionState,
     ) -> Option<StopReason> {
+        let position = get_position(&cur_y, self.geometry.coordinate_system());
+
         // Check if there is a big jump. This happens when crossing the horizon and is a
         // heuristic here to mark this ray as entering the black hole.
         // TODO: find a better way.
         let position_jump = get_position(&(last_y - cur_y), self.geometry.coordinate_system());
         if position_jump.get_spatial_vector().norm() > 1.0 {
+            return Some(HorizonReached);
+        }
+
+        if self
+            .geometry
+            .inside_horizon(&Vector4::new(cur_y[0], cur_y[1], cur_y[2], cur_y[3]))
+        {
             return Some(HorizonReached);
         }
 
@@ -406,6 +415,9 @@ impl<T: TextureMap, G: Geometry> Scene<T, G> {
                     let phi = point_on_celestial_sphere[2];
                     let u = ((PI + phi) % (2.0 * PI)) / (2.0 * PI);
                     let v = theta / PI;
+
+                    // println!("theta: {}, phi: {}", theta, phi);
+                    // println!("u: {}, v: {}", u, v);
 
                     let redshift = self.compute_redshift(y, observer_energy);
                     return (

@@ -97,6 +97,10 @@ impl Geometry for EuclideanSpace {
     fn get_stationary_velocity_at(&self, _position: &Vector4<f64>) -> FourVector {
         FourVector::new_cartesian(1.0, 0.0, 0.0, 0.0)
     }
+
+    fn inside_horizon(&self, _position: &Vector4<f64>) -> bool {
+        false
+    }
 }
 
 #[cfg(test)]

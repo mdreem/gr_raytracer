@@ -135,6 +135,10 @@ impl Geometry for Schwarzschild {
         let a = 1.0 - self.radius / position[1];
         FourVector::new_spherical(a.sqrt().recip(), 0.0, 0.0, 0.0)
     }
+
+    fn inside_horizon(&self, position: &Vector4<f64>) -> bool {
+        position[1] <= self.radius
+    }
 }
 
 #[cfg(test)]
