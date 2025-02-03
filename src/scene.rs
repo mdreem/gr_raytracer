@@ -232,7 +232,7 @@ impl<T: TextureMap, G: Geometry> Scene<T, G> {
 
             let theta = point_on_sphere[1];
             let phi = point_on_sphere[2];
-            let u = ((PI + phi) % (2.0 * PI)) / (2.0 * PI);
+            let u = (PI + phi) / (2.0 * PI);
             let v = theta / PI;
 
             let color = self.center_sphere_map.color_at_uv(u, v);
@@ -391,6 +391,8 @@ impl<T: TextureMap, G: Geometry> Scene<T, G> {
                     let step_size = self
                         .integration_configuration
                         .step_size_celestial_continuation;
+
+                    // integrate further until we are far out.
                     for _ in 1..self
                         .integration_configuration
                         .max_steps_celestial_continuation
@@ -413,11 +415,8 @@ impl<T: TextureMap, G: Geometry> Scene<T, G> {
                         get_position(&y, self.geometry.coordinate_system()).get_as_spherical();
                     let theta = point_on_celestial_sphere[1];
                     let phi = point_on_celestial_sphere[2];
-                    let u = ((PI + phi) % (2.0 * PI)) / (2.0 * PI);
+                    let u = (PI + phi) / (2.0 * PI);
                     let v = theta / PI;
-
-                    // println!("theta: {}, phi: {}", theta, phi);
-                    // println!("u: {}, v: {}", u, v);
 
                     let redshift = self.compute_redshift(y, observer_energy);
                     return (
