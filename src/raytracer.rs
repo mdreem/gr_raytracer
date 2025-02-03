@@ -19,12 +19,8 @@ impl<T: TextureMap, G: Geometry> Raytracer<T, G> {
         println!("color: {:?}", color);
     }
 
-    pub fn render(&self) {
-        let mut imgbuf = image::ImageBuffer::new(
-            self.scene.camera.columns as u32,
-            self.scene.camera.rows as u32,
-        );
-        // TODO: maybe change image width and height types to align through the codebase
+    pub fn render_section(&self, from_row: u32, from_col: u32, to_row: u32, to_col: u32) {
+        let mut imgbuf = image::ImageBuffer::new(to_col - from_col, to_row - from_row);
 
         let count = AtomicUsize::new(0);
         let max_count = self.scene.camera.rows * self.scene.camera.columns;
@@ -40,12 +36,32 @@ impl<T: TextureMap, G: Geometry> Raytracer<T, G> {
                 last_progress.store(progress, Ordering::Relaxed);
             }
 
-            let ray = self.scene.camera.get_ray_for(y as i64, x as i64);
+            let ray = self
+                .scene
+                .camera
+                .get_ray_for((y + from_row) as i64, (x + from_col) as i64);
             let (color, _) = self.scene.color_of_ray(&ray);
             *pixel = image::Rgb(color.get_as_array());
         });
 
         imgbuf.save("render.png").unwrap();
         println!("saved image");
+    }
+
+    // TODO: maybe change image width and height types to align through the codebase
+
+    pub fn render(&self) {
+        self.render_section(
+            0,
+            0,
+            self.scene.camera.rows as u32,
+            self.scene.camera.columns as u32,
+        );
+    }
+
+    pub fn render_point(&self, row: i64, col: i64) {
+        let ray = self.scene.camera.get_ray_for(row, col);
+        let (color, _) = self.scene.color_of_ray(&ray);
+        println!("color: {:?}", color);
     }
 }
