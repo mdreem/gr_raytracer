@@ -40,6 +40,7 @@ pub trait Geometry: Clone + Sync + OdeFunction<Const<8>> + HasCoordinateSystem {
     ) -> Matrix4<f64>;
     fn mul(&self, position: &Vector4<f64>, v: &FourVector, w: &FourVector) -> f64;
     fn get_stationary_velocity_at(&self, position: &Vector4<f64>) -> FourVector;
+    fn inside_horizon(&self, position: &Vector4<f64>) -> bool;
 }
 
 pub trait HasCoordinateSystem {

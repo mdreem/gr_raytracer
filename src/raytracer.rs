@@ -49,7 +49,6 @@ impl<T: TextureMap, G: Geometry> Raytracer<T, G> {
     }
 
     // TODO: maybe change image width and height types to align through the codebase
-
     pub fn render(&self) {
         self.render_section(
             0,
