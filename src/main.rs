@@ -2,6 +2,7 @@ use crate::camera::Camera;
 use crate::scene::{IntegrationConfiguration, Scene, TextureMapper};
 use nalgebra::Vector4;
 use std::f64::consts::PI;
+use std::time::Instant;
 
 mod camera;
 mod color;
@@ -137,7 +138,11 @@ fn render_schwarzschild() {
 }
 
 fn main() {
+    let start = Instant::now();
     // render_euclidean();
     // render_euclidean_spherical();
     render_schwarzschild();
+    
+    let duration = start.elapsed();
+    println!("Elapsed time: {:.2?}", duration);
 }
