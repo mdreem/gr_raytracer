@@ -9,7 +9,7 @@ pub fn save_rays_to_file<G: Geometry>(
     cols: i64,
     position: &Vector4<f64>,
     geometry: G,
-    camera: Camera<G>,
+    camera: Camera,
 ) {
     let mut file = File::create("rays.csv").expect("Unable to create file");
     file.write_all(b"row,col,d_x0,d_x1,d_x2,d_x3,m_x0,m_x1,m_x2,m_x3,m_sc,d_sc\n")
