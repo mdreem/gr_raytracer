@@ -20,7 +20,7 @@ pub struct Scene<T: TextureMap, G: Geometry> {
     center_disk_map: T,
     center_sphere_map: T,
     pub geometry: G,
-    pub camera: Camera<G>,
+    pub camera: Camera,
     save_ray_data: bool,
 }
 
@@ -156,7 +156,7 @@ impl<T: TextureMap, G: Geometry> Scene<T, G> {
         center_disk_map: T,
         center_sphere_map: T,
         geometry: G,
-        camera: Camera<G>,
+        camera: Camera,
         save_ray_data: bool,
     ) -> Scene<T, G> {
         Scene {
@@ -247,8 +247,6 @@ impl<T: TextureMap, G: Geometry> Scene<T, G> {
         last_y: &EquationOfMotionState,
         cur_y: &EquationOfMotionState,
     ) -> Option<StopReason> {
-        let position = get_position(&cur_y, self.geometry.coordinate_system());
-
         // Check if there is a big jump. This happens when crossing the horizon and is a
         // heuristic here to mark this ray as entering the black hole.
         // TODO: find a better way.
@@ -358,7 +356,7 @@ impl<T: TextureMap, G: Geometry> Scene<T, G> {
                 &get_position(&y, self.geometry.coordinate_system()),
             ) {
                 None => {}
-                Some(c) => {
+                Some(c) => { // TODO: use c
                     let redshift = self.compute_redshift(y, observer_energy);
                     let tune_redshift = 1.0;
                     let redshift = (redshift - 1.0) * tune_redshift + 1.0;
@@ -470,7 +468,7 @@ pub mod test_scene {
             PI / 4.0,
             500,
             500,
-            geometry.clone(), // TODO see how geometry can be distributed to all needed places.
+            &geometry,
         );
 
         create_scene_with_camera(
@@ -487,7 +485,7 @@ pub mod test_scene {
         center_disk_inner_radius: f64,
         center_disk_outer_radius: f64,
         geometry: G,
-        camera: Camera<G>,
+        camera: Camera,
     ) -> Scene<CheckerMapper, G> {
         let texture_mapper_celestial =
             CheckerMapper::new(100.0, 100.0, Color::new(0, 255, 0), Color::new(0, 100, 0));
@@ -543,7 +541,7 @@ mod tests {
             std::f64::consts::PI / 2.0,
             11,
             11,
-            EuclideanSpace::new(),
+            &EuclideanSpace::new(),
         );
         let scene = create_scene_with_camera(2.0, 0.2, 0.3, EuclideanSpace::new(), camera);
 
@@ -562,7 +560,7 @@ mod tests {
             std::f64::consts::PI / 2.0,
             11,
             11,
-            EuclideanSpaceSpherical::new(),
+            &EuclideanSpaceSpherical::new(),
         );
         let scene = create_scene_with_camera(2.0, 0.2, 0.3, EuclideanSpaceSpherical::new(), camera);
 
@@ -582,7 +580,7 @@ mod tests {
 
         let geometry = Schwarzschild::new(radius);
 
-        let camera = Camera::new(position, velocity, PI / 2.0, 11, 11, geometry.clone());
+        let camera = Camera::new(position, velocity, PI / 2.0, 11, 11, &geometry);
         let scene = create_scene_with_camera(2.0, 0.2, 0.3, geometry, camera);
 
         let ray = scene.camera.get_ray_for(6, 6);
@@ -604,7 +602,7 @@ mod tests {
 
         let geometry = Schwarzschild::new(radius);
 
-        let camera = Camera::new(position, velocity, PI / 2.0, 11, 11, geometry.clone());
+        let camera = Camera::new(position, velocity, PI / 2.0, 11, 11, &geometry);
         let scene = create_scene_with_camera(sphere_radius, 0.2, 0.3, geometry, camera);
 
         let ray = scene.camera.get_ray_for(6, 6);
@@ -627,7 +625,7 @@ mod tests {
             PI / 2.0,
             11,
             11,
-            EuclideanSpace::new(),
+            &EuclideanSpace::new(),
         );
         let scene: Scene<CheckerMapper, EuclideanSpace> =
             create_scene_with_camera(2.0, 0.2, 0.3, EuclideanSpace::new(), camera);
@@ -652,7 +650,7 @@ mod tests {
             PI / 2.0,
             11,
             11,
-            Schwarzschild::new(radius),
+            &Schwarzschild::new(radius),
         );
         let scene = create_scene_with_camera(2.0, 0.2, 0.3, Schwarzschild::new(radius), camera);
 
@@ -677,7 +675,7 @@ mod tests {
             PI / 2.0,
             11,
             11,
-            Schwarzschild::new(2.0),
+            &Schwarzschild::new(2.0),
         );
         let scene = create_scene_with_camera(2.0, 0.2, 0.3, Schwarzschild::new(2.0), camera);
 
@@ -695,7 +693,7 @@ mod tests {
             PI / 4.0,
             101,
             101,
-            EuclideanSpace::new(),
+            &EuclideanSpace::new(),
         );
         let scene: Scene<CheckerMapper, EuclideanSpace> =
             create_scene_with_camera(1.0, 2.0, 7.0, EuclideanSpace::new(), camera);

@@ -29,13 +29,12 @@ impl Ray {
 }
 
 #[derive(Debug, Clone)]
-pub struct Camera<G: Geometry> {
+pub struct Camera {
     alpha: f64,
     pub rows: i64,
     pub columns: i64,
     position: Vector4<f64>,
     pub velocity: FourVector,
-    geometry: G,
     tetrad: Tetrad,
 }
 
@@ -87,19 +86,19 @@ pub fn lorentz_transform_tetrad<G: Geometry>(
     )
 }
 
-impl<G: Geometry> Camera<G> {
+impl Camera {
     // Position is given in cartesian coordinates.
-    pub fn new(
+    pub fn new<G: Geometry>(
         position: Vector4<f64>,
         velocity: FourVector,
         alpha: f64,
         rows: i64,
         columns: i64,
-        geometry: G,
-    ) -> Camera<G> {
+        geometry: &G,
+    ) -> Camera {
         let original_tetrad = geometry.get_tetrad_at(&position);
         println!("original_tetrad: {:?}", original_tetrad);
-        let tetrad = lorentz_transform_tetrad(&geometry, &original_tetrad, &position, &velocity);
+        let tetrad = lorentz_transform_tetrad(geometry, &original_tetrad, &position, &velocity);
         println!("tetrad: {:?}", tetrad);
         Self {
             position,
@@ -107,7 +106,6 @@ impl<G: Geometry> Camera<G> {
             alpha,
             rows,
             columns,
-            geometry,
             tetrad,
         }
     }
@@ -152,7 +150,7 @@ mod tests {
             PI / 2.0,
             11,
             11,
-            EuclideanSpace::new(),
+            &EuclideanSpace::new(),
         );
         let geometry = EuclideanSpace::new();
         let position = Vector4::new(0.0, 0.0, 1.0, 0.0);

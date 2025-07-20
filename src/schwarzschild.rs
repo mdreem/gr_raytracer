@@ -345,7 +345,7 @@ mod tests {
             PI / 2.0,
             rows,
             cols,
-            Schwarzschild::new(2.0),
+            &Schwarzschild::new(2.0),
         );
 
         save_rays_to_file(rows, cols, &position, geometry, camera);
@@ -365,7 +365,7 @@ mod tests {
             PI / 2.0,
             11,
             11,
-            Schwarzschild::new(2.0),
+            &Schwarzschild::new(2.0),
         );
 
         let ray = camera.get_ray_for(1, 6);
@@ -377,7 +377,7 @@ mod tests {
         assert_abs_diff_eq!(geometry.mul(&position, &ray.momentum, &ray.momentum), 0.0);
     }
 
-    fn create_camera(position: Vector4<f64>, radius: f64) -> Camera<Schwarzschild> {
+    fn create_camera(position: Vector4<f64>, radius: f64) -> Camera {
         let r = position[1];
         let a = 1.0 - radius / r;
         let velocity = FourVector::new_spherical(1.0 / a, -(radius / r).sqrt(), 0.0, 0.0); // we have a freely falling observer here.
@@ -387,7 +387,7 @@ mod tests {
             PI / 2.0,
             11,
             11,
-            Schwarzschild::new(radius),
+            &Schwarzschild::new(radius),
         );
         camera
     }
