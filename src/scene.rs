@@ -417,32 +417,38 @@ impl<'a, T: TextureMap, G: Geometry> Scene<'a, T, G> {
         }
 
         if let Some(reason) = stop_reason {
-            match reason {
-                HorizonReached => {
-                    return (Color::new(0, 0, 0), None);
-                }
+            return match reason {
+                HorizonReached => (Color::new(0, 0, 0), None),
                 CelestialSphereReached => {
-                    let y = steps.last().unwrap().y;
-                    let t = steps.last().unwrap().t;
-
-                    let y_far = self.integrator.integrate_to_celestial_sphere(y, t);
-
-                    let point_on_celestial_sphere =
-                        get_position(&y_far, self.geometry.coordinate_system()).get_as_spherical();
-                    let theta = point_on_celestial_sphere[1];
-                    let phi = point_on_celestial_sphere[2];
-                    let u = (PI + phi) / (2.0 * PI);
-                    let v = theta / PI;
-
-                    let redshift = self.compute_redshift(y_far, observer_energy);
-                    return (
-                        self.celestial_map.color_at_uv(1.0 - u, 1.0 - v),
-                        Some(redshift),
-                    );
+                    self.color_after_extending_to_celestial_sphere(steps, observer_energy)
                 }
-            }
+            };
         }
         (Color::new(0, 0, 0), None)
+    }
+
+    fn color_after_extending_to_celestial_sphere(
+        &self,
+        steps: Vec<Step>,
+        observer_energy: f64,
+    ) -> (Color, Option<f64>) {
+        let y = steps.last().unwrap().y;
+        let t = steps.last().unwrap().t;
+
+        let y_far = self.integrator.integrate_to_celestial_sphere(y, t);
+
+        let point_on_celestial_sphere =
+            get_position(&y_far, self.geometry.coordinate_system()).get_as_spherical();
+        let theta = point_on_celestial_sphere[1];
+        let phi = point_on_celestial_sphere[2];
+        let u = (PI + phi) / (2.0 * PI);
+        let v = theta / PI;
+
+        let redshift = self.compute_redshift(y_far, observer_energy);
+        (
+            self.celestial_map.color_at_uv(1.0 - u, 1.0 - v),
+            Some(redshift),
+        )
     }
 
     fn compute_redshift(&self, y: EquationOfMotionState, observer_energy: f64) -> f64 {
