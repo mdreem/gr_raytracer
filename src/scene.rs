@@ -65,11 +65,6 @@ pub fn get_position(y: &EquationOfMotionState, coordinate_system: CoordinateSyst
     }
 }
 
-fn radial_distance_spatial_part_squared(pos: &FourVector) -> f64 {
-    let v = pos.get_as_vector();
-    v[1] * v[1] + v[2] * v[2] + v[3] * v[3]
-}
-
 impl TextureMapper {
     pub fn new(filename: String) -> TextureMapper {
         let image = ImageReader::open(filename)
@@ -166,7 +161,7 @@ impl<'a, G: Geometry> Integrator<'a, G> {
             direction[3],
         ]);
 
-        let mut result: Vec<Step> = Vec::new();
+        let mut result: Vec<Step> = Vec::with_capacity(self.integration_configuration.max_steps);
         result.push(Step { y, t, step: 0 });
 
         for i in 1..self.integration_configuration.max_steps {
@@ -212,10 +207,9 @@ impl<'a, G: Geometry> Integrator<'a, G> {
         }
 
         // iterate until the celestial plane distance has been reached.
-        if radial_distance_spatial_part_squared(&get_position(
-            &cur_y,
-            self.geometry.coordinate_system(),
-        )) > self.integration_configuration.max_radius_sq
+        if get_position(&cur_y, self.geometry.coordinate_system())
+            .radial_distance_spatial_part_squared()
+            > self.integration_configuration.max_radius_sq
         {
             return Some(CelestialSphereReached);
         }
@@ -243,12 +237,11 @@ impl<'a, G: Geometry> Integrator<'a, G> {
             y_cur = rk4(&y_cur, t, step_size, self.geometry);
             t_cur += step_size;
 
-            if radial_distance_spatial_part_squared(&get_position(
-                &y_cur,
-                self.geometry.coordinate_system(),
-            )) > self
-                .integration_configuration
-                .max_radius_celestial_continuation_sq
+            if get_position(&y_cur, self.geometry.coordinate_system())
+                .radial_distance_spatial_part_squared()
+                > self
+                    .integration_configuration
+                    .max_radius_celestial_continuation_sq
             {
                 return y_cur;
             }
@@ -335,8 +328,8 @@ impl<'a, T: TextureMap, G: Geometry> Scene<'a, T, G> {
 
     // TODO: handle spherical coordinates here!
     fn intersects_with_sphere(&self, y_start: &FourVector, y_end: &FourVector) -> Option<Color> {
-        let r_start = radial_distance_spatial_part_squared(&y_start);
-        let r_end = radial_distance_spatial_part_squared(&y_end);
+        let r_start = y_start.radial_distance_spatial_part_squared();
+        let r_end = y_end.radial_distance_spatial_part_squared();
 
         if (r_start >= self.center_sphere_radius.powi(2)
             && r_end <= self.center_sphere_radius.powi(2))

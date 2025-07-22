@@ -117,6 +117,11 @@ impl FourVector {
             }
         }
     }
+
+    pub fn radial_distance_spatial_part_squared(&self) -> f64 {
+        let v = self.vector;
+        v[1] * v[1] + v[2] * v[2] + v[3] * v[3]
+    }
 }
 
 #[cfg(test)]
