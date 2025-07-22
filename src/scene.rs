@@ -250,7 +250,7 @@ impl<'a, G: Geometry> Integrator<'a, G> {
                 return y_cur;
             }
         }
-        y
+        y_cur
     }
 }
 
