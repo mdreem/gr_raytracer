@@ -11,15 +11,19 @@ use std::f64::consts::PI;
 use std::fs::File;
 use std::io::Write;
 
-pub struct Scene<T: TextureMap, G: Geometry> {
-    integration_configuration: IntegrationConfiguration,
+pub struct TextureData<T: TextureMap> {
+    pub celestial_map: T,
+    pub center_disk_map: T,
+    pub center_sphere_map: T,
+}
+
+pub struct Scene<'a, T: TextureMap, G: Geometry> {
+    pub integrator: Integrator<'a, G>,
     center_sphere_radius: f64,
     center_disk_outer_radius: f64,
     center_disk_inner_radius: f64,
-    celestial_map: T,
-    center_disk_map: T,
-    center_sphere_map: T,
-    pub geometry: G,
+    texture_data: TextureData<T>,
+    pub geometry: &'a G,
     pub camera: Camera,
     save_ray_data: bool,
 }
@@ -65,11 +69,6 @@ pub fn get_position(y: &EquationOfMotionState, coordinate_system: CoordinateSyst
     }
 }
 
-fn radial_distance_spatial_part_squared(pos: &FourVector) -> f64 {
-    let v = pos.get_as_vector();
-    v[1] * v[1] + v[2] * v[2] + v[3] * v[3]
-}
-
 impl TextureMapper {
     pub fn new(filename: String) -> TextureMapper {
         let image = ImageReader::open(filename)
@@ -79,6 +78,11 @@ impl TextureMapper {
 
         TextureMapper { image }
     }
+}
+
+pub struct Integrator<'a, G: Geometry> {
+    integration_configuration: IntegrationConfiguration,
+    geometry: &'a G,
 }
 
 pub struct IntegrationConfiguration {
@@ -146,27 +150,131 @@ impl TextureMap for CheckerMapper {
     }
 }
 
-impl<T: TextureMap, G: Geometry> Scene<T, G> {
+impl<'a, G: Geometry> Integrator<'a, G> {
+    pub fn integrate(&self, ray: &Ray) -> (Vec<Step>, Option<StopReason>) {
+        let mut t = 0.0;
+        let direction = ray.momentum.get_as_vector();
+        let mut y = EquationOfMotionState::from_column_slice(&[
+            ray.position[0],
+            ray.position[1],
+            ray.position[2],
+            ray.position[3],
+            direction[0],
+            direction[1],
+            direction[2],
+            direction[3],
+        ]);
+
+        let mut result: Vec<Step> = Vec::with_capacity(self.integration_configuration.max_steps);
+        result.push(Step { y, t, step: 0 });
+
+        for i in 1..self.integration_configuration.max_steps {
+            let last_y = y;
+
+            y = rk4(
+                &y,
+                t,
+                self.integration_configuration.step_size,
+                self.geometry,
+            );
+            t += self.integration_configuration.step_size;
+
+            match self.should_stop(&last_y, &y) {
+                None => {}
+                Some(r) => return (result, Some(r)),
+            }
+
+            result.push(Step { y, t, step: i });
+        }
+
+        (result, None)
+    }
+
+    fn should_stop(
+        &self,
+        last_y: &EquationOfMotionState,
+        cur_y: &EquationOfMotionState,
+    ) -> Option<StopReason> {
+        // Check if there is a big jump. This happens when crossing the horizon and is a
+        // heuristic here to mark this ray as entering the black hole.
+        // TODO: find a better way.
+        let position_jump = get_position(&(last_y - cur_y), self.geometry.coordinate_system());
+        if position_jump.get_spatial_vector().norm() > 1.0 {
+            return Some(HorizonReached);
+        }
+
+        if self
+            .geometry
+            .inside_horizon(&Vector4::new(cur_y[0], cur_y[1], cur_y[2], cur_y[3]))
+        {
+            return Some(HorizonReached);
+        }
+
+        // iterate until the celestial plane distance has been reached.
+        if get_position(&cur_y, self.geometry.coordinate_system())
+            .radial_distance_spatial_part_squared()
+            > self.integration_configuration.max_radius_sq
+        {
+            return Some(CelestialSphereReached);
+        }
+
+        None
+    }
+
+    fn integrate_to_celestial_sphere(
+        &self,
+        y: EquationOfMotionState,
+        t: f64,
+    ) -> EquationOfMotionState {
+        let step_size = self
+            .integration_configuration
+            .step_size_celestial_continuation;
+
+        let mut y_cur = y;
+        let mut t_cur = t;
+
+        // integrate further until we are far out.
+        for _ in 1..self
+            .integration_configuration
+            .max_steps_celestial_continuation
+        {
+            y_cur = rk4(&y_cur, t, step_size, self.geometry);
+            t_cur += step_size;
+
+            if get_position(&y_cur, self.geometry.coordinate_system())
+                .radial_distance_spatial_part_squared()
+                > self
+                    .integration_configuration
+                    .max_radius_celestial_continuation_sq
+            {
+                return y_cur;
+            }
+        }
+        y_cur
+    }
+}
+
+impl<'a, T: TextureMap, G: Geometry> Scene<'a, T, G> {
     pub fn new(
         integration_configuration: IntegrationConfiguration,
         center_sphere_radius: f64,
         center_disk_inner_radius: f64,
         center_disk_outer_radius: f64,
-        celestial_map: T,
-        center_disk_map: T,
-        center_sphere_map: T,
-        geometry: G,
+        texture_data: TextureData<T>,
+        geometry: &'a G,
         camera: Camera,
         save_ray_data: bool,
-    ) -> Scene<T, G> {
-        Scene {
+    ) -> Scene<'a, T, G> {
+        let integrator = Integrator {
             integration_configuration,
+            geometry,
+        };
+        Scene {
+            integrator,
             center_sphere_radius,
             center_disk_outer_radius,
             center_disk_inner_radius,
-            celestial_map,
-            center_disk_map,
-            center_sphere_map,
+            texture_data,
             geometry,
             camera,
             save_ray_data,
@@ -211,7 +319,7 @@ impl<T: TextureMap, G: Geometry> Scene<T, G> {
             let v = (rr.sqrt() - self.center_disk_inner_radius)
                 / (self.center_disk_outer_radius - self.center_disk_inner_radius);
 
-            let color = self.center_disk_map.color_at_uv(u, v);
+            let color = self.texture_data.center_disk_map.color_at_uv(u, v);
             Some(color)
         } else {
             None
@@ -220,8 +328,8 @@ impl<T: TextureMap, G: Geometry> Scene<T, G> {
 
     // TODO: handle spherical coordinates here!
     fn intersects_with_sphere(&self, y_start: &FourVector, y_end: &FourVector) -> Option<Color> {
-        let r_start = radial_distance_spatial_part_squared(&y_start);
-        let r_end = radial_distance_spatial_part_squared(&y_end);
+        let r_start = y_start.radial_distance_spatial_part_squared();
+        let r_end = y_end.radial_distance_spatial_part_squared();
 
         if (r_start >= self.center_sphere_radius.powi(2)
             && r_end <= self.center_sphere_radius.powi(2))
@@ -235,82 +343,11 @@ impl<T: TextureMap, G: Geometry> Scene<T, G> {
             let u = (PI + phi) / (2.0 * PI);
             let v = theta / PI;
 
-            let color = self.center_sphere_map.color_at_uv(u, v);
+            let color = self.texture_data.center_sphere_map.color_at_uv(u, v);
             return Some(color);
         }
 
         None
-    }
-
-    fn should_stop(
-        &self,
-        last_y: &EquationOfMotionState,
-        cur_y: &EquationOfMotionState,
-    ) -> Option<StopReason> {
-        // Check if there is a big jump. This happens when crossing the horizon and is a
-        // heuristic here to mark this ray as entering the black hole.
-        // TODO: find a better way.
-        let position_jump = get_position(&(last_y - cur_y), self.geometry.coordinate_system());
-        if position_jump.get_spatial_vector().norm() > 1.0 {
-            return Some(HorizonReached);
-        }
-
-        if self
-            .geometry
-            .inside_horizon(&Vector4::new(cur_y[0], cur_y[1], cur_y[2], cur_y[3]))
-        {
-            return Some(HorizonReached);
-        }
-
-        // iterate until the celestial plane distance has been reached.
-        if radial_distance_spatial_part_squared(&get_position(
-            &cur_y,
-            self.geometry.coordinate_system(),
-        )) > self.integration_configuration.max_radius_sq
-        {
-            return Some(CelestialSphereReached);
-        }
-
-        None
-    }
-
-    pub fn integrate(&self, ray: &Ray) -> (Vec<Step>, Option<StopReason>) {
-        let mut t = 0.0;
-        let direction = ray.momentum.get_as_vector();
-        let mut y = EquationOfMotionState::from_column_slice(&[
-            ray.position[0],
-            ray.position[1],
-            ray.position[2],
-            ray.position[3],
-            direction[0],
-            direction[1],
-            direction[2],
-            direction[3],
-        ]);
-
-        let mut result: Vec<Step> = Vec::new();
-        result.push(Step { y, t, step: 0 });
-
-        for i in 1..self.integration_configuration.max_steps {
-            let last_y = y;
-
-            y = rk4(
-                &y,
-                t,
-                self.integration_configuration.step_size,
-                &self.geometry,
-            );
-            t += self.integration_configuration.step_size;
-
-            match self.should_stop(&last_y, &y) {
-                None => {}
-                Some(r) => return (result, Some(r)),
-            }
-
-            result.push(Step { y, t, step: i });
-        }
-
-        (result, None)
     }
 
     fn save_steps(&self, steps: &Vec<Step>, filename: String) {
@@ -334,7 +371,7 @@ impl<T: TextureMap, G: Geometry> Scene<T, G> {
     }
 
     pub fn color_of_ray(&self, ray: &Ray) -> (Color, Option<f64>) {
-        let (steps, stop_reason) = self.integrate(&ray);
+        let (steps, stop_reason) = self.integrator.integrate(&ray);
         let mut y = steps[0].y;
 
         if self.save_ray_data {
@@ -356,7 +393,8 @@ impl<T: TextureMap, G: Geometry> Scene<T, G> {
                 &get_position(&y, self.geometry.coordinate_system()),
             ) {
                 None => {}
-                Some(c) => { // TODO: use c
+                Some(c) => {
+                    // TODO: use c
                     let redshift = self.compute_redshift(y, observer_energy);
                     let tune_redshift = 1.0;
                     let redshift = (redshift - 1.0) * tune_redshift + 1.0;
@@ -379,52 +417,40 @@ impl<T: TextureMap, G: Geometry> Scene<T, G> {
         }
 
         if let Some(reason) = stop_reason {
-            match reason {
-                HorizonReached => {
-                    return (Color::new(0, 0, 0), None);
-                }
+            return match reason {
+                HorizonReached => (Color::new(0, 0, 0), None),
                 CelestialSphereReached => {
-                    let mut y = steps.last().unwrap().y;
-                    let mut t = steps.last().unwrap().t;
-                    let step_size = self
-                        .integration_configuration
-                        .step_size_celestial_continuation;
-
-                    // integrate further until we are far out.
-                    for _ in 1..self
-                        .integration_configuration
-                        .max_steps_celestial_continuation
-                    {
-                        y = rk4(&y, t, step_size, &self.geometry);
-                        t += step_size;
-
-                        if radial_distance_spatial_part_squared(&get_position(
-                            &y,
-                            self.geometry.coordinate_system(),
-                        )) > self
-                            .integration_configuration
-                            .max_radius_celestial_continuation_sq
-                        {
-                            break;
-                        }
-                    }
-
-                    let point_on_celestial_sphere =
-                        get_position(&y, self.geometry.coordinate_system()).get_as_spherical();
-                    let theta = point_on_celestial_sphere[1];
-                    let phi = point_on_celestial_sphere[2];
-                    let u = (PI + phi) / (2.0 * PI);
-                    let v = theta / PI;
-
-                    let redshift = self.compute_redshift(y, observer_energy);
-                    return (
-                        self.celestial_map.color_at_uv(1.0 - u, 1.0 - v),
-                        Some(redshift),
-                    );
+                    self.color_after_extending_to_celestial_sphere(steps, observer_energy)
                 }
-            }
+            };
         }
         (Color::new(0, 0, 0), None)
+    }
+
+    fn color_after_extending_to_celestial_sphere(
+        &self,
+        steps: Vec<Step>,
+        observer_energy: f64,
+    ) -> (Color, Option<f64>) {
+        let y = steps.last().unwrap().y;
+        let t = steps.last().unwrap().t;
+
+        let y_far = self.integrator.integrate_to_celestial_sphere(y, t);
+
+        let point_on_celestial_sphere =
+            get_position(&y_far, self.geometry.coordinate_system()).get_as_spherical();
+        let theta = point_on_celestial_sphere[1];
+        let phi = point_on_celestial_sphere[2];
+        let u = (PI + phi) / (2.0 * PI);
+        let v = theta / PI;
+
+        let redshift = self.compute_redshift(y_far, observer_energy);
+        (
+            self.texture_data
+                .celestial_map
+                .color_at_uv(1.0 - u, 1.0 - v),
+            Some(redshift),
+        )
     }
 
     fn compute_redshift(&self, y: EquationOfMotionState, observer_energy: f64) -> f64 {
@@ -448,27 +474,27 @@ pub mod test_scene {
     use crate::color::Color;
     use crate::four_vector::FourVector;
     use crate::geometry::Geometry;
-    use crate::scene::{CheckerMapper, IntegrationConfiguration, Scene};
+    use crate::scene::{CheckerMapper, IntegrationConfiguration, Scene, TextureData};
     use nalgebra::Vector4;
     use std::f64::consts::PI;
 
     pub const CELESTIAL_SPHERE_RADIUS: f64 = 15.0;
 
-    pub fn create_scene<G: Geometry>(
+    pub fn create_scene<'a, G: Geometry>(
         center_sphere_radius: f64,
         center_disk_inner_radius: f64,
         center_disk_outer_radius: f64,
-        geometry: G,
+        geometry: &'a G,
         camera_position: Vector4<f64>,
         camera_velocity: FourVector,
-    ) -> Scene<CheckerMapper, G> {
+    ) -> Scene<'a, CheckerMapper, G> {
         let camera = Camera::new(
             camera_position,
             camera_velocity,
             PI / 4.0,
             500,
             500,
-            &geometry,
+            geometry,
         );
 
         create_scene_with_camera(
@@ -480,13 +506,13 @@ pub mod test_scene {
         )
     }
 
-    pub fn create_scene_with_camera<G: Geometry>(
+    pub fn create_scene_with_camera<'a, G: Geometry>(
         center_sphere_radius: f64,
         center_disk_inner_radius: f64,
         center_disk_outer_radius: f64,
-        geometry: G,
+        geometry: &'a G,
         camera: Camera,
-    ) -> Scene<CheckerMapper, G> {
+    ) -> Scene<'a, CheckerMapper, G> {
         let texture_mapper_celestial =
             CheckerMapper::new(100.0, 100.0, Color::new(0, 255, 0), Color::new(0, 100, 0));
         let texture_mapper_disk =
@@ -503,14 +529,18 @@ pub mod test_scene {
             1.0,
         );
 
+        let texture_data = TextureData {
+            celestial_map: texture_mapper_celestial,
+            center_disk_map: texture_mapper_disk,
+            center_sphere_map: texture_mapper_sphere,
+        };
+
         let scene = Scene::new(
             integration_configuration,
             center_sphere_radius,
             center_disk_inner_radius,
             center_disk_outer_radius,
-            texture_mapper_celestial,
-            texture_mapper_disk,
-            texture_mapper_sphere,
+            texture_data,
             geometry,
             camera,
             false,
@@ -543,7 +573,8 @@ mod tests {
             11,
             &EuclideanSpace::new(),
         );
-        let scene = create_scene_with_camera(2.0, 0.2, 0.3, EuclideanSpace::new(), camera);
+        let space = EuclideanSpace::new();
+        let scene = create_scene_with_camera(2.0, 0.2, 0.3, &space, camera);
 
         let ray = scene.camera.get_ray_for(6, 6);
         let (color, _) = scene.color_of_ray(&ray);
@@ -562,7 +593,8 @@ mod tests {
             11,
             &EuclideanSpaceSpherical::new(),
         );
-        let scene = create_scene_with_camera(2.0, 0.2, 0.3, EuclideanSpaceSpherical::new(), camera);
+        let space = EuclideanSpaceSpherical::new();
+        let scene = create_scene_with_camera(2.0, 0.2, 0.3, &space, camera);
 
         let ray = scene.camera.get_ray_for(6, 6);
         let (color, _) = scene.color_of_ray(&ray);
@@ -581,7 +613,7 @@ mod tests {
         let geometry = Schwarzschild::new(radius);
 
         let camera = Camera::new(position, velocity, PI / 2.0, 11, 11, &geometry);
-        let scene = create_scene_with_camera(2.0, 0.2, 0.3, geometry, camera);
+        let scene = create_scene_with_camera(2.0, 0.2, 0.3, &geometry, camera);
 
         let ray = scene.camera.get_ray_for(6, 6);
         let (color, Some(redshift)) = scene.color_of_ray(&ray) else {
@@ -603,7 +635,7 @@ mod tests {
         let geometry = Schwarzschild::new(radius);
 
         let camera = Camera::new(position, velocity, PI / 2.0, 11, 11, &geometry);
-        let scene = create_scene_with_camera(sphere_radius, 0.2, 0.3, geometry, camera);
+        let scene = create_scene_with_camera(sphere_radius, 0.2, 0.3, &geometry, camera);
 
         let ray = scene.camera.get_ray_for(6, 6);
         let (color, Some(redshift)) = scene.color_of_ray(&ray) else {
@@ -627,8 +659,9 @@ mod tests {
             11,
             &EuclideanSpace::new(),
         );
+        let space = EuclideanSpace::new();
         let scene: Scene<CheckerMapper, EuclideanSpace> =
-            create_scene_with_camera(2.0, 0.2, 0.3, EuclideanSpace::new(), camera);
+            create_scene_with_camera(2.0, 0.2, 0.3, &space, camera);
 
         let ray = scene.camera.get_ray_for(0, 0);
         let (color, _) = scene.color_of_ray(&ray);
@@ -652,7 +685,8 @@ mod tests {
             11,
             &Schwarzschild::new(radius),
         );
-        let scene = create_scene_with_camera(2.0, 0.2, 0.3, Schwarzschild::new(radius), camera);
+        let space = Schwarzschild::new(radius);
+        let scene = create_scene_with_camera(2.0, 0.2, 0.3, &space, camera);
 
         let ray = scene.camera.get_ray_for(0, 0);
         let (color, _) = scene.color_of_ray(&ray);
@@ -677,7 +711,8 @@ mod tests {
             11,
             &Schwarzschild::new(2.0),
         );
-        let scene = create_scene_with_camera(2.0, 0.2, 0.3, Schwarzschild::new(2.0), camera);
+        let space = Schwarzschild::new(2.0);
+        let scene = create_scene_with_camera(2.0, 0.2, 0.3, &space, camera);
 
         let ray = scene.camera.get_ray_for(6, 6);
         let (color, _) = scene.color_of_ray(&ray);
@@ -695,8 +730,9 @@ mod tests {
             101,
             &EuclideanSpace::new(),
         );
+        let space = EuclideanSpace::new();
         let scene: Scene<CheckerMapper, EuclideanSpace> =
-            create_scene_with_camera(1.0, 2.0, 7.0, EuclideanSpace::new(), camera);
+            create_scene_with_camera(1.0, 2.0, 7.0, &space, camera);
 
         let ray = scene.camera.get_ray_for(0, 51);
         let (color, redshift) = scene.color_of_ray(&ray);
