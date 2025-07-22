@@ -1,5 +1,5 @@
 use crate::camera::Camera;
-use crate::scene::{IntegrationConfiguration, Scene, TextureData, TextureMapper};
+use crate::scene::{Scene, TextureData, TextureMapper};
 use nalgebra::Vector4;
 use std::f64::consts::PI;
 use std::time::Instant;
@@ -11,6 +11,7 @@ mod euclidean;
 mod euclidean_spherical;
 mod four_vector;
 mod geometry;
+mod integrator;
 mod raytracer;
 mod runge_kutta;
 mod scene;
@@ -20,6 +21,7 @@ mod spherical_coordinates_helper;
 use crate::euclidean::EuclideanSpace;
 use crate::euclidean_spherical::EuclideanSpaceSpherical;
 use crate::four_vector::FourVector;
+use crate::integrator::IntegrationConfiguration;
 use crate::schwarzschild::Schwarzschild;
 use crate::spherical_coordinates_helper::cartesian_to_spherical;
 

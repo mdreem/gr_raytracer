@@ -248,9 +248,10 @@ mod tests {
     use crate::debug::save_rays_to_file;
     use crate::four_vector::FourVector;
     use crate::geometry::Geometry;
+    use crate::integrator::{Step, StopReason};
     use crate::scene;
     use crate::scene::test_scene::CELESTIAL_SPHERE_RADIUS;
-    use crate::scene::{CheckerMapper, Scene, StopReason};
+    use crate::scene::{CheckerMapper, Scene};
     use crate::schwarzschild::test_schwarzschild::{
         get_energy_from_r, get_energy_from_t, TestSchwarzschild,
     };
@@ -537,7 +538,7 @@ mod tests {
         e: f64,
         l: f64,
         max_steps: usize,
-    ) -> (Vec<Point>, Vec<scene::Step>, Option<StopReason>) {
+    ) -> (Vec<Point>, Vec<Step>, Option<StopReason>) {
         let position = Vector4::new(0.0, 5.0, PI / 2.0, 0.0);
 
         let r = position[1];
@@ -585,7 +586,7 @@ mod tests {
         println!("Finished writing trajectory to {}.", filename);
     }
 
-    fn collect_points_step(steps: &Vec<scene::Step>) -> Vec<Point> {
+    fn collect_points_step(steps: &Vec<Step>) -> Vec<Point> {
         steps
             .iter()
             .map(|step| Point {
