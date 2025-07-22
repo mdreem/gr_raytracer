@@ -440,7 +440,7 @@ mod tests {
         let geometry = Schwarzschild::new(radius);
         let camera = create_camera(position, radius);
         let scene: Scene<CheckerMapper, Schwarzschild> =
-            scene::test_scene::create_scene_with_camera(1.0, 2.0, 7.0, geometry.clone(), camera);
+            scene::test_scene::create_scene_with_camera(1.0, 2.0, 7.0, &geometry, camera);
 
         let ray_a = scene.camera.get_ray_for(6, 11);
         let ray_b = scene.camera.get_ray_for(1, 6);
@@ -452,8 +452,8 @@ mod tests {
         println!("ray_a: {:?}", ray_a);
         println!("ray_b: {:?}", ray_b);
 
-        let (trajectory_a, _) = scene.integrate(&ray_a);
-        let (trajectory_b, _) = scene.integrate(&ray_b);
+        let (trajectory_a, _) = scene.integrator.integrate(&ray_a);
+        let (trajectory_b, _) = scene.integrator.integrate(&ray_b);
         assert_eq!(trajectory_a.len(), trajectory_b.len());
 
         for i in 0..trajectory_a.len() {
@@ -546,7 +546,7 @@ mod tests {
         let velocity = FourVector::new_spherical(a.sqrt().recip(), 0.0, 0.0, 0.0);
         let geometry = Schwarzschild::new(radius);
         let scene: Scene<CheckerMapper, Schwarzschild> =
-            scene::test_scene::create_scene(1.0, 2.0, 7.0, geometry.clone(), position, velocity);
+            scene::test_scene::create_scene(1.0, 2.0, 7.0, &geometry, position, velocity);
 
         let momentum = FourVector::new_spherical(
             e / a,
@@ -564,7 +564,7 @@ mod tests {
 
         let ts = TestSchwarzschild { radius };
 
-        let (result_geodesic_equation, stop_reason) = scene.integrate(&ray);
+        let (result_geodesic_equation, stop_reason) = scene.integrator.integrate(&ray);
         let result_r_phi_equation =
             ts.compute_test_schwarzschild_trajectory(r, l, e, max_steps, 0.01);
 

@@ -50,7 +50,7 @@ fn render_euclidean() {
         texture_mapper_celestial,
         texture_mapper_disk,
         texture_mapper_sphere,
-        geometry,
+        &geometry,
         camera,
         false,
     );
@@ -86,7 +86,7 @@ fn render_euclidean_spherical() {
         texture_mapper_celestial,
         texture_mapper_disk,
         texture_mapper_sphere,
-        geometry,
+        &geometry,
         camera,
         false,
     );
@@ -121,7 +121,7 @@ fn render_schwarzschild() {
         texture_mapper_celestial,
         texture_mapper_disk,
         texture_mapper_sphere,
-        geometry,
+        &geometry,
         camera,
         false,
     );
