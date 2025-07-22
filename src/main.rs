@@ -1,5 +1,5 @@
 use crate::camera::Camera;
-use crate::scene::{IntegrationConfiguration, Scene, TextureMapper};
+use crate::scene::{IntegrationConfiguration, Scene, TextureData, TextureMapper};
 use nalgebra::Vector4;
 use std::f64::consts::PI;
 use std::time::Instant;
@@ -42,14 +42,18 @@ fn render_euclidean() {
     let integration_configuration =
         IntegrationConfiguration::new(15000, 20.0, 0.01, 15000, 10000.0, 15.0);
 
+    let texture_data = TextureData {
+        celestial_map: texture_mapper_celestial,
+        center_disk_map: texture_mapper_disk,
+        center_sphere_map: texture_mapper_sphere,
+    };
+
     let scene = Scene::new(
         integration_configuration,
         2.0,
         3.0,
         5.0,
-        texture_mapper_celestial,
-        texture_mapper_disk,
-        texture_mapper_sphere,
+        texture_data,
         &geometry,
         camera,
         false,
@@ -78,14 +82,18 @@ fn render_euclidean_spherical() {
     let integration_configuration =
         IntegrationConfiguration::new(15000, 20.0, 0.01, 15000, 10000.0, 1.0);
 
+    let texture_data = TextureData {
+        celestial_map: texture_mapper_celestial,
+        center_disk_map: texture_mapper_disk,
+        center_sphere_map: texture_mapper_sphere,
+    };
+
     let scene = Scene::new(
         integration_configuration,
         2.0,
         3.0,
         5.0,
-        texture_mapper_celestial,
-        texture_mapper_disk,
-        texture_mapper_sphere,
+        texture_data,
         &geometry,
         camera,
         false,
@@ -113,14 +121,18 @@ fn render_schwarzschild() {
     let integration_configuration =
         IntegrationConfiguration::new(15000, 25.0, 0.01, 15000, 10000.0, 15.0);
 
+    let texture_data = TextureData {
+        celestial_map: texture_mapper_celestial,
+        center_disk_map: texture_mapper_disk,
+        center_sphere_map: texture_mapper_sphere,
+    };
+
     let scene = Scene::new(
         integration_configuration,
         0.01,
         3.0,
         5.0,
-        texture_mapper_celestial,
-        texture_mapper_disk,
-        texture_mapper_sphere,
+        texture_data,
         &geometry,
         camera,
         false,
