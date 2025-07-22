@@ -11,14 +11,18 @@ use std::f64::consts::PI;
 use std::fs::File;
 use std::io::Write;
 
+pub struct TextureData<T: TextureMap> {
+    pub celestial_map: T,
+    pub center_disk_map: T,
+    pub center_sphere_map: T,
+}
+
 pub struct Scene<'a, T: TextureMap, G: Geometry> {
     pub integrator: Integrator<'a, G>,
     center_sphere_radius: f64,
     center_disk_outer_radius: f64,
     center_disk_inner_radius: f64,
-    celestial_map: T,
-    center_disk_map: T,
-    center_sphere_map: T,
+    texture_data: TextureData<T>,
     pub geometry: &'a G,
     pub camera: Camera,
     save_ray_data: bool,
@@ -256,9 +260,7 @@ impl<'a, T: TextureMap, G: Geometry> Scene<'a, T, G> {
         center_sphere_radius: f64,
         center_disk_inner_radius: f64,
         center_disk_outer_radius: f64,
-        celestial_map: T,
-        center_disk_map: T,
-        center_sphere_map: T,
+        texture_data: TextureData<T>,
         geometry: &'a G,
         camera: Camera,
         save_ray_data: bool,
@@ -272,9 +274,7 @@ impl<'a, T: TextureMap, G: Geometry> Scene<'a, T, G> {
             center_sphere_radius,
             center_disk_outer_radius,
             center_disk_inner_radius,
-            celestial_map,
-            center_disk_map,
-            center_sphere_map,
+            texture_data,
             geometry,
             camera,
             save_ray_data,
@@ -319,7 +319,7 @@ impl<'a, T: TextureMap, G: Geometry> Scene<'a, T, G> {
             let v = (rr.sqrt() - self.center_disk_inner_radius)
                 / (self.center_disk_outer_radius - self.center_disk_inner_radius);
 
-            let color = self.center_disk_map.color_at_uv(u, v);
+            let color = self.texture_data.center_disk_map.color_at_uv(u, v);
             Some(color)
         } else {
             None
@@ -343,7 +343,7 @@ impl<'a, T: TextureMap, G: Geometry> Scene<'a, T, G> {
             let u = (PI + phi) / (2.0 * PI);
             let v = theta / PI;
 
-            let color = self.center_sphere_map.color_at_uv(u, v);
+            let color = self.texture_data.center_sphere_map.color_at_uv(u, v);
             return Some(color);
         }
 
@@ -446,7 +446,9 @@ impl<'a, T: TextureMap, G: Geometry> Scene<'a, T, G> {
 
         let redshift = self.compute_redshift(y_far, observer_energy);
         (
-            self.celestial_map.color_at_uv(1.0 - u, 1.0 - v),
+            self.texture_data
+                .celestial_map
+                .color_at_uv(1.0 - u, 1.0 - v),
             Some(redshift),
         )
     }
@@ -472,7 +474,7 @@ pub mod test_scene {
     use crate::color::Color;
     use crate::four_vector::FourVector;
     use crate::geometry::Geometry;
-    use crate::scene::{CheckerMapper, IntegrationConfiguration, Scene};
+    use crate::scene::{CheckerMapper, IntegrationConfiguration, Scene, TextureData};
     use nalgebra::Vector4;
     use std::f64::consts::PI;
 
@@ -527,14 +529,18 @@ pub mod test_scene {
             1.0,
         );
 
+        let texture_data = TextureData {
+            celestial_map: texture_mapper_celestial,
+            center_disk_map: texture_mapper_disk,
+            center_sphere_map: texture_mapper_sphere,
+        };
+
         let scene = Scene::new(
             integration_configuration,
             center_sphere_radius,
             center_disk_inner_radius,
             center_disk_outer_radius,
-            texture_mapper_celestial,
-            texture_mapper_disk,
-            texture_mapper_sphere,
+            texture_data,
             geometry,
             camera,
             false,
