@@ -3,12 +3,12 @@ use crate::scene::{Scene, TextureMap};
 use rayon::iter::ParallelIterator;
 use std::sync::atomic::{AtomicUsize, Ordering};
 
-pub struct Raytracer<T: TextureMap, G: Geometry> {
-    scene: Scene<T, G>,
+pub struct Raytracer<'a, T: TextureMap, G: Geometry> {
+    scene: Scene<'a, T, G>,
 }
 
-impl<T: TextureMap, G: Geometry> Raytracer<T, G> {
-    pub fn new(scene: Scene<T, G>) -> Self {
+impl<'a, T: TextureMap, G: Geometry> Raytracer<'a, T, G> {
+    pub fn new(scene: Scene<'a, T, G>) -> Self {
         Self { scene }
     }
 
