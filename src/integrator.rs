@@ -153,7 +153,7 @@ impl<'a, G: Geometry> Integrator<'a, G> {
             .integration_configuration
             .max_steps_celestial_continuation
         {
-            y_cur = rk4(&y_cur, t, step_size, self.geometry);
+            y_cur = rk4(&y_cur, t_cur, step_size, self.geometry);
             t_cur += step_size;
 
             if get_position(&y_cur, self.geometry.coordinate_system())
