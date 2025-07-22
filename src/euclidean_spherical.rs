@@ -125,7 +125,7 @@ mod tests {
             PI / 2.0,
             rows,
             cols,
-            EuclideanSpaceSpherical::new(),
+            &EuclideanSpaceSpherical::new(),
         );
 
         save_rays_to_file(

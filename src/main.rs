@@ -36,7 +36,7 @@ fn render_euclidean() {
         PI / 4.0,
         500,
         500,
-        geometry.clone(), // TODO see how geometry can be distributed to all needed places.
+        &geometry,
     );
 
     let integration_configuration =
@@ -72,7 +72,7 @@ fn render_euclidean_spherical() {
         PI / 4.0,
         500,
         500,
-        geometry.clone(), // TODO see how geometry can be distributed to all needed places.
+        &geometry,
     );
 
     let integration_configuration =
@@ -108,14 +108,7 @@ fn render_schwarzschild() {
     let velocity = FourVector::new_spherical(1.0 / a.sqrt(), 0.0, 0.0, 0.0); // we have a freely falling observer here.
     let geometry = Schwarzschild::new(radius);
 
-    let camera = Camera::new(
-        camera_position,
-        velocity,
-        PI / 4.0,
-        250,
-        250,
-        geometry.clone(), // TODO see how geometry can be distributed to all needed places.
-    );
+    let camera = Camera::new(camera_position, velocity, PI / 4.0, 250, 250, &geometry);
 
     let integration_configuration =
         IntegrationConfiguration::new(15000, 25.0, 0.01, 15000, 10000.0, 15.0);
@@ -142,7 +135,7 @@ fn main() {
     // render_euclidean();
     // render_euclidean_spherical();
     render_schwarzschild();
-    
+
     let duration = start.elapsed();
     println!("Elapsed time: {:.2?}", duration);
 }
