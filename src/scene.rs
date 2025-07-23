@@ -138,20 +138,18 @@ impl<'a, T: TextureMap, G: Geometry> Scene<'a, T, G> {
         let y_end_spatial = y_end.get_spatial_vector();
         let direction = y_end_spatial - y_start_spatial;
 
-        let p1 = (y_start_spatial - center).transpose() * normal;
-        let p2 = direction.transpose() * normal;
+        let p1 = (y_start_spatial - center).dot(&normal);
+        let p2 = direction.dot(&normal);
 
         // TODO: p2 can be 0 if parallel -> handle
-        let t = p1[0] / p2[0]; // plane intersection parameter.
+        let t = p1 / p2; // plane intersection parameter.
 
         if !(t >= 0.0 && t <= 1.0) {
             return None;
         }
 
         let intersection_point = y_start_spatial + t * direction;
-        let rr = intersection_point[0] * intersection_point[0]
-            + intersection_point[1] * intersection_point[1]
-            + intersection_point[2] * intersection_point[2];
+        let rr = intersection_point.norm_squared();
 
         if rr >= self.center_disk_inner_radius * self.center_disk_inner_radius
             && rr <= self.center_disk_outer_radius * self.center_disk_outer_radius
@@ -171,7 +169,6 @@ impl<'a, T: TextureMap, G: Geometry> Scene<'a, T, G> {
         }
     }
 
-    // TODO: handle spherical coordinates here!
     fn intersects_with_sphere(&self, y_start: &FourVector, y_end: &FourVector) -> Option<Color> {
         let r_start = y_start.radial_distance_spatial_part_squared();
         let r_end = y_end.radial_distance_spatial_part_squared();
