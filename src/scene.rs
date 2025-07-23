@@ -4,9 +4,10 @@ use crate::four_vector::{CoordinateSystem, FourVector};
 use crate::geometry::Geometry;
 use crate::integrator::StopReason::{CelestialSphereReached, HorizonReached};
 use crate::integrator::{IntegrationConfiguration, Integrator, Step};
+use crate::scene_objects::objects::Objects;
 use crate::spherical_coordinates_helper::spherical_to_cartesian;
-use image::{DynamicImage, GenericImageView, ImageReader};
-use nalgebra::{Const, OVector, Vector3, Vector4};
+use crate::texture::{TextureMap, UVCoordinates};
+use nalgebra::{Const, OVector, Vector4};
 use std::f64::consts::PI;
 use std::fs::File;
 use std::io::Write;
@@ -19,28 +20,11 @@ pub struct TextureData<T: TextureMap> {
 
 pub struct Scene<'a, T: TextureMap, G: Geometry> {
     pub integrator: Integrator<'a, G>,
-    center_sphere_radius: f64,
-    center_disk_outer_radius: f64,
-    center_disk_inner_radius: f64,
+    objects: Objects,
     texture_data: TextureData<T>,
     pub geometry: &'a G,
     pub camera: Camera,
     save_ray_data: bool,
-}
-
-pub trait TextureMap: Sync {
-    fn color_at_uv(&self, u: f64, v: f64) -> Color;
-}
-
-pub struct TextureMapper {
-    image: DynamicImage,
-}
-
-pub struct CheckerMapper {
-    width: f64,
-    height: f64,
-    c1: Color,
-    c2: Color,
 }
 
 pub type EquationOfMotionState = OVector<f64, Const<8>>;
@@ -56,140 +40,25 @@ pub fn get_position(y: &EquationOfMotionState, coordinate_system: CoordinateSyst
     }
 }
 
-impl TextureMapper {
-    pub fn new(filename: String) -> TextureMapper {
-        let image = ImageReader::open(filename)
-            .expect("Failed to open image file")
-            .decode()
-            .expect("Failed to decode image");
-
-        TextureMapper { image }
-    }
-}
-
-impl TextureMap for TextureMapper {
-    fn color_at_uv(&self, u: f64, v: f64) -> Color {
-        let (width, height) = self.image.dimensions();
-        let pixel = self.image.get_pixel(
-            (((width - 1) as f64) * u) as u32,
-            (((height - 1) as f64) * v) as u32,
-        );
-        Color::new(pixel[0], pixel[1], pixel[2])
-    }
-}
-
-impl CheckerMapper {
-    pub fn new(width: f64, height: f64, c1: Color, c2: Color) -> CheckerMapper {
-        CheckerMapper {
-            width,
-            height,
-            c1,
-            c2,
-        }
-    }
-}
-
-impl TextureMap for CheckerMapper {
-    fn color_at_uv(&self, u: f64, v: f64) -> Color {
-        let ut = (u * self.width).floor() as usize;
-        let vt = (v * self.height).floor() as usize;
-
-        if (ut + vt) % 2 == 0 {
-            self.c1
-        } else {
-            self.c2
-        }
-    }
-}
-
 impl<'a, T: TextureMap, G: Geometry> Scene<'a, T, G> {
     pub fn new(
         integration_configuration: IntegrationConfiguration,
-        center_sphere_radius: f64,
-        center_disk_inner_radius: f64,
-        center_disk_outer_radius: f64,
+        objects: Objects,
         texture_data: TextureData<T>,
         geometry: &'a G,
         camera: Camera,
         save_ray_data: bool,
     ) -> Scene<'a, T, G> {
         let integrator = Integrator::new(geometry, integration_configuration);
+
         Scene {
             integrator,
-            center_sphere_radius,
-            center_disk_outer_radius,
-            center_disk_inner_radius,
+            objects,
             texture_data,
             geometry,
             camera,
             save_ray_data,
         }
-    }
-
-    // TODO: explicitly construct the ray. Follow the integration. Some intervals seem to be skipped
-    // here. See with current test setup. Intersection should be at t=7.63. With z=-2.442748091.
-    // The intersection should be with an interval crossing y=0. But it seems to happen near 0 with
-    // both coordinates.
-    fn intersects_with_disk(&self, y_start: &FourVector, y_end: &FourVector) -> Option<Color> {
-        // z x y
-        let normal = Vector3::new(0.0, 1.0, 0.0);
-        let center = Vector3::new(0.0, 0.0, 0.0);
-        let y_start_spatial = y_start.get_spatial_vector();
-        let y_end_spatial = y_end.get_spatial_vector();
-        let direction = y_end_spatial - y_start_spatial;
-
-        let p1 = (y_start_spatial - center).dot(&normal);
-        let p2 = direction.dot(&normal);
-
-        // TODO: p2 can be 0 if parallel -> handle
-        let t = p1 / p2; // plane intersection parameter.
-
-        if !(t >= 0.0 && t <= 1.0) {
-            return None;
-        }
-
-        let intersection_point = y_start_spatial + t * direction;
-        let rr = intersection_point.norm_squared();
-
-        if rr >= self.center_disk_inner_radius * self.center_disk_inner_radius
-            && rr <= self.center_disk_outer_radius * self.center_disk_outer_radius
-        {
-            let vector_in_plane = intersection_point - center;
-            // TODO: properly implement finding intersection and compute the values accordingly.
-
-            let phi = vector_in_plane[2].atan2(vector_in_plane[0]); // phi in x-z plane.
-            let u = (PI + phi) / (2.0 * PI);
-            let v = (rr.sqrt() - self.center_disk_inner_radius)
-                / (self.center_disk_outer_radius - self.center_disk_inner_radius);
-
-            let color = self.texture_data.center_disk_map.color_at_uv(u, v);
-            Some(color)
-        } else {
-            None
-        }
-    }
-
-    fn intersects_with_sphere(&self, y_start: &FourVector, y_end: &FourVector) -> Option<Color> {
-        let r_start = y_start.radial_distance_spatial_part_squared();
-        let r_end = y_end.radial_distance_spatial_part_squared();
-
-        if (r_start >= self.center_sphere_radius.powi(2)
-            && r_end <= self.center_sphere_radius.powi(2))
-            || (r_start <= self.center_sphere_radius.powi(2)
-                && r_end >= self.center_sphere_radius.powi(2))
-        {
-            let point_on_sphere = y_start.get_as_spherical(); // approximate y_start als intersection point.
-
-            let theta = point_on_sphere[1];
-            let phi = point_on_sphere[2];
-            let u = (PI + phi) / (2.0 * PI);
-            let v = theta / PI;
-
-            let color = self.texture_data.center_sphere_map.color_at_uv(u, v);
-            return Some(color);
-        }
-
-        None
     }
 
     fn save_steps(&self, steps: &Vec<Step>, filename: String) {
@@ -230,31 +99,17 @@ impl<'a, T: TextureMap, G: Geometry> Scene<'a, T, G> {
             let last_y = y;
             y = step.y;
 
-            match self.intersects_with_disk(
+            if let Some(intersection_color) = self.objects.intersects(
                 &get_position(&last_y, self.geometry.coordinate_system()),
                 &get_position(&y, self.geometry.coordinate_system()),
             ) {
-                None => {}
-                Some(c) => {
-                    // TODO: use c
-                    let redshift = self.compute_redshift(y, observer_energy);
-                    let tune_redshift = 1.0;
-                    let redshift = (redshift - 1.0) * tune_redshift + 1.0;
-                    let wavelength = 400.0 * redshift;
-                    let c = wavelength_to_rgb(wavelength);
-                    return (c, Some(redshift));
-                }
-            }
-
-            match self.intersects_with_sphere(
-                &get_position(&last_y, self.geometry.coordinate_system()),
-                &get_position(&y, self.geometry.coordinate_system()),
-            ) {
-                None => {}
-                Some(c) => {
-                    let redshift = self.compute_redshift(y, observer_energy);
-                    return (c, Some(redshift));
-                }
+                // TODO: use c mixed with intersection_color.
+                let redshift = self.compute_redshift(y, observer_energy);
+                let tune_redshift = 1.0;
+                let redshift = (redshift - 1.0) * tune_redshift + 1.0;
+                let wavelength = 400.0 * redshift;
+                let c = wavelength_to_rgb(wavelength);
+                return (intersection_color, Some(redshift));
             }
         }
 
@@ -288,9 +143,10 @@ impl<'a, T: TextureMap, G: Geometry> Scene<'a, T, G> {
 
         let redshift = self.compute_redshift(y_far, observer_energy);
         (
-            self.texture_data
-                .celestial_map
-                .color_at_uv(1.0 - u, 1.0 - v),
+            self.texture_data.celestial_map.color_at_uv(UVCoordinates {
+                u: 1.0 - u,
+                v: 1.0 - v,
+            }),
             Some(redshift),
         )
     }
@@ -316,7 +172,9 @@ pub mod test_scene {
     use crate::color::Color;
     use crate::four_vector::FourVector;
     use crate::geometry::Geometry;
-    use crate::scene::{CheckerMapper, IntegrationConfiguration, Scene, TextureData};
+    use crate::scene::{IntegrationConfiguration, Scene, TextureData};
+    use crate::scene_objects;
+    use crate::texture::CheckerMapper;
     use nalgebra::Vector4;
     use std::f64::consts::PI;
 
@@ -373,15 +231,23 @@ pub mod test_scene {
 
         let texture_data = TextureData {
             celestial_map: texture_mapper_celestial,
-            center_disk_map: texture_mapper_disk,
-            center_sphere_map: texture_mapper_sphere,
+            center_disk_map: texture_mapper_disk.clone(),
+            center_sphere_map: texture_mapper_sphere.clone(),
         };
+        let mut objects = scene_objects::objects::Objects::new();
+        objects.add_object(Box::new(scene_objects::sphere::Sphere::new(
+            center_sphere_radius,
+            texture_mapper_sphere,
+        )));
+        objects.add_object(Box::new(scene_objects::disc::Disc::new(
+            center_disk_inner_radius,
+            center_disk_outer_radius,
+            texture_mapper_disk,
+        )));
 
         let scene = Scene::new(
             integration_configuration,
-            center_sphere_radius,
-            center_disk_inner_radius,
-            center_disk_outer_radius,
+            objects,
             texture_data,
             geometry,
             camera,
@@ -398,11 +264,12 @@ mod tests {
     use crate::euclidean_spherical::EuclideanSpaceSpherical;
     use crate::four_vector::FourVector;
     use crate::scene::test_scene::create_scene_with_camera;
-    use crate::scene::{CheckerMapper, Color, Scene};
+    use crate::scene::{Color, Scene};
     use crate::schwarzschild::Schwarzschild;
     use crate::spherical_coordinates_helper::cartesian_to_spherical;
+    use crate::texture::CheckerMapper;
     use approx::assert_abs_diff_eq;
-    use nalgebra::{ComplexField, Vector4};
+    use nalgebra::Vector4;
     use std::f64::consts::PI;
 
     #[test]
@@ -410,7 +277,7 @@ mod tests {
         let camera = Camera::new(
             Vector4::new(0.0, 0.0, 0.0, -10.0),
             FourVector::new_cartesian(1.0, 0.0, 0.0, 0.0),
-            std::f64::consts::PI / 2.0,
+            PI / 2.0,
             11,
             11,
             &EuclideanSpace::new(),
@@ -430,7 +297,7 @@ mod tests {
         let camera = Camera::new(
             position,
             FourVector::new_spherical(1.0, 0.0, 0.0, 0.0),
-            std::f64::consts::PI / 2.0,
+            PI / 2.0,
             11,
             11,
             &EuclideanSpaceSpherical::new(),
@@ -580,6 +447,7 @@ mod tests {
         let (color, redshift) = scene.color_of_ray(&ray);
 
         assert_eq!(redshift, Some(1.0));
-        assert_eq!(color, Color::new(1, 0, 16));
+        // assert_eq!(color, Color::new(1, 0, 16));  // TODO: red shift is ignored for now.
+        assert_eq!(color, Color::new(0, 0, 255));
     }
 }

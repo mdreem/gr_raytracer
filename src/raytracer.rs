@@ -1,5 +1,6 @@
 use crate::geometry::Geometry;
-use crate::scene::{Scene, TextureMap};
+use crate::scene::Scene;
+use crate::texture::TextureMap;
 use rayon::iter::ParallelIterator;
 use std::sync::atomic::{AtomicUsize, Ordering};
 
