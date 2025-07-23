@@ -3,7 +3,7 @@ use crate::four_vector::{CoordinateSystem, FourVector};
 use crate::geometry::{Geometry, HasCoordinateSystem, Tetrad};
 use crate::runge_kutta::OdeFunction;
 use crate::scene::EquationOfMotionState;
-use nalgebra::{ComplexField, Const, Matrix4, OVector, Vector4};
+use nalgebra::{Const, Matrix4, OVector, Vector4};
 
 #[derive(Clone, Debug)]
 pub struct Schwarzschild {
@@ -251,12 +251,13 @@ mod tests {
     use crate::integrator::{Step, StopReason};
     use crate::scene;
     use crate::scene::test_scene::CELESTIAL_SPHERE_RADIUS;
-    use crate::scene::{CheckerMapper, Scene};
+    use crate::scene::Scene;
     use crate::schwarzschild::test_schwarzschild::{
         get_energy_from_r, get_energy_from_t, TestSchwarzschild,
     };
     use crate::schwarzschild::{test_schwarzschild, Schwarzschild};
     use crate::spherical_coordinates_helper::cartesian_to_spherical;
+    use crate::texture::CheckerMapper;
     use approx::assert_abs_diff_eq;
     use nalgebra::Vector4;
     use std::f64::consts::PI;

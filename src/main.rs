@@ -1,5 +1,5 @@
 use crate::camera::Camera;
-use crate::scene::{Scene, TextureData, TextureMapper};
+use crate::scene::{Scene, TextureData};
 use nalgebra::Vector4;
 use std::f64::consts::PI;
 use std::time::Instant;
@@ -11,19 +11,24 @@ mod euclidean;
 mod euclidean_spherical;
 mod four_vector;
 mod geometry;
+mod hittable;
 mod integrator;
 mod raytracer;
 mod runge_kutta;
 mod scene;
+mod scene_objects;
 mod schwarzschild;
 mod spherical_coordinates_helper;
+mod texture;
 
 use crate::euclidean::EuclideanSpace;
 use crate::euclidean_spherical::EuclideanSpaceSpherical;
 use crate::four_vector::FourVector;
 use crate::integrator::IntegrationConfiguration;
+use crate::scene_objects::objects::Objects;
 use crate::schwarzschild::Schwarzschild;
 use crate::spherical_coordinates_helper::cartesian_to_spherical;
+use crate::texture::TextureMapper;
 
 fn render_euclidean() {
     let texture_mapper_celestial = TextureMapper::new(String::from("./resources/celestial.png"));
@@ -46,15 +51,19 @@ fn render_euclidean() {
 
     let texture_data = TextureData {
         celestial_map: texture_mapper_celestial,
-        center_disk_map: texture_mapper_disk,
-        center_sphere_map: texture_mapper_sphere,
+        center_disk_map: texture_mapper_disk.clone(),
+        center_sphere_map: texture_mapper_sphere.clone(),
     };
+
+    let mut objects = Objects::new();
+    let disc = scene_objects::disc::Disc::new(3.0, 5.0, texture_mapper_disk);
+    let sphere = scene_objects::sphere::Sphere::new(2.0, texture_mapper_sphere);
+    objects.add_object(Box::new(disc));
+    objects.add_object(Box::new(sphere));
 
     let scene = Scene::new(
         integration_configuration,
-        2.0,
-        3.0,
-        5.0,
+        objects,
         texture_data,
         &geometry,
         camera,
@@ -86,15 +95,19 @@ fn render_euclidean_spherical() {
 
     let texture_data = TextureData {
         celestial_map: texture_mapper_celestial,
-        center_disk_map: texture_mapper_disk,
-        center_sphere_map: texture_mapper_sphere,
+        center_disk_map: texture_mapper_disk.clone(),
+        center_sphere_map: texture_mapper_sphere.clone(),
     };
+
+    let mut objects = Objects::new();
+    let disc = scene_objects::disc::Disc::new(3.0, 5.0, texture_mapper_disk);
+    let sphere = scene_objects::sphere::Sphere::new(2.0, texture_mapper_sphere);
+    objects.add_object(Box::new(disc));
+    objects.add_object(Box::new(sphere));
 
     let scene = Scene::new(
         integration_configuration,
-        2.0,
-        3.0,
-        5.0,
+        objects,
         texture_data,
         &geometry,
         camera,
@@ -125,15 +138,19 @@ fn render_schwarzschild() {
 
     let texture_data = TextureData {
         celestial_map: texture_mapper_celestial,
-        center_disk_map: texture_mapper_disk,
-        center_sphere_map: texture_mapper_sphere,
+        center_disk_map: texture_mapper_disk.clone(),
+        center_sphere_map: texture_mapper_sphere.clone(),
     };
+
+    let mut objects = Objects::new();
+    let disc = scene_objects::disc::Disc::new(3.0, 5.0, texture_mapper_disk);
+    let sphere = scene_objects::sphere::Sphere::new(0.01, texture_mapper_sphere);
+    objects.add_object(Box::new(disc));
+    objects.add_object(Box::new(sphere));
 
     let scene = Scene::new(
         integration_configuration,
-        0.01,
-        3.0,
-        5.0,
+        objects,
         texture_data,
         &geometry,
         camera,
