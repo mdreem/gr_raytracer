@@ -124,7 +124,8 @@ impl FourVector {
             CoordinateSystem::Cartesian => v[1] * v[1] + v[2] * v[2] + v[3] * v[3],
             CoordinateSystem::Spherical => {
                 // In spherical coordinates, the radial distance is just r^2.
-                v[1] * v[1]
+                let r = v[1]; // v[1] represents the radial coordinate r.
+                r * r
             }
         }
     }
