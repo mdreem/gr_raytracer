@@ -1,9 +1,9 @@
 use crate::camera::Ray;
 use crate::geometry::Geometry;
+use crate::integrator::StopReason::{CelestialSphereReached, HorizonReached};
 use crate::runge_kutta::rk4;
 use crate::scene::{get_position, EquationOfMotionState};
 use nalgebra::Vector4;
-use crate::integrator::StopReason::{CelestialSphereReached, HorizonReached};
 
 #[derive(Debug)]
 pub struct Step {
