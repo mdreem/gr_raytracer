@@ -4,6 +4,7 @@ use crate::four_vector::{CoordinateSystem, FourVector};
 use crate::geometry::Geometry;
 use crate::integrator::StopReason::{CelestialSphereReached, HorizonReached};
 use crate::integrator::{IntegrationConfiguration, Integrator, Step};
+use crate::redshift::RedshiftComputer;
 use crate::scene_objects::objects::Objects;
 use crate::spherical_coordinates_helper::spherical_to_cartesian;
 use crate::texture::{TextureMap, UVCoordinates};
@@ -25,6 +26,7 @@ pub struct Scene<'a, T: TextureMap, G: Geometry> {
     pub geometry: &'a G,
     pub camera: Camera,
     save_ray_data: bool,
+    redshift_computer: RedshiftComputer<'a, G>,
 }
 
 pub type EquationOfMotionState = OVector<f64, Const<8>>;
@@ -58,6 +60,7 @@ impl<'a, T: TextureMap, G: Geometry> Scene<'a, T, G> {
             geometry,
             camera,
             save_ray_data,
+            redshift_computer: RedshiftComputer::new(geometry),
         }
     }
 
@@ -104,7 +107,7 @@ impl<'a, T: TextureMap, G: Geometry> Scene<'a, T, G> {
                 &get_position(&y, self.geometry.coordinate_system()),
             ) {
                 // TODO: use c mixed with intersection_color.
-                let redshift = self.compute_redshift(y, observer_energy);
+                let redshift = self.redshift_computer.compute_redshift(y, observer_energy);
                 let tune_redshift = 1.0;
                 let redshift = (redshift - 1.0) * tune_redshift + 1.0;
                 let wavelength = 400.0 * redshift;
@@ -141,7 +144,9 @@ impl<'a, T: TextureMap, G: Geometry> Scene<'a, T, G> {
         let u = (PI + phi) / (2.0 * PI);
         let v = theta / PI;
 
-        let redshift = self.compute_redshift(y_far, observer_energy);
+        let redshift = self
+            .redshift_computer
+            .compute_redshift(y_far, observer_energy);
         (
             self.texture_data.celestial_map.color_at_uv(UVCoordinates {
                 u: 1.0 - u,
@@ -149,20 +154,6 @@ impl<'a, T: TextureMap, G: Geometry> Scene<'a, T, G> {
             }),
             Some(redshift),
         )
-    }
-
-    fn compute_redshift(&self, y: EquationOfMotionState, observer_energy: f64) -> f64 {
-        let emitter_energy = self.energy_of_stationary_emitter(y);
-        let shift = emitter_energy / observer_energy;
-        shift
-    }
-
-    fn energy_of_stationary_emitter(&self, y: EquationOfMotionState) -> f64 {
-        let position = Vector4::new(y[0], y[1], y[2], y[3]);
-        let velocity = self.geometry.get_stationary_velocity_at(&position);
-        let momentum = FourVector::new(y[4], y[5], y[6], y[7], self.geometry.coordinate_system());
-        let energy = self.geometry.mul(&position, &velocity, &momentum);
-        energy
     }
 }
 
