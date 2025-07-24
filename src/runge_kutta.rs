@@ -13,7 +13,7 @@ pub fn rk4<D: Dim, F: OdeFunction<D>>(x: &OVector<f64, D>, t: f64, h: f64, f: &F
 where
     DefaultAllocator: Allocator<D>,
 {
-    let k1 = f.apply(t, &x);
+    let k1 = f.apply(t, x);
     let k2 = f.apply(t + 0.5 * h, &(x + 0.5 * h * k1.clone()));
     let k3 = f.apply(t + 0.5 * h, &(x + 0.5 * h * k2.clone()));
     let k4 = f.apply(t + h, &(x + h * k3.clone()));

@@ -54,10 +54,9 @@ impl Geometry for Schwarzschild {
         let a_theta = -(2.0 / r) * v_r * v_theta + theta.sin() * theta.cos() * v_phi * v_phi;
         let a_phi = -(2.0 / r) * v_phi * v_r - 2.0 * theta.cos() / theta.sin() * v_theta * v_phi;
 
-        let y_new = EquationOfMotionState::from_column_slice(&[
+        EquationOfMotionState::from_column_slice(&[
             v_t, v_r, v_theta, v_phi, a_t, a_r, a_theta, a_phi,
-        ]);
-        y_new
+        ])
     }
 
     // TODO: take into account rotations.
@@ -70,7 +69,7 @@ impl Geometry for Schwarzschild {
         let a = 1.0 - rr0;
 
         Tetrad::new(
-            position.clone(),
+            *position,
             FourVector::new_spherical(1.0 / a, -rr0.sqrt(), 0.0, 0.0),
             FourVector::new_spherical(0.0, 0.0, 0.0, 1.0 / (r * theta.sin())), // Phi
             -FourVector::new_spherical(0.0, 0.0, 1.0 / r, 0.0),                // Theta
@@ -84,7 +83,7 @@ impl Geometry for Schwarzschild {
         velocity: &FourVector,
     ) -> Matrix4<f64> {
         let mut matrix = Matrix4::zeros();
-        let tetrad_t = self.get_tetrad_at(&position).t;
+        let tetrad_t = self.get_tetrad_at(position).t;
 
         let r = position[1];
         let theta = position[2];
@@ -371,11 +370,6 @@ mod tests {
         );
 
         let ray = camera.get_ray_for(1, 6);
-        // This is a space-like vector and therefore should be -1.
-        assert_abs_diff_eq!(
-            geometry.mul(&position, &ray.direction, &ray.direction),
-            -1.0
-        );
         assert_abs_diff_eq!(geometry.mul(&position, &ray.momentum, &ray.momentum), 0.0);
     }
 
@@ -422,7 +416,6 @@ mod tests {
 
         for i in 1..11 {
             let ray = camera.get_ray_for(6, i);
-            assert_abs_diff_eq!(ray.direction.vector[2], 0.0); // ensure that the ray is in the equatorial plane.
             assert_abs_diff_eq!(ray.momentum.vector[2], 0.0); // ensure that the ray is in the equatorial plane.
 
             let m_s = geometry.mul(&position, &ray.momentum, &ray.momentum);
@@ -557,7 +550,7 @@ mod tests {
             l / (r * r),
         );
 
-        let ray = Ray::new(0, 0, position, momentum, momentum);
+        let ray = Ray::new(0, 0, position, momentum);
         assert_abs_diff_eq!(
             geometry.mul(&position, &ray.momentum, &ray.momentum),
             0.0,

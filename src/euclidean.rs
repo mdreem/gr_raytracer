@@ -29,15 +29,13 @@ impl HasCoordinateSystem for EuclideanSpace {
 
 impl Geometry for EuclideanSpace {
     fn geodesic(&self, _: f64, y: &EquationOfMotionState) -> EquationOfMotionState {
-        let y_new =
-            EquationOfMotionState::from_column_slice(&[y[4], y[5], y[6], y[7], 0.0, 0.0, 0.0, 0.0]);
-        y_new
+        EquationOfMotionState::from_column_slice(&[y[4], y[5], y[6], y[7], 0.0, 0.0, 0.0, 0.0])
     }
 
     // TODO: take into account rotations.
     fn get_tetrad_at(&self, position: &Vector4<f64>) -> Tetrad {
         Tetrad::new(
-            position.clone(),
+            *position,
             FourVector::new_cartesian(1.0, 0.0, 0.0, 0.0),
             FourVector::new_cartesian(0.0, 1.0, 0.0, 0.0),
             FourVector::new_cartesian(0.0, 0.0, 1.0, 0.0),
@@ -67,12 +65,7 @@ impl Geometry for EuclideanSpace {
                     res = 1.0;
                 }
 
-                let g;
-                if j == 0 {
-                    g = 1.0;
-                } else {
-                    g = -1.0;
-                }
+                let g = if j == 0 { 1.0 } else { -1.0 };
 
                 let a = -1.0 / (1.0 + gamma);
                 let b = t_tetrad[i] + velocity[i];

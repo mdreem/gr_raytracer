@@ -85,7 +85,7 @@ impl<'a, T: TextureMap, G: Geometry> Scene<'a, T, G> {
     }
 
     pub fn color_of_ray(&self, ray: &Ray) -> (Color, Option<f64>) {
-        let (steps, stop_reason) = self.integrator.integrate(&ray);
+        let (steps, stop_reason) = self.integrator.integrate(ray);
         let mut y = steps[0].y;
 
         if self.save_ray_data {
@@ -171,14 +171,14 @@ pub mod test_scene {
 
     pub const CELESTIAL_SPHERE_RADIUS: f64 = 15.0;
 
-    pub fn create_scene<'a, G: Geometry>(
+    pub fn create_scene<G: Geometry>(
         center_sphere_radius: f64,
         center_disk_inner_radius: f64,
         center_disk_outer_radius: f64,
-        geometry: &'a G,
+        geometry: &G,
         camera_position: Vector4<f64>,
         camera_velocity: FourVector,
-    ) -> Scene<'a, CheckerMapper, G> {
+    ) -> Scene<CheckerMapper, G> {
         let camera = Camera::new(
             camera_position,
             camera_velocity,
@@ -197,13 +197,13 @@ pub mod test_scene {
         )
     }
 
-    pub fn create_scene_with_camera<'a, G: Geometry>(
+    pub fn create_scene_with_camera<G: Geometry>(
         center_sphere_radius: f64,
         center_disk_inner_radius: f64,
         center_disk_outer_radius: f64,
-        geometry: &'a G,
+        geometry: &G,
         camera: Camera,
-    ) -> Scene<'a, CheckerMapper, G> {
+    ) -> Scene<CheckerMapper, G> {
         let texture_mapper_celestial =
             CheckerMapper::new(100.0, 100.0, Color::new(0, 255, 0), Color::new(0, 100, 0));
         let texture_mapper_disk =
