@@ -12,7 +12,7 @@ pub struct Disc<T: TextureMap> {
     texture_mapper: T,
 }
 
-impl<'a, T: TextureMap> Disc<T> {
+impl<T: TextureMap> Disc<T> {
     pub fn new(
         center_disk_inner_radius: f64,
         center_disk_outer_radius: f64,
@@ -45,7 +45,7 @@ impl<T: TextureMap> Hittable for Disc<T> {
         // TODO: p2 can be 0 if parallel -> handle
         let t = p1 / p2; // plane intersection parameter.
 
-        if !(t >= 0.0 && t <= 1.0) {
+        if !(0.0..=1.0).contains(&t) {
             return None;
         }
 

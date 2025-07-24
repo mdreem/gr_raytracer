@@ -5,24 +5,16 @@ use nalgebra::Vector4;
 #[derive(Debug)]
 pub struct Ray {
     pub position: Vector4<f64>,
-    pub direction: FourVector,
     pub momentum: FourVector,
     pub row: i64,
     pub col: i64,
 }
 impl Ray {
-    pub fn new(
-        row: i64,
-        col: i64,
-        position: Vector4<f64>,
-        direction: FourVector,
-        momentum: FourVector,
-    ) -> Self {
+    pub fn new(row: i64, col: i64, position: Vector4<f64>, momentum: FourVector) -> Self {
         Self {
             row,
             col,
             position,
-            direction,
             momentum,
         }
     }
@@ -54,7 +46,7 @@ pub fn lorentz_transform_tetrad<G: Geometry>(
     let z_vec = lorentz * tetrad.z.get_as_vector();
 
     Tetrad::new(
-        position.clone(),
+        *position,
         FourVector::new(
             t_vec[0],
             t_vec[1],
@@ -127,7 +119,7 @@ impl Camera {
     pub fn get_ray_for(&self, row: i64, column: i64) -> Ray {
         let direction = self.get_direction_for(row, column);
         let momentum = direction + self.tetrad.t; // Add T-component of the tetrad to get the momentum.
-        Ray::new(row, column, self.position, direction, momentum)
+        Ray::new(row, column, self.position, momentum)
     }
 }
 

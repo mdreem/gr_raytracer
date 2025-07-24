@@ -39,9 +39,9 @@ fn xyz_to_srgb(x: f64, y: f64, z: f64) -> Color {
     let g_lin = -0.9689 * x + 1.8758 * y + 0.0415 * z;
     let b_lin = 0.0557 * x - 0.2040 * y + 1.0570 * z;
 
-    let r = ((r_lin.max(0.0).min(1.0)) * 255.0).round() as u8;
-    let g = ((g_lin.max(0.0).min(1.0)) * 255.0).round() as u8;
-    let b = ((b_lin.max(0.0).min(1.0)) * 255.0).round() as u8;
+    let r = ((r_lin.clamp(0.0, 1.0)) * 255.0).round() as u8;
+    let g = ((g_lin.clamp(0.0, 1.0)) * 255.0).round() as u8;
+    let b = ((b_lin.clamp(0.0, 1.0)) * 255.0).round() as u8;
 
     Color { r, g, b }
 }
