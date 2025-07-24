@@ -28,7 +28,7 @@ pub fn save_rays_to_file<G: Geometry>(
                     momentum[1],
                     momentum[2],
                     momentum[3],
-                    geometry.mul(&position, &ray.momentum, &ray.momentum),
+                    geometry.inner_product(&position, &ray.momentum, &ray.momentum),
                 )
                 .as_bytes(),
             )

@@ -30,19 +30,27 @@ impl Tetrad {
     }
 }
 
-pub trait Geometry: Clone + Sync + OdeFunction<Const<8>> + HasCoordinateSystem {
+pub trait GeodesicSolver {
     fn geodesic(&self, t: f64, y: &EquationOfMotionState) -> EquationOfMotionState;
+}
+
+pub trait HasCoordinateSystem {
+    fn coordinate_system(&self) -> CoordinateSystem;
+}
+
+pub trait InnerProduct {
+    fn inner_product(&self, position: &Vector4<f64>, v: &FourVector, w: &FourVector) -> f64;
+}
+
+pub trait Geometry:
+    GeodesicSolver + InnerProduct + HasCoordinateSystem + Clone + Sync + OdeFunction<Const<8>>
+{
     fn get_tetrad_at(&self, position: &Vector4<f64>) -> Tetrad;
     fn lorentz_transformation(
         &self,
         position: &Vector4<f64>,
         velocity: &FourVector,
     ) -> Matrix4<f64>;
-    fn mul(&self, position: &Vector4<f64>, v: &FourVector, w: &FourVector) -> f64;
     fn get_stationary_velocity_at(&self, position: &Vector4<f64>) -> FourVector;
     fn inside_horizon(&self, position: &Vector4<f64>) -> bool;
-}
-
-pub trait HasCoordinateSystem {
-    fn coordinate_system(&self) -> CoordinateSystem;
 }

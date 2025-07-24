@@ -96,7 +96,9 @@ impl<'a, T: TextureMap, G: Geometry> Scene<'a, T, G> {
         }
 
         let velocity = self.camera.velocity;
-        let observer_energy = self.geometry.mul(&ray.position, &velocity, &ray.momentum);
+        let observer_energy = self
+            .geometry
+            .inner_product(&ray.position, &velocity, &ray.momentum);
 
         for step in steps.iter().skip(1) {
             let last_y = y;
