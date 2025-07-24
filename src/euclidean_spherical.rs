@@ -59,7 +59,7 @@ impl Geometry for EuclideanSpaceSpherical {
         let _phi = position[3];
 
         Tetrad::new(
-            position.clone(),
+            *position,
             FourVector::new_spherical(1.0, 0.0, 0.0, 0.0),
             FourVector::new_spherical(0.0, 0.0, 0.0, 1.0 / (r * theta.sin())), // Phi
             -FourVector::new_spherical(0.0, 0.0, 1.0 / r, 0.0),                // Theta

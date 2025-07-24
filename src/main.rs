@@ -14,6 +14,7 @@ mod geometry;
 mod hittable;
 mod integrator;
 mod raytracer;
+mod redshift;
 mod runge_kutta;
 mod scene;
 mod scene_objects;

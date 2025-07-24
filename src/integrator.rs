@@ -65,7 +65,7 @@ impl IntegrationConfiguration {
     }
 }
 
-impl<'a, G: Geometry> Integrator<'a, G> {
+impl<G: Geometry> Integrator<'_, G> {
     pub fn integrate(&self, ray: &Ray) -> (Vec<Step>, Option<StopReason>) {
         let mut t = 0.0;
         let direction = ray.momentum.get_as_vector();
@@ -126,7 +126,7 @@ impl<'a, G: Geometry> Integrator<'a, G> {
         }
 
         // iterate until the celestial plane distance has been reached.
-        if get_position(&cur_y, self.geometry.coordinate_system())
+        if get_position(cur_y, self.geometry.coordinate_system())
             .radial_distance_spatial_part_squared()
             > self.integration_configuration.max_radius_sq
         {
