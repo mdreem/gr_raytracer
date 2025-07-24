@@ -9,7 +9,7 @@ pub struct Sphere<T: TextureMap> {
     texture_mapper: T,
 }
 
-impl<'a, T: TextureMap> Sphere<T> {
+impl<T: TextureMap> Sphere<T> {
     pub fn new(radius: f64, texture_mapper: T) -> Self {
         Self {
             radius,
