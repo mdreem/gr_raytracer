@@ -7,7 +7,6 @@ use std::time::Instant;
 mod camera;
 mod color;
 mod debug;
-mod hittable;
 mod integrator;
 mod raytracer;
 mod redshift;
