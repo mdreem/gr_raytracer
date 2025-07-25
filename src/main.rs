@@ -1,5 +1,5 @@
 use crate::camera::Camera;
-use crate::scene::{Scene};
+use crate::scene::Scene;
 use nalgebra::Vector4;
 use std::f64::consts::PI;
 use std::time::Instant;
@@ -15,6 +15,7 @@ mod scene;
 mod scene_objects;
 
 mod geometry;
+mod ray;
 mod texture;
 
 use crate::geometry::euclidean::EuclideanSpace;

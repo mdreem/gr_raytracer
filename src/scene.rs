@@ -1,10 +1,11 @@
-use crate::camera::{Camera, Ray};
+use crate::camera::Camera;
 use crate::color::{wavelength_to_rgb, Color};
 use crate::geometry::four_vector::{CoordinateSystem, FourVector};
 use crate::geometry::geometry::Geometry;
 use crate::geometry::spherical_coordinates_helper::spherical_to_cartesian;
 use crate::integrator::StopReason::{CelestialSphereReached, HorizonReached};
 use crate::integrator::{IntegrationConfiguration, Integrator, Step};
+use crate::ray::Ray;
 use crate::redshift::RedshiftComputer;
 use crate::scene_objects::objects::Objects;
 use crate::texture::{TextureData, TextureMap, UVCoordinates};

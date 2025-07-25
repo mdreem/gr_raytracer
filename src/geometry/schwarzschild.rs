@@ -249,7 +249,7 @@ mod test_schwarzschild {
 
 #[cfg(test)]
 mod tests {
-    use crate::camera::{Camera, Ray};
+    use crate::camera::Camera;
     use crate::debug::save_rays_to_file;
     use crate::geometry::four_vector::FourVector;
     use crate::geometry::geometry::{Geometry, InnerProduct};
@@ -259,6 +259,7 @@ mod tests {
     use crate::geometry::schwarzschild::{test_schwarzschild, Schwarzschild};
     use crate::geometry::spherical_coordinates_helper::cartesian_to_spherical;
     use crate::integrator::{Step, StopReason};
+    use crate::ray::Ray;
     use crate::scene;
     use crate::scene::test_scene::CELESTIAL_SPHERE_RADIUS;
     use crate::scene::Scene;
