@@ -1,5 +1,5 @@
 use crate::color::Color;
-use crate::four_vector::FourVector;
+use crate::geometry::four_vector::FourVector;
 use crate::hittable::Hittable;
 use crate::scene_objects::objects::SceneObject;
 use crate::texture::{TextureMap, UVCoordinates};

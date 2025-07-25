@@ -1,4 +1,4 @@
-use crate::four_vector::{CoordinateSystem, FourVector};
+use crate::geometry::four_vector::{CoordinateSystem, FourVector};
 use crate::runge_kutta::OdeFunction;
 use crate::scene::EquationOfMotionState;
 use nalgebra::{Const, Matrix4, Vector4};

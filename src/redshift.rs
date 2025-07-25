@@ -1,5 +1,5 @@
-use crate::four_vector::FourVector;
-use crate::geometry::Geometry;
+use crate::geometry::four_vector::FourVector;
+use crate::geometry::geometry::Geometry;
 use crate::scene::EquationOfMotionState;
 use nalgebra::Vector4;
 

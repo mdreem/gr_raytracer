@@ -1,9 +1,10 @@
-use crate::four_vector::CoordinateSystem::Cartesian;
-use crate::four_vector::{CoordinateSystem, FourVector};
-use crate::geometry::{GeodesicSolver, Geometry, HasCoordinateSystem, InnerProduct, Tetrad};
+use crate::geometry::four_vector::CoordinateSystem::Cartesian;
+use crate::geometry::four_vector::{CoordinateSystem, FourVector};
+use crate::geometry::geometry::{
+    GeodesicSolver, Geometry, HasCoordinateSystem, InnerProduct, Tetrad,
+};
 use crate::runge_kutta::OdeFunction;
 use crate::scene::EquationOfMotionState;
-use crate::schwarzschild::Schwarzschild;
 use nalgebra::{Const, Matrix4, OVector, Vector4};
 
 #[derive(Clone)]
@@ -104,8 +105,8 @@ impl Geometry for EuclideanSpace {
 mod tests {
     use crate::camera::Camera;
     use crate::debug::save_rays_to_file;
-    use crate::euclidean::EuclideanSpace;
-    use crate::four_vector::FourVector;
+    use crate::geometry::euclidean::EuclideanSpace;
+    use crate::geometry::four_vector::FourVector;
     use nalgebra::Vector4;
     use std::f64::consts::PI;
 

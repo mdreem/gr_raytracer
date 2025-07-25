@@ -1,5 +1,5 @@
-use crate::four_vector::FourVector;
-use crate::geometry::{Geometry, Tetrad};
+use crate::geometry::four_vector::FourVector;
+use crate::geometry::geometry::{Geometry, Tetrad};
 use nalgebra::Vector4;
 
 #[derive(Debug)]
@@ -126,10 +126,10 @@ impl Camera {
 #[cfg(test)]
 mod tests {
     use crate::camera::Camera;
-    use crate::euclidean::EuclideanSpace;
+    use crate::geometry::euclidean::EuclideanSpace;
 
-    use crate::four_vector::FourVector;
-    use crate::geometry::{Geometry, InnerProduct};
+    use crate::geometry::four_vector::FourVector;
+    use crate::geometry::geometry::{Geometry, InnerProduct};
     use approx::assert_abs_diff_eq;
     use nalgebra::Vector4;
     use std::f64::consts::PI;
