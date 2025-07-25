@@ -18,7 +18,7 @@ impl<T: TextureMap> Sphere<T> {
     }
 }
 
-impl<T: TextureMap> crate::hittable::Hittable for Sphere<T> {
+impl<T: TextureMap> crate::scene_objects::hittable::Hittable for Sphere<T> {
     fn intersects(&self, y_start: &FourVector, y_end: &FourVector) -> Option<UVCoordinates> {
         let r_start = y_start.radial_distance_spatial_part_squared();
         let r_end = y_end.radial_distance_spatial_part_squared();
