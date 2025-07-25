@@ -7,17 +7,11 @@ use crate::integrator::StopReason::{CelestialSphereReached, HorizonReached};
 use crate::integrator::{IntegrationConfiguration, Integrator, Step};
 use crate::redshift::RedshiftComputer;
 use crate::scene_objects::objects::Objects;
-use crate::texture::{TextureMap, UVCoordinates};
+use crate::texture::{TextureData, TextureMap, UVCoordinates};
 use nalgebra::{Const, OVector, Vector4};
 use std::f64::consts::PI;
 use std::fs::File;
 use std::io::Write;
-
-pub struct TextureData<T: TextureMap> {
-    pub celestial_map: T,
-    pub center_disk_map: T,
-    pub center_sphere_map: T,
-}
 
 pub struct Scene<'a, T: TextureMap, G: Geometry> {
     pub integrator: Integrator<'a, G>,

@@ -1,5 +1,5 @@
 use crate::camera::Camera;
-use crate::scene::{Scene, TextureData};
+use crate::scene::{Scene};
 use nalgebra::Vector4;
 use std::f64::consts::PI;
 use std::time::Instant;
@@ -24,7 +24,7 @@ use crate::geometry::schwarzschild::Schwarzschild;
 use crate::geometry::spherical_coordinates_helper::cartesian_to_spherical;
 use crate::integrator::IntegrationConfiguration;
 use crate::scene_objects::objects::Objects;
-use crate::texture::TextureMapper;
+use crate::texture::{TextureData, TextureMapper};
 
 fn render_euclidean() {
     let texture_mapper_celestial = TextureMapper::new(String::from("./resources/celestial.png"));
