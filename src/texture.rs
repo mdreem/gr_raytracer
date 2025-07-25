@@ -6,6 +6,12 @@ pub struct UVCoordinates {
     pub v: f64,
 }
 
+pub struct TextureData<T: TextureMap> {
+    pub celestial_map: T,
+    pub center_disk_map: T,
+    pub center_sphere_map: T,
+}
+
 pub trait TextureMap: Sync {
     fn color_at_uv(&self, uv: UVCoordinates) -> Color;
 }
