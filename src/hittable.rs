@@ -1,4 +1,4 @@
-use crate::four_vector::FourVector;
+use crate::geometry::four_vector::FourVector;
 use crate::texture::UVCoordinates;
 
 pub trait Hittable {

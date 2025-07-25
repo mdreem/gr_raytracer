@@ -1,7 +1,8 @@
-use crate::euclidean::EuclideanSpace;
-use crate::four_vector::CoordinateSystem::Spherical;
-use crate::four_vector::{CoordinateSystem, FourVector};
-use crate::geometry::{GeodesicSolver, Geometry, HasCoordinateSystem, InnerProduct, Tetrad};
+use crate::geometry::four_vector::CoordinateSystem::Spherical;
+use crate::geometry::four_vector::{CoordinateSystem, FourVector};
+use crate::geometry::geometry::{
+    GeodesicSolver, Geometry, HasCoordinateSystem, InnerProduct, Tetrad,
+};
 use crate::runge_kutta::OdeFunction;
 use crate::scene::EquationOfMotionState;
 use nalgebra::{Const, Matrix4, OVector, Vector4};
@@ -110,9 +111,9 @@ impl Geometry for EuclideanSpaceSpherical {
 mod tests {
     use crate::camera::Camera;
     use crate::debug::save_rays_to_file;
-    use crate::euclidean_spherical::EuclideanSpaceSpherical;
-    use crate::four_vector::FourVector;
-    use crate::spherical_coordinates_helper::cartesian_to_spherical;
+    use crate::geometry::euclidean_spherical::EuclideanSpaceSpherical;
+    use crate::geometry::four_vector::FourVector;
+    use crate::geometry::spherical_coordinates_helper::cartesian_to_spherical;
     use nalgebra::Vector4;
     use std::f64::consts::PI;
 

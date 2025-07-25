@@ -1,5 +1,5 @@
 use crate::color::Color;
-use crate::four_vector::FourVector;
+use crate::geometry::four_vector::FourVector;
 use crate::scene_objects::objects::SceneObject;
 use crate::texture::{TextureMap, UVCoordinates};
 use std::f64::consts::PI;

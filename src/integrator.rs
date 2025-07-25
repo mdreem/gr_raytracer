@@ -1,5 +1,5 @@
 use crate::camera::Ray;
-use crate::geometry::Geometry;
+use crate::geometry::geometry::Geometry;
 use crate::integrator::StopReason::{CelestialSphereReached, HorizonReached};
 use crate::runge_kutta::rk4;
 use crate::scene::{get_position, EquationOfMotionState};

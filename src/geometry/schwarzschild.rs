@@ -1,6 +1,8 @@
-use crate::four_vector::CoordinateSystem::Spherical;
-use crate::four_vector::{CoordinateSystem, FourVector};
-use crate::geometry::{GeodesicSolver, Geometry, HasCoordinateSystem, InnerProduct, Tetrad};
+use crate::geometry::four_vector::CoordinateSystem::Spherical;
+use crate::geometry::four_vector::{CoordinateSystem, FourVector};
+use crate::geometry::geometry::{
+    GeodesicSolver, Geometry, HasCoordinateSystem, InnerProduct, Tetrad,
+};
 use crate::runge_kutta::OdeFunction;
 use crate::scene::EquationOfMotionState;
 use nalgebra::{Const, Matrix4, OVector, Vector4};
@@ -146,9 +148,9 @@ impl Geometry for Schwarzschild {
 
 #[cfg(test)]
 mod test_schwarzschild {
-    use crate::four_vector::FourVector;
+    use crate::geometry::four_vector::FourVector;
+    use crate::geometry::schwarzschild::Schwarzschild;
     use crate::runge_kutta::{rk4, OdeFunction};
-    use crate::schwarzschild::Schwarzschild;
     use nalgebra::{Const, OVector, Vector2, Vector4};
 
     pub fn get_angular_momentum_from_phi(
@@ -249,17 +251,17 @@ mod test_schwarzschild {
 mod tests {
     use crate::camera::{Camera, Ray};
     use crate::debug::save_rays_to_file;
-    use crate::four_vector::FourVector;
-    use crate::geometry::{Geometry, InnerProduct};
+    use crate::geometry::four_vector::FourVector;
+    use crate::geometry::geometry::{Geometry, InnerProduct};
+    use crate::geometry::schwarzschild::test_schwarzschild::{
+        get_energy_from_r, get_energy_from_t, TestSchwarzschild,
+    };
+    use crate::geometry::schwarzschild::{test_schwarzschild, Schwarzschild};
+    use crate::geometry::spherical_coordinates_helper::cartesian_to_spherical;
     use crate::integrator::{Step, StopReason};
     use crate::scene;
     use crate::scene::test_scene::CELESTIAL_SPHERE_RADIUS;
     use crate::scene::Scene;
-    use crate::schwarzschild::test_schwarzschild::{
-        get_energy_from_r, get_energy_from_t, TestSchwarzschild,
-    };
-    use crate::schwarzschild::{test_schwarzschild, Schwarzschild};
-    use crate::spherical_coordinates_helper::cartesian_to_spherical;
     use crate::texture::CheckerMapper;
     use approx::assert_abs_diff_eq;
     use nalgebra::Vector4;

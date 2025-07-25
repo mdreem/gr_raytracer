@@ -1,12 +1,12 @@
 use crate::camera::{Camera, Ray};
 use crate::color::{wavelength_to_rgb, Color};
-use crate::four_vector::{CoordinateSystem, FourVector};
-use crate::geometry::Geometry;
+use crate::geometry::four_vector::{CoordinateSystem, FourVector};
+use crate::geometry::geometry::Geometry;
+use crate::geometry::spherical_coordinates_helper::spherical_to_cartesian;
 use crate::integrator::StopReason::{CelestialSphereReached, HorizonReached};
 use crate::integrator::{IntegrationConfiguration, Integrator, Step};
 use crate::redshift::RedshiftComputer;
 use crate::scene_objects::objects::Objects;
-use crate::spherical_coordinates_helper::spherical_to_cartesian;
 use crate::texture::{TextureMap, UVCoordinates};
 use nalgebra::{Const, OVector, Vector4};
 use std::f64::consts::PI;
@@ -163,8 +163,8 @@ impl<'a, T: TextureMap, G: Geometry> Scene<'a, T, G> {
 pub mod test_scene {
     use crate::camera::Camera;
     use crate::color::Color;
-    use crate::four_vector::FourVector;
-    use crate::geometry::Geometry;
+    use crate::geometry::four_vector::FourVector;
+    use crate::geometry::geometry::Geometry;
     use crate::scene::{IntegrationConfiguration, Scene, TextureData};
     use crate::scene_objects;
     use crate::texture::CheckerMapper;
@@ -253,13 +253,13 @@ pub mod test_scene {
 #[cfg(test)]
 mod tests {
     use crate::camera::Camera;
-    use crate::euclidean::EuclideanSpace;
-    use crate::euclidean_spherical::EuclideanSpaceSpherical;
-    use crate::four_vector::FourVector;
+    use crate::geometry::euclidean::EuclideanSpace;
+    use crate::geometry::euclidean_spherical::EuclideanSpaceSpherical;
+    use crate::geometry::four_vector::FourVector;
+    use crate::geometry::schwarzschild::Schwarzschild;
+    use crate::geometry::spherical_coordinates_helper::cartesian_to_spherical;
     use crate::scene::test_scene::create_scene_with_camera;
     use crate::scene::{Color, Scene};
-    use crate::schwarzschild::Schwarzschild;
-    use crate::spherical_coordinates_helper::cartesian_to_spherical;
     use crate::texture::CheckerMapper;
     use approx::assert_abs_diff_eq;
     use nalgebra::Vector4;
