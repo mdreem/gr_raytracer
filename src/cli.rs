@@ -35,5 +35,8 @@ pub struct App {
 
 #[derive(Subcommand, Debug, Clone)]
 pub enum Action {
-    Render,
+    Render {
+        #[arg(long, default_value = "render.png")]
+        filename: String,
+    },
 }

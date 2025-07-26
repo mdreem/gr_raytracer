@@ -109,11 +109,11 @@ impl Geometry for EuclideanSpaceSpherical {
 
 #[cfg(test)]
 mod tests {
-    use crate::rendering::camera::Camera;
-    use crate::rendering::debug::save_rays_to_file;
     use crate::geometry::euclidean_spherical::EuclideanSpaceSpherical;
     use crate::geometry::four_vector::FourVector;
     use crate::geometry::spherical_coordinates_helper::cartesian_to_spherical;
+    use crate::rendering::camera::Camera;
+    use crate::rendering::debug::save_rays_to_file;
     use nalgebra::Vector4;
     use std::f64::consts::PI;
 

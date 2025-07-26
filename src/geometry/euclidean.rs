@@ -103,10 +103,10 @@ impl Geometry for EuclideanSpace {
 
 #[cfg(test)]
 mod tests {
-    use crate::rendering::camera::Camera;
-    use crate::rendering::debug::save_rays_to_file;
     use crate::geometry::euclidean::EuclideanSpace;
     use crate::geometry::four_vector::FourVector;
+    use crate::rendering::camera::Camera;
+    use crate::rendering::debug::save_rays_to_file;
     use nalgebra::Vector4;
     use std::f64::consts::PI;
 

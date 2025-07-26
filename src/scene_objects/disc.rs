@@ -1,8 +1,8 @@
-use crate::rendering::color::Color;
 use crate::geometry::four_vector::FourVector;
+use crate::rendering::color::Color;
+use crate::rendering::texture::{TextureMap, UVCoordinates};
 use crate::scene_objects::hittable::Hittable;
 use crate::scene_objects::objects::SceneObject;
-use crate::rendering::texture::{TextureMap, UVCoordinates};
 use nalgebra::Vector3;
 use std::f64::consts::PI;
 

@@ -1,7 +1,7 @@
-use crate::rendering::color::Color;
 use crate::geometry::four_vector::FourVector;
-use crate::scene_objects::objects::SceneObject;
+use crate::rendering::color::Color;
 use crate::rendering::texture::{TextureMap, UVCoordinates};
+use crate::scene_objects::objects::SceneObject;
 use std::f64::consts::PI;
 
 pub struct Sphere<T: TextureMap> {
