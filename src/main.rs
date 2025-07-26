@@ -25,24 +25,39 @@ use rendering::integrator::IntegrationConfiguration;
 use rendering::raytracer;
 use rendering::texture::{TextureData, TextureMapper};
 
-fn render_euclidean(opts: GlobalOpts, config: RenderConfig, filename: String) {
+fn render_euclidean(
+    opts: GlobalOpts,
+    config: RenderConfig,
+    camera_position: Vector4<f64>,
+    filename: String,
+) {
     let geometry = EuclideanSpace::new();
     let momentum = FourVector::new_cartesian(1.0, 0.0, 0.0, 0.0);
-    let camera_position = Vector4::new(0.0, 0.0, 0.8, -15.0);
 
     render(geometry, camera_position, momentum, opts, config, filename);
 }
 
-fn render_euclidean_spherical(opts: GlobalOpts, config: RenderConfig, filename: String) {
-    let camera_position = cartesian_to_spherical(&Vector4::new(0.0, 0.0, 0.8, -7.0));
+fn render_euclidean_spherical(
+    opts: GlobalOpts,
+    config: RenderConfig,
+    camera_position: Vector4<f64>,
+    filename: String,
+) {
+    let camera_position = cartesian_to_spherical(&camera_position);
     let momentum = FourVector::new_spherical(1.0, 0.0, 0.0, 0.0);
     let geometry = EuclideanSpaceSpherical::new();
 
     render(geometry, camera_position, momentum, opts, config, filename);
 }
 
-fn render_schwarzschild(radius: f64, opts: GlobalOpts, config: RenderConfig, filename: String) {
-    let camera_position = cartesian_to_spherical(&Vector4::new(0.0, 0.0, 0.8, -18.0));
+fn render_schwarzschild(
+    radius: f64,
+    opts: GlobalOpts,
+    config: RenderConfig,
+    camera_position: Vector4<f64>,
+    filename: String,
+) {
+    let camera_position = cartesian_to_spherical(&camera_position);
 
     let r = camera_position[1];
     let a = 1.0 - radius / r;
@@ -140,18 +155,28 @@ fn main() {
 
             let config: RenderConfig = toml::from_str(config_file.as_str()).unwrap();
 
+            if args.global_opts.camera_position.len() != 3 {
+                panic!("Camera position must be a vector of length 3");
+            }
+            let position = Vector4::new(
+                0.0,
+                args.global_opts.camera_position[0],
+                args.global_opts.camera_position[1],
+                args.global_opts.camera_position[2],
+            );
+
             match config.geometry_type {
                 configuration::GeometryType::Euclidean => {
                     println!("Rendering Euclidean geometry");
-                    render_euclidean(args.global_opts, config, filename);
+                    render_euclidean(args.global_opts, config, position, filename);
                 }
                 configuration::GeometryType::EuclideanSpherical => {
                     println!("Rendering Euclidean spherical geometry");
-                    render_euclidean_spherical(args.global_opts, config, filename);
+                    render_euclidean_spherical(args.global_opts, config, position, filename);
                 }
                 configuration::GeometryType::Schwarzschild { radius } => {
                     println!("Rendering Schwarzschild geometry with radius: {}", radius);
-                    render_schwarzschild(radius, args.global_opts, config, filename);
+                    render_schwarzschild(radius, args.global_opts, config, position, filename);
                 }
             }
         }
