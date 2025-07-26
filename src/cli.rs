@@ -39,4 +39,12 @@ pub enum Action {
         #[arg(long, default_value = "render.png")]
         filename: String,
     },
+    RenderRay {
+        #[arg(short, long)]
+        row: i64,
+        #[arg(short, long)]
+        col: i64,
+        #[arg(long, default_value = "rendered-ray.csv")]
+        filename: String,
+    },
 }

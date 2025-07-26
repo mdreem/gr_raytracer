@@ -72,9 +72,9 @@ impl Camera {
         geometry: &G,
     ) -> Camera {
         let original_tetrad = geometry.get_tetrad_at(&position);
-        println!("original_tetrad: {:?}", original_tetrad);
+        println!("original_tetrad: {}", original_tetrad);
         let tetrad = lorentz_transform_tetrad(geometry, &original_tetrad, &position, &velocity);
-        println!("tetrad: {:?}", tetrad);
+        println!("tetrad: {}", tetrad);
         Self {
             position,
             velocity,
@@ -85,12 +85,15 @@ impl Camera {
         }
     }
 
-    // row, column range from 1..R, 1..C
+    // row, column range from 1..R, 1..C in https://arxiv.org/abs/1511.06025, but here we work
+    // with 0-based indices. This needs to be accounted for below.
     fn get_direction_for(&self, row: i64, column: i64) -> FourVector {
+        let shifted_column = (column + 1) as f64; // Convert to 1-based index.
+        let shifted_row = (row + 1) as f64; // Convert to 1-based index.
         let i_prime = (2.0 * f64::tan(self.alpha / 2.0) / (self.columns as f64))
-            * (column as f64 - (self.columns as f64 + 1.0) / 2.0);
+            * (shifted_column - (self.columns as f64 + 1.0) / 2.0);
         let j_prime = (2.0 * f64::tan(self.alpha / 2.0) / (self.rows as f64))
-            * (row as f64 - (self.rows as f64 + 1.0) / 2.0);
+            * (shifted_row as f64 - (self.rows as f64 + 1.0) / 2.0);
 
         let w = self.tetrad.z + i_prime * self.tetrad.x + j_prime * self.tetrad.y;
         let w_squared = -1.0 - i_prime * i_prime - j_prime * j_prime;
@@ -112,7 +115,7 @@ mod tests {
     use crate::rendering::camera::Camera;
 
     use crate::geometry::four_vector::FourVector;
-    use crate::geometry::geometry::{Geometry, InnerProduct};
+    use crate::geometry::geometry::InnerProduct;
     use approx::assert_abs_diff_eq;
     use nalgebra::Vector4;
     use std::f64::consts::PI;
@@ -130,11 +133,11 @@ mod tests {
         let geometry = EuclideanSpace::new();
         let position = Vector4::new(0.0, 0.0, 1.0, 0.0);
 
-        let top_left_corner = camera.get_direction_for(1, 1);
-        let top_right_corner = camera.get_direction_for(1, 11);
-        let middle = camera.get_direction_for(6, 6);
-        let bottom_left_corner = camera.get_direction_for(11, 1);
-        let bottom_right_corner = camera.get_direction_for(11, 11);
+        let top_left_corner = camera.get_direction_for(0, 0);
+        let top_right_corner = camera.get_direction_for(0, 10);
+        let middle = camera.get_direction_for(5, 5);
+        let bottom_left_corner = camera.get_direction_for(10, 0);
+        let bottom_right_corner = camera.get_direction_for(10, 10);
 
         let corner = -0.6853582554517135;
         let corner_z = -0.24610591900311507;
