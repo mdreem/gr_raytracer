@@ -1,19 +1,11 @@
-use crate::cli::{Action, App, GlobalOpts};
-use crate::configuration::RenderConfig;
-use clap::Parser;
-use nalgebra::Vector4;
-use rendering::camera::Camera;
-use rendering::scene::Scene;
-use std::f64::consts::PI;
-use std::fs;
-use std::time::Instant;
-
 mod cli;
 mod configuration;
 mod geometry;
 mod rendering;
 mod scene_objects;
 
+use crate::cli::{Action, App, GlobalOpts};
+use crate::configuration::RenderConfig;
 use crate::geometry::euclidean::EuclideanSpace;
 use crate::geometry::euclidean_spherical::EuclideanSpaceSpherical;
 use crate::geometry::four_vector::FourVector;
@@ -21,9 +13,16 @@ use crate::geometry::geometry::Geometry;
 use crate::geometry::schwarzschild::Schwarzschild;
 use crate::geometry::spherical_coordinates_helper::cartesian_to_spherical;
 use crate::scene_objects::objects::Objects;
+use clap::Parser;
+use nalgebra::Vector4;
+use rendering::camera::Camera;
 use rendering::integrator::IntegrationConfiguration;
 use rendering::raytracer;
+use rendering::scene::Scene;
 use rendering::texture::{TextureData, TextureMapper};
+use std::f64::consts::PI;
+use std::fs;
+use std::time::Instant;
 
 fn render_euclidean(
     opts: GlobalOpts,
@@ -33,8 +32,28 @@ fn render_euclidean(
 ) {
     let geometry = EuclideanSpace::new();
     let momentum = FourVector::new_cartesian(1.0, 0.0, 0.0, 0.0);
+    let scene = create_scene(&geometry, camera_position, momentum, opts, config);
 
-    render(geometry, camera_position, momentum, opts, config, filename);
+    render(scene, filename);
+}
+
+fn render_euclidean_ray(
+    row: i64,
+    col: i64,
+    opts: GlobalOpts,
+    config: RenderConfig,
+    camera_position: Vector4<f64>,
+    filename: String,
+) {
+    let geometry = EuclideanSpace::new();
+    let momentum = FourVector::new_cartesian(1.0, 0.0, 0.0, 0.0);
+
+    let scene = create_scene(&geometry, camera_position, momentum, opts, config);
+    let raytracer = raytracer::Raytracer::new(scene);
+    let (integrated_ray, stop_reason) = raytracer.integrate_ray_at_point(row, col);
+    println!("Stop reason: {:?}", stop_reason);
+    integrated_ray.save(filename.clone(), &geometry);
+    println!("Saved integrated ray to {}", filename);
 }
 
 fn render_euclidean_spherical(
@@ -46,8 +65,29 @@ fn render_euclidean_spherical(
     let camera_position = cartesian_to_spherical(&camera_position);
     let momentum = FourVector::new_spherical(1.0, 0.0, 0.0, 0.0);
     let geometry = EuclideanSpaceSpherical::new();
+    let scene = create_scene(&geometry, camera_position, momentum, opts, config);
 
-    render(geometry, camera_position, momentum, opts, config, filename);
+    render(scene, filename);
+}
+
+fn render_euclidean_spherical_ray(
+    row: i64,
+    col: i64,
+    opts: GlobalOpts,
+    config: RenderConfig,
+    camera_position: Vector4<f64>,
+    filename: String,
+) {
+    let camera_position = cartesian_to_spherical(&camera_position);
+    let momentum = FourVector::new_spherical(1.0, 0.0, 0.0, 0.0);
+    let geometry = EuclideanSpaceSpherical::new();
+
+    let scene = create_scene(&geometry, camera_position, momentum, opts, config);
+    let raytracer = raytracer::Raytracer::new(scene);
+    let (integrated_ray, stop_reason) = raytracer.integrate_ray_at_point(row, col);
+    println!("Stop reason: {:?}", stop_reason);
+    integrated_ray.save(filename.clone(), &geometry);
+    println!("Saved integrated ray to {}", filename);
 }
 
 fn render_schwarzschild(
@@ -64,18 +104,46 @@ fn render_schwarzschild(
     let momentum = FourVector::new_spherical(1.0 / a.sqrt(), 0.0, 0.0, 0.0);
 
     let geometry = Schwarzschild::new(radius);
+    let scene = create_scene(&geometry, camera_position, momentum, opts, config);
 
-    render(geometry, camera_position, momentum, opts, config, filename);
+    render(scene, filename);
 }
 
-fn render<G: Geometry>(
-    geometry: G,
+fn render_schwarzschild_ray(
+    radius: f64,
+    row: i64,
+    col: i64,
+    opts: GlobalOpts,
+    config: RenderConfig,
+    camera_position: Vector4<f64>,
+    filename: String,
+) {
+    let camera_position = cartesian_to_spherical(&camera_position);
+    let r = camera_position[1];
+    let a = 1.0 - radius / r;
+    let momentum = FourVector::new_spherical(1.0 / a.sqrt(), 0.0, 0.0, 0.0);
+    let geometry = Schwarzschild::new(radius);
+
+    let scene = create_scene(&geometry, camera_position, momentum, opts, config);
+    let raytracer = raytracer::Raytracer::new(scene);
+    let (integrated_ray, stop_reason) = raytracer.integrate_ray_at_point(row, col);
+    println!("Stop reason: {:?}", stop_reason);
+    integrated_ray.save(filename.clone(), &geometry);
+    println!("Saved integrated ray to {}", filename);
+}
+
+fn render<G: Geometry>(scene: Scene<TextureMapper, G>, filename: String) {
+    let raytracer = raytracer::Raytracer::new(scene);
+    raytracer.render(filename);
+}
+
+fn create_scene<G: Geometry>(
+    geometry: &G,
     camera_position: Vector4<f64>,
     camera_momentum: FourVector,
     opts: GlobalOpts,
     config: RenderConfig,
-    filename: String,
-) {
+) -> Scene<TextureMapper, G> {
     let integration_configuration = IntegrationConfiguration::new(
         opts.max_steps,
         opts.max_radius,
@@ -95,7 +163,7 @@ fn render<G: Geometry>(
         PI / 4.0,
         opts.height,
         opts.width,
-        &geometry,
+        geometry,
     );
 
     let texture_data = TextureData {
@@ -135,13 +203,11 @@ fn render<G: Geometry>(
         integration_configuration,
         objects,
         texture_data,
-        &geometry,
+        geometry,
         camera,
         false,
     );
-
-    let raytracer = raytracer::Raytracer::new(scene);
-    raytracer.render(filename);
+    scene
 }
 
 fn main() {
@@ -177,6 +243,55 @@ fn main() {
                 configuration::GeometryType::Schwarzschild { radius } => {
                     println!("Rendering Schwarzschild geometry with radius: {}", radius);
                     render_schwarzschild(radius, args.global_opts, config, position, filename);
+                }
+            }
+        }
+        Action::RenderRay { row, col, filename } => {
+            let config_file =
+                fs::read_to_string(args.config_file).expect("Unable to open configuration file");
+
+            let config: RenderConfig = toml::from_str(config_file.as_str()).unwrap();
+
+            if args.global_opts.camera_position.len() != 3 {
+                panic!("Camera position must be a vector of length 3");
+            }
+            let position = Vector4::new(
+                0.0,
+                args.global_opts.camera_position[0],
+                args.global_opts.camera_position[1],
+                args.global_opts.camera_position[2],
+            );
+
+            match config.geometry_type {
+                configuration::GeometryType::Euclidean => {
+                    println!("Rendering ray in Euclidean geometry");
+                    render_euclidean_ray(row, col, args.global_opts, config, position, filename);
+                }
+                configuration::GeometryType::EuclideanSpherical => {
+                    println!("Rendering ray in Euclidean spherical geometry");
+                    render_euclidean_spherical_ray(
+                        row,
+                        col,
+                        args.global_opts,
+                        config,
+                        position,
+                        filename,
+                    );
+                }
+                configuration::GeometryType::Schwarzschild { radius } => {
+                    println!(
+                        "Rendering ray in Schwarzschild geometry with radius: {}",
+                        radius
+                    );
+                    render_schwarzschild_ray(
+                        radius,
+                        row,
+                        col,
+                        args.global_opts,
+                        config,
+                        position,
+                        filename,
+                    );
                 }
             }
         }
