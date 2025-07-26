@@ -1,7 +1,7 @@
 use crate::geometry::four_vector::FourVector;
 use crate::geometry::geometry::Geometry;
-use crate::ray::Ray;
-use crate::scene::EquationOfMotionState;
+use crate::rendering::ray::Ray;
+use crate::rendering::scene::EquationOfMotionState;
 use nalgebra::Vector4;
 
 pub struct RedshiftComputer<'a, G: Geometry> {

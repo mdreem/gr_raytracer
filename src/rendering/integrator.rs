@@ -1,8 +1,8 @@
 use crate::geometry::geometry::Geometry;
-use crate::integrator::StopReason::{CelestialSphereReached, HorizonReached};
-use crate::ray::{IntegratedRay, Ray};
-use crate::runge_kutta::rk4;
-use crate::scene::{get_position, EquationOfMotionState};
+use crate::rendering::integrator::StopReason::{CelestialSphereReached, HorizonReached};
+use crate::rendering::ray::{IntegratedRay, Ray};
+use crate::rendering::runge_kutta::rk4;
+use crate::rendering::scene::{get_position, EquationOfMotionState};
 use nalgebra::Vector4;
 
 #[derive(Debug)]

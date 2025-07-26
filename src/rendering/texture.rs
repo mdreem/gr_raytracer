@@ -1,4 +1,4 @@
-use crate::color::Color;
+use crate::rendering::color::Color;
 use image::{DynamicImage, GenericImageView, ImageReader};
 
 pub struct UVCoordinates {
