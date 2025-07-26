@@ -1,4 +1,6 @@
 use crate::geometry::geometry::Geometry;
+use crate::rendering::integrator::StopReason;
+use crate::rendering::ray::IntegratedRay;
 use crate::rendering::scene::Scene;
 use crate::rendering::texture::TextureMap;
 use rayon::iter::ParallelIterator;
@@ -67,9 +69,12 @@ impl<'a, T: TextureMap, G: Geometry> Raytracer<'a, T, G> {
         );
     }
 
-    pub fn render_point(&self, row: i64, col: i64) {
+    pub fn integrate_ray_at_point(
+        &self,
+        row: i64,
+        col: i64,
+    ) -> (IntegratedRay, Option<StopReason>) {
         let ray = self.scene.camera.get_ray_for(row, col);
-        let (color, _) = self.scene.color_of_ray(&ray);
-        println!("color: {:?}", color);
+        self.scene.integrate_ray(&ray)
     }
 }
