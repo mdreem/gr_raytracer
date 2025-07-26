@@ -1,23 +1,16 @@
-use crate::camera::{Camera, Ray};
+use crate::camera::Camera;
 use crate::color::{wavelength_to_rgb, Color};
-use crate::four_vector::{CoordinateSystem, FourVector};
-use crate::geometry::Geometry;
+use crate::geometry::four_vector::{CoordinateSystem, FourVector};
+use crate::geometry::geometry::Geometry;
+use crate::geometry::spherical_coordinates_helper::spherical_to_cartesian;
 use crate::integrator::StopReason::{CelestialSphereReached, HorizonReached};
-use crate::integrator::{IntegrationConfiguration, Integrator, Step};
+use crate::integrator::{IntegrationConfiguration, Integrator};
+use crate::ray::{IntegratedRay, Ray};
 use crate::redshift::RedshiftComputer;
 use crate::scene_objects::objects::Objects;
-use crate::spherical_coordinates_helper::spherical_to_cartesian;
-use crate::texture::{TextureMap, UVCoordinates};
+use crate::texture::{TextureData, TextureMap, UVCoordinates};
 use nalgebra::{Const, OVector, Vector4};
 use std::f64::consts::PI;
-use std::fs::File;
-use std::io::Write;
-
-pub struct TextureData<T: TextureMap> {
-    pub celestial_map: T,
-    pub center_disk_map: T,
-    pub center_sphere_map: T,
-}
 
 pub struct Scene<'a, T: TextureMap, G: Geometry> {
     pub integrator: Integrator<'a, G>,
@@ -64,39 +57,16 @@ impl<'a, T: TextureMap, G: Geometry> Scene<'a, T, G> {
         }
     }
 
-    fn save_steps(&self, steps: &Vec<Step>, filename: String) {
-        let mut file = File::create(filename).expect("Unable to create file");
-
-        file.write_all(b"i,t,tau,x,y,z\n")
-            .expect("Unable to write file");
-
-        for step in steps {
-            let position = get_position(&step.y, self.geometry.coordinate_system()).get_as_vector();
-
-            file.write_all(
-                format!(
-                    "{},{},{},{},{},{}\n",
-                    step.step, step.t, position[0], position[1], position[2], position[3],
-                )
-                .as_bytes(),
-            )
-            .expect("Unable to write file");
-        }
-    }
-
     pub fn color_of_ray(&self, ray: &Ray) -> (Color, Option<f64>) {
         let (steps, stop_reason) = self.integrator.integrate(ray);
         let mut y = steps[0].y;
 
         if self.save_ray_data {
-            self.save_steps(
-                &steps,
-                String::from(format!("ray-{}-{}.csv", ray.row, ray.col)),
-            );
+            steps.save(format!("ray-{}-{}.csv", ray.row, ray.col), self.geometry);
         }
 
         let velocity = self.camera.velocity;
-        let observer_energy = self.geometry.mul(&ray.position, &velocity, &ray.momentum);
+        let observer_energy = self.redshift_computer.get_observer_energy(ray, &velocity);
 
         for step in steps.iter().skip(1) {
             let last_y = y;
@@ -129,31 +99,38 @@ impl<'a, T: TextureMap, G: Geometry> Scene<'a, T, G> {
 
     fn color_after_extending_to_celestial_sphere(
         &self,
-        steps: Vec<Step>,
+        steps: IntegratedRay,
         observer_energy: f64,
     ) -> (Color, Option<f64>) {
-        let y = steps.last().unwrap().y;
-        let t = steps.last().unwrap().t;
+        let y_start = steps.last().unwrap().y;
+        let t_start = steps.last().unwrap().t;
+        let y_far = self
+            .integrator
+            .integrate_to_celestial_sphere(y_start, t_start);
 
-        let y_far = self.integrator.integrate_to_celestial_sphere(y, t);
-
-        let point_on_celestial_sphere =
-            get_position(&y_far, self.geometry.coordinate_system()).get_as_spherical();
-        let theta = point_on_celestial_sphere[1];
-        let phi = point_on_celestial_sphere[2];
-        let u = (PI + phi) / (2.0 * PI);
-        let v = theta / PI;
-
+        let uv = self.get_uv_coordinates(&y_far);
         let redshift = self
             .redshift_computer
             .compute_redshift(y_far, observer_energy);
         (
-            self.texture_data.celestial_map.color_at_uv(UVCoordinates {
-                u: 1.0 - u,
-                v: 1.0 - v,
-            }),
+            self.texture_data.celestial_map.color_at_uv(uv),
             Some(redshift),
         )
+    }
+
+    fn get_uv_coordinates(&self, y_far: &EquationOfMotionState) -> UVCoordinates {
+        let point_on_celestial_sphere =
+            get_position(y_far, self.geometry.coordinate_system()).get_as_spherical();
+
+        let theta = point_on_celestial_sphere[1];
+        let phi = point_on_celestial_sphere[2];
+
+        let u = (PI + phi) / (2.0 * PI);
+        let v = theta / PI;
+        UVCoordinates {
+            u: 1.0 - u,
+            v: 1.0 - v,
+        }
     }
 }
 
@@ -161,8 +138,8 @@ impl<'a, T: TextureMap, G: Geometry> Scene<'a, T, G> {
 pub mod test_scene {
     use crate::camera::Camera;
     use crate::color::Color;
-    use crate::four_vector::FourVector;
-    use crate::geometry::Geometry;
+    use crate::geometry::four_vector::FourVector;
+    use crate::geometry::geometry::Geometry;
     use crate::scene::{IntegrationConfiguration, Scene, TextureData};
     use crate::scene_objects;
     use crate::texture::CheckerMapper;
@@ -251,13 +228,13 @@ pub mod test_scene {
 #[cfg(test)]
 mod tests {
     use crate::camera::Camera;
-    use crate::euclidean::EuclideanSpace;
-    use crate::euclidean_spherical::EuclideanSpaceSpherical;
-    use crate::four_vector::FourVector;
+    use crate::geometry::euclidean::EuclideanSpace;
+    use crate::geometry::euclidean_spherical::EuclideanSpaceSpherical;
+    use crate::geometry::four_vector::FourVector;
+    use crate::geometry::schwarzschild::Schwarzschild;
+    use crate::geometry::spherical_coordinates_helper::cartesian_to_spherical;
     use crate::scene::test_scene::create_scene_with_camera;
     use crate::scene::{Color, Scene};
-    use crate::schwarzschild::Schwarzschild;
-    use crate::spherical_coordinates_helper::cartesian_to_spherical;
     use crate::texture::CheckerMapper;
     use approx::assert_abs_diff_eq;
     use nalgebra::Vector4;

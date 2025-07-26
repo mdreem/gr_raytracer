@@ -1,5 +1,5 @@
 use crate::camera::Camera;
-use crate::geometry::Geometry;
+use crate::geometry::geometry::Geometry;
 use nalgebra::Vector4;
 use std::fs::File;
 use std::io::Write;
@@ -28,7 +28,7 @@ pub fn save_rays_to_file<G: Geometry>(
                     momentum[1],
                     momentum[2],
                     momentum[3],
-                    geometry.mul(&position, &ray.momentum, &ray.momentum),
+                    geometry.inner_product(position, &ray.momentum, &ray.momentum),
                 )
                 .as_bytes(),
             )

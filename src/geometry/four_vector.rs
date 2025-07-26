@@ -1,4 +1,4 @@
-use crate::spherical_coordinates_helper::cartesian_to_spherical;
+use crate::geometry::spherical_coordinates_helper::cartesian_to_spherical;
 use nalgebra::{Vector3, Vector4};
 use std::ops::{Add, Div, Mul, Neg};
 
@@ -133,9 +133,9 @@ impl FourVector {
 
 #[cfg(test)]
 mod tests {
-    use crate::euclidean::EuclideanSpace;
-    use crate::four_vector::FourVector;
-    use crate::geometry::Geometry;
+    use crate::geometry::euclidean::EuclideanSpace;
+    use crate::geometry::four_vector::FourVector;
+    use crate::geometry::geometry::InnerProduct;
     use approx::assert_abs_diff_eq;
     use nalgebra::Vector4;
 
@@ -144,7 +144,7 @@ mod tests {
         let geometry = EuclideanSpace::new();
         let v1 = FourVector::new_cartesian(1.0, 2.0, 3.0, 4.0);
         assert_abs_diff_eq!(
-            geometry.mul(&Vector4::new(0.0, 0.0, 0.0, 0.0), &v1, &v1),
+            geometry.inner_product(&Vector4::new(0.0, 0.0, 0.0, 0.0), &v1, &v1),
             -28.0
         );
     }
@@ -156,7 +156,7 @@ mod tests {
         let v2 = FourVector::new_cartesian(5.0, 6.0, 7.0, 8.0);
 
         assert_abs_diff_eq!(
-            geometry.mul(&Vector4::new(0.0, 0.0, 0.0, 0.0), &v1, &v2),
+            geometry.inner_product(&Vector4::new(0.0, 0.0, 0.0, 0.0), &v1, &v2),
             -60.0
         );
     }

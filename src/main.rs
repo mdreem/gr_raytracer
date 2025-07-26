@@ -1,5 +1,5 @@
 use crate::camera::Camera;
-use crate::scene::{Scene, TextureData};
+use crate::scene::Scene;
 use nalgebra::Vector4;
 use std::f64::consts::PI;
 use std::time::Instant;
@@ -7,29 +7,25 @@ use std::time::Instant;
 mod camera;
 mod color;
 mod debug;
-mod euclidean;
-mod euclidean_spherical;
-mod four_vector;
-mod geometry;
-mod hittable;
 mod integrator;
 mod raytracer;
 mod redshift;
 mod runge_kutta;
 mod scene;
 mod scene_objects;
-mod schwarzschild;
-mod spherical_coordinates_helper;
+
+mod geometry;
+mod ray;
 mod texture;
 
-use crate::euclidean::EuclideanSpace;
-use crate::euclidean_spherical::EuclideanSpaceSpherical;
-use crate::four_vector::FourVector;
+use crate::geometry::euclidean::EuclideanSpace;
+use crate::geometry::euclidean_spherical::EuclideanSpaceSpherical;
+use crate::geometry::four_vector::FourVector;
+use crate::geometry::schwarzschild::Schwarzschild;
+use crate::geometry::spherical_coordinates_helper::cartesian_to_spherical;
 use crate::integrator::IntegrationConfiguration;
 use crate::scene_objects::objects::Objects;
-use crate::schwarzschild::Schwarzschild;
-use crate::spherical_coordinates_helper::cartesian_to_spherical;
-use crate::texture::TextureMapper;
+use crate::texture::{TextureData, TextureMapper};
 
 fn render_euclidean() {
     let texture_mapper_celestial = TextureMapper::new(String::from("./resources/celestial.png"));

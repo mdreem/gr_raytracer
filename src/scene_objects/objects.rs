@@ -1,6 +1,6 @@
 use crate::color::Color;
-use crate::four_vector::FourVector;
-use crate::hittable::Hittable;
+use crate::geometry::four_vector::FourVector;
+use crate::scene_objects::hittable::Hittable;
 use crate::texture::TextureMap;
 
 pub trait SceneObject: Hittable + TextureMap {}

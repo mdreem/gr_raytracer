@@ -1,24 +1,7 @@
-use crate::four_vector::FourVector;
-use crate::geometry::{Geometry, Tetrad};
+use crate::geometry::four_vector::FourVector;
+use crate::geometry::geometry::{Geometry, Tetrad};
+use crate::ray::Ray;
 use nalgebra::Vector4;
-
-#[derive(Debug)]
-pub struct Ray {
-    pub position: Vector4<f64>,
-    pub momentum: FourVector,
-    pub row: i64,
-    pub col: i64,
-}
-impl Ray {
-    pub fn new(row: i64, col: i64, position: Vector4<f64>, momentum: FourVector) -> Self {
-        Self {
-            row,
-            col,
-            position,
-            momentum,
-        }
-    }
-}
 
 #[derive(Debug, Clone)]
 pub struct Camera {
@@ -126,10 +109,10 @@ impl Camera {
 #[cfg(test)]
 mod tests {
     use crate::camera::Camera;
-    use crate::euclidean::EuclideanSpace;
+    use crate::geometry::euclidean::EuclideanSpace;
 
-    use crate::four_vector::FourVector;
-    use crate::geometry::Geometry;
+    use crate::geometry::four_vector::FourVector;
+    use crate::geometry::geometry::{Geometry, InnerProduct};
     use approx::assert_abs_diff_eq;
     use nalgebra::Vector4;
     use std::f64::consts::PI;
@@ -159,18 +142,20 @@ mod tests {
             top_left_corner.get_as_vector(),
             Vector4::new(0.0, corner, corner, corner_z)
         );
-        let top_left_corner_scalar = geometry.mul(&position, &top_left_corner, &top_left_corner);
+        let top_left_corner_scalar =
+            geometry.inner_product(&position, &top_left_corner, &top_left_corner);
         assert_abs_diff_eq!(top_left_corner_scalar, -1.0);
 
         assert_abs_diff_eq!(
             top_right_corner.get_as_vector(),
             Vector4::new(0.0, -corner, corner, corner_z)
         );
-        let top_right_corner_scalar = geometry.mul(&position, &top_right_corner, &top_right_corner);
+        let top_right_corner_scalar =
+            geometry.inner_product(&position, &top_right_corner, &top_right_corner);
         assert_abs_diff_eq!(top_right_corner_scalar, -1.0);
 
         assert_abs_diff_eq!(middle.get_as_vector(), Vector4::new(0.0, 0.0, 0.0, 1.0));
-        let middle_scalar = geometry.mul(&position, &middle, &middle);
+        let middle_scalar = geometry.inner_product(&position, &middle, &middle);
         assert_abs_diff_eq!(middle_scalar, -1.0);
 
         assert_abs_diff_eq!(
@@ -178,7 +163,7 @@ mod tests {
             Vector4::new(0.0, corner, -corner, corner_z)
         );
         let bottom_left_corner_scalar =
-            geometry.mul(&position, &bottom_left_corner, &bottom_left_corner);
+            geometry.inner_product(&position, &bottom_left_corner, &bottom_left_corner);
         assert_abs_diff_eq!(bottom_left_corner_scalar, -1.0);
 
         assert_abs_diff_eq!(
@@ -186,7 +171,7 @@ mod tests {
             Vector4::new(0.0, -corner, -corner, corner_z)
         );
         let bottom_right_corner_scalar =
-            geometry.mul(&position, &bottom_right_corner, &bottom_right_corner);
+            geometry.inner_product(&position, &bottom_right_corner, &bottom_right_corner);
         assert_abs_diff_eq!(bottom_right_corner_scalar, -1.0);
     }
 }
