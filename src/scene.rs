@@ -11,7 +11,6 @@ use crate::scene_objects::objects::Objects;
 use crate::texture::{TextureData, TextureMap, UVCoordinates};
 use nalgebra::{Const, OVector, Vector4};
 use std::f64::consts::PI;
-use std::io::Write;
 
 pub struct Scene<'a, T: TextureMap, G: Geometry> {
     pub integrator: Integrator<'a, G>,
@@ -63,14 +62,11 @@ impl<'a, T: TextureMap, G: Geometry> Scene<'a, T, G> {
         let mut y = steps[0].y;
 
         if self.save_ray_data {
-            steps.save(
-                String::from(format!("ray-{}-{}.csv", ray.row, ray.col)),
-                self.geometry,
-            );
+            steps.save(format!("ray-{}-{}.csv", ray.row, ray.col), self.geometry);
         }
 
         let velocity = self.camera.velocity;
-        let observer_energy = self.redshift_computer.get_observer_energy(&ray, &velocity);
+        let observer_energy = self.redshift_computer.get_observer_energy(ray, &velocity);
 
         for step in steps.iter().skip(1) {
             let last_y = y;
@@ -124,7 +120,7 @@ impl<'a, T: TextureMap, G: Geometry> Scene<'a, T, G> {
 
     fn get_uv_coordinates(&self, y_far: &EquationOfMotionState) -> UVCoordinates {
         let point_on_celestial_sphere =
-            get_position(&y_far, self.geometry.coordinate_system()).get_as_spherical();
+            get_position(y_far, self.geometry.coordinate_system()).get_as_spherical();
 
         let theta = point_on_celestial_sphere[1];
         let phi = point_on_celestial_sphere[2];
