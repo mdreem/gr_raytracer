@@ -1,5 +1,6 @@
 use crate::geometry::four_vector::FourVector;
 use crate::geometry::geometry::Geometry;
+use crate::ray::Ray;
 use crate::scene::EquationOfMotionState;
 use nalgebra::Vector4;
 
@@ -16,6 +17,11 @@ impl<'a, G: Geometry> RedshiftComputer<'a, G> {
         let emitter_energy = self.energy_of_stationary_emitter(y);
         let shift = emitter_energy / observer_energy;
         shift
+    }
+
+    pub fn get_observer_energy(&self, ray: &Ray, velocity: &FourVector) -> f64 {
+        self.geometry
+            .inner_product(&ray.position, &velocity, &ray.momentum)
     }
 
     fn energy_of_stationary_emitter(&self, y: EquationOfMotionState) -> f64 {

@@ -70,9 +70,7 @@ impl<'a, T: TextureMap, G: Geometry> Scene<'a, T, G> {
         }
 
         let velocity = self.camera.velocity;
-        let observer_energy = self
-            .geometry
-            .inner_product(&ray.position, &velocity, &ray.momentum);
+        let observer_energy = self.redshift_computer.get_observer_energy(&ray, &velocity);
 
         for step in steps.iter().skip(1) {
             let last_y = y;
@@ -108,28 +106,35 @@ impl<'a, T: TextureMap, G: Geometry> Scene<'a, T, G> {
         steps: IntegratedRay,
         observer_energy: f64,
     ) -> (Color, Option<f64>) {
-        let y = steps.last().unwrap().y;
-        let t = steps.last().unwrap().t;
+        let y_start = steps.last().unwrap().y;
+        let t_start = steps.last().unwrap().t;
+        let y_far = self
+            .integrator
+            .integrate_to_celestial_sphere(y_start, t_start);
 
-        let y_far = self.integrator.integrate_to_celestial_sphere(y, t);
-
-        let point_on_celestial_sphere =
-            get_position(&y_far, self.geometry.coordinate_system()).get_as_spherical();
-        let theta = point_on_celestial_sphere[1];
-        let phi = point_on_celestial_sphere[2];
-        let u = (PI + phi) / (2.0 * PI);
-        let v = theta / PI;
-
+        let uv = self.get_uv_coordinates(&y_far);
         let redshift = self
             .redshift_computer
             .compute_redshift(y_far, observer_energy);
         (
-            self.texture_data.celestial_map.color_at_uv(UVCoordinates {
-                u: 1.0 - u,
-                v: 1.0 - v,
-            }),
+            self.texture_data.celestial_map.color_at_uv(uv),
             Some(redshift),
         )
+    }
+
+    fn get_uv_coordinates(&self, y_far: &EquationOfMotionState) -> UVCoordinates {
+        let point_on_celestial_sphere =
+            get_position(&y_far, self.geometry.coordinate_system()).get_as_spherical();
+
+        let theta = point_on_celestial_sphere[1];
+        let phi = point_on_celestial_sphere[2];
+
+        let u = (PI + phi) / (2.0 * PI);
+        let v = theta / PI;
+        UVCoordinates {
+            u: 1.0 - u,
+            v: 1.0 - v,
+        }
     }
 }
 
