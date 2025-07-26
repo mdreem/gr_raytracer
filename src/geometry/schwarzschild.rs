@@ -3,8 +3,8 @@ use crate::geometry::four_vector::{CoordinateSystem, FourVector};
 use crate::geometry::geometry::{
     GeodesicSolver, Geometry, HasCoordinateSystem, InnerProduct, Tetrad,
 };
-use crate::runge_kutta::OdeFunction;
-use crate::scene::EquationOfMotionState;
+use crate::rendering::runge_kutta::OdeFunction;
+use crate::rendering::scene::EquationOfMotionState;
 use nalgebra::{Const, Matrix4, OVector, Vector4};
 
 #[derive(Clone, Debug)]
@@ -150,7 +150,7 @@ impl Geometry for Schwarzschild {
 mod test_schwarzschild {
     use crate::geometry::four_vector::FourVector;
     use crate::geometry::schwarzschild::Schwarzschild;
-    use crate::runge_kutta::{rk4, OdeFunction};
+    use crate::rendering::runge_kutta::{rk4, OdeFunction};
     use nalgebra::{Const, OVector, Vector2, Vector4};
 
     pub fn get_angular_momentum_from_phi(
@@ -249,8 +249,6 @@ mod test_schwarzschild {
 
 #[cfg(test)]
 mod tests {
-    use crate::camera::Camera;
-    use crate::debug::save_rays_to_file;
     use crate::geometry::four_vector::FourVector;
     use crate::geometry::geometry::{Geometry, InnerProduct};
     use crate::geometry::schwarzschild::test_schwarzschild::{
@@ -258,12 +256,14 @@ mod tests {
     };
     use crate::geometry::schwarzschild::{test_schwarzschild, Schwarzschild};
     use crate::geometry::spherical_coordinates_helper::cartesian_to_spherical;
-    use crate::integrator::{Step, StopReason};
-    use crate::ray::{IntegratedRay, Ray};
-    use crate::scene;
-    use crate::scene::test_scene::CELESTIAL_SPHERE_RADIUS;
-    use crate::scene::Scene;
-    use crate::texture::CheckerMapper;
+    use crate::rendering::camera::Camera;
+    use crate::rendering::debug::save_rays_to_file;
+    use crate::rendering::integrator::{Step, StopReason};
+    use crate::rendering::ray::{IntegratedRay, Ray};
+    use crate::rendering::scene;
+    use crate::rendering::scene::test_scene::CELESTIAL_SPHERE_RADIUS;
+    use crate::rendering::scene::Scene;
+    use crate::rendering::texture::CheckerMapper;
     use approx::assert_abs_diff_eq;
     use nalgebra::Vector4;
     use std::f64::consts::PI;
@@ -317,7 +317,7 @@ mod tests {
         let velocity = FourVector::new_spherical(1.0 / a, -(radius / r).sqrt(), 0.0, 0.0); // we have a freely falling observer here.
 
         let original_tetrad = geometry.get_tetrad_at(&position);
-        let tetrad = crate::camera::lorentz_transform_tetrad(
+        let tetrad = crate::rendering::camera::lorentz_transform_tetrad(
             &geometry,
             &original_tetrad,
             &position,

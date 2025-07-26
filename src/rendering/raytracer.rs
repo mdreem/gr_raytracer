@@ -1,6 +1,6 @@
 use crate::geometry::geometry::Geometry;
-use crate::scene::Scene;
-use crate::texture::TextureMap;
+use crate::rendering::scene::Scene;
+use crate::rendering::texture::TextureMap;
 use rayon::iter::ParallelIterator;
 use std::sync::atomic::{AtomicUsize, Ordering};
 
@@ -20,7 +20,14 @@ impl<'a, T: TextureMap, G: Geometry> Raytracer<'a, T, G> {
         println!("color: {:?}", color);
     }
 
-    pub fn render_section(&self, from_row: u32, from_col: u32, to_row: u32, to_col: u32) {
+    pub fn render_section(
+        &self,
+        from_row: u32,
+        from_col: u32,
+        to_row: u32,
+        to_col: u32,
+        filename: String,
+    ) {
         let mut imgbuf = image::ImageBuffer::new(to_col - from_col, to_row - from_row);
 
         let count = AtomicUsize::new(0);
@@ -45,17 +52,18 @@ impl<'a, T: TextureMap, G: Geometry> Raytracer<'a, T, G> {
             *pixel = image::Rgb(color.get_as_array());
         });
 
-        imgbuf.save("render.png").unwrap();
-        println!("saved image");
+        imgbuf.save(&filename).unwrap();
+        println!("saved image to {}", filename);
     }
 
     // TODO: maybe change image width and height types to align through the codebase
-    pub fn render(&self) {
+    pub fn render(&self, filename: String) {
         self.render_section(
             0,
             0,
             self.scene.camera.rows as u32,
             self.scene.camera.columns as u32,
+            filename,
         );
     }
 

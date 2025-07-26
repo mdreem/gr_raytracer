@@ -1,0 +1,12 @@
+[geometry_type.EuclideanSpherical]
+
+[[objects]]
+
+[objects.Sphere]
+radius = 3.0
+
+[[objects]]
+
+[objects.Disc]
+inner_radius = 3.0
+outer_radius = 5.0

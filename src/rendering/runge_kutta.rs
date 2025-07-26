@@ -23,7 +23,7 @@ where
 
 #[cfg(test)]
 mod tests {
-    use crate::runge_kutta::{rk4, OdeFunction};
+    use crate::rendering::runge_kutta::{rk4, OdeFunction};
     use approx::assert_abs_diff_eq;
     use nalgebra::{Const, OVector, Vector2};
 

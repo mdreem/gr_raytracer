@@ -1,6 +1,6 @@
 use crate::geometry::four_vector::{CoordinateSystem, FourVector};
-use crate::runge_kutta::OdeFunction;
-use crate::scene::EquationOfMotionState;
+use crate::rendering::runge_kutta::OdeFunction;
+use crate::rendering::scene::EquationOfMotionState;
 use nalgebra::{Const, Matrix4, Vector4};
 
 #[derive(Debug, Clone)]
