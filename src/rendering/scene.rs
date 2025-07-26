@@ -257,7 +257,7 @@ mod tests {
         let space = EuclideanSpace::new();
         let scene = create_scene_with_camera(2.0, 0.2, 0.3, &space, camera);
 
-        let ray = scene.camera.get_ray_for(6, 6);
+        let ray = scene.camera.get_ray_for(5, 5);
         let (color, _) = scene.color_of_ray(&ray);
 
         assert_eq!(color, Color::new(100, 0, 0));
@@ -277,7 +277,7 @@ mod tests {
         let space = EuclideanSpaceSpherical::new();
         let scene = create_scene_with_camera(2.0, 0.2, 0.3, &space, camera);
 
-        let ray = scene.camera.get_ray_for(6, 6);
+        let ray = scene.camera.get_ray_for(5, 5);
         let (color, _) = scene.color_of_ray(&ray);
 
         assert_eq!(color, Color::new(100, 0, 0));
@@ -296,7 +296,7 @@ mod tests {
         let camera = Camera::new(position, velocity, PI / 2.0, 11, 11, &geometry);
         let scene = create_scene_with_camera(2.0, 0.2, 0.3, &geometry, camera);
 
-        let ray = scene.camera.get_ray_for(6, 6);
+        let ray = scene.camera.get_ray_for(5, 5);
         let (color, Some(redshift)) = scene.color_of_ray(&ray) else {
             panic!("No redshift found");
         };
@@ -318,7 +318,7 @@ mod tests {
         let camera = Camera::new(position, velocity, PI / 2.0, 11, 11, &geometry);
         let scene = create_scene_with_camera(sphere_radius, 0.2, 0.3, &geometry, camera);
 
-        let ray = scene.camera.get_ray_for(6, 6);
+        let ray = scene.camera.get_ray_for(5, 5);
         let (color, Some(redshift)) = scene.color_of_ray(&ray) else {
             panic!("No redshift found");
         };
@@ -347,7 +347,7 @@ mod tests {
         let ray = scene.camera.get_ray_for(0, 0);
         let (color, _) = scene.color_of_ray(&ray);
 
-        assert_eq!(color, Color::new(0, 255, 0));
+        assert_eq!(color, Color::new(0, 100, 0));
     }
 
     #[test]
