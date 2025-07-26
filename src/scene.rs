@@ -4,14 +4,13 @@ use crate::geometry::four_vector::{CoordinateSystem, FourVector};
 use crate::geometry::geometry::Geometry;
 use crate::geometry::spherical_coordinates_helper::spherical_to_cartesian;
 use crate::integrator::StopReason::{CelestialSphereReached, HorizonReached};
-use crate::integrator::{IntegrationConfiguration, Integrator, Step};
-use crate::ray::Ray;
+use crate::integrator::{IntegrationConfiguration, Integrator};
+use crate::ray::{IntegratedRay, Ray};
 use crate::redshift::RedshiftComputer;
 use crate::scene_objects::objects::Objects;
 use crate::texture::{TextureData, TextureMap, UVCoordinates};
 use nalgebra::{Const, OVector, Vector4};
 use std::f64::consts::PI;
-use std::fs::File;
 use std::io::Write;
 
 pub struct Scene<'a, T: TextureMap, G: Geometry> {
@@ -59,34 +58,14 @@ impl<'a, T: TextureMap, G: Geometry> Scene<'a, T, G> {
         }
     }
 
-    fn save_steps(&self, steps: &Vec<Step>, filename: String) {
-        let mut file = File::create(filename).expect("Unable to create file");
-
-        file.write_all(b"i,t,tau,x,y,z\n")
-            .expect("Unable to write file");
-
-        for step in steps {
-            let position = get_position(&step.y, self.geometry.coordinate_system()).get_as_vector();
-
-            file.write_all(
-                format!(
-                    "{},{},{},{},{},{}\n",
-                    step.step, step.t, position[0], position[1], position[2], position[3],
-                )
-                .as_bytes(),
-            )
-            .expect("Unable to write file");
-        }
-    }
-
     pub fn color_of_ray(&self, ray: &Ray) -> (Color, Option<f64>) {
         let (steps, stop_reason) = self.integrator.integrate(ray);
         let mut y = steps[0].y;
 
         if self.save_ray_data {
-            self.save_steps(
-                &steps,
+            steps.save(
                 String::from(format!("ray-{}-{}.csv", ray.row, ray.col)),
+                self.geometry,
             );
         }
 
@@ -126,7 +105,7 @@ impl<'a, T: TextureMap, G: Geometry> Scene<'a, T, G> {
 
     fn color_after_extending_to_celestial_sphere(
         &self,
-        steps: Vec<Step>,
+        steps: IntegratedRay,
         observer_energy: f64,
     ) -> (Color, Option<f64>) {
         let y = steps.last().unwrap().y;
