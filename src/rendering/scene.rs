@@ -4,7 +4,7 @@ use crate::geometry::spherical_coordinates_helper::spherical_to_cartesian;
 use crate::rendering::camera::Camera;
 use crate::rendering::color::{wavelength_to_rgb, Color};
 use crate::rendering::integrator::StopReason::{CelestialSphereReached, HorizonReached};
-use crate::rendering::integrator::{IntegrationConfiguration, Integrator};
+use crate::rendering::integrator::{IntegrationConfiguration, Integrator, StopReason};
 use crate::rendering::ray::{IntegratedRay, Ray};
 use crate::rendering::redshift::RedshiftComputer;
 use crate::rendering::texture::{TextureData, TextureMap, UVCoordinates};
@@ -57,8 +57,12 @@ impl<'a, T: TextureMap, G: Geometry> Scene<'a, T, G> {
         }
     }
 
+    pub fn integrate_ray(&self, ray: &Ray) -> (IntegratedRay, Option<StopReason>) {
+        self.integrator.integrate(ray)
+    }
+
     pub fn color_of_ray(&self, ray: &Ray) -> (Color, Option<f64>) {
-        let (steps, stop_reason) = self.integrator.integrate(ray);
+        let (steps, stop_reason) = self.integrate_ray(ray);
         let mut y = steps[0].y;
 
         if self.save_ray_data {
