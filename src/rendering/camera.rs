@@ -72,9 +72,9 @@ impl Camera {
         geometry: &G,
     ) -> Camera {
         let original_tetrad = geometry.get_tetrad_at(&position);
-        println!("original_tetrad: {:?}", original_tetrad);
+        println!("original_tetrad: {}", original_tetrad);
         let tetrad = lorentz_transform_tetrad(geometry, &original_tetrad, &position, &velocity);
-        println!("tetrad: {:?}", tetrad);
+        println!("tetrad: {}", tetrad);
         Self {
             position,
             velocity,
@@ -85,12 +85,15 @@ impl Camera {
         }
     }
 
-    // row, column range from 1..R, 1..C
+    // row, column range from 1..R, 1..C in https://arxiv.org/abs/1511.06025, but here we work
+    // with 0-based indices. This needs to be accounted for below.
     fn get_direction_for(&self, row: i64, column: i64) -> FourVector {
+        let shifted_column = (column + 1) as f64; // Convert to 1-based index.
+        let shifted_row = (row + 1) as f64; // Convert to 1-based index.
         let i_prime = (2.0 * f64::tan(self.alpha / 2.0) / (self.columns as f64))
-            * (column as f64 - (self.columns as f64 + 1.0) / 2.0);
+            * (shifted_column - (self.columns as f64 + 1.0) / 2.0);
         let j_prime = (2.0 * f64::tan(self.alpha / 2.0) / (self.rows as f64))
-            * (row as f64 - (self.rows as f64 + 1.0) / 2.0);
+            * (shifted_row as f64 - (self.rows as f64 + 1.0) / 2.0);
 
         let w = self.tetrad.z + i_prime * self.tetrad.x + j_prime * self.tetrad.y;
         let w_squared = -1.0 - i_prime * i_prime - j_prime * j_prime;
