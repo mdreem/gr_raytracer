@@ -1,9 +1,9 @@
-use rendering::camera::Camera;
 use crate::cli::{Action, App, GlobalOpts};
 use crate::configuration::RenderConfig;
-use rendering::scene::Scene;
 use clap::Parser;
 use nalgebra::Vector4;
+use rendering::camera::Camera;
+use rendering::scene::Scene;
 use std::f64::consts::PI;
 use std::fs;
 use std::time::Instant;
@@ -11,8 +11,8 @@ use std::time::Instant;
 mod cli;
 mod configuration;
 mod geometry;
-mod scene_objects;
 mod rendering;
+mod scene_objects;
 
 use crate::geometry::euclidean::EuclideanSpace;
 use crate::geometry::euclidean_spherical::EuclideanSpaceSpherical;
@@ -20,28 +20,28 @@ use crate::geometry::four_vector::FourVector;
 use crate::geometry::geometry::Geometry;
 use crate::geometry::schwarzschild::Schwarzschild;
 use crate::geometry::spherical_coordinates_helper::cartesian_to_spherical;
+use crate::scene_objects::objects::Objects;
 use rendering::integrator::IntegrationConfiguration;
 use rendering::raytracer;
-use crate::scene_objects::objects::Objects;
 use rendering::texture::{TextureData, TextureMapper};
 
-fn render_euclidean(opts: GlobalOpts, config: RenderConfig) {
+fn render_euclidean(opts: GlobalOpts, config: RenderConfig, filename: String) {
     let geometry = EuclideanSpace::new();
     let momentum = FourVector::new_cartesian(1.0, 0.0, 0.0, 0.0);
     let camera_position = Vector4::new(0.0, 0.0, 0.8, -15.0);
 
-    render(geometry, camera_position, momentum, opts, config);
+    render(geometry, camera_position, momentum, opts, config, filename);
 }
 
-fn render_euclidean_spherical(opts: GlobalOpts, config: RenderConfig) {
+fn render_euclidean_spherical(opts: GlobalOpts, config: RenderConfig, filename: String) {
     let camera_position = cartesian_to_spherical(&Vector4::new(0.0, 0.0, 0.8, -7.0));
     let momentum = FourVector::new_spherical(1.0, 0.0, 0.0, 0.0);
     let geometry = EuclideanSpaceSpherical::new();
 
-    render(geometry, camera_position, momentum, opts, config);
+    render(geometry, camera_position, momentum, opts, config, filename);
 }
 
-fn render_schwarzschild(radius: f64, opts: GlobalOpts, config: RenderConfig) {
+fn render_schwarzschild(radius: f64, opts: GlobalOpts, config: RenderConfig, filename: String) {
     let camera_position = cartesian_to_spherical(&Vector4::new(0.0, 0.0, 0.8, -18.0));
 
     let r = camera_position[1];
@@ -50,7 +50,7 @@ fn render_schwarzschild(radius: f64, opts: GlobalOpts, config: RenderConfig) {
 
     let geometry = Schwarzschild::new(radius);
 
-    render(geometry, camera_position, momentum, opts, config);
+    render(geometry, camera_position, momentum, opts, config, filename);
 }
 
 fn render<G: Geometry>(
@@ -59,6 +59,7 @@ fn render<G: Geometry>(
     camera_momentum: FourVector,
     opts: GlobalOpts,
     config: RenderConfig,
+    filename: String,
 ) {
     let integration_configuration = IntegrationConfiguration::new(
         opts.max_steps,
@@ -125,7 +126,7 @@ fn render<G: Geometry>(
     );
 
     let raytracer = raytracer::Raytracer::new(scene);
-    raytracer.render();
+    raytracer.render(filename);
 }
 
 fn main() {
@@ -133,7 +134,7 @@ fn main() {
 
     let start = Instant::now();
     match args.action {
-        Action::Render => {
+        Action::Render { filename } => {
             let config_file =
                 fs::read_to_string(args.config_file).expect("Unable to open configuration file");
 
@@ -142,15 +143,15 @@ fn main() {
             match config.geometry_type {
                 configuration::GeometryType::Euclidean => {
                     println!("Rendering Euclidean geometry");
-                    render_euclidean(args.global_opts, config);
+                    render_euclidean(args.global_opts, config, filename);
                 }
                 configuration::GeometryType::EuclideanSpherical => {
                     println!("Rendering Euclidean spherical geometry");
-                    render_euclidean_spherical(args.global_opts, config);
+                    render_euclidean_spherical(args.global_opts, config, filename);
                 }
                 configuration::GeometryType::Schwarzschild { radius } => {
                     println!("Rendering Schwarzschild geometry with radius: {}", radius);
-                    render_schwarzschild(radius, args.global_opts, config);
+                    render_schwarzschild(radius, args.global_opts, config, filename);
                 }
             }
         }

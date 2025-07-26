@@ -1,14 +1,14 @@
-use crate::rendering::camera::Camera;
-use crate::rendering::color::{wavelength_to_rgb, Color};
 use crate::geometry::four_vector::{CoordinateSystem, FourVector};
 use crate::geometry::geometry::Geometry;
 use crate::geometry::spherical_coordinates_helper::spherical_to_cartesian;
+use crate::rendering::camera::Camera;
+use crate::rendering::color::{wavelength_to_rgb, Color};
 use crate::rendering::integrator::StopReason::{CelestialSphereReached, HorizonReached};
 use crate::rendering::integrator::{IntegrationConfiguration, Integrator};
 use crate::rendering::ray::{IntegratedRay, Ray};
 use crate::rendering::redshift::RedshiftComputer;
-use crate::scene_objects::objects::Objects;
 use crate::rendering::texture::{TextureData, TextureMap, UVCoordinates};
+use crate::scene_objects::objects::Objects;
 use nalgebra::{Const, OVector, Vector4};
 use std::f64::consts::PI;
 
@@ -136,13 +136,13 @@ impl<'a, T: TextureMap, G: Geometry> Scene<'a, T, G> {
 
 #[cfg(test)]
 pub mod test_scene {
-    use crate::rendering::camera::Camera;
-    use crate::rendering::color::Color;
     use crate::geometry::four_vector::FourVector;
     use crate::geometry::geometry::Geometry;
+    use crate::rendering::camera::Camera;
+    use crate::rendering::color::Color;
     use crate::rendering::scene::{IntegrationConfiguration, Scene, TextureData};
-    use crate::scene_objects;
     use crate::rendering::texture::CheckerMapper;
+    use crate::scene_objects;
     use nalgebra::Vector4;
     use std::f64::consts::PI;
 
@@ -227,12 +227,12 @@ pub mod test_scene {
 
 #[cfg(test)]
 mod tests {
-    use crate::rendering::camera::Camera;
     use crate::geometry::euclidean::EuclideanSpace;
     use crate::geometry::euclidean_spherical::EuclideanSpaceSpherical;
     use crate::geometry::four_vector::FourVector;
     use crate::geometry::schwarzschild::Schwarzschild;
     use crate::geometry::spherical_coordinates_helper::cartesian_to_spherical;
+    use crate::rendering::camera::Camera;
     use crate::rendering::scene::test_scene::create_scene_with_camera;
     use crate::rendering::scene::{Color, Scene};
     use crate::rendering::texture::CheckerMapper;

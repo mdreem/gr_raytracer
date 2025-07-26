@@ -108,8 +108,8 @@ impl Camera {
 
 #[cfg(test)]
 mod tests {
-    use crate::rendering::camera::Camera;
     use crate::geometry::euclidean::EuclideanSpace;
+    use crate::rendering::camera::Camera;
 
     use crate::geometry::four_vector::FourVector;
     use crate::geometry::geometry::{Geometry, InnerProduct};
