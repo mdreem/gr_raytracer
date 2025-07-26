@@ -2,6 +2,7 @@ use crate::geometry::four_vector::{CoordinateSystem, FourVector};
 use crate::rendering::runge_kutta::OdeFunction;
 use crate::rendering::scene::EquationOfMotionState;
 use nalgebra::{Const, Matrix4, Vector4};
+use std::fmt::{Display, Formatter};
 
 #[derive(Debug, Clone)]
 pub struct Tetrad {
@@ -27,6 +28,17 @@ impl Tetrad {
             y,
             z,
         }
+    }
+}
+
+impl Display for Tetrad {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        write!(f, "Tetrad\n")?;
+        write!(f, "  t: {:?}\n", self.t)?;
+        write!(f, "  x: {:?}\n", self.x)?;
+        write!(f, "  y: {:?}\n", self.y)?;
+        write!(f, "  z: {:?}\n", self.z)?;
+        Ok(())
     }
 }
 

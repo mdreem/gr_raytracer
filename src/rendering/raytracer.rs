@@ -75,6 +75,7 @@ impl<'a, T: TextureMap, G: Geometry> Raytracer<'a, T, G> {
         col: i64,
     ) -> (IntegratedRay, Option<StopReason>) {
         let ray = self.scene.camera.get_ray_for(row, col);
+        println!("ray for {}-{} is: {:?}", row, col, ray);
         self.scene.integrate_ray(&ray)
     }
 }
