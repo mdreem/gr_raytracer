@@ -1,4 +1,4 @@
-use crate::camera::Camera;
+use crate::rendering::camera::Camera;
 use crate::geometry::geometry::Geometry;
 use nalgebra::Vector4;
 use std::fs::File;

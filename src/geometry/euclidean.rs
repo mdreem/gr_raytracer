@@ -3,8 +3,8 @@ use crate::geometry::four_vector::{CoordinateSystem, FourVector};
 use crate::geometry::geometry::{
     GeodesicSolver, Geometry, HasCoordinateSystem, InnerProduct, Tetrad,
 };
-use crate::runge_kutta::OdeFunction;
-use crate::scene::EquationOfMotionState;
+use crate::rendering::runge_kutta::OdeFunction;
+use crate::rendering::scene::EquationOfMotionState;
 use nalgebra::{Const, Matrix4, OVector, Vector4};
 
 #[derive(Clone)]
@@ -103,8 +103,8 @@ impl Geometry for EuclideanSpace {
 
 #[cfg(test)]
 mod tests {
-    use crate::camera::Camera;
-    use crate::debug::save_rays_to_file;
+    use crate::rendering::camera::Camera;
+    use crate::rendering::debug::save_rays_to_file;
     use crate::geometry::euclidean::EuclideanSpace;
     use crate::geometry::four_vector::FourVector;
     use nalgebra::Vector4;

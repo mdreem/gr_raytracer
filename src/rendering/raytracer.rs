@@ -1,6 +1,6 @@
 use crate::geometry::geometry::Geometry;
-use crate::scene::Scene;
-use crate::texture::TextureMap;
+use crate::rendering::scene::Scene;
+use crate::rendering::texture::TextureMap;
 use rayon::iter::ParallelIterator;
 use std::sync::atomic::{AtomicUsize, Ordering};
 
@@ -45,7 +45,7 @@ impl<'a, T: TextureMap, G: Geometry> Raytracer<'a, T, G> {
             *pixel = image::Rgb(color.get_as_array());
         });
 
-        imgbuf.save("render.png").unwrap();
+        imgbuf.save("../../render.png").unwrap();
         println!("saved image");
     }
 
