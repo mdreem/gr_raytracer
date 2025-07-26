@@ -259,7 +259,7 @@ mod tests {
     use crate::geometry::schwarzschild::{test_schwarzschild, Schwarzschild};
     use crate::geometry::spherical_coordinates_helper::cartesian_to_spherical;
     use crate::integrator::{Step, StopReason};
-    use crate::ray::Ray;
+    use crate::ray::{IntegratedRay, Ray};
     use crate::scene;
     use crate::scene::test_scene::CELESTIAL_SPHERE_RADIUS;
     use crate::scene::Scene;
@@ -489,11 +489,11 @@ mod tests {
         let e = 1.0;
         let l = 5.0;
 
-        let (_, trajectory, _) = compute_compared_trajectories(radius, e, l, 350);
+        let result = compute_compared_trajectories(radius, e, l, 350);
 
         save_trajectory(
             format!("trajectory-{:.2}-{:.2}.csv", e, l).as_str(),
-            &collect_points_step(&trajectory),
+            &collect_points_step(&result.result_geodesic_equation),
         );
     }
 
@@ -504,16 +504,15 @@ mod tests {
         let e = 1.0;
         let l = 5.0;
 
-        let (matching, from_geodesic_eq, stop_reason) =
-            compute_compared_trajectories(radius, e, l, 450);
+        let result = compute_compared_trajectories(radius, e, l, 450);
 
         assert_abs_diff_eq!(
-            from_geodesic_eq.last().unwrap().y[1],
+            result.result_geodesic_equation.last().unwrap().y[1],
             CELESTIAL_SPHERE_RADIUS,
             epsilon = 1e-3
         );
-        assert_eq!(matching.len(), 214);
-        assert_eq!(stop_reason, Some(StopReason::CelestialSphereReached));
+        assert_eq!(result.matching.len(), 214);
+        assert_eq!(result.stop_reason, Some(StopReason::CelestialSphereReached));
     }
 
     #[test]
@@ -523,10 +522,10 @@ mod tests {
         let e = 1.0;
         let l = 2.0;
 
-        let (matching, _, stop_reason) = compute_compared_trajectories(radius, e, l, 450);
+        let result = compute_compared_trajectories(radius, e, l, 450);
 
-        assert_eq!(matching.len(), 224);
-        assert_eq!(stop_reason, Some(StopReason::HorizonReached));
+        assert_eq!(result.matching.len(), 224);
+        assert_eq!(result.stop_reason, Some(StopReason::HorizonReached));
     }
 
     #[test]
@@ -540,10 +539,16 @@ mod tests {
         let e = 1.0;
         let l = b_crit * e;
 
-        let (matching, _, stop_reason) = compute_compared_trajectories(radius, e, l, 600);
+        let result = compute_compared_trajectories(radius, e, l, 600);
 
-        assert_eq!(matching.len(), 600);
-        assert_eq!(stop_reason, None);
+        assert_eq!(result.matching.len(), 600);
+        assert_eq!(result.stop_reason, None);
+    }
+
+    struct ComputeComparedTrajectoriesResult {
+        pub matching: Vec<Point>,
+        pub result_geodesic_equation: IntegratedRay,
+        pub stop_reason: Option<StopReason>,
     }
 
     fn compute_compared_trajectories(
@@ -551,7 +556,7 @@ mod tests {
         e: f64,
         l: f64,
         max_steps: usize,
-    ) -> (Vec<Point>, Vec<Step>, Option<StopReason>) {
+    ) -> ComputeComparedTrajectoriesResult {
         let position = Vector4::new(0.0, 5.0, PI / 2.0, 0.0);
 
         let r = position[1];
@@ -559,8 +564,10 @@ mod tests {
 
         let velocity = FourVector::new_spherical(a.sqrt().recip(), 0.0, 0.0, 0.0);
         let geometry = Schwarzschild::new(radius);
-        let scene: Scene<CheckerMapper, Schwarzschild> =
-            scene::test_scene::create_scene(1.0, 2.0, 7.0, &geometry, position, velocity);
+
+        let scene: Box<Scene<CheckerMapper, Schwarzschild>> = Box::new(
+            scene::test_scene::create_scene(1.0, 2.0, 7.0, &geometry, position, velocity),
+        );
 
         let momentum = FourVector::new_spherical(
             e / a,
@@ -575,10 +582,9 @@ mod tests {
             0.0,
             epsilon = 1e-8
         );
+        let (result_geodesic_equation, stop_reason) = scene.integrator.integrate(&ray);
 
         let ts = TestSchwarzschild { radius };
-
-        let (result_geodesic_equation, stop_reason) = scene.integrator.integrate(&ray);
         let result_r_phi_equation =
             ts.compute_test_schwarzschild_trajectory(r, l, e, max_steps, 0.01);
 
@@ -586,7 +592,11 @@ mod tests {
             &collect_points_step(&result_geodesic_equation),
             &collect_points_test_step(&result_r_phi_equation),
         );
-        (matching, result_geodesic_equation, stop_reason)
+        ComputeComparedTrajectoriesResult {
+            matching,
+            result_geodesic_equation,
+            stop_reason,
+        }
     }
 
     fn save_trajectory(filename: &str, trajectory: &Vec<Point>) {
@@ -599,7 +609,7 @@ mod tests {
         println!("Finished writing trajectory to {}.", filename);
     }
 
-    fn collect_points_step(steps: &Vec<Step>) -> Vec<Point> {
+    fn collect_points_step(steps: &IntegratedRay) -> Vec<Point> {
         steps
             .iter()
             .map(|step| Point {

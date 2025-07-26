@@ -1,6 +1,6 @@
 use crate::geometry::geometry::Geometry;
 use crate::integrator::StopReason::{CelestialSphereReached, HorizonReached};
-use crate::ray::Ray;
+use crate::ray::{IntegratedRay, Ray};
 use crate::runge_kutta::rk4;
 use crate::scene::{get_position, EquationOfMotionState};
 use nalgebra::Vector4;
@@ -66,7 +66,7 @@ impl IntegrationConfiguration {
 }
 
 impl<G: Geometry> Integrator<'_, G> {
-    pub fn integrate(&self, ray: &Ray) -> (Vec<Step>, Option<StopReason>) {
+    pub fn integrate(&self, ray: &Ray) -> (IntegratedRay, Option<StopReason>) {
         let mut t = 0.0;
         let direction = ray.momentum.get_as_vector();
         let mut y = EquationOfMotionState::from_column_slice(&[
@@ -96,13 +96,13 @@ impl<G: Geometry> Integrator<'_, G> {
 
             match self.should_stop(&last_y, &y) {
                 None => {}
-                Some(r) => return (result, Some(r)),
+                Some(r) => return (IntegratedRay::new(result), Some(r)),
             }
 
             result.push(Step { y, t, step: i });
         }
 
-        (result, None)
+        (IntegratedRay::new(result), None)
     }
 
     fn should_stop(
