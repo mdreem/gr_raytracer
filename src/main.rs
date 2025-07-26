@@ -1,27 +1,18 @@
-use crate::camera::Camera;
+use rendering::camera::Camera;
 use crate::cli::{Action, App, GlobalOpts};
 use crate::configuration::RenderConfig;
-use crate::scene::Scene;
+use rendering::scene::Scene;
 use clap::Parser;
 use nalgebra::Vector4;
 use std::f64::consts::PI;
 use std::fs;
 use std::time::Instant;
 
-mod camera;
 mod cli;
-mod color;
 mod configuration;
-mod debug;
 mod geometry;
-mod integrator;
-mod ray;
-mod raytracer;
-mod redshift;
-mod runge_kutta;
-mod scene;
 mod scene_objects;
-mod texture;
+mod rendering;
 
 use crate::geometry::euclidean::EuclideanSpace;
 use crate::geometry::euclidean_spherical::EuclideanSpaceSpherical;
@@ -29,9 +20,10 @@ use crate::geometry::four_vector::FourVector;
 use crate::geometry::geometry::Geometry;
 use crate::geometry::schwarzschild::Schwarzschild;
 use crate::geometry::spherical_coordinates_helper::cartesian_to_spherical;
-use crate::integrator::IntegrationConfiguration;
+use rendering::integrator::IntegrationConfiguration;
+use rendering::raytracer;
 use crate::scene_objects::objects::Objects;
-use crate::texture::{TextureData, TextureMapper};
+use rendering::texture::{TextureData, TextureMapper};
 
 fn render_euclidean(opts: GlobalOpts, config: RenderConfig) {
     let geometry = EuclideanSpace::new();

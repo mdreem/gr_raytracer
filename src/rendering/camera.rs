@@ -1,6 +1,6 @@
 use crate::geometry::four_vector::FourVector;
 use crate::geometry::geometry::{Geometry, Tetrad};
-use crate::ray::Ray;
+use crate::rendering::ray::Ray;
 use nalgebra::Vector4;
 
 #[derive(Debug, Clone)]
@@ -108,7 +108,7 @@ impl Camera {
 
 #[cfg(test)]
 mod tests {
-    use crate::camera::Camera;
+    use crate::rendering::camera::Camera;
     use crate::geometry::euclidean::EuclideanSpace;
 
     use crate::geometry::four_vector::FourVector;

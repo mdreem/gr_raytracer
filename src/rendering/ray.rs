@@ -1,7 +1,7 @@
 use crate::geometry::four_vector::FourVector;
 use crate::geometry::geometry::HasCoordinateSystem;
-use crate::integrator::Step;
-use crate::scene::get_position;
+use crate::rendering::integrator::Step;
+use crate::rendering::scene::get_position;
 use nalgebra::Vector4;
 use std::fs::File;
 use std::io::Write;
