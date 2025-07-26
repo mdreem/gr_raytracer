@@ -115,7 +115,7 @@ mod tests {
     use crate::rendering::camera::Camera;
 
     use crate::geometry::four_vector::FourVector;
-    use crate::geometry::geometry::{Geometry, InnerProduct};
+    use crate::geometry::geometry::InnerProduct;
     use approx::assert_abs_diff_eq;
     use nalgebra::Vector4;
     use std::f64::consts::PI;
@@ -133,11 +133,11 @@ mod tests {
         let geometry = EuclideanSpace::new();
         let position = Vector4::new(0.0, 0.0, 1.0, 0.0);
 
-        let top_left_corner = camera.get_direction_for(1, 1);
-        let top_right_corner = camera.get_direction_for(1, 11);
-        let middle = camera.get_direction_for(6, 6);
-        let bottom_left_corner = camera.get_direction_for(11, 1);
-        let bottom_right_corner = camera.get_direction_for(11, 11);
+        let top_left_corner = camera.get_direction_for(0, 0);
+        let top_right_corner = camera.get_direction_for(0, 10);
+        let middle = camera.get_direction_for(5, 5);
+        let bottom_left_corner = camera.get_direction_for(10, 0);
+        let bottom_right_corner = camera.get_direction_for(10, 10);
 
         let corner = -0.6853582554517135;
         let corner_z = -0.24610591900311507;

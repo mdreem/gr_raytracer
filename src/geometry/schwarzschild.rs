@@ -258,7 +258,7 @@ mod tests {
     use crate::geometry::spherical_coordinates_helper::cartesian_to_spherical;
     use crate::rendering::camera::Camera;
     use crate::rendering::debug::save_rays_to_file;
-    use crate::rendering::integrator::{Step, StopReason};
+    use crate::rendering::integrator::StopReason;
     use crate::rendering::ray::{IntegratedRay, Ray};
     use crate::rendering::scene;
     use crate::rendering::scene::test_scene::CELESTIAL_SPHERE_RADIUS;
@@ -433,8 +433,8 @@ mod tests {
         let geometry = Schwarzschild::new(radius);
         let camera = create_camera(position, radius);
 
-        for i in 1..11 {
-            let ray = camera.get_ray_for(6, i);
+        for i in 0..10 {
+            let ray = camera.get_ray_for(5, i);
             assert_abs_diff_eq!(ray.momentum.vector[2], 0.0); // ensure that the ray is in the equatorial plane.
 
             let m_s = geometry.inner_product(&position, &ray.momentum, &ray.momentum);
@@ -456,8 +456,8 @@ mod tests {
         let scene: Scene<CheckerMapper, Schwarzschild> =
             scene::test_scene::create_scene_with_camera(1.0, 2.0, 7.0, &geometry, camera);
 
-        let ray_a = scene.camera.get_ray_for(6, 11);
-        let ray_b = scene.camera.get_ray_for(1, 6);
+        let ray_a = scene.camera.get_ray_for(5, 10);
+        let ray_b = scene.camera.get_ray_for(0, 5);
 
         // ensure rays are rotated by 90 degrees.
         assert_abs_diff_eq!(ray_a.momentum.vector[2], ray_b.momentum.vector[3]);
