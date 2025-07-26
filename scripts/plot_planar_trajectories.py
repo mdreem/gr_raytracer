@@ -21,6 +21,12 @@ def read_trajectories(file_paths):
                 y = r * np.sin(phi)
 
                 trajectories.append((x, y, os.path.basename(file_path)))  # Store with filename for labeling
+            elif 'x' in df.columns and 'y' in df.columns:
+                x = df['y'].values
+                y = df['z'].values
+
+                # Store Cartesian coordinates directly
+                trajectories.append((x, y, os.path.basename(file_path)))
             else:
                 print(f"Skipping {file_path}: Missing required columns 'r' and 'phi'")
         else:
