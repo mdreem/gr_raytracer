@@ -1,4 +1,4 @@
-use crate::geometry::Geometry;
+use crate::geometry::geometry::Geometry;
 use crate::scene::Scene;
 use crate::texture::TextureMap;
 use rayon::iter::ParallelIterator;

@@ -33,7 +33,9 @@ pub fn spherical_to_cartesian(spherical: &Vector4<f64>) -> Vector4<f64> {
 
 #[cfg(test)]
 mod tests {
-    use crate::spherical_coordinates_helper::{cartesian_to_spherical, spherical_to_cartesian};
+    use crate::geometry::spherical_coordinates_helper::{
+        cartesian_to_spherical, spherical_to_cartesian,
+    };
     use approx::assert_abs_diff_eq;
     use nalgebra::Vector4;
 
