@@ -3,10 +3,14 @@ import pandas as pd
 from scipy.interpolate import interp1d
 import glob
 import dataclasses
+import numpy as np
+
+NUM_STEPS = 100
 
 
 @dataclasses.dataclass
 class Interpolators:
+    global_t_points: np.ndarray
     t_points: np.ndarray
     x_interpolator: interp1d
     y_interpolator: interp1d
@@ -29,7 +33,7 @@ class AnimateRays(Scene):
             print(f"Reading {file_path}...")
             df = pd.read_csv(file_path)
 
-            scale = 1.0/2.0
+            scale = 1.0 / 2.0
             df["x"] *= scale
             df["y"] *= scale
             df["z"] *= scale
@@ -68,11 +72,11 @@ class AnimateRays(Scene):
             self.add(path, dot)
 
         center_disc = Circle(
-            radius=1.0/2.0,           # Radius = 1 unit
-            color=RED,          # Border color
-            fill_color=RED_E, # Fill color
-            fill_opacity=0.8,   # Transparency
-            stroke_width=2      # Border thickness
+            radius=1.0 / 2.0,  # Radius = 1 unit
+            color=RED,  # Border color
+            fill_color=RED_E,  # Fill color
+            fill_opacity=0.8,  # Transparency
+            stroke_width=2,  # Border thickness
         )
         self.add(center_disc)
 
@@ -82,8 +86,8 @@ class AnimateRays(Scene):
         def update_all_dots(alpha):
             updates = []
             for i, (dot, interpolator) in enumerate(zip(dots, interpolators)):
-                sim_time = interpolator.t_points[0] + alpha * (
-                    interpolator.t_points[-1] - interpolator.t_points[0]
+                sim_time = interpolator.global_t_points[0] + alpha * (
+                    interpolator.global_t_points[-1] - interpolator.global_t_points[0]
                 )
                 x_pos = interpolator.x_interpolator(sim_time)
                 y_pos = interpolator.y_interpolator(sim_time)
@@ -91,7 +95,7 @@ class AnimateRays(Scene):
             return updates
 
         # Run animation in steps
-        steps = 100
+        steps = NUM_STEPS
         for i in range(steps):
             alpha = i / (steps - 1)
             animations = update_all_dots(alpha)
@@ -101,14 +105,44 @@ class AnimateRays(Scene):
         self.wait(2)
 
     def create_interpolation_functions(self, trajectories):
+
+        # Find global time range across all rays
+        all_start_times = [df["t"].min() for df, _ in trajectories]
+        all_end_times = [df["t"].max() for df, _ in trajectories]
+
+        global_start_time = min(all_start_times)
+        global_end_time = max(all_end_times)
+        global_duration = global_end_time - global_start_time
+
+        print(f"Global time range: {global_start_time:.2f} to {global_end_time:.2f}")
+        print(f"Global duration: {global_duration:.2f}")
+
+        global_time_grid = np.linspace(global_start_time, global_end_time, NUM_STEPS)
+
+        # Create interpolators for each trajectory
         interpolators = []
         for df, _ in trajectories:
             t_points = df["t"].values
-            x_interp = interp1d(t_points, df["y"].values, kind="linear")
-            y_interp = interp1d(t_points, df["z"].values, kind="linear")
+            x_interp = interp1d(
+                t_points,
+                df["y"].values,
+                kind="linear",
+                bounds_error=False,
+                fill_value=df["y"].values[-1],
+            )
+            y_interp = interp1d(
+                t_points,
+                df["z"].values,
+                kind="linear",
+                bounds_error=False,
+                fill_value=df["z"].values[-1],
+            )
             interpolators.append(
                 Interpolators(
-                    t_points=t_points, x_interpolator=x_interp, y_interpolator=y_interp
+                    global_t_points=global_time_grid,
+                    t_points=t_points,
+                    x_interpolator=x_interp,
+                    y_interpolator=y_interp,
                 )
             )
         return interpolators
