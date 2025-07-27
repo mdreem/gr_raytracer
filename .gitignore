@@ -22,3 +22,6 @@ Cargo.lock
 
 *.png
 *.webp
+
+# use by manim
+media/
