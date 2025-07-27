@@ -11,6 +11,7 @@ use crate::rendering::texture::{TextureData, TextureMap, UVCoordinates};
 use crate::scene_objects::objects::Objects;
 use nalgebra::{Const, OVector, Vector4};
 use std::f64::consts::PI;
+use std::fs::File;
 
 pub struct Scene<'a, T: TextureMap, G: Geometry> {
     pub integrator: Integrator<'a, G>,
@@ -66,7 +67,9 @@ impl<'a, T: TextureMap, G: Geometry> Scene<'a, T, G> {
         let mut y = steps[0].y;
 
         if self.save_ray_data {
-            steps.save(format!("ray-{}-{}.csv", ray.row, ray.col), self.geometry);
+            let mut file = File::create(format!("ray-{}-{}.csv", ray.row, ray.col))
+                .expect("Unable to create file");
+            steps.save(&mut file, self.geometry);
         }
 
         let velocity = self.camera.velocity;

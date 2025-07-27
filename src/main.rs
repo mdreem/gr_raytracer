@@ -7,12 +7,15 @@ mod scene_objects;
 use crate::cli::cli::{Action, App};
 use crate::cli::euclidean::{render_euclidean, render_euclidean_ray};
 use crate::cli::euclidean_spherical::{render_euclidean_spherical, render_euclidean_spherical_ray};
-use crate::cli::schwarzschild::{render_schwarzschild, render_schwarzschild_ray};
-use crate::configuration::RenderConfig;
+use crate::cli::schwarzschild::{
+    render_schwarzschild, render_schwarzschild_ray, render_schwarzschild_ray_at,
+};
+use crate::configuration::{GeometryType, RenderConfig};
 use crate::geometry::geometry::Geometry;
 use clap::Parser;
 use nalgebra::Vector4;
 use std::fs;
+use std::fs::File;
 use std::time::Instant;
 
 fn main() {
@@ -67,10 +70,12 @@ fn main() {
                 args.global_opts.camera_position[2],
             );
 
+            let mut file = File::create(filename.clone()).expect("Unable to create file");
             match config.geometry_type {
                 configuration::GeometryType::Euclidean => {
                     println!("Rendering ray in Euclidean geometry");
-                    render_euclidean_ray(row, col, args.global_opts, config, position, filename);
+                    render_euclidean_ray(row, col, args.global_opts, config, position, &mut file);
+                    println!("Saved integrated ray to {}", filename);
                 }
                 configuration::GeometryType::EuclideanSpherical => {
                     println!("Rendering ray in Euclidean spherical geometry");
@@ -80,8 +85,9 @@ fn main() {
                         args.global_opts,
                         config,
                         position,
-                        filename,
+                        &mut file,
                     );
+                    println!("Saved integrated ray to {}", filename);
                 }
                 configuration::GeometryType::Schwarzschild { radius } => {
                     println!(
@@ -95,8 +101,43 @@ fn main() {
                         args.global_opts,
                         config,
                         position,
-                        filename,
+                        &mut file,
                     );
+                    println!("Saved integrated ray to {}", filename);
+                }
+            }
+        }
+        Action::RenderRayAt {
+            position,
+            direction,
+            filename,
+        } => {
+            if position.len() != 3 {
+                panic!("Position must be a vector of length 3");
+            }
+            if direction.len() != 3 {
+                panic!("Direction must be a vector of length 3");
+            }
+            let mut file = File::create(filename.clone()).expect("Unable to create file");
+            let config_file =
+                fs::read_to_string(args.config_file).expect("Unable to open configuration file");
+            let config: RenderConfig = toml::from_str(config_file.as_str()).unwrap();
+            match config.geometry_type {
+                GeometryType::Euclidean => {
+                    panic!("Rendering ray at not supported in Euclidean geometry yet");
+                }
+                GeometryType::EuclideanSpherical => {
+                    panic!("Rendering ray at not supported in Euclidean spherical geometry yet");
+                }
+                GeometryType::Schwarzschild { radius } => {
+                    render_schwarzschild_ray_at(
+                        radius,
+                        Vector4::new(0.0, position[0], position[1], position[2]),
+                        Vector4::new(0.0, direction[0], direction[1], direction[2]),
+                        args.global_opts,
+                        &mut file,
+                    );
+                    println!("Saved integrated ray to {}", filename);
                 }
             }
         }
