@@ -5,7 +5,6 @@ use crate::geometry::euclidean::EuclideanSpace;
 use crate::geometry::four_vector::FourVector;
 use crate::rendering::raytracer;
 use nalgebra::Vector4;
-use std::fs::File;
 use std::io::Write;
 
 pub fn render_euclidean(
