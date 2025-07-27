@@ -22,3 +22,8 @@ on [Manim](https://github.com/3b1b/manim).
 
 Running `python -m manim scripts/animate-rays/main.py AnimateRays` will create an animation of the rays saved in
 CSV files in the directory `rays/`.
+
+# Example
+
+Plot of the Schwarzschild solution with a accretion disk using a checkerboard texture to visualize the relations.
+![alt text](./images/render_checker_texture.png "Black Hole with accretion disk")
