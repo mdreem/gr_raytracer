@@ -52,6 +52,7 @@ impl IntegratedRay {
                 )
                 .expect("Unable to write file");
         }
+        write.flush().unwrap();
     }
 
     pub fn len(&self) -> usize {

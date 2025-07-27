@@ -106,6 +106,7 @@ pub fn render_schwarzschild_ray_at(
 
 #[cfg(test)]
 mod tests {
+    use std::fs::read_to_string;
     use crate::cli::cli::GlobalOpts;
     use crate::cli::schwarzschild::render_schwarzschild_ray_at;
     use nalgebra::Vector4;
@@ -118,7 +119,7 @@ mod tests {
         let radius = 1.0;
         let opts = GlobalOpts {
             width: 400,
-            max_steps: 10000,
+            max_steps: 10,
             max_radius: 20.0,
             step_size: 0.01,
             max_steps_celestial_continuation: 50,
@@ -136,8 +137,9 @@ mod tests {
             &mut output_buffer,
         );
         let output = std::str::from_utf8(output_buffer.get_ref()).unwrap();
+        let expected_file = read_to_string("src/cli/test_data/test_ray_schwarzschild_ray_at.csv")
+            .expect("Failed to read file containing expected test output.");
 
-        let does_contain = output.contains("16.521969912564067\n");
-        assert_eq!(does_contain, true, "Output does not contain expected value");
+        assert_eq!(output, expected_file);
     }
 }
