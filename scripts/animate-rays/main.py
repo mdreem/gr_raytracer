@@ -29,8 +29,7 @@ class AnimateRays(Scene):
             print(f"Reading {file_path}...")
             df = pd.read_csv(file_path)
 
-            max_coord = 5.0
-            scale = 1.0 / max_coord
+            scale = 1.0/2.0
             df["x"] *= scale
             df["y"] *= scale
             df["z"] *= scale
@@ -67,6 +66,15 @@ class AnimateRays(Scene):
             dots.append(dot)
             paths.append(path)
             self.add(path, dot)
+
+        center_disc = Circle(
+            radius=1.0/2.0,           # Radius = 1 unit
+            color=RED,          # Border color
+            fill_color=RED_E, # Fill color
+            fill_opacity=0.8,   # Transparency
+            stroke_width=2      # Border thickness
+        )
+        self.add(center_disc)
 
         interpolators = self.create_interpolation_functions(trajectories)
 
