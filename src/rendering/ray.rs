@@ -34,24 +34,25 @@ impl IntegratedRay {
         Self { steps }
     }
 
-    pub fn save(&self, filename: String, geometry: &dyn HasCoordinateSystem) {
-        let mut file = File::create(filename).expect("Unable to create file");
-
-        file.write_all(b"i,t,tau,x,y,z\n")
+    pub fn save(&self, write: &mut dyn Write, geometry: &dyn HasCoordinateSystem) {
+        write
+            .write_all(b"i,t,tau,x,y,z\n")
             .expect("Unable to write file");
 
         for step in &self.steps {
             let position = get_position(&step.y, geometry.coordinate_system()).get_as_vector();
 
-            file.write_all(
-                format!(
-                    "{},{},{},{},{},{}\n",
-                    step.step, step.t, position[0], position[1], position[2], position[3],
+            write
+                .write_all(
+                    format!(
+                        "{},{},{},{},{},{}\n",
+                        step.step, step.t, position[0], position[1], position[2], position[3],
+                    )
+                    .as_bytes(),
                 )
-                .as_bytes(),
-            )
-            .expect("Unable to write file");
+                .expect("Unable to write file");
         }
+        write.flush().unwrap();
     }
 
     pub fn len(&self) -> usize {
