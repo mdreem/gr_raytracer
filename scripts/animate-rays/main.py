@@ -39,6 +39,17 @@ class AnimateRays(Scene):
         return trajectories
 
     def construct(self):
+        self.camera.background_color = DARK_GRAY
+
+        polarplane_pi = PolarPlane(
+            azimuth_units="PI radians",
+            radius_step=2.0,
+            radius_max=10.0,
+            size=10,
+            background_line_style={"stroke_opacity": 0.4},
+        ).add_coordinates()
+        self.add(polarplane_pi)
+
         file_paths = glob.glob("rays/*.csv")
         trajectories = self.read_trajectories(file_paths)
 
