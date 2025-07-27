@@ -5,6 +5,8 @@ use crate::geometry::euclidean::EuclideanSpace;
 use crate::geometry::four_vector::FourVector;
 use crate::rendering::raytracer;
 use nalgebra::Vector4;
+use std::fs::File;
+use std::io::Write;
 
 pub fn render_euclidean(
     opts: GlobalOpts,
@@ -25,7 +27,7 @@ pub fn render_euclidean_ray(
     opts: GlobalOpts,
     config: RenderConfig,
     camera_position: Vector4<f64>,
-    filename: String,
+    write: &mut dyn Write,
 ) {
     let geometry = EuclideanSpace::new();
     let momentum = FourVector::new_cartesian(1.0, 0.0, 0.0, 0.0);
@@ -34,6 +36,5 @@ pub fn render_euclidean_ray(
     let raytracer = raytracer::Raytracer::new(scene);
     let (integrated_ray, stop_reason) = raytracer.integrate_ray_at_point(row, col);
     println!("Stop reason: {:?}", stop_reason);
-    integrated_ray.save(filename.clone(), &geometry);
-    println!("Saved integrated ray to {}", filename);
+    integrated_ray.save(write, &geometry);
 }

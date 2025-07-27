@@ -47,4 +47,12 @@ pub enum Action {
         #[arg(long, default_value = "rendered-ray.csv")]
         filename: String,
     },
+    RenderRayAt {
+        #[arg(short, long, value_delimiter = ',')]
+        position: Vec<f64>,
+        #[arg(short, long, value_delimiter = ',')]
+        direction: Vec<f64>,
+        #[arg(long, default_value = "rendered-ray-at.csv")]
+        filename: String,
+    },
 }

@@ -6,6 +6,7 @@ use crate::geometry::four_vector::FourVector;
 use crate::geometry::spherical_coordinates_helper::cartesian_to_spherical;
 use crate::rendering::raytracer;
 use nalgebra::Vector4;
+use std::io::Write;
 
 pub fn render_euclidean_spherical(
     opts: GlobalOpts,
@@ -27,7 +28,7 @@ pub fn render_euclidean_spherical_ray(
     opts: GlobalOpts,
     config: RenderConfig,
     camera_position: Vector4<f64>,
-    filename: String,
+    write: &mut dyn Write,
 ) {
     let camera_position = cartesian_to_spherical(&camera_position);
     let momentum = FourVector::new_spherical(1.0, 0.0, 0.0, 0.0);
@@ -37,6 +38,5 @@ pub fn render_euclidean_spherical_ray(
     let raytracer = raytracer::Raytracer::new(scene);
     let (integrated_ray, stop_reason) = raytracer.integrate_ray_at_point(row, col);
     println!("Stop reason: {:?}", stop_reason);
-    integrated_ray.save(filename.clone(), &geometry);
-    println!("Saved integrated ray to {}", filename);
+    integrated_ray.save(write, &geometry);
 }
