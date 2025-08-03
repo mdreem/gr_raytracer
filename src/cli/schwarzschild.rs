@@ -87,7 +87,7 @@ pub fn render_schwarzschild_ray_at(
         position_spherical, momentum, m_s
     );
 
-    let ray = Ray::new(0, 0, position_spherical, momentum);
+    let ray = Ray::new(0, 0, opts.width, opts.height, position_spherical, momentum);
 
     let integration_configuration = IntegrationConfiguration::new(
         opts.max_steps,

@@ -13,12 +13,23 @@ pub struct Ray {
     pub momentum: FourVector,
     pub row: i64,
     pub col: i64,
+    pub width: i64,
+    pub height: i64,
 }
 impl Ray {
-    pub fn new(row: i64, col: i64, position: Vector4<f64>, momentum: FourVector) -> Self {
+    pub fn new(
+        row: i64,
+        col: i64,
+        width: i64,
+        height: i64,
+        position: Vector4<f64>,
+        momentum: FourVector,
+    ) -> Self {
         Self {
             row,
             col,
+            width,
+            height,
             position,
             momentum,
         }

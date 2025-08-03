@@ -576,7 +576,7 @@ mod tests {
             l / (r * r),
         );
 
-        let ray = Ray::new(0, 0, position, momentum);
+        let ray = Ray::new(0, 0, 1000, 1000, position, momentum);
         assert_abs_diff_eq!(
             geometry.inner_product(&position, &ray.momentum, &ray.momentum),
             0.0,
