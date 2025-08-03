@@ -106,10 +106,10 @@ pub fn render_schwarzschild_ray_at(
 
 #[cfg(test)]
 mod tests {
-    use std::fs::read_to_string;
     use crate::cli::cli::GlobalOpts;
     use crate::cli::schwarzschild::render_schwarzschild_ray_at;
     use nalgebra::Vector4;
+    use std::fs::read_to_string;
     use std::io::BufWriter;
 
     #[test]
