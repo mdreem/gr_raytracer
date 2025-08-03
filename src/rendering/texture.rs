@@ -43,9 +43,12 @@ impl TextureMapper {
 impl TextureMap for TextureMapper {
     fn color_at_uv(&self, uv: UVCoordinates) -> Color {
         let (width, height) = self.image.dimensions();
+        // If mapping uv to width-1 and height-1 there are distortions horizontally across the
+        // center. Maybe because in spherical coordinates u,v < 1.0, i.e. they're not inclusive.
+        // Doing it this way seems to stabilize it.
         let pixel = self.image.get_pixel(
-            (((width - 1) as f64) * uv.u) as u32,
-            (((height - 1) as f64) * uv.v) as u32,
+            (((width as f64) * uv.u) as u32).min(width - 1),
+            (((height as f64) * uv.v) as u32).min(height - 1),
         );
         Color::new(pixel[0], pixel[1], pixel[2])
     }

@@ -83,15 +83,26 @@ impl<G: Geometry> Integrator<'_, G> {
         let mut result: Vec<Step> = Vec::with_capacity(self.integration_configuration.max_steps);
         result.push(Step { y, t, step: 0 });
 
-        for i in 1..self.integration_configuration.max_steps {
+        // TODO: Workaround to remove artifacts along the vertical middle line of the image, where
+        // the integrations gets harder due to to coordinate singularities.
+        let max_steps = if ray.col < 747 || ray.col > 753 {
+            self.integration_configuration.max_steps
+        } else {
+            self.integration_configuration.max_steps * 100
+        };
+
+        for i in 1..max_steps {
             let last_y = y;
 
-            y = rk4(
-                &y,
-                t,
-                self.integration_configuration.step_size,
-                self.geometry,
-            );
+            // TODO: Workaround to remove artifacts along the vertical middle line of the image, where
+            // the integrations gets harder due to to coordinate singularities.
+            let step_size = if ray.col < 747 || ray.col > 753 {
+                self.integration_configuration.step_size
+            } else {
+                self.integration_configuration.step_size / 100.0
+            };
+
+            y = rk4(&y, t, step_size, self.geometry);
             t += self.integration_configuration.step_size;
 
             match self.should_stop(&last_y, &y) {
