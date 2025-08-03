@@ -87,7 +87,7 @@ pub fn render_schwarzschild_ray_at(
         position_spherical, momentum, m_s
     );
 
-    let ray = Ray::new(0, 0, position_spherical, momentum);
+    let ray = Ray::new(0, 0, opts.width, opts.height, position_spherical, momentum);
 
     let integration_configuration = IntegrationConfiguration::new(
         opts.max_steps,
@@ -97,7 +97,7 @@ pub fn render_schwarzschild_ray_at(
         opts.max_radius_celestial_continuation,
         opts.step_size_celestial_continuation,
     );
-    let integrator = Integrator::new(&geometry, integration_configuration);
+    let integrator = Integrator::new(&geometry, integration_configuration, true);
 
     let (integrated_ray, stop_reason) = integrator.integrate(&ray);
     println!("Stop reason: {:?}", stop_reason);
