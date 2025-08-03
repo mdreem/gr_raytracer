@@ -104,7 +104,14 @@ impl Camera {
     pub fn get_ray_for(&self, row: i64, column: i64) -> Ray {
         let direction = self.get_direction_for(row, column);
         let momentum = direction + self.tetrad.t; // Add T-component of the tetrad to get the momentum.
-        Ray::new(row, column, self.position, momentum)
+        Ray::new(
+            row,
+            column,
+            self.rows,
+            self.columns,
+            self.position,
+            momentum,
+        )
     }
 }
 
