@@ -44,5 +44,5 @@ colors = ["#FFB5A7", "#FCD5CE", "#F8E5A8", "#B7CFA2"]
 create_checkerboard(rows, cols, square_size, colors, texts, output_file)
 
 output_file = "disk.png"
-colors = ["#CAB9E7", "#89CFF0", "#A4D7D6", "#B9BCC4"]
+colors = ["#FF6B35", "#F7931E", "#C5282F", "#FF9F1C"]
 create_checkerboard(rows, cols, square_size, colors, texts, output_file)
