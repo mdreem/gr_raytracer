@@ -86,7 +86,6 @@ pub fn create_scene<G: Geometry>(
         geometry,
         camera,
         false,
-        true,
     );
     scene
 }

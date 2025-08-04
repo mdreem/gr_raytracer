@@ -44,13 +44,8 @@ impl<'a, T: TextureMap, G: Geometry> Scene<'a, T, G> {
         geometry: &'a G,
         camera: Camera,
         save_ray_data: bool,
-        use_artifact_removal_workaround: bool,
     ) -> Scene<'a, T, G> {
-        let integrator = Integrator::new(
-            geometry,
-            integration_configuration,
-            use_artifact_removal_workaround,
-        );
+        let integrator = Integrator::new(geometry, integration_configuration);
 
         Scene {
             integrator,
@@ -231,7 +226,6 @@ pub mod test_scene {
             texture_data,
             geometry,
             camera,
-            false,
             false,
         );
         scene
