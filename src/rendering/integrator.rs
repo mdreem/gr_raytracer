@@ -112,7 +112,7 @@ impl<G: Geometry> Integrator<'_, G> {
                 self.integration_configuration.step_size / 100.0
             };
 
-            (y, h) = rkf45(&y, t, h, 1e-6, self.geometry);
+            (y, h) = rkf45(&y, t, h, 1e-5, self.geometry);
             t += h;
 
             match self.should_stop(&last_y, &y) {
@@ -165,18 +165,20 @@ impl<G: Geometry> Integrator<'_, G> {
             .integration_configuration
             .max_steps_celestial_continuation
         {
-            (y_cur, h) = rkf45(&y, t, h, 1e-6, self.geometry);
+            (y_cur, h) = rkf45(&y_cur, t, h, 1e-4, self.geometry);
             t_cur += h;
 
-            if get_position(&y_cur, self.geometry.coordinate_system())
+            let cartesian_position = get_position(&y_cur, self.geometry.coordinate_system());
+            if cartesian_position
                 .radial_distance_spatial_part_squared()
                 > self
                     .integration_configuration
                     .max_radius_celestial_continuation_sq
             {
+
                 return y_cur;
             }
         }
-        y_cur
+        y_cur // TODO: This should return an error instead of silently returning the last value.
     }
 }
