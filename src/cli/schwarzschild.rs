@@ -97,7 +97,7 @@ pub fn render_schwarzschild_ray_at(
         opts.max_radius_celestial_continuation,
         opts.step_size_celestial_continuation,
     );
-    let integrator = Integrator::new(&geometry, integration_configuration, true);
+    let integrator = Integrator::new(&geometry, integration_configuration);
 
     let (integrated_ray, stop_reason) = integrator.integrate(&ray);
     println!("Stop reason: {:?}", stop_reason);
