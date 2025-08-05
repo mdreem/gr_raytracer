@@ -10,11 +10,15 @@ use nalgebra::{Const, Matrix4, OVector, Vector4};
 #[derive(Clone, Debug)]
 pub struct Schwarzschild {
     radius: f64,
+    horizon_epsilon: f64,
 }
 
 impl Schwarzschild {
-    pub fn new(radius: f64) -> Self {
-        Schwarzschild { radius }
+    pub fn new(radius: f64, horizon_epsilon: f64) -> Self {
+        Schwarzschild {
+            radius,
+            horizon_epsilon,
+        }
     }
 }
 
@@ -142,7 +146,7 @@ impl Geometry for Schwarzschild {
     }
 
     fn inside_horizon(&self, position: &Vector4<f64>) -> bool {
-        position[1] <= self.radius + 0.0001
+        position[1] <= self.radius + self.horizon_epsilon
     }
 }
 
@@ -151,7 +155,7 @@ mod test_schwarzschild {
     use crate::geometry::four_vector::FourVector;
     use crate::geometry::schwarzschild::tests::rk4;
     use crate::geometry::schwarzschild::Schwarzschild;
-    use crate::rendering::runge_kutta::{rkf45, OdeFunction};
+    use crate::rendering::runge_kutta::OdeFunction;
     use crate::rendering::scene::test_scene::CELESTIAL_SPHERE_RADIUS;
     use nalgebra::{Const, OVector, Vector2, Vector4};
 
@@ -281,7 +285,7 @@ mod tests {
     #[test]
     fn test_tetrad_orthonormal() {
         let position = cartesian_to_spherical(&Vector4::new(2.0, 3.0, 4.0, 5.0));
-        let geometry = Schwarzschild::new(2.0);
+        let geometry = Schwarzschild::new(2.0, 1e-4);
 
         let tetrad = geometry.get_tetrad_at(&position);
 
@@ -313,6 +317,8 @@ mod tests {
         assert_abs_diff_eq!(geometry.inner_product(&position, &tetrad.y, &tetrad.z), 0.0);
     }
 
+    const SCHWARZSCHILD_RADIUS_EPSILON: f64 = 1e-4;
+
     #[test]
     fn test_lorentz_transformed_tetrad_orthonormal() {
         let position = cartesian_to_spherical(&Vector4::new(2.0, 3.0, 4.0, 5.0));
@@ -320,7 +326,7 @@ mod tests {
         let r = position[1];
         let a = 1.0 - radius / position[1];
 
-        let geometry = Schwarzschild::new(radius);
+        let geometry = Schwarzschild::new(radius, SCHWARZSCHILD_RADIUS_EPSILON);
 
         let velocity = FourVector::new_spherical(1.0 / a, -(radius / r).sqrt(), 0.0, 0.0); // we have a freely falling observer here.
 
@@ -360,7 +366,7 @@ mod tests {
 
         let position = cartesian_to_spherical(&Vector4::new(0.0, 0.0, 0.0, -10.0));
         let radius = 2.0;
-        let geometry = Schwarzschild::new(radius);
+        let geometry = Schwarzschild::new(radius, 1e-4);
         let r = position[1];
         let a = 1.0 - radius / r;
         let velocity = FourVector::new_spherical(1.0 / a, -(radius / r).sqrt(), 0.0, 0.0); // we have a freely falling observer here.
@@ -370,7 +376,7 @@ mod tests {
             PI / 2.0,
             rows,
             cols,
-            &Schwarzschild::new(2.0),
+            &Schwarzschild::new(2.0, 1e-4),
         );
 
         save_rays_to_file(rows, cols, &position, geometry, camera);
@@ -380,7 +386,7 @@ mod tests {
     fn test_schwarzschild_ray() {
         let position = cartesian_to_spherical(&Vector4::new(2.0, 3.0, 4.0, 5.0));
         let radius = 2.0;
-        let geometry = Schwarzschild::new(radius);
+        let geometry = Schwarzschild::new(radius, 1e-4);
         let r = position[1];
         let a = 1.0 - radius / r;
         let velocity = FourVector::new_spherical(1.0 / a, -(radius / r).sqrt(), 0.0, 0.0); // we have a freely falling observer here.
@@ -390,7 +396,7 @@ mod tests {
             PI / 2.0,
             11,
             11,
-            &Schwarzschild::new(2.0),
+            &Schwarzschild::new(2.0, 1e-4),
         );
 
         let ray = camera.get_ray_for(1, 6);
@@ -410,7 +416,7 @@ mod tests {
             PI / 2.0,
             11,
             11,
-            &Schwarzschild::new(radius),
+            &Schwarzschild::new(radius, 1e-4),
         );
         camera
     }
@@ -419,7 +425,7 @@ mod tests {
     fn test_ray_null_condition_momentum() {
         let position = cartesian_to_spherical(&Vector4::new(2.0, 0.0, 0.0, 5.0));
         let radius = 2.0;
-        let geometry = Schwarzschild::new(radius);
+        let geometry = Schwarzschild::new(radius, 1e-4);
         let camera = create_camera(position, radius);
 
         for i in 1..11 {
@@ -438,7 +444,7 @@ mod tests {
     fn test_ray_compare_conserved_quantities_in_equatorial_plane() {
         let position = cartesian_to_spherical(&Vector4::new(2.0, 0.0, 0.0, 5.0));
         let radius = 2.0;
-        let geometry = Schwarzschild::new(radius);
+        let geometry = Schwarzschild::new(radius, 1e-4);
         let camera = create_camera(position, radius);
 
         for i in 0..10 {
@@ -459,7 +465,7 @@ mod tests {
     fn test_trajectories_equal_with_rotated_momentum() {
         let position = cartesian_to_spherical(&Vector4::new(2.0, 0.0, 0.0, 5.0));
         let radius = 2.0;
-        let geometry = Schwarzschild::new(radius);
+        let geometry = Schwarzschild::new(radius, 1e-4);
         let camera = create_camera(position, radius);
         let scene: Scene<CheckerMapper, Schwarzschild> =
             scene::test_scene::create_scene_with_camera(1.0, 2.0, 7.0, &geometry, camera, 1e-5);
@@ -577,7 +583,7 @@ mod tests {
         let a = 1.0 - radius / r;
 
         let velocity = FourVector::new_spherical(a.sqrt().recip(), 0.0, 0.0, 0.0);
-        let geometry = Schwarzschild::new(radius);
+        let geometry = Schwarzschild::new(radius, 1e-4);
 
         let scene: Box<Scene<CheckerMapper, Schwarzschild>> = Box::new(
             scene::test_scene::create_scene(1.0, 2.0, 7.0, &geometry, position, velocity),

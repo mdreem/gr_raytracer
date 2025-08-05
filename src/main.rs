@@ -48,9 +48,19 @@ fn main() {
                     println!("Rendering Euclidean spherical geometry");
                     render_euclidean_spherical(args.global_opts, config, position, filename);
                 }
-                configuration::GeometryType::Schwarzschild { radius } => {
+                configuration::GeometryType::Schwarzschild {
+                    radius,
+                    horizon_epsilon,
+                } => {
                     println!("Rendering Schwarzschild geometry with radius: {}", radius);
-                    render_schwarzschild(radius, args.global_opts, config, position, filename);
+                    render_schwarzschild(
+                        radius,
+                        horizon_epsilon,
+                        args.global_opts,
+                        config,
+                        position,
+                        filename,
+                    );
                 }
             }
         }
@@ -89,13 +99,17 @@ fn main() {
                     );
                     println!("Saved integrated ray to {}", filename);
                 }
-                configuration::GeometryType::Schwarzschild { radius } => {
+                configuration::GeometryType::Schwarzschild {
+                    radius,
+                    horizon_epsilon,
+                } => {
                     println!(
                         "Rendering ray in Schwarzschild geometry with radius: {}",
                         radius
                     );
                     render_schwarzschild_ray(
                         radius,
+                        horizon_epsilon,
                         row,
                         col,
                         args.global_opts,
@@ -129,9 +143,13 @@ fn main() {
                 GeometryType::EuclideanSpherical => {
                     panic!("Rendering ray at not supported in Euclidean spherical geometry yet");
                 }
-                GeometryType::Schwarzschild { radius } => {
+                GeometryType::Schwarzschild {
+                    radius,
+                    horizon_epsilon,
+                } => {
                     render_schwarzschild_ray_at(
                         radius,
+                        horizon_epsilon,
                         Vector4::new(0.0, position[0], position[1], position[2]),
                         Vector4::new(0.0, direction[0], direction[1], direction[2]),
                         args.global_opts,
