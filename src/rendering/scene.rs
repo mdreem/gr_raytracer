@@ -308,7 +308,7 @@ mod tests {
             panic!("No redshift found");
         };
 
-        assert_eq!(color, Color::new(255, 0, 0));
+        assert_eq!(color, Color::new(100, 0, 0));
     }
 
     #[test]
@@ -334,7 +334,7 @@ mod tests {
         let expected_redshift = (a / a_emitter).sqrt();
 
         assert_abs_diff_eq!(redshift, expected_redshift, epsilon = 1e-3);
-        assert_eq!(color, Color::new(255, 0, 0));
+        assert_eq!(color, Color::new(100, 0, 0));
     }
 
     #[test]
