@@ -101,12 +101,11 @@ impl<G: Geometry> Integrator<'_, G> {
             );
             t += h;
 
+            result.push(Step { y, t, step: i });
             match self.should_stop(&last_y, &y) {
                 None => {}
                 Some(r) => return (IntegratedRay::new(result), Some(r)),
             }
-
-            result.push(Step { y, t, step: i });
         }
 
         (IntegratedRay::new(result), None)
