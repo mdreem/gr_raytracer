@@ -199,9 +199,11 @@ pub mod test_scene {
             30000,
             CELESTIAL_SPHERE_RADIUS,
             0.001,
+            1e-5,
             15000,
             10000.0,
             1.0,
+            1e-4,
         );
 
         let texture_data = TextureData {

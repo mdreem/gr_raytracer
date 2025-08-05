@@ -28,9 +28,11 @@ pub fn create_scene<G: Geometry>(
         opts.max_steps,
         opts.max_radius,
         opts.step_size,
+        opts.epsilon,
         opts.max_steps_celestial_continuation,
         opts.max_radius_celestial_continuation,
         opts.step_size_celestial_continuation,
+        opts.epsilon_celestial_continuation,
     );
 
     let texture_mapper_celestial = TextureMapper::new(String::from("./resources/celestial.png"));
