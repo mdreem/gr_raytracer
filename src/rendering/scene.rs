@@ -178,6 +178,7 @@ pub mod test_scene {
             center_disk_outer_radius,
             geometry,
             camera,
+            1e-12,
         )
     }
 
@@ -187,6 +188,7 @@ pub mod test_scene {
         center_disk_outer_radius: f64,
         geometry: &G,
         camera: Camera,
+        epsilon: f64,
     ) -> Scene<CheckerMapper, G> {
         let texture_mapper_celestial =
             CheckerMapper::new(100.0, 100.0, Color::new(0, 255, 0), Color::new(0, 100, 0));
@@ -199,7 +201,7 @@ pub mod test_scene {
             30000,
             CELESTIAL_SPHERE_RADIUS,
             0.001,
-            1e-5,
+            epsilon,
             15000,
             10000.0,
             1.0,
@@ -260,7 +262,7 @@ mod tests {
             &EuclideanSpace::new(),
         );
         let space = EuclideanSpace::new();
-        let scene = create_scene_with_camera(2.0, 0.2, 0.3, &space, camera);
+        let scene = create_scene_with_camera(2.0, 0.2, 0.3, &space, camera, 1e-12);
 
         let ray = scene.camera.get_ray_for(5, 5);
         let (color, _) = scene.color_of_ray(&ray);
@@ -280,7 +282,7 @@ mod tests {
             &EuclideanSpaceSpherical::new(),
         );
         let space = EuclideanSpaceSpherical::new();
-        let scene = create_scene_with_camera(2.0, 0.2, 0.3, &space, camera);
+        let scene = create_scene_with_camera(2.0, 0.2, 0.3, &space, camera, 1e-12);
 
         let ray = scene.camera.get_ray_for(5, 5);
         let (color, _) = scene.color_of_ray(&ray);
@@ -299,7 +301,7 @@ mod tests {
         let geometry = Schwarzschild::new(radius);
 
         let camera = Camera::new(position, velocity, PI / 2.0, 11, 11, &geometry);
-        let scene = create_scene_with_camera(2.0, 0.2, 0.3, &geometry, camera);
+        let scene = create_scene_with_camera(2.0, 0.2, 0.3, &geometry, camera, 1e-12);
 
         let ray = scene.camera.get_ray_for(5, 5);
         let (color, Some(redshift)) = scene.color_of_ray(&ray) else {
@@ -321,7 +323,7 @@ mod tests {
         let geometry = Schwarzschild::new(radius);
 
         let camera = Camera::new(position, velocity, PI / 2.0, 11, 11, &geometry);
-        let scene = create_scene_with_camera(sphere_radius, 0.2, 0.3, &geometry, camera);
+        let scene = create_scene_with_camera(sphere_radius, 0.2, 0.3, &geometry, camera, 1e-12);
 
         let ray = scene.camera.get_ray_for(5, 5);
         let (color, Some(redshift)) = scene.color_of_ray(&ray) else {
@@ -347,7 +349,7 @@ mod tests {
         );
         let space = EuclideanSpace::new();
         let scene: Scene<CheckerMapper, EuclideanSpace> =
-            create_scene_with_camera(2.0, 0.2, 0.3, &space, camera);
+            create_scene_with_camera(2.0, 0.2, 0.3, &space, camera, 1e-12);
 
         let ray = scene.camera.get_ray_for(0, 0);
         let (color, _) = scene.color_of_ray(&ray);
@@ -372,7 +374,7 @@ mod tests {
             &Schwarzschild::new(radius),
         );
         let space = Schwarzschild::new(radius);
-        let scene = create_scene_with_camera(2.0, 0.2, 0.3, &space, camera);
+        let scene = create_scene_with_camera(2.0, 0.2, 0.3, &space, camera, 1e-12);
 
         let ray = scene.camera.get_ray_for(0, 0);
         let (color, _) = scene.color_of_ray(&ray);
@@ -398,7 +400,7 @@ mod tests {
             &Schwarzschild::new(2.0),
         );
         let space = Schwarzschild::new(2.0);
-        let scene = create_scene_with_camera(2.0, 0.2, 0.3, &space, camera);
+        let scene = create_scene_with_camera(2.0, 0.2, 0.3, &space, camera, 1e-12);
 
         let ray = scene.camera.get_ray_for(6, 6);
         let (color, _) = scene.color_of_ray(&ray);
@@ -418,7 +420,7 @@ mod tests {
         );
         let space = EuclideanSpace::new();
         let scene: Scene<CheckerMapper, EuclideanSpace> =
-            create_scene_with_camera(1.0, 2.0, 7.0, &space, camera);
+            create_scene_with_camera(1.0, 2.0, 7.0, &space, camera, 1e-12);
 
         let ray = scene.camera.get_ray_for(0, 51);
         let (color, redshift) = scene.color_of_ray(&ray);
