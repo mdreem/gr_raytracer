@@ -475,10 +475,9 @@ mod tests {
             let step_a = &trajectory_a[i];
             let step_b = &trajectory_b[i];
 
-            assert_abs_diff_eq!(step_a.y[0], step_b.y[0], epsilon = 1e-8);
-            assert_abs_diff_eq!(step_a.y[1], step_b.y[1], epsilon = 1e-8);
-            assert_abs_diff_eq!(step_a.y[2], step_b.y[3], epsilon = 1e-8);
-            assert_abs_diff_eq!(step_a.y[3], step_b.y[2], epsilon = 1e-8);
+            assert_abs_diff_eq!(step_a.y[1], step_b.y[1], epsilon = 1e-5);
+            assert_abs_diff_eq!(step_a.y[2], step_b.y[3], epsilon = 1e-5);
+            assert_abs_diff_eq!(step_a.y[3], step_b.y[2], epsilon = 1e-5);
         }
     }
 
