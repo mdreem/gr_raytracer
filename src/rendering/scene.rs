@@ -298,7 +298,7 @@ mod tests {
         let a = 1.0 - radius / r;
         let velocity = FourVector::new_spherical(1.0 / a, -(radius / r).sqrt(), 0.0, 0.0); // we have a freely falling observer here.
 
-        let geometry = Schwarzschild::new(radius);
+        let geometry = Schwarzschild::new(radius, 1e-4);
 
         let camera = Camera::new(position, velocity, PI / 2.0, 11, 11, &geometry);
         let scene = create_scene_with_camera(2.0, 0.2, 0.3, &geometry, camera, 1e-12);
@@ -320,7 +320,7 @@ mod tests {
         let a = 1.0 - radius / r;
         let velocity = FourVector::new_spherical(a.sqrt().recip(), 0.0, 0.0, 0.0); // we have a freely falling observer here.
 
-        let geometry = Schwarzschild::new(radius);
+        let geometry = Schwarzschild::new(radius, 1e-4);
 
         let camera = Camera::new(position, velocity, PI / 2.0, 11, 11, &geometry);
         let scene = create_scene_with_camera(sphere_radius, 0.2, 0.3, &geometry, camera, 1e-12);
@@ -371,9 +371,9 @@ mod tests {
             PI / 2.0,
             11,
             11,
-            &Schwarzschild::new(radius),
+            &Schwarzschild::new(radius, 1e-4),
         );
-        let space = Schwarzschild::new(radius);
+        let space = Schwarzschild::new(radius, 1e-4);
         let scene = create_scene_with_camera(2.0, 0.2, 0.3, &space, camera, 1e-12);
 
         let ray = scene.camera.get_ray_for(0, 0);
@@ -397,9 +397,9 @@ mod tests {
             PI / 2.0,
             11,
             11,
-            &Schwarzschild::new(2.0),
+            &Schwarzschild::new(2.0, 1e-4),
         );
-        let space = Schwarzschild::new(2.0);
+        let space = Schwarzschild::new(2.0, 1e-4);
         let scene = create_scene_with_camera(2.0, 0.2, 0.3, &space, camera, 1e-12);
 
         let ray = scene.camera.get_ray_for(6, 6);

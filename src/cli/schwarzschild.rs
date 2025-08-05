@@ -14,6 +14,7 @@ use std::io::Write;
 
 pub fn render_schwarzschild(
     radius: f64,
+    horizon_epsilon: f64,
     opts: GlobalOpts,
     config: RenderConfig,
     camera_position: Vector4<f64>,
@@ -25,7 +26,7 @@ pub fn render_schwarzschild(
     let a = 1.0 - radius / r;
     let momentum = FourVector::new_spherical(1.0 / a.sqrt(), 0.0, 0.0, 0.0);
 
-    let geometry = Schwarzschild::new(radius);
+    let geometry = Schwarzschild::new(radius, horizon_epsilon);
     let scene = create_scene(&geometry, camera_position, momentum, opts, config);
 
     render(scene, filename);
@@ -33,6 +34,7 @@ pub fn render_schwarzschild(
 
 pub fn render_schwarzschild_ray(
     radius: f64,
+    horizon_epsilon: f64,
     row: i64,
     col: i64,
     opts: GlobalOpts,
@@ -44,7 +46,7 @@ pub fn render_schwarzschild_ray(
     let r = camera_position[1];
     let a = 1.0 - radius / r;
     let momentum = FourVector::new_spherical(1.0 / a.sqrt(), 0.0, 0.0, 0.0);
-    let geometry = Schwarzschild::new(radius);
+    let geometry = Schwarzschild::new(radius, horizon_epsilon);
 
     let scene = create_scene(&geometry, camera_position, momentum, opts, config);
     let raytracer = raytracer::Raytracer::new(scene);
@@ -55,6 +57,7 @@ pub fn render_schwarzschild_ray(
 
 pub fn render_schwarzschild_ray_at(
     radius: f64,
+    horizon_epsilon: f64,
     position: Vector4<f64>,
     direction: Vector4<f64>,
     opts: GlobalOpts,
@@ -73,7 +76,7 @@ pub fn render_schwarzschild_ray_at(
     let phi_d = -phi.sin() * direction[1] + phi.cos() * direction[2];
 
     let bare_spherical = EuclideanSpaceSpherical::new();
-    let geometry = Schwarzschild::new(radius);
+    let geometry = Schwarzschild::new(radius, horizon_epsilon);
 
     let tetrad = bare_spherical.get_tetrad_at(&position_spherical);
     println!("Tetrad at position {:?}: {}", position_spherical, tetrad);
@@ -119,6 +122,7 @@ mod tests {
         let position = Vector4::new(0.0, 0.0, 4.0, -18.0);
         let direction = Vector4::new(0.0, 0.0, 1.0, 0.0);
         let radius = 1.0;
+        let horizon_epsilon = 1e-5;
         let opts = GlobalOpts {
             width: 400,
             max_steps: 10,
@@ -135,6 +139,7 @@ mod tests {
         let mut output_buffer = BufWriter::new(Vec::new());
         render_schwarzschild_ray_at(
             radius,
+            horizon_epsilon,
             position,
             direction,
             opts.clone(),

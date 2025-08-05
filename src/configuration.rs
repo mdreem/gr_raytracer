@@ -10,7 +10,7 @@ pub struct RenderConfig {
 pub enum GeometryType {
     Euclidean,
     EuclideanSpherical,
-    Schwarzschild { radius: f64 },
+    Schwarzschild { radius: f64, horizon_epsilon: f64 },
 }
 
 #[derive(Deserialize, Debug)]
@@ -33,6 +33,7 @@ mod tests {
         let toml_str = r#"
             [geometry_type.Schwarzschild]
             radius = 2.0
+            horizon_epsilon = 1e-4
 
             [[objects]]
 
@@ -49,7 +50,10 @@ mod tests {
         let config: RenderConfig = toml::from_str(toml_str).unwrap();
         assert_eq!(
             config.geometry_type,
-            GeometryType::Schwarzschild { radius: 2.0 }
+            GeometryType::Schwarzschild {
+                radius: 2.0,
+                horizon_epsilon: 1e-4
+            }
         );
         assert_eq!(config.objects.len(), 2);
         if let ObjectsConfig::Sphere { radius } = &config.objects[0] {
