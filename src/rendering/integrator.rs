@@ -39,9 +39,11 @@ pub struct IntegrationConfiguration {
     max_steps: usize,
     max_radius_sq: f64,
     step_size: f64,
+    epsilon: f64,
     max_steps_celestial_continuation: usize,
     max_radius_celestial_continuation_sq: f64,
     step_size_celestial_continuation: f64,
+    epsilon_celestial_continuation: f64,
 }
 
 impl IntegrationConfiguration {
@@ -49,18 +51,22 @@ impl IntegrationConfiguration {
         max_steps: usize,
         max_radius: f64,
         step_size: f64,
+        epsilon: f64,
         max_steps_celestial_continuation: usize,
         max_radius_celestial_continuation: f64,
         step_size_celestial_continuation: f64,
+        epsilon_celestial_continuation: f64,
     ) -> IntegrationConfiguration {
         IntegrationConfiguration {
             max_steps,
             max_radius_sq: max_radius * max_radius,
             step_size,
+            epsilon,
             max_steps_celestial_continuation,
             max_radius_celestial_continuation_sq: max_radius_celestial_continuation
                 * max_radius_celestial_continuation,
             step_size_celestial_continuation,
+            epsilon_celestial_continuation,
         }
     }
 }
@@ -86,7 +92,13 @@ impl<G: Geometry> Integrator<'_, G> {
         let mut h = self.integration_configuration.step_size;
         for i in 1..self.integration_configuration.max_steps {
             let last_y = y;
-            (y, h) = rkf45(&y, t, h, 1e-5, self.geometry);
+            (y, h) = rkf45(
+                &y,
+                t,
+                h,
+                self.integration_configuration.epsilon,
+                self.geometry,
+            );
             t += h;
 
             match self.should_stop(&last_y, &y) {
@@ -139,7 +151,14 @@ impl<G: Geometry> Integrator<'_, G> {
             .integration_configuration
             .max_steps_celestial_continuation
         {
-            (y_cur, h) = rkf45(&y_cur, t, h, 1e-4, self.geometry);
+            (y_cur, h) = rkf45(
+                &y_cur,
+                t,
+                h,
+                self.integration_configuration
+                    .epsilon_celestial_continuation,
+                self.geometry,
+            );
             t_cur += h;
 
             let cartesian_position = get_position(&y_cur, self.geometry.coordinate_system());
