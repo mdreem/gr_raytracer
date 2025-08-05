@@ -151,6 +151,7 @@ mod test_schwarzschild {
     use crate::geometry::four_vector::FourVector;
     use crate::geometry::schwarzschild::Schwarzschild;
     use crate::rendering::runge_kutta::{rkf45, OdeFunction};
+    use crate::rendering::scene::test_scene::CELESTIAL_SPHERE_RADIUS;
     use nalgebra::{Const, OVector, Vector2, Vector4};
 
     pub fn get_angular_momentum_from_phi(
@@ -216,6 +217,7 @@ mod test_schwarzschild {
             e: f64,
             max_steps: usize,
             step_size: f64,
+            epsilon: f64,
         ) -> Vec<Step> {
             let u0 = 1.0 / r0;
             let b = l / e;
@@ -233,7 +235,7 @@ mod test_schwarzschild {
 
             let mut h = step_size;
             for _ in 1..max_steps {
-                (y, h) = rkf45(&y, t, step_size, 1e-5, self);
+                (y, h) = rkf45(&y, t, step_size, epsilon, self);
                 t += h;
 
                 result.push(Step {
@@ -241,6 +243,10 @@ mod test_schwarzschild {
                     u: y[0],
                     du_dphi: y[1],
                 });
+
+                if y[0].recip() >= CELESTIAL_SPHERE_RADIUS {
+                    break;
+                }
             }
 
             result
@@ -495,6 +501,10 @@ mod tests {
             format!("trajectory-{:.2}-{:.2}.csv", e, l).as_str(),
             &collect_points_step(&result.result_geodesic_equation),
         );
+        save_trajectory(
+            format!("trajectory-r-phi-{:.2}-{:.2}.csv", e, l).as_str(),
+            &collect_points_test_step(&result.result_r_phi_equation),
+        );
     }
 
     #[test]
@@ -548,6 +558,7 @@ mod tests {
     struct ComputeComparedTrajectoriesResult {
         pub matching: Vec<Point>,
         pub result_geodesic_equation: IntegratedRay,
+        pub result_r_phi_equation: Vec<test_schwarzschild::Step>,
         pub stop_reason: Option<StopReason>,
     }
 
@@ -586,8 +597,16 @@ mod tests {
 
         let ts = TestSchwarzschild { radius };
         let result_r_phi_equation =
-            ts.compute_test_schwarzschild_trajectory(r, l, e, max_steps, 0.01);
+            ts.compute_test_schwarzschild_trajectory(r, l, e, max_steps, 0.01, 1e-5);
 
+        println!(
+            "Geodesic equation steps: {:?}",
+            collect_points_step(&result_geodesic_equation)
+        );
+        println!(
+            "Test equation steps: {:?}",
+            collect_points_test_step(&result_r_phi_equation)
+        );
         let matching = find_matching_points(
             &collect_points_step(&result_geodesic_equation),
             &collect_points_test_step(&result_r_phi_equation),
@@ -595,6 +614,7 @@ mod tests {
         ComputeComparedTrajectoriesResult {
             matching,
             result_geodesic_equation,
+            result_r_phi_equation,
             stop_reason,
         }
     }
@@ -652,6 +672,7 @@ mod tests {
         result
     }
 
+    #[derive(Debug)]
     struct Point {
         pub r: f64,
         pub phi: f64,
