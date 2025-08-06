@@ -1,5 +1,6 @@
 [geometry_type.Schwarzschild]
 radius = 1.0
+horizon_epsilon = 1e-4
 
 [[objects]]
 
