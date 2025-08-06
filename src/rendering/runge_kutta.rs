@@ -56,6 +56,10 @@ const CT_4: f64 = 16.0 / 75.0;
 const CT_5: f64 = 1.0 / 20.0;
 const CT_6: f64 = -6.0 / 25.0;
 
+const BETA: f64 = 0.9;
+const CONVERGENCY_ORDER: f64 = 5.0;
+const ERROR_RATIO_SMALL_ERROR: f64 = 1e-5;
+
 pub fn rkf45<D: Dim, F: OdeFunction<D>>(
     y: &OVector<f64, D>,
     t: f64,
@@ -96,14 +100,14 @@ where
     let truncation_error =
         (CT_1 * k1 + CT_2 * k2 + CT_3 * k3 + CT_4 * k4 + CT_5 * k5 + CT_6 * k6).norm();
 
-    let h_new = 0.9 * h * (epsilon / truncation_error).powf(1.0 / 5.0);
+    let h_new = BETA * h * (epsilon / truncation_error).powf(1.0 / CONVERGENCY_ORDER);
 
     if truncation_error > epsilon {
         let (y_new_t, h_t) = rkf45(y, t, h_new / 2.0, epsilon, f);
-        (y_new_t, h_t / 2.0)
+        (y_new_t, h_t / 2.0) // Halve the step size.
     } else {
-        if truncation_error < epsilon.powf(1.0 / 10.0) {
-            (y_new, 2.0 * h)
+        if truncation_error / epsilon < ERROR_RATIO_SMALL_ERROR {
+            (y_new, 2.0 * h) // Double the step size.
         } else {
             (y_new, h)
         }
@@ -149,9 +153,7 @@ mod tests {
         let mut t = 0.0;
         let mut h = step_size;
         while t <= 25.0 {
-            // println!("t: {}", t);
             (y, h) = rkf45(&y, t, h, 1e-10, &simple_equation);
-            // println!("h: {}", h);
             t += h;
         }
         assert_abs_diff_eq!(y, solution_simple_equation(t - h), epsilon = 1e-5);
