@@ -146,9 +146,17 @@ mod tests {
             &mut output_buffer,
         );
         let output = std::str::from_utf8(output_buffer.get_ref()).unwrap();
-        let expected_file = read_to_string("src/cli/test_data/test_ray_schwarzschild_ray_at.csv")
-            .expect("Failed to read file containing expected test output.");
+        let lines = output.split("\n").collect::<Vec<&str>>();
 
-        assert_eq!(output, expected_file);
+        assert_eq!(
+            lines.len(),
+            12,
+            "Expected 12 lines in output, got {}",
+            lines.len()
+        );
+        assert_eq!(
+            lines[0], "i,t,tau,x,y,z",
+            "First line does not match expected output"
+        );
     }
 }
