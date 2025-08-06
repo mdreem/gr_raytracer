@@ -39,7 +39,7 @@ impl<T: TextureMap> Hittable for Disc<T> {
         let y_end_spatial = y_end.get_spatial_vector();
         let direction = y_end_spatial - y_start_spatial;
 
-        let p1 = (y_start_spatial - center).dot(&normal);
+        let p1 = (center - y_start_spatial).dot(&normal);
         let p2 = direction.dot(&normal);
 
         // TODO: p2 can be 0 if parallel -> handle
@@ -56,7 +56,6 @@ impl<T: TextureMap> Hittable for Disc<T> {
             && rr <= self.center_disk_outer_radius * self.center_disk_outer_radius
         {
             let vector_in_plane = intersection_point - center;
-            // TODO: properly implement finding intersection and compute the values accordingly.
 
             let phi = vector_in_plane[2].atan2(vector_in_plane[0]); // phi in x-z plane.
             let u = (PI + phi) / (2.0 * PI);
