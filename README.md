@@ -6,6 +6,23 @@ based on the principles of general relativity and uses numerical methods to solv
 It is based on the
 paper [Seeing relativity -- I. Ray tracing in a Schwarzschild metric to explore the maximal analytic extension of the metric and making a proper rendering of the stars](https://arxiv.org/abs/1511.06025).
 
+# How to render an image
+
+There are various predefined geometries, defined via TOML-files:
+
+- `euclidean-spherical.toml`
+- `euclidean.toml`
+- `schwarzschild.toml`
+
+These can be used to render an image of the described setup via
+
+```ah
+cargo run --release -- --width=1500 --height=1500 --camera-position=0.0,0.8,-10.0  --config-file schwarzschild.toml render --filename=render.png
+```
+
+where `--width` and `--height` define the resolution, the camera position can be adapted via `--camera-position`.
+Call the command `render` to render a full image which will be saved to a file given by `--filename`.
+
 # Scripts
 
 There are various scripts. Some of them create importable CSV files, others create images and animations based
