@@ -59,12 +59,12 @@ const CT_6: f64 = -6.0 / 25.0;
 const BETA: f64 = 0.9;
 const CONVERGENCY_ORDER: f64 = 5.0;
 const ERROR_RATIO_SMALL_ERROR: f64 = 1e-5;
+const MAX_RETRY_STEP: i32 = 100;
 
-pub fn rkf45<D: Dim, F: OdeFunction<D>>(
+fn rkf45_step<D: Dim, F: OdeFunction<D>>(
     y: &OVector<f64, D>,
     t: f64,
     h: f64,
-    epsilon: f64,
     f: &F,
 ) -> (OVector<f64, D>, f64)
 where
@@ -99,19 +99,37 @@ where
         + CH_6 * k6.clone();
     let truncation_error =
         (CT_1 * k1 + CT_2 * k2 + CT_3 * k3 + CT_4 * k4 + CT_5 * k5 + CT_6 * k6).norm();
+    (y_new, truncation_error)
+}
 
-    let h_new = BETA * h * (epsilon / truncation_error).powf(1.0 / CONVERGENCY_ORDER);
+pub fn rkf45<D: Dim, F: OdeFunction<D>>(
+    y: &OVector<f64, D>,
+    t: f64,
+    h: f64,
+    epsilon: f64,
+    f: &F,
+) -> (OVector<f64, D>, f64)
+where
+    DefaultAllocator: Allocator<D>,
+{
+    let mut h_cur = h;
+    for i in 0..MAX_RETRY_STEP {
+        let (y_new, truncation_error) = rkf45_step(y, t, h_cur, f);
 
-    if truncation_error > epsilon {
-        let (y_new_t, h_t) = rkf45(y, t, h_new / 2.0, epsilon, f);
-        (y_new_t, h_t / 2.0) // Halve the step size.
-    } else {
-        if truncation_error / epsilon < ERROR_RATIO_SMALL_ERROR {
-            (y_new, 2.0 * h) // Double the step size.
+        let h_new = BETA * h * (epsilon / truncation_error).powf(1.0 / CONVERGENCY_ORDER);
+
+        if truncation_error > epsilon {
+            h_cur = h_new / 2.0; // Halve the step size and retry.
         } else {
-            (y_new, h)
+            // step is accepted
+            if truncation_error / epsilon < ERROR_RATIO_SMALL_ERROR {
+                return (y_new, 2.0 * h_cur);
+            } else {
+                return (y_new, h_cur);
+            }
         }
     }
+    panic!("RKF45 did not converge after {} retries.", MAX_RETRY_STEP);
 }
 
 #[cfg(test)]
