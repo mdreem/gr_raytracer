@@ -73,12 +73,12 @@ impl<T: TextureMap> crate::scene_objects::hittable::Hittable for Sphere<T> {
                 point_on_sphere_spatial[2],
             ));
 
-            let theta = point_on_sphere[1];
-            let phi = point_on_sphere[2];
+            let theta = point_on_sphere[2];
+            let phi = point_on_sphere[3];
             let u = (PI + phi) / (2.0 * PI);
             let v = theta / PI;
 
-            return Some(UVCoordinates { u, v });
+            return Some(UVCoordinates { u, v: 1.0 - v });
         }
 
         None
