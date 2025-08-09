@@ -9,6 +9,8 @@ where
     fn apply(&self, t: f64, y: &OVector<f64, D>) -> OVector<f64, D>;
 }
 
+// See https://en.wikipedia.org/wiki/Runge%E2%80%93Kutta%E2%80%93Fehlberg_method
+
 const A1: f64 = 0.0;
 const A2: f64 = 2.0 / 9.0;
 const A3: f64 = 1.0 / 3.0;
@@ -116,7 +118,7 @@ where
     for _i in 0..MAX_RETRY_STEP {
         let (y_new, truncation_error) = rkf45_step(y, t, h_cur, f);
 
-        let h_new = BETA * h * (epsilon / truncation_error).powf(1.0 / CONVERGENCY_ORDER);
+        let h_new = BETA * h_cur * (epsilon / truncation_error).powf(1.0 / CONVERGENCY_ORDER);
 
         if truncation_error > epsilon {
             h_cur = h_new / 2.0; // Halve the step size and retry.
