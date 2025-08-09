@@ -97,10 +97,6 @@ pub fn render_schwarzschild_ray_at(
         opts.max_radius,
         opts.step_size,
         opts.epsilon,
-        opts.max_steps_celestial_continuation,
-        opts.max_radius_celestial_continuation,
-        opts.step_size_celestial_continuation,
-        opts.epsilon_celestial_continuation,
     );
     let integrator = Integrator::new(&geometry, integration_configuration);
 
@@ -129,10 +125,6 @@ mod tests {
             max_radius: 20.0,
             step_size: 0.01,
             epsilon: 1e-5,
-            max_steps_celestial_continuation: 50,
-            max_radius_celestial_continuation: 5.0,
-            step_size_celestial_continuation: 0.05,
-            epsilon_celestial_continuation: 1e-4,
             height: 400,
             camera_position: vec![],
         };

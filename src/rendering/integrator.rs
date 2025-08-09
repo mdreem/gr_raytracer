@@ -40,10 +40,6 @@ pub struct IntegrationConfiguration {
     max_radius_sq: f64,
     step_size: f64,
     epsilon: f64,
-    max_steps_celestial_continuation: usize,
-    max_radius_celestial_continuation_sq: f64,
-    step_size_celestial_continuation: f64,
-    epsilon_celestial_continuation: f64,
 }
 
 impl IntegrationConfiguration {
@@ -52,21 +48,12 @@ impl IntegrationConfiguration {
         max_radius: f64,
         step_size: f64,
         epsilon: f64,
-        max_steps_celestial_continuation: usize,
-        max_radius_celestial_continuation: f64,
-        step_size_celestial_continuation: f64,
-        epsilon_celestial_continuation: f64,
     ) -> IntegrationConfiguration {
         IntegrationConfiguration {
             max_steps,
             max_radius_sq: max_radius * max_radius,
             step_size,
             epsilon,
-            max_steps_celestial_continuation,
-            max_radius_celestial_continuation_sq: max_radius_celestial_continuation
-                * max_radius_celestial_continuation,
-            step_size_celestial_continuation,
-            epsilon_celestial_continuation,
         }
     }
 }
@@ -144,30 +131,22 @@ impl<G: Geometry> Integrator<'_, G> {
     ) -> EquationOfMotionState {
         let mut y_cur = y;
         let mut t_cur = t;
-        let mut h = self
-            .integration_configuration
-            .step_size_celestial_continuation;
+        let mut h = self.integration_configuration.step_size;
 
         // integrate further until we are far out.
-        for _ in 1..self
-            .integration_configuration
-            .max_steps_celestial_continuation
-        {
+        for _ in 1..self.integration_configuration.max_steps {
             (y_cur, h) = rkf45(
                 &y_cur,
                 t_cur,
                 h,
-                self.integration_configuration
-                    .epsilon_celestial_continuation,
+                self.integration_configuration.epsilon,
                 self.geometry,
             );
             t_cur += h;
 
             let cartesian_position = get_position(&y_cur, self.geometry.coordinate_system());
             if cartesian_position.radial_distance_spatial_part_squared()
-                > self
-                    .integration_configuration
-                    .max_radius_celestial_continuation_sq
+                > self.integration_configuration.max_radius_sq
             {
                 return y_cur;
             }
