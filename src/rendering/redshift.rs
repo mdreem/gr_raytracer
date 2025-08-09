@@ -1,8 +1,8 @@
 use crate::geometry::four_vector::FourVector;
 use crate::geometry::geometry::Geometry;
+use crate::geometry::point::Point;
 use crate::rendering::ray::Ray;
 use crate::rendering::scene::EquationOfMotionState;
-use nalgebra::Vector4;
 
 pub struct RedshiftComputer<'a, G: Geometry> {
     geometry: &'a G,
@@ -24,7 +24,7 @@ impl<'a, G: Geometry> RedshiftComputer<'a, G> {
     }
 
     fn energy_of_stationary_emitter(&self, y: EquationOfMotionState) -> f64 {
-        let position = Vector4::new(y[0], y[1], y[2], y[3]);
+        let position = Point::new(y[0], y[1], y[2], y[3], self.geometry.coordinate_system());
         let velocity = self.geometry.get_stationary_velocity_at(&position);
         let momentum = FourVector::new(y[4], y[5], y[6], y[7], self.geometry.coordinate_system());
         self.geometry.inner_product(&position, &velocity, &momentum)

@@ -1,11 +1,12 @@
-use crate::geometry::four_vector::CoordinateSystem::Spherical;
-use crate::geometry::four_vector::{CoordinateSystem, FourVector};
+use crate::geometry::four_vector::FourVector;
 use crate::geometry::geometry::{
     GeodesicSolver, Geometry, HasCoordinateSystem, InnerProduct, Tetrad,
 };
+use crate::geometry::point::CoordinateSystem::Spherical;
+use crate::geometry::point::{CoordinateSystem, Point};
 use crate::rendering::runge_kutta::OdeFunction;
 use crate::rendering::scene::EquationOfMotionState;
-use nalgebra::{Const, Matrix4, OVector, Vector4};
+use nalgebra::{Const, Matrix4, OVector};
 
 #[derive(Clone, Debug)]
 pub struct Schwarzschild {
@@ -66,7 +67,7 @@ impl HasCoordinateSystem for Schwarzschild {
 }
 
 impl InnerProduct for Schwarzschild {
-    fn inner_product(&self, position: &Vector4<f64>, v: &FourVector, w: &FourVector) -> f64 {
+    fn inner_product(&self, position: &Point, v: &FourVector, w: &FourVector) -> f64 {
         let r = position[1];
         let theta = position[2];
         let _phi = position[3];
@@ -83,7 +84,7 @@ impl InnerProduct for Schwarzschild {
 // All coordinates here are spherical coordinates.
 impl Geometry for Schwarzschild {
     // TODO: take into account rotations.
-    fn get_tetrad_at(&self, position: &Vector4<f64>) -> Tetrad {
+    fn get_tetrad_at(&self, position: &Point) -> Tetrad {
         let r = position[1];
         let theta = position[2];
         let _phi = position[3];
@@ -100,11 +101,7 @@ impl Geometry for Schwarzschild {
         )
     }
 
-    fn lorentz_transformation(
-        &self,
-        position: &Vector4<f64>,
-        velocity: &FourVector,
-    ) -> Matrix4<f64> {
+    fn lorentz_transformation(&self, position: &Point, velocity: &FourVector) -> Matrix4<f64> {
         let mut matrix = Matrix4::zeros();
         let tetrad_t = self.get_tetrad_at(position).t;
 
@@ -114,7 +111,8 @@ impl Geometry for Schwarzschild {
 
         let a = 1.0 - self.radius / r;
 
-        let metric_diag = Vector4::new(a, -1.0 / a, -r * r, -r * r * theta.sin() * theta.sin());
+        let metric_diag =
+            Point::new_spherical(a, -1.0 / a, -r * r, -r * r * theta.sin() * theta.sin());
 
         let mut gamma = 0.0;
         for i in 0..4 {
@@ -140,12 +138,12 @@ impl Geometry for Schwarzschild {
         matrix
     }
 
-    fn get_stationary_velocity_at(&self, position: &Vector4<f64>) -> FourVector {
+    fn get_stationary_velocity_at(&self, position: &Point) -> FourVector {
         let a = 1.0 - self.radius / position[1];
         FourVector::new_spherical(a.sqrt().recip(), 0.0, 0.0, 0.0)
     }
 
-    fn inside_horizon(&self, position: &Vector4<f64>) -> bool {
+    fn inside_horizon(&self, position: &Point) -> bool {
         position[1] <= self.radius + self.horizon_epsilon
     }
 }
@@ -153,14 +151,15 @@ impl Geometry for Schwarzschild {
 #[cfg(test)]
 mod test_schwarzschild {
     use crate::geometry::four_vector::FourVector;
+    use crate::geometry::point::Point;
     use crate::geometry::schwarzschild::tests::rk4;
     use crate::geometry::schwarzschild::Schwarzschild;
     use crate::rendering::runge_kutta::OdeFunction;
     use crate::rendering::scene::test_scene::CELESTIAL_SPHERE_RADIUS;
-    use nalgebra::{Const, OVector, Vector2, Vector4};
+    use nalgebra::{Const, OVector, Vector2};
 
     pub fn get_angular_momentum_from_phi(
-        position: &Vector4<f64>,
+        position: &Point,
         momentum: &FourVector,
         _geometry: &Schwarzschild,
     ) -> f64 {
@@ -170,7 +169,7 @@ mod test_schwarzschild {
     }
 
     pub fn get_energy_from_r(
-        position: &Vector4<f64>,
+        position: &Point,
         momentum: &FourVector,
         geometry: &Schwarzschild,
     ) -> f64 {
@@ -184,7 +183,7 @@ mod test_schwarzschild {
     }
 
     pub fn get_energy_from_t(
-        position: &Vector4<f64>,
+        position: &Point,
         momentum: &FourVector,
         geometry: &Schwarzschild,
     ) -> f64 {
@@ -261,6 +260,7 @@ mod test_schwarzschild {
 mod tests {
     use crate::geometry::four_vector::FourVector;
     use crate::geometry::geometry::{Geometry, InnerProduct};
+    use crate::geometry::point::Point;
     use crate::geometry::schwarzschild::test_schwarzschild::{
         get_energy_from_r, get_energy_from_t, TestSchwarzschild,
     };
@@ -277,14 +277,14 @@ mod tests {
     use crate::rendering::texture::CheckerMapper;
     use approx::assert_abs_diff_eq;
     use nalgebra::allocator::Allocator;
-    use nalgebra::{DefaultAllocator, Dim, OVector, Vector4};
+    use nalgebra::{DefaultAllocator, Dim, OVector};
     use std::f64::consts::PI;
     use std::fs::File;
     use std::io::Write;
 
     #[test]
     fn test_tetrad_orthonormal() {
-        let position = cartesian_to_spherical(&Vector4::new(2.0, 3.0, 4.0, 5.0));
+        let position = cartesian_to_spherical(&Point::new_cartesian(2.0, 3.0, 4.0, 5.0));
         let geometry = Schwarzschild::new(2.0, 1e-4);
 
         let tetrad = geometry.get_tetrad_at(&position);
@@ -321,7 +321,7 @@ mod tests {
 
     #[test]
     fn test_lorentz_transformed_tetrad_orthonormal() {
-        let position = cartesian_to_spherical(&Vector4::new(2.0, 3.0, 4.0, 5.0));
+        let position = cartesian_to_spherical(&Point::new_cartesian(2.0, 3.0, 4.0, 5.0));
         let radius = 2.0;
         let r = position[1];
         let a = 1.0 - radius / position[1];
@@ -364,7 +364,7 @@ mod tests {
         let rows = 30;
         let cols = 30;
 
-        let position = cartesian_to_spherical(&Vector4::new(0.0, 0.0, 0.0, -10.0));
+        let position = cartesian_to_spherical(&Point::new_cartesian(0.0, 0.0, 0.0, -10.0));
         let radius = 2.0;
         let geometry = Schwarzschild::new(radius, 1e-4);
         let r = position[1];
@@ -384,7 +384,7 @@ mod tests {
 
     #[test]
     fn test_schwarzschild_ray() {
-        let position = cartesian_to_spherical(&Vector4::new(2.0, 3.0, 4.0, 5.0));
+        let position = cartesian_to_spherical(&Point::new_cartesian(2.0, 3.0, 4.0, 5.0));
         let radius = 2.0;
         let geometry = Schwarzschild::new(radius, 1e-4);
         let r = position[1];
@@ -406,7 +406,7 @@ mod tests {
         );
     }
 
-    fn create_camera(position: Vector4<f64>, radius: f64) -> Camera {
+    fn create_camera(position: Point, radius: f64) -> Camera {
         let r = position[1];
         let a = 1.0 - radius / r;
         let velocity = FourVector::new_spherical(1.0 / a, -(radius / r).sqrt(), 0.0, 0.0); // we have a freely falling observer here.
@@ -423,7 +423,7 @@ mod tests {
 
     #[test]
     fn test_ray_null_condition_momentum() {
-        let position = cartesian_to_spherical(&Vector4::new(2.0, 0.0, 0.0, 5.0));
+        let position = cartesian_to_spherical(&Point::new_cartesian(2.0, 0.0, 0.0, 5.0));
         let radius = 2.0;
         let geometry = Schwarzschild::new(radius, 1e-4);
         let camera = create_camera(position, radius);
@@ -442,7 +442,7 @@ mod tests {
 
     #[test]
     fn test_ray_compare_conserved_quantities_in_equatorial_plane() {
-        let position = cartesian_to_spherical(&Vector4::new(2.0, 0.0, 0.0, 5.0));
+        let position = cartesian_to_spherical(&Point::new_cartesian(2.0, 0.0, 0.0, 5.0));
         let radius = 2.0;
         let geometry = Schwarzschild::new(radius, 1e-4);
         let camera = create_camera(position, radius);
@@ -463,7 +463,7 @@ mod tests {
 
     #[test]
     fn test_trajectories_equal_with_rotated_momentum() {
-        let position = cartesian_to_spherical(&Vector4::new(2.0, 0.0, 0.0, 5.0));
+        let position = cartesian_to_spherical(&Point::new_cartesian(2.0, 0.0, 0.0, 5.0));
         let radius = 2.0;
         let geometry = Schwarzschild::new(radius, 1e-4);
         let camera = create_camera(position, radius);
@@ -565,7 +565,7 @@ mod tests {
     }
 
     struct ComputeComparedTrajectoriesResult {
-        pub matching: Vec<Point>,
+        pub matching: Vec<MatchedPoint>,
         pub result_geodesic_equation: IntegratedRay,
         pub result_r_phi_equation: Vec<test_schwarzschild::Step>,
         pub stop_reason: Option<StopReason>,
@@ -577,7 +577,7 @@ mod tests {
         l: f64,
         max_steps: usize,
     ) -> ComputeComparedTrajectoriesResult {
-        let position = Vector4::new(0.0, 5.0, PI / 2.0, 0.0);
+        let position = Point::new_spherical(0.0, 5.0, PI / 2.0, 0.0);
 
         let r = position[1];
         let a = 1.0 - radius / r;
@@ -623,7 +623,7 @@ mod tests {
         }
     }
 
-    fn save_trajectory(filename: &str, trajectory: &Vec<Point>) {
+    fn save_trajectory(filename: &str, trajectory: &Vec<MatchedPoint>) {
         let mut file = File::create(filename).expect("Unable to create file");
         file.write_all(b"r,phi\n").expect("Unable to write file");
         for step in trajectory {
@@ -633,27 +633,30 @@ mod tests {
         println!("Finished writing trajectory to {}.", filename);
     }
 
-    fn collect_points_step(steps: &IntegratedRay) -> Vec<Point> {
+    fn collect_points_step(steps: &IntegratedRay) -> Vec<MatchedPoint> {
         steps
             .iter()
-            .map(|step| Point {
+            .map(|step| MatchedPoint {
                 r: step.y[1],
                 phi: step.y[3],
             })
             .collect()
     }
 
-    fn collect_points_test_step(steps: &Vec<test_schwarzschild::Step>) -> Vec<Point> {
+    fn collect_points_test_step(steps: &Vec<test_schwarzschild::Step>) -> Vec<MatchedPoint> {
         steps
             .iter()
-            .map(|step| Point {
+            .map(|step| MatchedPoint {
                 r: step.u.recip(),
                 phi: step.phi,
             })
             .collect()
     }
 
-    fn find_matching_points(points_a: &Vec<Point>, points_b: &Vec<Point>) -> Vec<Point> {
+    fn find_matching_points(
+        points_a: &Vec<MatchedPoint>,
+        points_b: &Vec<MatchedPoint>,
+    ) -> Vec<MatchedPoint> {
         let mut result = Vec::new();
 
         let mut pos_b = 0;
@@ -663,7 +666,7 @@ mod tests {
                 let point_b = &points_b[i];
 
                 if (point_a.r - point_b.r).abs() < 0.1 && (point_a.phi - point_b.phi).abs() < 0.1 {
-                    result.push(Point {
+                    result.push(MatchedPoint {
                         r: point_a.r,
                         phi: point_a.phi,
                     });
@@ -677,7 +680,7 @@ mod tests {
     }
 
     #[derive(Debug)]
-    struct Point {
+    struct MatchedPoint {
         pub r: f64,
         pub phi: f64,
     }

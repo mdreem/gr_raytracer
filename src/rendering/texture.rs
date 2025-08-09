@@ -8,8 +8,6 @@ pub struct UVCoordinates {
 
 pub struct TextureData<T: TextureMap> {
     pub celestial_map: T,
-    pub center_disk_map: T,
-    pub center_sphere_map: T,
 }
 
 pub trait TextureMap: Sync {
@@ -55,6 +53,7 @@ impl TextureMap for TextureMapper {
 }
 
 impl CheckerMapper {
+    #[allow(dead_code)] // For testing
     pub fn new(width: f64, height: f64, c1: Color, c2: Color) -> CheckerMapper {
         CheckerMapper {
             width,

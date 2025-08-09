@@ -1,11 +1,12 @@
-use crate::geometry::four_vector::CoordinateSystem::Spherical;
-use crate::geometry::four_vector::{CoordinateSystem, FourVector};
+use crate::geometry::four_vector::FourVector;
 use crate::geometry::geometry::{
     GeodesicSolver, Geometry, HasCoordinateSystem, InnerProduct, Tetrad,
 };
+use crate::geometry::point::CoordinateSystem::Spherical;
+use crate::geometry::point::{CoordinateSystem, Point};
 use crate::rendering::runge_kutta::OdeFunction;
 use crate::rendering::scene::EquationOfMotionState;
-use nalgebra::{Const, Matrix4, OVector, Vector4};
+use nalgebra::{Const, Matrix4, OVector};
 
 #[derive(Clone)]
 pub struct EuclideanSpaceSpherical {}
@@ -56,7 +57,7 @@ impl HasCoordinateSystem for EuclideanSpaceSpherical {
 }
 
 impl InnerProduct for EuclideanSpaceSpherical {
-    fn inner_product(&self, position: &Vector4<f64>, v: &FourVector, w: &FourVector) -> f64 {
+    fn inner_product(&self, position: &Point, v: &FourVector, w: &FourVector) -> f64 {
         let r = position[1];
         let theta = position[2];
         let _phi = position[3];
@@ -70,7 +71,7 @@ impl InnerProduct for EuclideanSpaceSpherical {
 
 impl Geometry for EuclideanSpaceSpherical {
     // TODO: take into account rotations.
-    fn get_tetrad_at(&self, position: &Vector4<f64>) -> Tetrad {
+    fn get_tetrad_at(&self, position: &Point) -> Tetrad {
         let r = position[1];
         let theta = position[2];
         let _phi = position[3];
@@ -84,11 +85,7 @@ impl Geometry for EuclideanSpaceSpherical {
         )
     }
 
-    fn lorentz_transformation(
-        &self,
-        _position: &Vector4<f64>,
-        _velocity: &FourVector,
-    ) -> Matrix4<f64> {
+    fn lorentz_transformation(&self, _position: &Point, _velocity: &FourVector) -> Matrix4<f64> {
         let mut matrix = Matrix4::zeros();
         matrix[(0, 0)] = 1.0;
         matrix[(1, 1)] = 1.0;
@@ -98,11 +95,11 @@ impl Geometry for EuclideanSpaceSpherical {
         matrix
     }
 
-    fn get_stationary_velocity_at(&self, _position: &Vector4<f64>) -> FourVector {
+    fn get_stationary_velocity_at(&self, _position: &Point) -> FourVector {
         FourVector::new_spherical(1.0, 0.0, 0.0, 0.0)
     }
 
-    fn inside_horizon(&self, _position: &Vector4<f64>) -> bool {
+    fn inside_horizon(&self, _position: &Point) -> bool {
         false
     }
 }
@@ -111,10 +108,10 @@ impl Geometry for EuclideanSpaceSpherical {
 mod tests {
     use crate::geometry::euclidean_spherical::EuclideanSpaceSpherical;
     use crate::geometry::four_vector::FourVector;
+    use crate::geometry::point::Point;
     use crate::geometry::spherical_coordinates_helper::cartesian_to_spherical;
     use crate::rendering::camera::Camera;
     use crate::rendering::debug::save_rays_to_file;
-    use nalgebra::Vector4;
     use std::f64::consts::PI;
 
     #[ignore]
@@ -123,7 +120,7 @@ mod tests {
         let rows = 30;
         let cols = 30;
 
-        let position = cartesian_to_spherical(&Vector4::new(0.0, 0.0, 0.0, -10.0));
+        let position = cartesian_to_spherical(&Point::new_cartesian(0.0, 0.0, 0.0, -10.0));
         let velocity = FourVector::new_spherical(1.0, 0.0, 0.0, 0.0);
         let camera = Camera::new(
             position,

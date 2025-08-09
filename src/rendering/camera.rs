@@ -1,14 +1,14 @@
 use crate::geometry::four_vector::FourVector;
 use crate::geometry::geometry::{Geometry, Tetrad};
+use crate::geometry::point::Point;
 use crate::rendering::ray::Ray;
-use nalgebra::Vector4;
 
 #[derive(Debug, Clone)]
 pub struct Camera {
     alpha: f64,
     pub rows: i64,
     pub columns: i64,
-    position: Vector4<f64>,
+    position: Point,
     pub velocity: FourVector,
     tetrad: Tetrad,
 }
@@ -16,7 +16,7 @@ pub struct Camera {
 pub fn lorentz_transform_tetrad<G: Geometry>(
     geometry: &G,
     tetrad: &Tetrad,
-    position: &Vector4<f64>,
+    position: &Point,
     velocity: &FourVector,
 ) -> Tetrad {
     let lorentz = geometry.lorentz_transformation(position, velocity);
@@ -29,7 +29,7 @@ pub fn lorentz_transform_tetrad<G: Geometry>(
     let z_vec = lorentz * tetrad.z.get_as_vector();
 
     Tetrad::new(
-        *position,
+        position.clone(),
         FourVector::new(
             t_vec[0],
             t_vec[1],
@@ -64,7 +64,7 @@ pub fn lorentz_transform_tetrad<G: Geometry>(
 impl Camera {
     // Position is given in cartesian coordinates.
     pub fn new<G: Geometry>(
-        position: Vector4<f64>,
+        position: Point,
         velocity: FourVector,
         alpha: f64,
         rows: i64,
@@ -118,18 +118,17 @@ impl Camera {
 #[cfg(test)]
 mod tests {
     use crate::geometry::euclidean::EuclideanSpace;
-    use crate::rendering::camera::Camera;
-
     use crate::geometry::four_vector::FourVector;
     use crate::geometry::geometry::InnerProduct;
+    use crate::geometry::point::{CoordinateSystem, Point};
+    use crate::rendering::camera::Camera;
     use approx::assert_abs_diff_eq;
-    use nalgebra::Vector4;
     use std::f64::consts::PI;
 
     #[test]
     fn test_get_direction_for() {
         let camera = Camera::new(
-            Vector4::new(0.0, 0.0, 1.0, 0.0),
+            Point::new(0.0, 0.0, 1.0, 0.0, CoordinateSystem::Cartesian),
             FourVector::new_cartesian(1.0, 0.0, 0.0, 0.0),
             PI / 2.0,
             11,
@@ -137,7 +136,7 @@ mod tests {
             &EuclideanSpace::new(),
         );
         let geometry = EuclideanSpace::new();
-        let position = Vector4::new(0.0, 0.0, 1.0, 0.0);
+        let position = Point::new(0.0, 0.0, 1.0, 0.0, CoordinateSystem::Cartesian);
 
         let top_left_corner = camera.get_direction_for(0, 0);
         let top_right_corner = camera.get_direction_for(0, 10);
@@ -149,7 +148,7 @@ mod tests {
         let corner_z = -0.24610591900311507;
         assert_abs_diff_eq!(
             top_left_corner.get_as_vector(),
-            Vector4::new(0.0, corner, corner, corner_z)
+            FourVector::new_cartesian(0.0, corner, corner, corner_z).get_as_vector()
         );
         let top_left_corner_scalar =
             geometry.inner_product(&position, &top_left_corner, &top_left_corner);
@@ -157,19 +156,22 @@ mod tests {
 
         assert_abs_diff_eq!(
             top_right_corner.get_as_vector(),
-            Vector4::new(0.0, -corner, corner, corner_z)
+            FourVector::new_cartesian(0.0, -corner, corner, corner_z).get_as_vector()
         );
         let top_right_corner_scalar =
             geometry.inner_product(&position, &top_right_corner, &top_right_corner);
         assert_abs_diff_eq!(top_right_corner_scalar, -1.0);
 
-        assert_abs_diff_eq!(middle.get_as_vector(), Vector4::new(0.0, 0.0, 0.0, 1.0));
+        assert_abs_diff_eq!(
+            middle.get_as_vector(),
+            FourVector::new_cartesian(0.0, 0.0, 0.0, 1.0).get_as_vector()
+        );
         let middle_scalar = geometry.inner_product(&position, &middle, &middle);
         assert_abs_diff_eq!(middle_scalar, -1.0);
 
         assert_abs_diff_eq!(
             bottom_left_corner.get_as_vector(),
-            Vector4::new(0.0, corner, -corner, corner_z)
+            FourVector::new_cartesian(0.0, corner, -corner, corner_z).get_as_vector()
         );
         let bottom_left_corner_scalar =
             geometry.inner_product(&position, &bottom_left_corner, &bottom_left_corner);
@@ -177,7 +179,7 @@ mod tests {
 
         assert_abs_diff_eq!(
             bottom_right_corner.get_as_vector(),
-            Vector4::new(0.0, -corner, -corner, corner_z)
+            FourVector::new_cartesian(0.0, -corner, -corner, corner_z).get_as_vector()
         );
         let bottom_right_corner_scalar =
             geometry.inner_product(&position, &bottom_right_corner, &bottom_right_corner);
