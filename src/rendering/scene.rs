@@ -81,6 +81,7 @@ impl<'a, G: Geometry> Scene<'a, G> {
         let velocity = self.camera.velocity;
         let observer_energy = self.redshift_computer.get_observer_energy(ray, &velocity);
 
+        let mut intersections = Vec::new();
         for step in steps.iter().skip(1) {
             let last_y = y;
             y = step.y;
@@ -95,25 +96,38 @@ impl<'a, G: Geometry> Scene<'a, G> {
                 let redshift = (redshift - 1.0) * tune_redshift + 1.0;
                 let wavelength = 400.0 * redshift;
                 let c = wavelength_to_rgb(wavelength);
-                return (intersection_color, Some(redshift));
+                intersections.push((intersection_color, redshift));
             }
         }
 
         if let Some(reason) = stop_reason {
-            return match reason {
-                HorizonReached => (Color::new(0, 0, 0), None),
+            match reason {
+                HorizonReached => {
+                    intersections.push((Color::new(0, 0, 0, 255), 0.0));
+                }
                 CelestialSphereReached => {
                     let uv = self.get_uv_coordinates(&y);
                     let redshift = self.redshift_computer.compute_redshift(y, observer_energy);
-                    (
-                        self.texture_data.celestial_map.color_at_uv(uv),
-                        Some(redshift),
-                    )
+                    intersections.push((self.texture_data.celestial_map.color_at_uv(uv), redshift));
                 }
             };
+        } else {
+            println!("ERROR: Ray did not hit anything: {:?}", ray);
         }
-        println!("ERROR: Ray did not hit anything: {:?}", ray);
-        (Color::new(0, 0, 0), None)
+        let mut result = Color::new(0, 0, 0, 255);
+
+        for (color, _) in intersections.iter().rev() {
+            result = color.blend(&result)
+        }
+
+        let redshift = if intersections.is_empty() {
+            None
+        } else {
+            let (_, r) = intersections[0];
+            Some(r)
+        };
+
+        (result, redshift)
     }
 
     fn get_uv_coordinates(&self, y_far: &EquationOfMotionState) -> UVCoordinates {
@@ -185,20 +199,20 @@ pub mod test_scene {
         let texture_mapper_celestial = Arc::new(CheckerMapper::new(
             100.0,
             100.0,
-            Color::new(0, 255, 0),
-            Color::new(0, 100, 0),
+            Color::new(0, 255, 0, 255),
+            Color::new(0, 100, 0, 255),
         ));
         let texture_mapper_disk = Arc::new(CheckerMapper::new(
             200.0,
             10.0,
-            Color::new(0, 0, 255),
-            Color::new(0, 0, 100),
+            Color::new(0, 0, 255, 255),
+            Color::new(0, 0, 100, 255),
         ));
         let texture_mapper_sphere = Arc::new(CheckerMapper::new(
             10.0,
             10.0,
-            Color::new(255, 0, 0),
-            Color::new(100, 0, 0),
+            Color::new(255, 0, 0, 255),
+            Color::new(100, 0, 0, 255),
         ));
 
         let integration_configuration =
@@ -262,7 +276,7 @@ mod tests {
         let ray = scene.camera.get_ray_for(5, 5);
         let (color, _) = scene.color_of_ray(&ray);
 
-        assert_eq!(color, Color::new(100, 0, 0));
+        assert_eq!(color, Color::new(100, 0, 0, 255));
     }
 
     #[test]
@@ -288,7 +302,7 @@ mod tests {
         let ray = scene.camera.get_ray_for(5, 5);
         let (color, _) = scene.color_of_ray(&ray);
 
-        assert_eq!(color, Color::new(100, 0, 0));
+        assert_eq!(color, Color::new(100, 0, 0, 255));
     }
 
     #[test]
@@ -309,7 +323,7 @@ mod tests {
             panic!("No redshift found");
         };
 
-        assert_eq!(color, Color::new(255, 0, 0));
+        assert_eq!(color, Color::new(255, 0, 0, 255));
     }
 
     #[test]
@@ -335,7 +349,7 @@ mod tests {
         let expected_redshift = (a / a_emitter).sqrt();
 
         assert_abs_diff_eq!(redshift, expected_redshift, epsilon = 1e-3);
-        assert_eq!(color, Color::new(255, 0, 0));
+        assert_eq!(color, Color::new(255, 0, 0, 255));
     }
 
     #[test]
@@ -355,7 +369,7 @@ mod tests {
         let ray = scene.camera.get_ray_for(0, 0);
         let (color, _) = scene.color_of_ray(&ray);
 
-        assert_eq!(color, Color::new(0, 100, 0));
+        assert_eq!(color, Color::new(0, 100, 0, 255));
     }
 
     #[test]
@@ -386,7 +400,7 @@ mod tests {
         let ray = scene.camera.get_ray_for(0, 0);
         let (color, _) = scene.color_of_ray(&ray);
 
-        assert_eq!(color, Color::new(0, 255, 0));
+        assert_eq!(color, Color::new(0, 255, 0, 255));
     }
 
     #[test]
@@ -419,7 +433,7 @@ mod tests {
         let ray = scene.camera.get_ray_for(6, 6);
         let (color, _) = scene.color_of_ray(&ray);
 
-        assert_eq!(color, Color::new(0, 0, 0));
+        assert_eq!(color, Color::new(0, 0, 0, 255));
     }
 
     #[test]
@@ -441,6 +455,6 @@ mod tests {
 
         assert_eq!(redshift, Some(1.0));
         // assert_eq!(color, Color::new(1, 0, 16));  // TODO: red shift is ignored for now.
-        assert_eq!(color, Color::new(0, 0, 255));
+        assert_eq!(color, Color::new(0, 0, 255, 255));
     }
 }
