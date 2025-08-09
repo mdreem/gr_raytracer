@@ -10,18 +10,10 @@ pub struct GlobalOpts {
     pub step_size: f64,
     #[arg(long, default_value = "15000")]
     pub max_steps: usize,
-    #[arg(long, default_value = "25")]
+    #[arg(long, default_value = "15000")]
     pub max_radius: f64,
-    #[arg(long, default_value = "15.0")]
-    pub step_size_celestial_continuation: f64,
     #[arg(long, default_value = "0.00001")]
     pub epsilon: f64,
-    #[arg(long, default_value = "10000")]
-    pub max_steps_celestial_continuation: usize,
-    #[arg(long, default_value = "15000")]
-    pub max_radius_celestial_continuation: f64,
-    #[arg(long, default_value = "0.0001")]
-    pub epsilon_celestial_continuation: f64,
     #[arg(short, long, value_delimiter = ',', default_value = "0.0,0.8,-18.0")]
     pub camera_position: Vec<f64>,
 }

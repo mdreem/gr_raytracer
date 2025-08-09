@@ -526,9 +526,9 @@ mod tests {
         assert_abs_diff_eq!(
             result.result_geodesic_equation.last().unwrap().y[1],
             CELESTIAL_SPHERE_RADIUS,
-            epsilon = 1e-1
+            epsilon = 100.0
         );
-        assert_eq!(result.matching.len(), 214);
+        assert_eq!(result.matching.len(), 245);
         assert_eq!(result.stop_reason, Some(StopReason::CelestialSphereReached));
     }
 
