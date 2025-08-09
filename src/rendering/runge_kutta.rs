@@ -1,5 +1,5 @@
 use nalgebra::allocator::Allocator;
-use nalgebra::{ComplexField, OVector};
+use nalgebra::OVector;
 use nalgebra::{DefaultAllocator, Dim};
 
 pub trait OdeFunction<D: Dim>
@@ -113,7 +113,7 @@ where
     DefaultAllocator: Allocator<D>,
 {
     let mut h_cur = h;
-    for i in 0..MAX_RETRY_STEP {
+    for _i in 0..MAX_RETRY_STEP {
         let (y_new, truncation_error) = rkf45_step(y, t, h_cur, f);
 
         let h_new = BETA * h * (epsilon / truncation_error).powf(1.0 / CONVERGENCY_ORDER);

@@ -115,7 +115,6 @@ mod tests {
     use crate::cli::schwarzschild::render_schwarzschild_ray_at;
     use crate::geometry::four_vector::FourVector;
     use crate::geometry::point::Point;
-    use nalgebra::Vector4;
     use std::io::BufWriter;
 
     #[test]

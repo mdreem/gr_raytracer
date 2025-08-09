@@ -127,7 +127,6 @@ mod tests {
     use crate::geometry::geometry::InnerProduct;
     use crate::geometry::point::Point;
     use approx::assert_abs_diff_eq;
-    use nalgebra::Vector4;
 
     #[test]
     fn test_multiplication_self() {

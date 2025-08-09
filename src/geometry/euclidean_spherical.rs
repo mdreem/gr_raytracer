@@ -112,7 +112,6 @@ mod tests {
     use crate::geometry::spherical_coordinates_helper::cartesian_to_spherical;
     use crate::rendering::camera::Camera;
     use crate::rendering::debug::save_rays_to_file;
-    use nalgebra::Vector4;
     use std::f64::consts::PI;
 
     #[ignore]

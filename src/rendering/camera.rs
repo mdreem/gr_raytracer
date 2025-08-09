@@ -16,7 +16,7 @@ pub struct Camera {
 pub fn lorentz_transform_tetrad<G: Geometry>(
     geometry: &G,
     tetrad: &Tetrad,
-    position: &Point, // XXX should be a reference?
+    position: &Point,
     velocity: &FourVector,
 ) -> Tetrad {
     let lorentz = geometry.lorentz_transformation(position, velocity);
@@ -29,7 +29,7 @@ pub fn lorentz_transform_tetrad<G: Geometry>(
     let z_vec = lorentz * tetrad.z.get_as_vector();
 
     Tetrad::new(
-        *position,
+        position.clone(),
         FourVector::new(
             t_vec[0],
             t_vec[1],

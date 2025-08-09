@@ -47,9 +47,8 @@ impl InnerProduct for EuclideanSpace {
 impl Geometry for EuclideanSpace {
     // TODO: take into account rotations.
     fn get_tetrad_at(&self, position: &Point) -> Tetrad {
-        // XXX no reference? Or explicit copy?
         Tetrad::new(
-            *position,
+            position.clone(),
             FourVector::new_cartesian(1.0, 0.0, 0.0, 0.0),
             FourVector::new_cartesian(0.0, 1.0, 0.0, 0.0),
             FourVector::new_cartesian(0.0, 0.0, 1.0, 0.0),

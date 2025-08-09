@@ -38,7 +38,6 @@ mod tests {
         cartesian_to_spherical, spherical_to_cartesian,
     };
     use approx::assert_abs_diff_eq;
-    use nalgebra::Vector4;
 
     #[test]
     fn test_cartesian_to_spherical() {

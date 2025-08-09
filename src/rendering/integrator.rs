@@ -113,7 +113,7 @@ impl<G: Geometry> Integrator<'_, G> {
 
     fn should_stop(
         &self,
-        last_y: &EquationOfMotionState,
+        _last_y: &EquationOfMotionState,
         cur_y: &EquationOfMotionState,
     ) -> Option<StopReason> {
         if self.geometry.inside_horizon(&Point::new(
@@ -155,7 +155,7 @@ impl<G: Geometry> Integrator<'_, G> {
         {
             (y_cur, h) = rkf45(
                 &y_cur,
-                t,
+                t_cur,
                 h,
                 self.integration_configuration
                     .epsilon_celestial_continuation,

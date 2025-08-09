@@ -156,7 +156,7 @@ mod test_schwarzschild {
     use crate::geometry::schwarzschild::Schwarzschild;
     use crate::rendering::runge_kutta::OdeFunction;
     use crate::rendering::scene::test_scene::CELESTIAL_SPHERE_RADIUS;
-    use nalgebra::{Const, OVector, Vector2, Vector4};
+    use nalgebra::{Const, OVector, Vector2};
 
     pub fn get_angular_momentum_from_phi(
         position: &Point,
@@ -277,7 +277,7 @@ mod tests {
     use crate::rendering::texture::CheckerMapper;
     use approx::assert_abs_diff_eq;
     use nalgebra::allocator::Allocator;
-    use nalgebra::{DefaultAllocator, Dim, OVector, Vector4};
+    use nalgebra::{DefaultAllocator, Dim, OVector};
     use std::f64::consts::PI;
     use std::fs::File;
     use std::io::Write;

@@ -73,6 +73,7 @@ impl Point {
         }
     }
 
+    #[allow(dead_code)] // For testing
     pub fn get_as_vector(self) -> Vector4<f64> {
         self.vector
     }
