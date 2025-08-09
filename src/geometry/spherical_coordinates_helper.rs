@@ -1,7 +1,7 @@
-use nalgebra::Vector4;
+use crate::geometry::point::{CoordinateSystem, Point};
 
 // The order of the components is: (r, theta, phi)
-pub fn cartesian_to_spherical(cartesian: &Vector4<f64>) -> Vector4<f64> {
+pub fn cartesian_to_spherical(cartesian: &Point) -> Point {
     let t = cartesian[0];
     let x = cartesian[1];
     let y = cartesian[2];
@@ -9,16 +9,16 @@ pub fn cartesian_to_spherical(cartesian: &Vector4<f64>) -> Vector4<f64> {
 
     let r = (x * x + y * y + z * z).sqrt();
     if r == 0.0 {
-        return Vector4::new(t, 0.0, 0.0, 0.0);
+        return Point::new(t, 0.0, 0.0, 0.0, CoordinateSystem::Spherical);
     }
 
     let theta = (y / r).acos();
     let phi = z.atan2(x);
 
-    Vector4::new(t, r, theta, phi)
+    Point::new(t, r, theta, phi, CoordinateSystem::Spherical)
 }
 
-pub fn spherical_to_cartesian(spherical: &Vector4<f64>) -> Vector4<f64> {
+pub fn spherical_to_cartesian(spherical: &Point) -> Point {
     let t = spherical[0];
     let r = spherical[1];
     let theta = spherical[2];
@@ -28,11 +28,12 @@ pub fn spherical_to_cartesian(spherical: &Vector4<f64>) -> Vector4<f64> {
     let y = r * theta.cos();
     let z = r * theta.sin() * phi.sin();
 
-    Vector4::new(t, x, y, z)
+    Point::new(t, x, y, z, CoordinateSystem::Cartesian)
 }
 
 #[cfg(test)]
 mod tests {
+    use crate::geometry::point::{CoordinateSystem, Point};
     use crate::geometry::spherical_coordinates_helper::{
         cartesian_to_spherical, spherical_to_cartesian,
     };
@@ -41,10 +42,14 @@ mod tests {
 
     #[test]
     fn test_cartesian_to_spherical() {
-        let cartesian = Vector4::new(0.0, 1.0, 2.0, 3.0);
+        let cartesian = Point::new(0.0, 1.0, 2.0, 3.0, CoordinateSystem::Cartesian);
         let spherical = cartesian_to_spherical(&cartesian);
         let back_to_cartesian = spherical_to_cartesian(&spherical);
 
-        assert_abs_diff_eq!(cartesian, back_to_cartesian, epsilon = 1e-15);
+        assert_abs_diff_eq!(
+            cartesian.get_as_vector(),
+            back_to_cartesian.get_as_vector(),
+            epsilon = 1e-15
+        );
     }
 }

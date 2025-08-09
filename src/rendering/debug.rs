@@ -1,13 +1,13 @@
 use crate::geometry::geometry::Geometry;
+use crate::geometry::point::Point;
 use crate::rendering::camera::Camera;
-use nalgebra::Vector4;
 use std::fs::File;
 use std::io::Write;
 
 pub fn save_rays_to_file<G: Geometry>(
     rows: i64,
     cols: i64,
-    position: &Vector4<f64>,
+    position: &Point,
     geometry: G,
     camera: Camera,
 ) {

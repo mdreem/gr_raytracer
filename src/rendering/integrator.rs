@@ -1,9 +1,9 @@
 use crate::geometry::geometry::Geometry;
+use crate::geometry::point::Point;
 use crate::rendering::integrator::StopReason::{CelestialSphereReached, HorizonReached};
 use crate::rendering::ray::{IntegratedRay, Ray};
 use crate::rendering::runge_kutta::rkf45;
 use crate::rendering::scene::{get_position, EquationOfMotionState};
-use nalgebra::Vector4;
 
 #[derive(Debug)]
 pub struct Step {
@@ -116,10 +116,13 @@ impl<G: Geometry> Integrator<'_, G> {
         last_y: &EquationOfMotionState,
         cur_y: &EquationOfMotionState,
     ) -> Option<StopReason> {
-        if self
-            .geometry
-            .inside_horizon(&Vector4::new(cur_y[0], cur_y[1], cur_y[2], cur_y[3]))
-        {
+        if self.geometry.inside_horizon(&Point::new(
+            cur_y[0],
+            cur_y[1],
+            cur_y[2],
+            cur_y[3],
+            self.geometry.coordinate_system(),
+        )) {
             return Some(HorizonReached);
         }
 

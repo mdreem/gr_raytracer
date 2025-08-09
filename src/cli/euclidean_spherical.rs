@@ -3,15 +3,15 @@ use crate::cli::shared::{create_scene, render};
 use crate::configuration::RenderConfig;
 use crate::geometry::euclidean_spherical::EuclideanSpaceSpherical;
 use crate::geometry::four_vector::FourVector;
+use crate::geometry::point::Point;
 use crate::geometry::spherical_coordinates_helper::cartesian_to_spherical;
 use crate::rendering::raytracer;
-use nalgebra::Vector4;
 use std::io::Write;
 
 pub fn render_euclidean_spherical(
     opts: GlobalOpts,
     config: RenderConfig,
-    camera_position: Vector4<f64>,
+    camera_position: Point,
     filename: String,
 ) {
     let camera_position = cartesian_to_spherical(&camera_position);
@@ -27,7 +27,7 @@ pub fn render_euclidean_spherical_ray(
     col: i64,
     opts: GlobalOpts,
     config: RenderConfig,
-    camera_position: Vector4<f64>,
+    camera_position: Point,
     write: &mut dyn Write,
 ) {
     let camera_position = cartesian_to_spherical(&camera_position);

@@ -11,7 +11,8 @@ use crate::cli::schwarzschild::{
     render_schwarzschild, render_schwarzschild_ray, render_schwarzschild_ray_at,
 };
 use crate::configuration::{GeometryType, RenderConfig};
-use crate::geometry::geometry::Geometry;
+use crate::geometry::four_vector::FourVector;
+use crate::geometry::point::{CoordinateSystem, Point};
 use clap::Parser;
 use nalgebra::Vector4;
 use std::fs;
@@ -42,11 +43,21 @@ fn main() {
             match config.geometry_type {
                 configuration::GeometryType::Euclidean => {
                     println!("Rendering Euclidean geometry");
-                    render_euclidean(args.global_opts, config, position, filename);
+                    render_euclidean(
+                        args.global_opts,
+                        config,
+                        Point::new_from_vector(position, CoordinateSystem::Cartesian),
+                        filename,
+                    );
                 }
                 configuration::GeometryType::EuclideanSpherical => {
                     println!("Rendering Euclidean spherical geometry");
-                    render_euclidean_spherical(args.global_opts, config, position, filename);
+                    render_euclidean_spherical(
+                        args.global_opts,
+                        config,
+                        Point::new_from_vector(position, CoordinateSystem::Cartesian),
+                        filename,
+                    );
                 }
                 configuration::GeometryType::Schwarzschild {
                     radius,
@@ -58,7 +69,7 @@ fn main() {
                         horizon_epsilon,
                         args.global_opts,
                         config,
-                        position,
+                        Point::new_from_vector(position, CoordinateSystem::Cartesian),
                         filename,
                     );
                 }
@@ -84,7 +95,14 @@ fn main() {
             match config.geometry_type {
                 configuration::GeometryType::Euclidean => {
                     println!("Rendering ray in Euclidean geometry");
-                    render_euclidean_ray(row, col, args.global_opts, config, position, &mut file);
+                    render_euclidean_ray(
+                        row,
+                        col,
+                        args.global_opts,
+                        config,
+                        Point::new_from_vector(position, CoordinateSystem::Cartesian),
+                        &mut file,
+                    );
                     println!("Saved integrated ray to {}", filename);
                 }
                 configuration::GeometryType::EuclideanSpherical => {
@@ -94,7 +112,7 @@ fn main() {
                         col,
                         args.global_opts,
                         config,
-                        position,
+                        Point::new_from_vector(position, CoordinateSystem::Cartesian),
                         &mut file,
                     );
                     println!("Saved integrated ray to {}", filename);
@@ -114,7 +132,7 @@ fn main() {
                         col,
                         args.global_opts,
                         config,
-                        position,
+                        Point::new_from_vector(position, CoordinateSystem::Cartesian),
                         &mut file,
                     );
                     println!("Saved integrated ray to {}", filename);
@@ -150,8 +168,8 @@ fn main() {
                     render_schwarzschild_ray_at(
                         radius,
                         horizon_epsilon,
-                        Vector4::new(0.0, position[0], position[1], position[2]),
-                        Vector4::new(0.0, direction[0], direction[1], direction[2]),
+                        Point::new_cartesian(0.0, position[0], position[1], position[2]),
+                        FourVector::new_cartesian(0.0, direction[0], direction[1], direction[2]),
                         args.global_opts,
                         &mut file,
                     );

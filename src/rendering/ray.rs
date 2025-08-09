@@ -1,15 +1,14 @@
 use crate::geometry::four_vector::FourVector;
 use crate::geometry::geometry::HasCoordinateSystem;
+use crate::geometry::point::Point;
 use crate::rendering::integrator::Step;
 use crate::rendering::scene::get_position;
-use nalgebra::Vector4;
-use std::fs::File;
 use std::io::Write;
 use std::ops::Index;
 
 #[derive(Debug)]
 pub struct Ray {
-    pub position: Vector4<f64>,
+    pub position: Point,
     pub momentum: FourVector,
     pub row: i64,
     pub col: i64,
@@ -22,7 +21,7 @@ impl Ray {
         col: i64,
         width: i64,
         height: i64,
-        position: Vector4<f64>,
+        position: Point,
         momentum: FourVector,
     ) -> Self {
         Self {
@@ -51,7 +50,7 @@ impl IntegratedRay {
             .expect("Unable to write file");
 
         for step in &self.steps {
-            let position = get_position(&step.y, geometry.coordinate_system()).get_as_vector();
+            let position = get_position(&step.y, geometry.coordinate_system());
 
             write
                 .write_all(

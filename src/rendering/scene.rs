@@ -1,5 +1,5 @@
-use crate::geometry::four_vector::{CoordinateSystem, FourVector};
 use crate::geometry::geometry::Geometry;
+use crate::geometry::point::{CoordinateSystem, Point};
 use crate::geometry::spherical_coordinates_helper::spherical_to_cartesian;
 use crate::rendering::camera::Camera;
 use crate::rendering::color::{wavelength_to_rgb, Color};
@@ -9,7 +9,7 @@ use crate::rendering::ray::{IntegratedRay, Ray};
 use crate::rendering::redshift::RedshiftComputer;
 use crate::rendering::texture::{TextureData, TextureMap, UVCoordinates};
 use crate::scene_objects::objects::Objects;
-use nalgebra::{Const, OVector, Vector4};
+use nalgebra::{Const, OVector};
 use std::f64::consts::PI;
 use std::fs::File;
 
@@ -26,12 +26,18 @@ pub struct Scene<'a, T: TextureMap, G: Geometry> {
 pub type EquationOfMotionState = OVector<f64, Const<8>>;
 
 // TODO: replace this with a more natural function, that does not need to use cartesian coordinates.
-pub fn get_position(y: &EquationOfMotionState, coordinate_system: CoordinateSystem) -> FourVector {
+pub fn get_position(y: &EquationOfMotionState, coordinate_system: CoordinateSystem) -> Point {
     match coordinate_system {
-        CoordinateSystem::Cartesian => FourVector::new_cartesian(y[0], y[1], y[2], y[3]),
+        CoordinateSystem::Cartesian => Point::new_cartesian(y[0], y[1], y[2], y[3]),
         CoordinateSystem::Spherical => {
-            let t_vec = spherical_to_cartesian(&Vector4::new(y[0], y[1], y[2], y[3]));
-            FourVector::new_cartesian(t_vec[0], t_vec[1], t_vec[2], t_vec[3]) // TODO: try to do all of this without this conversion.
+            let t_vec = spherical_to_cartesian(&Point::new(
+                y[0],
+                y[1],
+                y[2],
+                y[3],
+                CoordinateSystem::Spherical,
+            ));
+            Point::new_cartesian(t_vec[0], t_vec[1], t_vec[2], t_vec[3]) // TODO: try to do all of this without this conversion.
         }
     }
 }
@@ -145,12 +151,12 @@ impl<'a, T: TextureMap, G: Geometry> Scene<'a, T, G> {
 pub mod test_scene {
     use crate::geometry::four_vector::FourVector;
     use crate::geometry::geometry::Geometry;
+    use crate::geometry::point::Point;
     use crate::rendering::camera::Camera;
     use crate::rendering::color::Color;
     use crate::rendering::scene::{IntegrationConfiguration, Scene, TextureData};
     use crate::rendering::texture::CheckerMapper;
     use crate::scene_objects;
-    use nalgebra::Vector4;
     use std::f64::consts::PI;
 
     pub const CELESTIAL_SPHERE_RADIUS: f64 = 15.0;
@@ -160,7 +166,7 @@ pub mod test_scene {
         center_disk_inner_radius: f64,
         center_disk_outer_radius: f64,
         geometry: &G,
-        camera_position: Vector4<f64>,
+        camera_position: Point,
         camera_velocity: FourVector,
     ) -> Scene<CheckerMapper, G> {
         let camera = Camera::new(
@@ -241,6 +247,7 @@ mod tests {
     use crate::geometry::euclidean::EuclideanSpace;
     use crate::geometry::euclidean_spherical::EuclideanSpaceSpherical;
     use crate::geometry::four_vector::FourVector;
+    use crate::geometry::point::{CoordinateSystem, Point};
     use crate::geometry::schwarzschild::Schwarzschild;
     use crate::geometry::spherical_coordinates_helper::cartesian_to_spherical;
     use crate::rendering::camera::Camera;
@@ -248,13 +255,12 @@ mod tests {
     use crate::rendering::scene::{Color, Scene};
     use crate::rendering::texture::CheckerMapper;
     use approx::assert_abs_diff_eq;
-    use nalgebra::Vector4;
     use std::f64::consts::PI;
 
     #[test]
     fn test_color_of_ray_hits_sphere() {
         let camera = Camera::new(
-            Vector4::new(0.0, 0.0, 0.0, -10.0),
+            Point::new(0.0, 0.0, 0.0, -10.0, CoordinateSystem::Cartesian),
             FourVector::new_cartesian(1.0, 0.0, 0.0, 0.0),
             PI / 2.0,
             11,
@@ -272,7 +278,13 @@ mod tests {
 
     #[test]
     fn test_color_of_ray_hits_sphere_spherical() {
-        let position = cartesian_to_spherical(&Vector4::new(0.0, 0.0, 0.0, -10.0));
+        let position = cartesian_to_spherical(&Point::new(
+            0.0,
+            0.0,
+            0.0,
+            -10.0,
+            CoordinateSystem::Spherical,
+        ));
         let camera = Camera::new(
             position,
             FourVector::new_spherical(1.0, 0.0, 0.0, 0.0),
@@ -292,7 +304,7 @@ mod tests {
 
     #[test]
     fn test_color_of_ray_hits_sphere_schwarzschild() {
-        let position = Vector4::new(0.0, 10.0, PI / 2.0, 0.0);
+        let position = Point::new(0.0, 10.0, PI / 2.0, 0.0, CoordinateSystem::Spherical);
         let radius = 1.0;
         let r = position[1];
         let a = 1.0 - radius / r;
@@ -313,7 +325,7 @@ mod tests {
 
     #[test]
     fn test_color_of_ray_hits_sphere_schwarzschild_stationary_observer() {
-        let position = Vector4::new(0.0, 10.0, PI / 2.0, 0.0);
+        let position = Point::new(0.0, 10.0, PI / 2.0, 0.0, CoordinateSystem::Spherical);
         let radius = 1.0;
         let sphere_radius = 2.0;
         let r = position[1];
@@ -340,7 +352,7 @@ mod tests {
     #[test]
     fn test_color_of_ray_misses_sphere() {
         let camera = Camera::new(
-            Vector4::new(0.0, 0.0, 0.0, -10.0),
+            Point::new(0.0, 0.0, 0.0, -10.0, CoordinateSystem::Cartesian),
             FourVector::new_spherical(1.0, 0.0, 0.0, 0.0),
             PI / 2.0,
             11,
@@ -359,7 +371,13 @@ mod tests {
 
     #[test]
     fn test_color_of_ray_misses_sphere_schwarzschild() {
-        let position = cartesian_to_spherical(&Vector4::new(0.0, 0.0, 0.0, -10.0));
+        let position = cartesian_to_spherical(&Point::new(
+            0.0,
+            0.0,
+            0.0,
+            -10.0,
+            CoordinateSystem::Cartesian,
+        ));
         let radius = 2.0;
         let r = position[1];
         let a = 1.0 - radius / r;
@@ -384,14 +402,21 @@ mod tests {
 
     #[test]
     fn test_color_of_ray_hits_horizon_schwarzschild() {
-        let spatial_position = cartesian_to_spherical(&Vector4::new(0.0, 0.0, 0.0, -10.0));
+        let spatial_position = cartesian_to_spherical(&Point::new(
+            0.0,
+            0.0,
+            0.0,
+            -10.0,
+            CoordinateSystem::Cartesian,
+        ));
 
         let camera = Camera::new(
-            Vector4::new(
+            Point::new(
                 0.0,
                 spatial_position[0],
                 spatial_position[1],
                 spatial_position[2],
+                CoordinateSystem::Cartesian,
             ),
             FourVector::new_spherical(1.0, 0.0, 0.0, 0.0),
             PI / 2.0,
@@ -411,7 +436,7 @@ mod tests {
     #[test]
     fn test_intersects_with_disk() {
         let camera = Camera::new(
-            Vector4::new(0.0, 0.0, 0.8, -7.0),
+            Point::new(0.0, 0.0, 0.8, -7.0, CoordinateSystem::Cartesian),
             FourVector::new_cartesian(1.0, 0.0, 0.0, 0.0),
             PI / 4.0,
             101,
