@@ -103,32 +103,17 @@ impl<'a, T: TextureMap, G: Geometry> Scene<'a, T, G> {
             return match reason {
                 HorizonReached => (Color::new(0, 0, 0), None),
                 CelestialSphereReached => {
-                    self.color_after_extending_to_celestial_sphere(steps, observer_energy)
+                    let uv = self.get_uv_coordinates(&y);
+                    let redshift = self.redshift_computer.compute_redshift(y, observer_energy);
+                    (
+                        self.texture_data.celestial_map.color_at_uv(uv),
+                        Some(redshift),
+                    )
                 }
             };
         }
+        println!("ERROR: Ray did not hit anything: {:?}", ray);
         (Color::new(0, 0, 0), None)
-    }
-
-    fn color_after_extending_to_celestial_sphere(
-        &self,
-        steps: IntegratedRay,
-        observer_energy: f64,
-    ) -> (Color, Option<f64>) {
-        let y_start = steps.last().unwrap().y;
-        let t_start = steps.last().unwrap().t;
-        let y_far = self
-            .integrator
-            .integrate_to_celestial_sphere(y_start, t_start);
-
-        let uv = self.get_uv_coordinates(&y_far);
-        let redshift = self
-            .redshift_computer
-            .compute_redshift(y_far, observer_energy);
-        (
-            self.texture_data.celestial_map.color_at_uv(uv),
-            Some(redshift),
-        )
     }
 
     fn get_uv_coordinates(&self, y_far: &EquationOfMotionState) -> UVCoordinates {
@@ -159,7 +144,7 @@ pub mod test_scene {
     use crate::scene_objects;
     use std::f64::consts::PI;
 
-    pub const CELESTIAL_SPHERE_RADIUS: f64 = 15.0;
+    pub const CELESTIAL_SPHERE_RADIUS: f64 = 10000.0;
 
     pub fn create_scene<G: Geometry>(
         center_sphere_radius: f64,
@@ -203,16 +188,8 @@ pub mod test_scene {
         let texture_mapper_sphere =
             CheckerMapper::new(10.0, 10.0, Color::new(255, 0, 0), Color::new(100, 0, 0));
 
-        let integration_configuration = IntegrationConfiguration::new(
-            30000,
-            CELESTIAL_SPHERE_RADIUS,
-            0.001,
-            epsilon,
-            15000,
-            10000.0,
-            1.0,
-            1e-4,
-        );
+        let integration_configuration =
+            IntegrationConfiguration::new(30000, CELESTIAL_SPHERE_RADIUS, 0.001, epsilon);
 
         let texture_data = TextureData {
             celestial_map: texture_mapper_celestial,
