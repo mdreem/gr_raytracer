@@ -2,6 +2,7 @@ use crate::cli::cli::GlobalOpts;
 use crate::configuration::RenderConfig;
 use crate::geometry::four_vector::FourVector;
 use crate::geometry::geometry::Geometry;
+use crate::geometry::point::Point;
 use crate::rendering::camera::Camera;
 use crate::rendering::integrator::IntegrationConfiguration;
 use crate::rendering::raytracer;
@@ -19,7 +20,7 @@ pub fn render<G: Geometry>(scene: Scene<TextureMapper, G>, filename: String) {
 
 pub fn create_scene<G: Geometry>(
     geometry: &G,
-    camera_position: Vector4<f64>,
+    camera_position: Point,
     camera_momentum: FourVector,
     opts: GlobalOpts,
     config: RenderConfig,

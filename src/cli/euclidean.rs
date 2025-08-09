@@ -3,14 +3,14 @@ use crate::cli::shared::{create_scene, render};
 use crate::configuration::RenderConfig;
 use crate::geometry::euclidean::EuclideanSpace;
 use crate::geometry::four_vector::FourVector;
+use crate::geometry::point::Point;
 use crate::rendering::raytracer;
-use nalgebra::Vector4;
 use std::io::Write;
 
 pub fn render_euclidean(
     opts: GlobalOpts,
     config: RenderConfig,
-    camera_position: Vector4<f64>,
+    camera_position: Point,
     filename: String,
 ) {
     let geometry = EuclideanSpace::new();
@@ -25,7 +25,7 @@ pub fn render_euclidean_ray(
     col: i64,
     opts: GlobalOpts,
     config: RenderConfig,
-    camera_position: Vector4<f64>,
+    camera_position: Point,
     write: &mut dyn Write,
 ) {
     let geometry = EuclideanSpace::new();

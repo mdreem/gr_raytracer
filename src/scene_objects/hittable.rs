@@ -1,6 +1,6 @@
-use crate::geometry::four_vector::FourVector;
+use crate::geometry::point::Point;
 use crate::rendering::texture::UVCoordinates;
 
 pub trait Hittable {
-    fn intersects(&self, y_start: &FourVector, y_end: &FourVector) -> Option<UVCoordinates>;
+    fn intersects(&self, y_start: &Point, y_end: &Point) -> Option<UVCoordinates>;
 }

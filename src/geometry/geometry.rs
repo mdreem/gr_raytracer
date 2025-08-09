@@ -1,12 +1,13 @@
-use crate::geometry::four_vector::{CoordinateSystem, FourVector};
+use crate::geometry::four_vector::FourVector;
+use crate::geometry::point::{CoordinateSystem, Point};
 use crate::rendering::runge_kutta::OdeFunction;
 use crate::rendering::scene::EquationOfMotionState;
-use nalgebra::{Const, Matrix4, Vector4};
+use nalgebra::{Const, Matrix4};
 use std::fmt::{Display, Formatter};
 
 #[derive(Debug, Clone)]
 pub struct Tetrad {
-    position: Vector4<f64>,
+    position: Point,
     pub t: FourVector,
     pub x: FourVector, // vertical wrt. the camera.
     pub y: FourVector, // horizontal wrt. the camera.
@@ -15,7 +16,7 @@ pub struct Tetrad {
 
 impl Tetrad {
     pub fn new(
-        position: Vector4<f64>,
+        position: Point,
         t: FourVector,
         x: FourVector,
         y: FourVector,
@@ -51,18 +52,14 @@ pub trait HasCoordinateSystem {
 }
 
 pub trait InnerProduct {
-    fn inner_product(&self, position: &Vector4<f64>, v: &FourVector, w: &FourVector) -> f64;
+    fn inner_product(&self, position: &Point, v: &FourVector, w: &FourVector) -> f64;
 }
 
 pub trait Geometry:
     GeodesicSolver + InnerProduct + HasCoordinateSystem + Clone + Sync + OdeFunction<Const<8>>
 {
-    fn get_tetrad_at(&self, position: &Vector4<f64>) -> Tetrad;
-    fn lorentz_transformation(
-        &self,
-        position: &Vector4<f64>,
-        velocity: &FourVector,
-    ) -> Matrix4<f64>;
-    fn get_stationary_velocity_at(&self, position: &Vector4<f64>) -> FourVector;
-    fn inside_horizon(&self, position: &Vector4<f64>) -> bool;
+    fn get_tetrad_at(&self, position: &Point) -> Tetrad;
+    fn lorentz_transformation(&self, position: &Point, velocity: &FourVector) -> Matrix4<f64>;
+    fn get_stationary_velocity_at(&self, position: &Point) -> FourVector;
+    fn inside_horizon(&self, position: &Point) -> bool;
 }

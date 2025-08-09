@@ -1,9 +1,9 @@
-use crate::geometry::four_vector::FourVector;
+use crate::geometry::point::{CoordinateSystem, Point};
 use crate::geometry::spherical_coordinates_helper::cartesian_to_spherical;
 use crate::rendering::color::Color;
 use crate::rendering::texture::{TextureMap, UVCoordinates};
 use crate::scene_objects::objects::SceneObject;
-use nalgebra::Vector4;
+use nalgebra::Vector3;
 use std::f64::consts::PI;
 
 pub struct Sphere<T: TextureMap> {
@@ -19,9 +19,6 @@ impl<T: TextureMap> Sphere<T> {
         }
     }
 }
-
-use crate::geometry::four_vector::CoordinateSystem::Spherical;
-use nalgebra::Vector3;
 
 fn solve_for_t(y_start_spatial: Vector3<f64>, direction: Vector3<f64>, r: f64) -> Option<f64> {
     let a = direction.dot(&direction);
@@ -47,7 +44,7 @@ fn solve_for_t(y_start_spatial: Vector3<f64>, direction: Vector3<f64>, r: f64) -
 }
 
 impl<T: TextureMap> crate::scene_objects::hittable::Hittable for Sphere<T> {
-    fn intersects(&self, y_start: &FourVector, y_end: &FourVector) -> Option<UVCoordinates> {
+    fn intersects(&self, y_start: &Point, y_end: &Point) -> Option<UVCoordinates> {
         let r_start = y_start.radial_distance_spatial_part_squared();
         let r_end = y_end.radial_distance_spatial_part_squared();
 
@@ -66,11 +63,12 @@ impl<T: TextureMap> crate::scene_objects::hittable::Hittable for Sphere<T> {
             };
 
             let point_on_sphere_spatial = y_start_spatial + t * direction;
-            let point_on_sphere = cartesian_to_spherical(&Vector4::new(
+            let point_on_sphere = cartesian_to_spherical(&Point::new(
                 0.0,
                 point_on_sphere_spatial[0],
                 point_on_sphere_spatial[1],
                 point_on_sphere_spatial[2],
+                CoordinateSystem::Cartesian,
             ));
 
             let theta = point_on_sphere[2];
