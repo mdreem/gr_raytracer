@@ -10,7 +10,6 @@ use crate::rendering::scene::Scene;
 use crate::rendering::texture::{TextureData, TextureMapper};
 use crate::scene_objects::objects::Objects;
 use crate::{configuration, scene_objects};
-use nalgebra::Vector4;
 use std::f64::consts::PI;
 
 pub fn render<G: Geometry>(scene: Scene<TextureMapper, G>, filename: String) {
@@ -24,7 +23,7 @@ pub fn create_scene<G: Geometry>(
     camera_momentum: FourVector,
     opts: GlobalOpts,
     config: RenderConfig,
-) -> Scene<TextureMapper, G> {
+) -> Scene<'_, TextureMapper, G> {
     let integration_configuration = IntegrationConfiguration::new(
         opts.max_steps,
         opts.max_radius,
@@ -51,8 +50,6 @@ pub fn create_scene<G: Geometry>(
 
     let texture_data = TextureData {
         celestial_map: texture_mapper_celestial,
-        center_disk_map: texture_mapper_disk.clone(),
-        center_sphere_map: texture_mapper_sphere.clone(),
     };
 
     let mut objects = Objects::new();

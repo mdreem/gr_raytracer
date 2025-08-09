@@ -168,7 +168,7 @@ pub mod test_scene {
         geometry: &G,
         camera_position: Point,
         camera_velocity: FourVector,
-    ) -> Scene<CheckerMapper, G> {
+    ) -> Scene<'_, CheckerMapper, G> {
         let camera = Camera::new(
             camera_position,
             camera_velocity,
@@ -195,7 +195,7 @@ pub mod test_scene {
         geometry: &G,
         camera: Camera,
         epsilon: f64,
-    ) -> Scene<CheckerMapper, G> {
+    ) -> Scene<'_, CheckerMapper, G> {
         let texture_mapper_celestial =
             CheckerMapper::new(100.0, 100.0, Color::new(0, 255, 0), Color::new(0, 100, 0));
         let texture_mapper_disk =
@@ -216,8 +216,6 @@ pub mod test_scene {
 
         let texture_data = TextureData {
             celestial_map: texture_mapper_celestial,
-            center_disk_map: texture_mapper_disk.clone(),
-            center_sphere_map: texture_mapper_sphere.clone(),
         };
         let mut objects = scene_objects::objects::Objects::new();
         objects.add_object(Box::new(scene_objects::sphere::Sphere::new(

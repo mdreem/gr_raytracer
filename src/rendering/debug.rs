@@ -4,6 +4,7 @@ use crate::rendering::camera::Camera;
 use std::fs::File;
 use std::io::Write;
 
+#[allow(dead_code)] // For testing
 pub fn save_rays_to_file<G: Geometry>(
     rows: i64,
     cols: i64,
