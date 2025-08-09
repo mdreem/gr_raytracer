@@ -112,8 +112,8 @@ mod tests {
             Arc::new(CheckerMapper::new(
                 5.0,
                 5.0,
-                Color::new(100, 0, 0),
-                Color::new(0, 100, 0),
+                Color::new(100, 0, 0, 255),
+                Color::new(0, 100, 0, 255),
             )),
             Point::new_cartesian(0.0, x, y, z),
         )
