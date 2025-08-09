@@ -15,6 +15,7 @@ impl<'a, T: TextureMap, G: Geometry> Raytracer<'a, T, G> {
         Self { scene }
     }
 
+    #[allow(dead_code)] // For testing
     pub fn render_ray_at(&self, row: i64, col: i64) {
         let ray = self.scene.camera.get_ray_for(row, col);
         println!("ray: {:?}", ray);

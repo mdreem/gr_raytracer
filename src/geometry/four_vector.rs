@@ -1,12 +1,6 @@
-use crate::geometry::spherical_coordinates_helper::cartesian_to_spherical;
+use crate::geometry::point::CoordinateSystem;
 use nalgebra::{Vector3, Vector4};
-use std::ops::{Add, Div, Mul, Neg};
-
-#[derive(Clone, Copy, Debug)]
-pub enum CoordinateSystem {
-    Cartesian,
-    Spherical,
-}
+use std::ops::{Add, Div, Index, Mul, Neg};
 
 #[derive(Clone, Copy, Debug)]
 pub struct FourVector {
@@ -105,19 +99,6 @@ impl FourVector {
         Vector3::new(self.vector[1], self.vector[2], self.vector[3])
     }
 
-    // The order of the components is: (r, theta, phi)
-    pub fn get_as_spherical(self) -> Vector3<f64> {
-        match self.coordinate_system {
-            CoordinateSystem::Cartesian => {
-                let v = cartesian_to_spherical(&self.vector);
-                Vector3::new(v[1], v[2], v[3])
-            }
-            CoordinateSystem::Spherical => {
-                Vector3::new(self.vector[1], self.vector[2], self.vector[3])
-            }
-        }
-    }
-
     pub fn radial_distance_spatial_part_squared(&self) -> f64 {
         let v = self.vector;
         match self.coordinate_system {
@@ -131,20 +112,28 @@ impl FourVector {
     }
 }
 
+impl Index<usize> for FourVector {
+    type Output = f64;
+
+    fn index(&self, index: usize) -> &Self::Output {
+        &self.vector[index]
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use crate::geometry::euclidean::EuclideanSpace;
     use crate::geometry::four_vector::FourVector;
     use crate::geometry::geometry::InnerProduct;
+    use crate::geometry::point::Point;
     use approx::assert_abs_diff_eq;
-    use nalgebra::Vector4;
 
     #[test]
     fn test_multiplication_self() {
         let geometry = EuclideanSpace::new();
         let v1 = FourVector::new_cartesian(1.0, 2.0, 3.0, 4.0);
         assert_abs_diff_eq!(
-            geometry.inner_product(&Vector4::new(0.0, 0.0, 0.0, 0.0), &v1, &v1),
+            geometry.inner_product(&Point::new_cartesian(0.0, 0.0, 0.0, 0.0), &v1, &v1),
             -28.0
         );
     }
@@ -156,7 +145,7 @@ mod tests {
         let v2 = FourVector::new_cartesian(5.0, 6.0, 7.0, 8.0);
 
         assert_abs_diff_eq!(
-            geometry.inner_product(&Vector4::new(0.0, 0.0, 0.0, 0.0), &v1, &v2),
+            geometry.inner_product(&Point::new_cartesian(0.0, 0.0, 0.0, 0.0), &v1, &v2),
             -60.0
         );
     }

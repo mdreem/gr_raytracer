@@ -1,4 +1,4 @@
-use crate::geometry::four_vector::FourVector;
+use crate::geometry::point::Point;
 use crate::rendering::color::Color;
 use crate::rendering::texture::TextureMap;
 use crate::scene_objects::hittable::Hittable;
@@ -20,7 +20,7 @@ impl Objects {
         self.objects.push(hittable);
     }
 
-    pub fn intersects(&self, y_start: &FourVector, y_end: &FourVector) -> Option<Color> {
+    pub fn intersects(&self, y_start: &Point, y_end: &Point) -> Option<Color> {
         for hittable in &self.objects {
             if let Some(uv) = hittable.intersects(y_start, y_end) {
                 return Some(hittable.color_at_uv(uv));
