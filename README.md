@@ -30,9 +30,9 @@ on [Manim](https://github.com/3b1b/manim).
 
 ## Create rays to be plotted.
 
-- `scripts/create_rays_positions.py`: Creates rays in a Schwarzschild metric based on a given position and direction and
+- `scripts/create_rays_positions.sh`: Creates rays in a Schwarzschild metric based on a given position and direction and
   saves them to a CSV file in the directory `rays/`.
-- `scripts/create_rays_from_camera.py`: Creates rays in a Schwarzschild metric using the camera given its position and
+- `scripts/create_rays_from_camera.sh`: Creates rays in a Schwarzschild metric using the camera given its position and
   a selected pixel. The data will be saved to a CSV file in the directory `rays/`.
 
 ## Plot rays.
@@ -40,7 +40,14 @@ on [Manim](https://github.com/3b1b/manim).
 Running `python -m manim scripts/animate-rays/main.py AnimateRays` will create an animation of the rays saved in
 CSV files in the directory `rays/`.
 
-# Example
+# Examples
+
+## Plot of a Schwarzschild black hole with a accretion disk
 
 Plot of the Schwarzschild solution with a accretion disk using a checkerboard texture to visualize the relations.
 ![alt text](./images/render_checker_texture.png "Black Hole with accretion disk")
+
+## Video of rays in a Schwarzschild metric
+
+https://github.com/user-attachments/assets/c1ce889b-6186-4ce5-b613-fecae3af03ef
+
