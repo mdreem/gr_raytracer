@@ -5,8 +5,8 @@ import glob
 import dataclasses
 import numpy as np
 
-NUM_STEPS = 100
-
+NUM_STEPS = 200
+RUN_TIME = 0.4
 
 @dataclasses.dataclass
 class Interpolators:
@@ -100,7 +100,7 @@ class AnimateRays(Scene):
             alpha = i / (steps - 1)
             animations = update_all_dots(alpha)
 
-            self.play(*animations, run_time=0.08, rate_func=linear)
+            self.play(*animations, run_time=RUN_TIME, rate_func=linear)
 
         self.wait(2)
 
