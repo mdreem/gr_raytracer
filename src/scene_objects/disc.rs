@@ -3,7 +3,8 @@ use crate::rendering::color::Color;
 use crate::rendering::texture::{TextureMap, TextureMapHandle, UVCoordinates};
 use crate::scene_objects::hittable::{Hittable, Intersection};
 use crate::scene_objects::objects::SceneObject;
-use nalgebra::Vector3;
+use image::imageops::dither;
+use nalgebra::{ComplexField, Vector3};
 use std::f64::consts::PI;
 
 pub struct Disc {
@@ -58,9 +59,11 @@ impl Hittable for Disc {
             let vector_in_plane = intersection_point - center;
 
             let phi = vector_in_plane[2].atan2(vector_in_plane[0]); // phi in x-z plane.
-            let u = (PI + phi) / (2.0 * PI);
-            let v = (rr.sqrt() - self.center_disk_inner_radius)
+            let r = (rr.sqrt() - self.center_disk_inner_radius)
                 / (self.center_disk_outer_radius - self.center_disk_inner_radius);
+
+            let u = 0.5 + 0.5 * r * phi.cos();
+            let v = 0.5 + 0.5 * r * phi.sin();
 
             Some(Intersection {
                 uv: UVCoordinates { u, v },
