@@ -17,6 +17,7 @@ pub enum GeometryType {
 pub enum ObjectsConfig {
     Sphere {
         radius: f64,
+        position: (f64, f64, f64),
     },
     Disc {
         inner_radius: f64,
@@ -39,6 +40,7 @@ mod tests {
 
             [objects.Sphere]
             radius = 1.0
+            position = [1.1, 2.2, 3.3]
 
             [[objects]]
 
@@ -56,8 +58,11 @@ mod tests {
             }
         );
         assert_eq!(config.objects.len(), 2);
-        if let ObjectsConfig::Sphere { radius } = &config.objects[0] {
+        if let ObjectsConfig::Sphere { radius, position } = &config.objects[0] {
             assert_eq!(*radius, 1.0);
+            assert_eq!(position.0, 1.1);
+            assert_eq!(position.1, 2.2);
+            assert_eq!(position.2, 3.3);
         } else {
             panic!("Expected first object to be a Sphere");
         }

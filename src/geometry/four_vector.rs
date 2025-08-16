@@ -98,18 +98,6 @@ impl FourVector {
     pub fn get_spatial_vector(self) -> Vector3<f64> {
         Vector3::new(self.vector[1], self.vector[2], self.vector[3])
     }
-
-    pub fn radial_distance_spatial_part_squared(&self) -> f64 {
-        let v = self.vector;
-        match self.coordinate_system {
-            CoordinateSystem::Cartesian => v[1] * v[1] + v[2] * v[2] + v[3] * v[3],
-            CoordinateSystem::Spherical => {
-                // In spherical coordinates, the radial distance is just r^2.
-                let r = v[1]; // v[1] represents the radial coordinate r.
-                r * r
-            }
-        }
-    }
 }
 
 impl Index<usize> for FourVector {

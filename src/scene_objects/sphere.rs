@@ -9,13 +9,15 @@ use std::f64::consts::PI;
 pub struct Sphere<T: TextureMap> {
     radius: f64,
     texture_mapper: T,
+    position: Point,
 }
 
 impl<T: TextureMap> Sphere<T> {
-    pub fn new(radius: f64, texture_mapper: T) -> Self {
+    pub fn new(radius: f64, texture_mapper: T, position: Point) -> Self {
         Self {
             radius,
             texture_mapper,
+            position,
         }
     }
 }
@@ -44,15 +46,20 @@ fn solve_for_t(y_start_spatial: Vector3<f64>, direction: Vector3<f64>, r: f64) -
 }
 
 impl<T: TextureMap> crate::scene_objects::hittable::Hittable for Sphere<T> {
+    // y_start and y_end have to be Cartesian.
     fn intersects(&self, y_start: &Point, y_end: &Point) -> Option<UVCoordinates> {
-        let r_start = y_start.radial_distance_spatial_part_squared();
-        let r_end = y_end.radial_distance_spatial_part_squared();
+        let neg_position = -self.position;
+        let y_start_shifted = y_start + &neg_position;
+        let y_end_shifted = y_end + &neg_position;
+        let r_start = y_start_shifted.radial_distance_spatial_part_squared();
+        let r_end = y_end_shifted.radial_distance_spatial_part_squared();
 
+        // Checks if the line element intersects the surface of the sphere.
         if (r_start >= self.radius.powi(2) && r_end <= self.radius.powi(2))
             || (r_start <= self.radius.powi(2) && r_end >= self.radius.powi(2))
         {
-            let y_start_spatial = y_start.get_spatial_vector();
-            let y_end_spatial = y_end.get_spatial_vector();
+            let y_start_spatial = y_start_shifted.get_spatial_vector();
+            let y_end_spatial = y_end_shifted.get_spatial_vector();
             let direction = y_end_spatial - y_start_spatial;
 
             let t = match solve_for_t(y_start_spatial, direction, self.radius) {
@@ -90,3 +97,55 @@ impl<T: TextureMap> TextureMap for Sphere<T> {
 }
 
 impl<T: TextureMap> SceneObject for Sphere<T> {}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::geometry::point::Point;
+    use crate::rendering::texture::CheckerMapper;
+    use crate::scene_objects::hittable::Hittable;
+
+    fn create_sphere_at(x: f64, y: f64, z: f64) -> Sphere<CheckerMapper> {
+        Sphere::new(
+            1.0,
+            CheckerMapper::new(5.0, 5.0, Color::new(100, 0, 0), Color::new(0, 100, 0)),
+            Point::new_cartesian(0.0, x, y, z),
+        )
+    }
+
+    #[test]
+    fn test_sphere_intersection_center_sphere() {
+        let sphere = create_sphere_at(0.0, 0.0, 0.0);
+        let y_start = Point::new_cartesian(0.0, 1.1, 0.0, 0.0);
+        let y_end = Point::new_cartesian(0.0, 0.9, 0.0, 0.0);
+
+        assert!(sphere.intersects(&y_start, &y_end).is_some());
+    }
+
+    #[test]
+    fn test_sphere_intersection_center_sphere_no_intersection() {
+        let sphere = create_sphere_at(0.0, 0.0, 0.0);
+        let y_start = Point::new_cartesian(0.0, 1.1, 0.0, 0.0);
+        let y_end = Point::new_cartesian(0.0, 1.01, 0.0, 0.0);
+
+        assert!(sphere.intersects(&y_start, &y_end).is_none());
+    }
+
+    #[test]
+    fn test_sphere_intersection_moved_sphere() {
+        let sphere = create_sphere_at(5.0, 0.0, 0.0);
+        let y_start = Point::new_cartesian(0.0, 6.1, 0.0, 0.0);
+        let y_end = Point::new_cartesian(0.0, 5.9, 0.0, 0.0);
+
+        assert!(sphere.intersects(&y_start, &y_end).is_some());
+    }
+
+    #[test]
+    fn test_sphere_intersection_moved_sphere_misses() {
+        let sphere = create_sphere_at(5.0, 0.0, 0.0);
+        let y_start = Point::new_cartesian(0.0, 6.1, 0.0, 0.0);
+        let y_end = Point::new_cartesian(0.0, 6.01, 0.0, 0.0);
+
+        assert!(sphere.intersects(&y_start, &y_end).is_none());
+    }
+}
