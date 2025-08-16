@@ -41,7 +41,7 @@ fn main() {
             );
 
             match config.geometry_type {
-                configuration::GeometryType::Euclidean => {
+                GeometryType::Euclidean => {
                     println!("Rendering Euclidean geometry");
                     render_euclidean(
                         args.global_opts,
@@ -50,7 +50,7 @@ fn main() {
                         filename,
                     );
                 }
-                configuration::GeometryType::EuclideanSpherical => {
+                GeometryType::EuclideanSpherical => {
                     println!("Rendering Euclidean spherical geometry");
                     render_euclidean_spherical(
                         args.global_opts,
@@ -59,7 +59,7 @@ fn main() {
                         filename,
                     );
                 }
-                configuration::GeometryType::Schwarzschild {
+                GeometryType::Schwarzschild {
                     radius,
                     horizon_epsilon,
                 } => {
@@ -93,7 +93,7 @@ fn main() {
 
             let mut file = File::create(filename.clone()).expect("Unable to create file");
             match config.geometry_type {
-                configuration::GeometryType::Euclidean => {
+                GeometryType::Euclidean => {
                     println!("Rendering ray in Euclidean geometry");
                     render_euclidean_ray(
                         row,
@@ -105,7 +105,7 @@ fn main() {
                     );
                     println!("Saved integrated ray to {}", filename);
                 }
-                configuration::GeometryType::EuclideanSpherical => {
+                GeometryType::EuclideanSpherical => {
                     println!("Rendering ray in Euclidean spherical geometry");
                     render_euclidean_spherical_ray(
                         row,
@@ -117,7 +117,7 @@ fn main() {
                     );
                     println!("Saved integrated ray to {}", filename);
                 }
-                configuration::GeometryType::Schwarzschild {
+                GeometryType::Schwarzschild {
                     radius,
                     horizon_epsilon,
                 } => {

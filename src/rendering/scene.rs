@@ -13,10 +13,10 @@ use nalgebra::{Const, OVector};
 use std::f64::consts::PI;
 use std::fs::File;
 
-pub struct Scene<'a, T: TextureMap, G: Geometry> {
+pub struct Scene<'a, G: Geometry> {
     pub integrator: Integrator<'a, G>,
     objects: Objects,
-    texture_data: TextureData<T>,
+    texture_data: TextureData,
     pub geometry: &'a G,
     pub camera: Camera,
     save_ray_data: bool,
@@ -42,15 +42,15 @@ pub fn get_position(y: &EquationOfMotionState, coordinate_system: CoordinateSyst
     }
 }
 
-impl<'a, T: TextureMap, G: Geometry> Scene<'a, T, G> {
+impl<'a, G: Geometry> Scene<'a, G> {
     pub fn new(
         integration_configuration: IntegrationConfiguration,
         objects: Objects,
-        texture_data: TextureData<T>,
+        texture_data: TextureData,
         geometry: &'a G,
         camera: Camera,
         save_ray_data: bool,
-    ) -> Scene<'a, T, G> {
+    ) -> Scene<'a, G> {
         let integrator = Integrator::new(geometry, integration_configuration);
 
         Scene {
@@ -143,6 +143,7 @@ pub mod test_scene {
     use crate::rendering::texture::CheckerMapper;
     use crate::scene_objects;
     use std::f64::consts::PI;
+    use std::sync::Arc;
 
     pub const CELESTIAL_SPHERE_RADIUS: f64 = 10000.0;
 
@@ -153,7 +154,7 @@ pub mod test_scene {
         geometry: &G,
         camera_position: Point,
         camera_velocity: FourVector,
-    ) -> Scene<'_, CheckerMapper, G> {
+    ) -> Scene<'_, G> {
         let camera = Camera::new(
             camera_position,
             camera_velocity,
@@ -180,13 +181,25 @@ pub mod test_scene {
         geometry: &G,
         camera: Camera,
         epsilon: f64,
-    ) -> Scene<'_, CheckerMapper, G> {
-        let texture_mapper_celestial =
-            CheckerMapper::new(100.0, 100.0, Color::new(0, 255, 0), Color::new(0, 100, 0));
-        let texture_mapper_disk =
-            CheckerMapper::new(200.0, 10.0, Color::new(0, 0, 255), Color::new(0, 0, 100));
-        let texture_mapper_sphere =
-            CheckerMapper::new(10.0, 10.0, Color::new(255, 0, 0), Color::new(100, 0, 0));
+    ) -> Scene<'_, G> {
+        let texture_mapper_celestial = Arc::new(CheckerMapper::new(
+            100.0,
+            100.0,
+            Color::new(0, 255, 0),
+            Color::new(0, 100, 0),
+        ));
+        let texture_mapper_disk = Arc::new(CheckerMapper::new(
+            200.0,
+            10.0,
+            Color::new(0, 0, 255),
+            Color::new(0, 0, 100),
+        ));
+        let texture_mapper_sphere = Arc::new(CheckerMapper::new(
+            10.0,
+            10.0,
+            Color::new(255, 0, 0),
+            Color::new(100, 0, 0),
+        ));
 
         let integration_configuration =
             IntegrationConfiguration::new(30000, CELESTIAL_SPHERE_RADIUS, 0.001, epsilon);
@@ -198,6 +211,7 @@ pub mod test_scene {
         objects.add_object(Box::new(scene_objects::sphere::Sphere::new(
             center_sphere_radius,
             texture_mapper_sphere,
+            Point::new_cartesian(0.0, 0.0, 0.0, 0.0),
         )));
         objects.add_object(Box::new(scene_objects::disc::Disc::new(
             center_disk_inner_radius,
@@ -335,7 +349,7 @@ mod tests {
             &EuclideanSpace::new(),
         );
         let space = EuclideanSpace::new();
-        let scene: Scene<CheckerMapper, EuclideanSpace> =
+        let scene: Scene<EuclideanSpace> =
             create_scene_with_camera(2.0, 0.2, 0.3, &space, camera, 1e-12);
 
         let ray = scene.camera.get_ray_for(0, 0);
@@ -419,7 +433,7 @@ mod tests {
             &EuclideanSpace::new(),
         );
         let space = EuclideanSpace::new();
-        let scene: Scene<CheckerMapper, EuclideanSpace> =
+        let scene: Scene<EuclideanSpace> =
             create_scene_with_camera(1.0, 2.0, 7.0, &space, camera, 1e-12);
 
         let ray = scene.camera.get_ray_for(0, 51);

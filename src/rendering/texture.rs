@@ -1,13 +1,14 @@
 use crate::rendering::color::Color;
 use image::{DynamicImage, GenericImageView, ImageReader};
+use std::sync::Arc;
 
 pub struct UVCoordinates {
     pub u: f64,
     pub v: f64,
 }
 
-pub struct TextureData<T: TextureMap> {
-    pub celestial_map: T,
+pub struct TextureData {
+    pub celestial_map: TextureMapHandle,
 }
 
 pub trait TextureMap: Sync {
@@ -74,5 +75,32 @@ impl TextureMap for CheckerMapper {
         } else {
             self.c2
         }
+    }
+}
+
+pub type TextureMapHandle = Arc<dyn TextureMap + Send + Sync>;
+
+pub struct TextureMapperFactory {
+    texture_map_map: std::collections::HashMap<String, TextureMapHandle>,
+}
+
+impl TextureMapperFactory {
+    pub fn new() -> Self {
+        Self {
+            texture_map_map: std::collections::HashMap::new(),
+        }
+    }
+
+    pub fn get_texture_mapper(&mut self, filename: String) -> TextureMapHandle {
+        if self.texture_map_map.get(&filename).is_none() {
+            let new_mapper = TextureMapper::new(filename.clone());
+            self.texture_map_map
+                .insert(filename.clone(), Arc::new(new_mapper));
+        }
+
+        self.texture_map_map
+            .get(&filename)
+            .expect("Failed to get texture mapper")
+            .clone()
     }
 }
