@@ -51,3 +51,9 @@ Plot of the Schwarzschild solution with a accretion disk using a checkerboard te
 
 https://github.com/user-attachments/assets/c1ce889b-6186-4ce5-b613-fecae3af03ef
 
+# Video of flying over a Schwarzschild black hole
+
+https://github.com/user-attachments/assets/914d3134-53db-4084-8a5f-1728d8460594
+
+The background is: https://commons.wikimedia.org/wiki/File:Messier_object_025.jpg
+
