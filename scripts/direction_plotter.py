@@ -1,7 +1,7 @@
+#!/usr/bin/env python3
 import pandas as pd
 import matplotlib.pyplot as plt
-from mpl_toolkits.mplot3d import Axes3D
-import numpy as np
+
 
 csv_file = "rays.csv"
 data = pd.read_csv(csv_file)
