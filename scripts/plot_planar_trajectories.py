@@ -1,3 +1,4 @@
+#!/usr/bin/env python3
 import os
 import sys
 import numpy as np
@@ -6,24 +7,27 @@ import matplotlib.pyplot as plt
 
 SCHWARZSCHILD_RADIUS = 1.0
 
+
 def read_trajectories(file_paths):
     trajectories = []
     for file_path in file_paths:
         if os.path.isfile(file_path) and file_path.endswith(".csv"):
             df = pd.read_csv(file_path)
 
-            if 'r' in df.columns and 'phi' in df.columns:
-                r = df['r'].values
-                phi = df['phi'].values  # phi is already in radians
+            if "r" in df.columns and "phi" in df.columns:
+                r = df["r"].values
+                phi = df["phi"].values  # phi is already in radians
 
                 # Convert to Cartesian coordinates
                 x = r * np.cos(phi)
                 y = r * np.sin(phi)
 
-                trajectories.append((x, y, os.path.basename(file_path)))  # Store with filename for labeling
-            elif 'x' in df.columns and 'y' in df.columns:
-                x = df['y'].values
-                y = df['z'].values
+                trajectories.append(
+                    (x, y, os.path.basename(file_path))
+                )  # Store with filename for labeling
+            elif "x" in df.columns and "y" in df.columns:
+                x = df["y"].values
+                y = df["z"].values
 
                 # Store Cartesian coordinates directly
                 trajectories.append((x, y, os.path.basename(file_path)))
@@ -33,6 +37,7 @@ def read_trajectories(file_paths):
             print(f"Skipping {file_path}: Not a valid CSV file")
     return trajectories
 
+
 def plot_trajectories(trajectories, disk_radius):
     plt.figure(figsize=(8, 8))
 
@@ -41,7 +46,13 @@ def plot_trajectories(trajectories, disk_radius):
         plt.plot(x, y, label=label)
 
     # Add central disk
-    disk = plt.Circle((0, 0), disk_radius, color='gray', alpha=0.5, label=f'Black Hole (r={disk_radius})')
+    disk = plt.Circle(
+        (0, 0),
+        disk_radius,
+        color="gray",
+        alpha=0.5,
+        label=f"Black Hole (r={disk_radius})",
+    )
     plt.gca().add_patch(disk)
 
     plt.xlabel("X")
@@ -51,6 +62,7 @@ def plot_trajectories(trajectories, disk_radius):
     plt.axis("equal")  # Keep aspect ratio square
     plt.grid()
     plt.show()
+
 
 # Main execution
 if __name__ == "__main__":
