@@ -1,3 +1,5 @@
+celestial_texture = "resources/celestial.png"
+
 [geometry_type.Schwarzschild]
 radius = 1.0
 horizon_epsilon = 1e-4
@@ -7,9 +9,11 @@ horizon_epsilon = 1e-4
 [objects.Disc]
 inner_radius = 3.0
 outer_radius = 5.0
+texture = "resources/disk.png"
 
 [[objects]]
 
 [objects.Sphere]
 radius = 2.0
 position = [0.0, 0.0, 20.0]
+texture = "resources/sphere.png"
