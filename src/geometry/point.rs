@@ -1,7 +1,8 @@
+use crate::geometry::four_vector::FourVector;
 use crate::geometry::spherical_coordinates_helper::cartesian_to_spherical;
 use nalgebra::{Vector3, Vector4};
 use std::cmp::PartialEq;
-use std::ops::Index;
+use std::ops::{Add, Index, Neg};
 
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub enum CoordinateSystem {
@@ -13,6 +14,39 @@ pub enum CoordinateSystem {
 pub struct Point {
     pub coordinate_system: CoordinateSystem,
     pub vector: Vector4<f64>,
+}
+
+impl Neg for Point {
+    type Output = Self;
+
+    fn neg(self) -> Self::Output {
+        Point {
+            coordinate_system: self.coordinate_system,
+            vector: self.vector.neg(),
+        }
+    }
+}
+
+impl Add for Point {
+    type Output = Self;
+
+    fn add(self, rhs: Self) -> Self::Output {
+        Point {
+            coordinate_system: self.coordinate_system,
+            vector: self.vector + rhs.vector,
+        }
+    }
+}
+
+impl Add for &Point {
+    type Output = Point;
+
+    fn add(self, rhs: Self) -> Self::Output {
+        Point {
+            coordinate_system: self.coordinate_system,
+            vector: self.vector + rhs.vector,
+        }
+    }
 }
 
 impl Point {

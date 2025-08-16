@@ -1,22 +1,22 @@
 use crate::geometry::point::Point;
 use crate::rendering::color::Color;
-use crate::rendering::texture::{TextureMap, UVCoordinates};
+use crate::rendering::texture::{TextureMap, TextureMapHandle, UVCoordinates};
 use crate::scene_objects::hittable::Hittable;
 use crate::scene_objects::objects::SceneObject;
 use nalgebra::Vector3;
 use std::f64::consts::PI;
 
-pub struct Disc<T: TextureMap> {
+pub struct Disc {
     center_disk_inner_radius: f64,
     center_disk_outer_radius: f64,
-    texture_mapper: T,
+    texture_mapper: TextureMapHandle,
 }
 
-impl<T: TextureMap> Disc<T> {
+impl Disc {
     pub fn new(
         center_disk_inner_radius: f64,
         center_disk_outer_radius: f64,
-        texture_mapper: T,
+        texture_mapper: TextureMapHandle,
     ) -> Self {
         Self {
             center_disk_inner_radius,
@@ -26,7 +26,7 @@ impl<T: TextureMap> Disc<T> {
     }
 }
 
-impl<T: TextureMap> Hittable for Disc<T> {
+impl Hittable for Disc {
     // TODO: explicitly construct the ray. Follow the integration. Some intervals seem to be skipped
     // here. See with current test setup. Intersection should be at t=7.63. With z=-2.442748091.
     // The intersection should be with an interval crossing y=0. But it seems to happen near 0 with
@@ -69,10 +69,10 @@ impl<T: TextureMap> Hittable for Disc<T> {
     }
 }
 
-impl<T: TextureMap> TextureMap for Disc<T> {
+impl TextureMap for Disc {
     fn color_at_uv(&self, uv: UVCoordinates) -> Color {
         self.texture_mapper.color_at_uv(uv)
     }
 }
 
-impl<T: TextureMap> SceneObject for Disc<T> {}
+impl SceneObject for Disc {}
