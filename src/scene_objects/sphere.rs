@@ -1,19 +1,19 @@
 use crate::geometry::point::{CoordinateSystem, Point};
 use crate::geometry::spherical_coordinates_helper::cartesian_to_spherical;
 use crate::rendering::color::Color;
-use crate::rendering::texture::{TextureMap, UVCoordinates};
+use crate::rendering::texture::{TextureMap, TextureMapHandle, UVCoordinates};
 use crate::scene_objects::objects::SceneObject;
 use nalgebra::Vector3;
 use std::f64::consts::PI;
 
-pub struct Sphere<T: TextureMap> {
+pub struct Sphere {
     radius: f64,
-    texture_mapper: T,
+    texture_mapper: TextureMapHandle,
     position: Point,
 }
 
-impl<T: TextureMap> Sphere<T> {
-    pub fn new(radius: f64, texture_mapper: T, position: Point) -> Self {
+impl Sphere {
+    pub fn new(radius: f64, texture_mapper: TextureMapHandle, position: Point) -> Self {
         Self {
             radius,
             texture_mapper,
@@ -45,7 +45,7 @@ fn solve_for_t(y_start_spatial: Vector3<f64>, direction: Vector3<f64>, r: f64) -
     }
 }
 
-impl<T: TextureMap> crate::scene_objects::hittable::Hittable for Sphere<T> {
+impl crate::scene_objects::hittable::Hittable for Sphere {
     // y_start and y_end have to be Cartesian.
     fn intersects(&self, y_start: &Point, y_end: &Point) -> Option<UVCoordinates> {
         let neg_position = -self.position;
@@ -90,13 +90,13 @@ impl<T: TextureMap> crate::scene_objects::hittable::Hittable for Sphere<T> {
     }
 }
 
-impl<T: TextureMap> TextureMap for Sphere<T> {
+impl TextureMap for Sphere {
     fn color_at_uv(&self, uv: UVCoordinates) -> Color {
         self.texture_mapper.color_at_uv(uv)
     }
 }
 
-impl<T: TextureMap> SceneObject for Sphere<T> {}
+impl SceneObject for Sphere {}
 
 #[cfg(test)]
 mod tests {
@@ -104,11 +104,17 @@ mod tests {
     use crate::geometry::point::Point;
     use crate::rendering::texture::CheckerMapper;
     use crate::scene_objects::hittable::Hittable;
+    use std::sync::Arc;
 
-    fn create_sphere_at(x: f64, y: f64, z: f64) -> Sphere<CheckerMapper> {
+    fn create_sphere_at(x: f64, y: f64, z: f64) -> Sphere {
         Sphere::new(
             1.0,
-            CheckerMapper::new(5.0, 5.0, Color::new(100, 0, 0), Color::new(0, 100, 0)),
+            Arc::new(CheckerMapper::new(
+                5.0,
+                5.0,
+                Color::new(100, 0, 0),
+                Color::new(0, 100, 0),
+            )),
             Point::new_cartesian(0.0, x, y, z),
         )
     }

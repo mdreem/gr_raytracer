@@ -467,7 +467,7 @@ mod tests {
         let radius = 2.0;
         let geometry = Schwarzschild::new(radius, 1e-4);
         let camera = create_camera(position, radius);
-        let scene: Scene<CheckerMapper, Schwarzschild> =
+        let scene: Scene<Schwarzschild> =
             scene::test_scene::create_scene_with_camera(1.0, 2.0, 7.0, &geometry, camera, 1e-5);
 
         let ray_a = scene.camera.get_ray_for(5, 10);
@@ -585,9 +585,9 @@ mod tests {
         let velocity = FourVector::new_spherical(a.sqrt().recip(), 0.0, 0.0, 0.0);
         let geometry = Schwarzschild::new(radius, 1e-4);
 
-        let scene: Box<Scene<CheckerMapper, Schwarzschild>> = Box::new(
-            scene::test_scene::create_scene(1.0, 2.0, 7.0, &geometry, position, velocity),
-        );
+        let scene: Box<Scene<Schwarzschild>> = Box::new(scene::test_scene::create_scene(
+            1.0, 2.0, 7.0, &geometry, position, velocity,
+        ));
 
         let momentum = FourVector::new_spherical(
             e / a,
