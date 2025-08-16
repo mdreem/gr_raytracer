@@ -57,3 +57,10 @@ https://github.com/user-attachments/assets/914d3134-53db-4084-8a5f-1728d8460594
 
 The background is: https://commons.wikimedia.org/wiki/File:Messier_object_025.jpg
 
+# Video of lensing due to a Schwarzschild black hole
+
+This shows a Schwarzschild black hole with a spherical object behind it and its lensing effects when moving around.
+
+https://github.com/user-attachments/assets/6907c6a2-970a-4d19-be60-5e0f6f340709
+
+The background is: https://commons.wikimedia.org/wiki/File:Messier_object_025.jpg
