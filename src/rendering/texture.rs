@@ -49,7 +49,7 @@ impl TextureMap for TextureMapper {
             (((width as f64) * uv.u) as u32).min(width - 1),
             (((height as f64) * uv.v) as u32).min(height - 1),
         );
-        Color::new(pixel[0], pixel[1], pixel[2])
+        Color::new(pixel[0], pixel[1], pixel[2], pixel[3])
     }
 }
 

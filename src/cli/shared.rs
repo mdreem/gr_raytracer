@@ -41,8 +41,8 @@ pub fn create_scene<G: Geometry>(
         Arc::new(CheckerMapper::new(
             20.0,
             20.0,
-            Color::new(255, 255, 255),
-            Color::new(0, 0, 0),
+            Color::new(255, 255, 255, 255),
+            Color::new(0, 0, 0, 255),
         ))
     };
 
@@ -78,8 +78,8 @@ pub fn create_scene<G: Geometry>(
                     Arc::new(CheckerMapper::new(
                         10.0,
                         10.0,
-                        Color::new(200, 0, 0),
-                        Color::new(0, 200, 0),
+                        Color::new(200, 0, 0, 255),
+                        Color::new(0, 200, 0, 255),
                     ))
                 };
                 let sphere = scene_objects::sphere::Sphere::new(
@@ -104,8 +104,8 @@ pub fn create_scene<G: Geometry>(
                     Arc::new(CheckerMapper::new(
                         10.0,
                         10.0,
-                        Color::new(200, 200, 0),
-                        Color::new(0, 200, 200),
+                        Color::new(200, 200, 0, 255),
+                        Color::new(0, 200, 200, 255),
                     ))
                 };
                 let disc =
