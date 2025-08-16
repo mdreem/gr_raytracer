@@ -198,6 +198,7 @@ pub mod test_scene {
         objects.add_object(Box::new(scene_objects::sphere::Sphere::new(
             center_sphere_radius,
             texture_mapper_sphere,
+            Point::new_cartesian(0.0, 0.0, 0.0, 0.0),
         )));
         objects.add_object(Box::new(scene_objects::disc::Disc::new(
             center_disk_inner_radius,

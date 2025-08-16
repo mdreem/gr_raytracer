@@ -51,10 +51,16 @@ pub fn create_scene<G: Geometry>(
     let mut objects = Objects::new();
     for object in config.objects {
         match object {
-            configuration::ObjectsConfig::Sphere { radius } => {
-                println!("Adding sphere with radius: {}", radius);
-                let sphere =
-                    scene_objects::sphere::Sphere::new(radius, texture_mapper_sphere.clone());
+            configuration::ObjectsConfig::Sphere { radius, position } => {
+                println!(
+                    "Adding sphere with radius: {} at ({},{},{})",
+                    radius, position.0, position.1, position.2
+                );
+                let sphere = scene_objects::sphere::Sphere::new(
+                    radius,
+                    texture_mapper_sphere.clone(),
+                    Point::new_cartesian(0.0, position.0, position.1, position.2),
+                );
                 objects.add_object(Box::new(sphere));
             }
             configuration::ObjectsConfig::Disc {
