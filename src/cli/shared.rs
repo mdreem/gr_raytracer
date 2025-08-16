@@ -7,12 +7,12 @@ use crate::rendering::camera::Camera;
 use crate::rendering::integrator::IntegrationConfiguration;
 use crate::rendering::raytracer;
 use crate::rendering::scene::Scene;
-use crate::rendering::texture::{TextureData, TextureMapper};
+use crate::rendering::texture::{TextureData, TextureMapper, TextureMapperFactory};
 use crate::scene_objects::objects::Objects;
 use crate::{configuration, scene_objects};
 use std::f64::consts::PI;
 
-pub fn render<G: Geometry>(scene: Scene<TextureMapper, G>, filename: String) {
+pub fn render<G: Geometry>(scene: Scene<G>, filename: String) {
     let raytracer = raytracer::Raytracer::new(scene);
     raytracer.render(filename);
 }
@@ -23,7 +23,7 @@ pub fn create_scene<G: Geometry>(
     camera_momentum: FourVector,
     opts: GlobalOpts,
     config: RenderConfig,
-) -> Scene<'_, TextureMapper, G> {
+) -> Scene<'_, G> {
     let integration_configuration = IntegrationConfiguration::new(
         opts.max_steps,
         opts.max_radius,
@@ -31,9 +31,14 @@ pub fn create_scene<G: Geometry>(
         opts.epsilon,
     );
 
-    let texture_mapper_celestial = TextureMapper::new(String::from("./resources/celestial.png"));
-    let texture_mapper_disk = TextureMapper::new(String::from("./resources/disk.png"));
-    let texture_mapper_sphere = TextureMapper::new(String::from("./resources/sphere.png"));
+    let mut texture_mapper_factor = TextureMapperFactory::new();
+
+    let texture_mapper_celestial =
+        texture_mapper_factor.get_texture_mapper(String::from("./resources/celestial.png"));
+    let texture_mapper_disk =
+        texture_mapper_factor.get_texture_mapper(String::from("./resources/disk.png"));
+    let texture_mapper_sphere =
+        texture_mapper_factor.get_texture_mapper(String::from("./resources/sphere.png"));
 
     let camera = Camera::new(
         camera_position,

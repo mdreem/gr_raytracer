@@ -2,16 +2,15 @@ use crate::geometry::geometry::Geometry;
 use crate::rendering::integrator::StopReason;
 use crate::rendering::ray::IntegratedRay;
 use crate::rendering::scene::Scene;
-use crate::rendering::texture::TextureMap;
 use rayon::iter::ParallelIterator;
 use std::sync::atomic::{AtomicUsize, Ordering};
 
-pub struct Raytracer<'a, T: TextureMap, G: Geometry> {
-    scene: Scene<'a, T, G>,
+pub struct Raytracer<'a, G: Geometry> {
+    scene: Scene<'a, G>,
 }
 
-impl<'a, T: TextureMap, G: Geometry> Raytracer<'a, T, G> {
-    pub fn new(scene: Scene<'a, T, G>) -> Self {
+impl<'a, G: Geometry> Raytracer<'a, G> {
+    pub fn new(scene: Scene<'a, G>) -> Self {
         Self { scene }
     }
 
