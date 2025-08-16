@@ -1,7 +1,7 @@
 use crate::geometry::point::Point;
 use crate::rendering::color::Color;
 use crate::rendering::texture::{TextureMap, TextureMapHandle, UVCoordinates};
-use crate::scene_objects::hittable::Hittable;
+use crate::scene_objects::hittable::{Hittable, Intersection};
 use crate::scene_objects::objects::SceneObject;
 use nalgebra::Vector3;
 use std::f64::consts::PI;
@@ -31,7 +31,7 @@ impl Hittable for Disc {
     // here. See with current test setup. Intersection should be at t=7.63. With z=-2.442748091.
     // The intersection should be with an interval crossing y=0. But it seems to happen near 0 with
     // both coordinates.
-    fn intersects(&self, y_start: &Point, y_end: &Point) -> Option<UVCoordinates> {
+    fn intersects(&self, y_start: &Point, y_end: &Point) -> Option<Intersection> {
         // z x y
         let normal = Vector3::new(0.0, 1.0, 0.0);
         let center = Vector3::new(0.0, 0.0, 0.0);
@@ -62,7 +62,15 @@ impl Hittable for Disc {
             let v = (rr.sqrt() - self.center_disk_inner_radius)
                 / (self.center_disk_outer_radius - self.center_disk_inner_radius);
 
-            Some(UVCoordinates { u, v })
+            Some(Intersection {
+                uv: UVCoordinates { u, v },
+                intersection_point: Point::new_cartesian(
+                    0.0,
+                    intersection_point[0],
+                    intersection_point[1],
+                    intersection_point[2],
+                ),
+            })
         } else {
             None
         }

@@ -2,6 +2,7 @@ use crate::geometry::point::{CoordinateSystem, Point};
 use crate::geometry::spherical_coordinates_helper::cartesian_to_spherical;
 use crate::rendering::color::Color;
 use crate::rendering::texture::{TextureMap, TextureMapHandle, UVCoordinates};
+use crate::scene_objects::hittable::Intersection;
 use crate::scene_objects::objects::SceneObject;
 use nalgebra::Vector3;
 use std::f64::consts::PI;
@@ -47,7 +48,7 @@ fn solve_for_t(y_start_spatial: Vector3<f64>, direction: Vector3<f64>, r: f64) -
 
 impl crate::scene_objects::hittable::Hittable for Sphere {
     // y_start and y_end have to be Cartesian.
-    fn intersects(&self, y_start: &Point, y_end: &Point) -> Option<UVCoordinates> {
+    fn intersects(&self, y_start: &Point, y_end: &Point) -> Option<Intersection> {
         let neg_position = -self.position;
         let y_start_shifted = y_start + &neg_position;
         let y_end_shifted = y_end + &neg_position;
@@ -83,7 +84,10 @@ impl crate::scene_objects::hittable::Hittable for Sphere {
             let u = (PI + phi) / (2.0 * PI);
             let v = theta / PI;
 
-            return Some(UVCoordinates { u, v: 1.0 - v });
+            return Some(Intersection {
+                uv: UVCoordinates { u, v: 1.0 - v },
+                intersection_point: point_on_sphere,
+            });
         }
 
         None
