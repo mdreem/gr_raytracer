@@ -1,5 +1,7 @@
 use crate::geometry::four_vector::FourVector;
-use crate::geometry::spherical_coordinates_helper::cartesian_to_spherical;
+use crate::geometry::spherical_coordinates_helper::{
+    cartesian_to_spherical, spherical_to_cartesian,
+};
 use nalgebra::{Vector3, Vector4};
 use std::cmp::PartialEq;
 use std::ops::{Add, Index, Neg};
@@ -80,6 +82,18 @@ impl Point {
 
     pub fn get_spatial_vector(self) -> Vector3<f64> {
         Vector3::new(self.vector[1], self.vector[2], self.vector[3])
+    }
+
+    pub fn get_as_cartesian(self) -> Vector3<f64> {
+        match self.coordinate_system {
+            CoordinateSystem::Cartesian => {
+                Vector3::new(self.vector[1], self.vector[2], self.vector[3])
+            }
+            CoordinateSystem::Spherical => {
+                let v = spherical_to_cartesian(&self);
+                Vector3::new(v[1], v[2], v[3])
+            }
+        }
     }
 
     // The order of the components is: (r, theta, phi)

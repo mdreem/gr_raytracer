@@ -51,7 +51,7 @@ impl<'a, G: Geometry> Raytracer<'a, G> {
                 .camera
                 .get_ray_for((y + from_row) as i64, (x + from_col) as i64);
             let (color, _) = self.scene.color_of_ray(&ray);
-            *pixel = image::Rgb(color.get_as_array());
+            *pixel = image::Rgba(color.get_as_array());
         });
 
         imgbuf.save(&filename).unwrap();

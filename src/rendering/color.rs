@@ -2,18 +2,49 @@ use std::f64::consts::E;
 
 #[derive(Debug, PartialEq, Copy, Clone)]
 pub struct Color {
-    r: u8,
-    g: u8,
-    b: u8,
+    pub r: u8,
+    pub g: u8,
+    pub b: u8,
+    pub alpha: u8,
 }
 
 impl Color {
-    pub fn new(r: u8, g: u8, b: u8) -> Color {
-        Color { r, g, b }
+    pub fn new(r: u8, g: u8, b: u8, alpha: u8) -> Color {
+        Color { r, g, b, alpha }
     }
 
-    pub fn get_as_array(&self) -> [u8; 3] {
-        [self.r, self.g, self.b]
+    pub fn get_as_array(&self) -> [u8; 4] {
+        [self.r, self.g, self.b, self.alpha]
+    }
+
+    pub fn blend(&self, other: &Color) -> Color {
+        let alpha_self = self.alpha as f64 / 255.0;
+        let alpha_other = other.alpha as f64 / 255.0;
+
+        let alpha_blend = alpha_self + alpha_other * (1.0 - alpha_self);
+
+        if alpha_blend == 0.0 {
+            // Both colors are fully transparent; return a fully transparent color
+            return Color {
+                r: 0,
+                g: 0,
+                b: 0,
+                alpha: 0,
+            };
+        }
+
+        Color {
+            r: ((self.r as f64 * alpha_self + other.r as f64 * alpha_other * (1.0 - alpha_self))
+                / alpha_blend)
+                .round() as u8,
+            g: ((self.g as f64 * alpha_self + other.g as f64 * alpha_other * (1.0 - alpha_self))
+                / alpha_blend)
+                .round() as u8,
+            b: ((self.b as f64 * alpha_self + other.b as f64 * alpha_other * (1.0 - alpha_self))
+                / alpha_blend)
+                .round() as u8,
+            alpha: (alpha_blend * 255.0).round() as u8,
+        }
     }
 }
 
@@ -43,7 +74,12 @@ fn xyz_to_srgb(x: f64, y: f64, z: f64) -> Color {
     let g = ((g_lin.clamp(0.0, 1.0)) * 255.0).round() as u8;
     let b = ((b_lin.clamp(0.0, 1.0)) * 255.0).round() as u8;
 
-    Color { r, g, b }
+    Color {
+        r,
+        g,
+        b,
+        alpha: 255,
+    }
 }
 
 fn srgb_to_xyz(color: Color) -> (f64, f64, f64) {
@@ -75,7 +111,8 @@ mod tests {
             Color {
                 r: 255,
                 g: 42,
-                b: 0
+                b: 0,
+                alpha: 255
             }
         );
     }
@@ -88,7 +125,8 @@ mod tests {
             Color {
                 r: 44,
                 g: 0,
-                b: 255
+                b: 255,
+                alpha: 255
             }
         );
     }
@@ -96,7 +134,15 @@ mod tests {
     #[test]
     fn test_green_wavelength_to_rgb() {
         let color = wavelength_to_rgb(540.0);
-        assert_eq!(color, Color { r: 0, g: 255, b: 0 });
+        assert_eq!(
+            color,
+            Color {
+                r: 0,
+                g: 255,
+                b: 0,
+                alpha: 255
+            }
+        );
     }
 
     #[test]
@@ -105,9 +151,34 @@ mod tests {
             r: 255,
             g: 42,
             b: 10,
+            alpha: 255,
         };
         let (x, y, z) = srgb_to_xyz(color);
         let color_back = xyz_to_srgb(x, y, z);
         assert_eq!(color, color_back);
+    }
+
+    #[test]
+    fn blend_first_color_stays() {
+        let color1 = Color::new(100, 200, 250, 255);
+        let color2 = Color::new(0, 0, 0, 255);
+        let blended_color = color1.blend(&color2);
+
+        assert_eq!(blended_color.r, 100);
+        assert_eq!(blended_color.g, 200);
+        assert_eq!(blended_color.b, 250);
+        assert_eq!(blended_color.alpha, 255);
+    }
+
+    #[test]
+    fn blend_two_fully_transparent_colors() {
+        let color1 = Color::new(100, 200, 250, 0);
+        let color2 = Color::new(0, 0, 0, 0);
+        let blended_color = color1.blend(&color2);
+
+        assert_eq!(blended_color.r, 0);
+        assert_eq!(blended_color.g, 0);
+        assert_eq!(blended_color.b, 0);
+        assert_eq!(blended_color.alpha, 0);
     }
 }

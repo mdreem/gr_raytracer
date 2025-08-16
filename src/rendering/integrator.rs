@@ -123,34 +123,4 @@ impl<G: Geometry> Integrator<'_, G> {
 
         None
     }
-
-    pub fn integrate_to_celestial_sphere(
-        &self,
-        y: EquationOfMotionState,
-        t: f64,
-    ) -> EquationOfMotionState {
-        let mut y_cur = y;
-        let mut t_cur = t;
-        let mut h = self.integration_configuration.step_size;
-
-        // integrate further until we are far out.
-        for _ in 1..self.integration_configuration.max_steps {
-            (y_cur, h) = rkf45(
-                &y_cur,
-                t_cur,
-                h,
-                self.integration_configuration.epsilon,
-                self.geometry,
-            );
-            t_cur += h;
-
-            let cartesian_position = get_position(&y_cur, self.geometry.coordinate_system());
-            if cartesian_position.radial_distance_spatial_part_squared()
-                > self.integration_configuration.max_radius_sq
-            {
-                return y_cur;
-            }
-        }
-        y_cur // TODO: This should return an error instead of silently returning the last value.
-    }
 }
