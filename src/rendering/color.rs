@@ -23,6 +23,16 @@ impl Color {
 
         let alpha_blend = alpha_self + alpha_other * (1.0 - alpha_self);
 
+        if alpha_blend == 0.0 {
+            // Both colors are fully transparent; return a fully transparent color
+            return Color {
+                r: 0,
+                g: 0,
+                b: 0,
+                alpha: 0,
+            };
+        }
+
         Color {
             r: ((self.r as f64 * alpha_self + other.r as f64 * alpha_other * (1.0 - alpha_self))
                 / alpha_blend)
@@ -158,5 +168,17 @@ mod tests {
         assert_eq!(blended_color.g, 200);
         assert_eq!(blended_color.b, 250);
         assert_eq!(blended_color.alpha, 255);
+    }
+
+    #[test]
+    fn blend_two_fully_transparent_colors() {
+        let color1 = Color::new(100, 200, 250, 0);
+        let color2 = Color::new(0, 0, 0, 0);
+        let blended_color = color1.blend(&color2);
+
+        assert_eq!(blended_color.r, 0);
+        assert_eq!(blended_color.g, 0);
+        assert_eq!(blended_color.b, 0);
+        assert_eq!(blended_color.alpha, 0);
     }
 }
