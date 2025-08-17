@@ -3,8 +3,9 @@
 This is a raytracer for general relativity, which can be used to visualize the effects of gravity on light paths. It is
 based on the principles of general relativity and uses numerical methods to solve the geodesic equations.
 
-It is based on the
-paper [Seeing relativity -- I. Ray tracing in a Schwarzschild metric to explore the maximal analytic extension of the metric and making a proper rendering of the stars](https://arxiv.org/abs/1511.06025).
+It is inspired by the
+paper [Seeing relativity -- I. Ray tracing in a Schwarzschild metric to explore the maximal analytic extension of the metric and making a proper rendering of the stars](https://arxiv.org/abs/1511.06025)
+and takes various formulas from it.
 
 # How to render an image
 
