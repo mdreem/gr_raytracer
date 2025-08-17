@@ -33,18 +33,17 @@ impl<'a, G: Geometry> Raytracer<'a, G> {
         let mut imgbuf = image::ImageBuffer::new(to_col - from_col, to_row - from_row);
 
         let count = AtomicUsize::new(0);
-        let max_count = self.scene.camera.rows * self.scene.camera.columns;
-        let last_progress = AtomicUsize::new(0);
+        let max_count = (to_row - from_row) * (to_col - from_col);
+
+        use indicatif::{ProgressBar, ProgressStyle};
+        let pb = ProgressBar::new(max_count as u64);
+        pb.set_style(ProgressStyle::with_template("🎨 {spinner:.green} [{elapsed_precise}] [{wide_bar:.blue}] {pos}/{len} ({percent_precise}%, {eta})")
+            .unwrap()
+            .progress_chars("█▇▆▅▄▃▂▁  "));
 
         imgbuf.par_enumerate_pixels_mut().for_each(|(x, y, pixel)| {
             count.fetch_add(1, Ordering::SeqCst);
-
-            let progress =
-                (100.0 * (count.load(Ordering::Relaxed) as f64) / (max_count as f64)) as usize;
-            if progress > last_progress.load(Ordering::Relaxed) {
-                println!("progress: {}% ({}|{})", progress, x, y);
-                last_progress.store(progress, Ordering::Relaxed);
-            }
+            pb.set_position(count.load(Ordering::Relaxed) as u64);
 
             let ray = self
                 .scene
@@ -53,6 +52,7 @@ impl<'a, G: Geometry> Raytracer<'a, G> {
             let (color, _) = self.scene.color_of_ray(&ray);
             *pixel = image::Rgba(color.get_as_array());
         });
+        pb.finish();
 
         imgbuf.save(&filename).unwrap();
         println!("saved image to {}", filename);
