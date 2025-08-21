@@ -1,4 +1,4 @@
-use std::f64::consts::E;
+use nalgebra::{Matrix3, Vector3};
 
 #[derive(Debug, PartialEq, Copy, Clone)]
 pub struct Color {
@@ -18,13 +18,21 @@ impl Color {
     }
 
     pub fn blend(&self, other: &Color) -> Color {
-        let alpha_self = self.alpha as f64 / 255.0;
-        let alpha_other = other.alpha as f64 / 255.0;
+        let (r0, g0, b0) = (
+            inv_compand_srgb(self.r as f64 / 255.0),
+            inv_compand_srgb(self.g as f64 / 255.0),
+            inv_compand_srgb(self.b as f64 / 255.0),
+        );
+        let (r1, g1, b1) = (
+            inv_compand_srgb(other.r as f64 / 255.0),
+            inv_compand_srgb(other.g as f64 / 255.0),
+            inv_compand_srgb(other.b as f64 / 255.0),
+        );
 
-        let alpha_blend = alpha_self + alpha_other * (1.0 - alpha_self);
-
-        if alpha_blend == 0.0 {
-            // Both colors are fully transparent; return a fully transparent color
+        let a0 = self.alpha as f64 / 255.0;
+        let a1 = other.alpha as f64 / 255.0;
+        let ao = a0 + a1 * (1.0 - a0);
+        if ao == 0.0 {
             return Color {
                 r: 0,
                 g: 0,
@@ -33,26 +41,24 @@ impl Color {
             };
         }
 
+        let r = (r0 * a0 + r1 * a1 * (1.0 - a0)) / ao;
+        let g = (g0 * a0 + g1 * a1 * (1.0 - a0)) / ao;
+        let b = (b0 * a0 + b1 * a1 * (1.0 - a0)) / ao;
+
         Color {
-            r: ((self.r as f64 * alpha_self + other.r as f64 * alpha_other * (1.0 - alpha_self))
-                / alpha_blend)
-                .round() as u8,
-            g: ((self.g as f64 * alpha_self + other.g as f64 * alpha_other * (1.0 - alpha_self))
-                / alpha_blend)
-                .round() as u8,
-            b: ((self.b as f64 * alpha_self + other.b as f64 * alpha_other * (1.0 - alpha_self))
-                / alpha_blend)
-                .round() as u8,
-            alpha: (alpha_blend * 255.0).round() as u8,
+            r: (compand_srgb(r).clamp(0.0, 1.0) * 255.0).round() as u8,
+            g: (compand_srgb(g).clamp(0.0, 1.0) * 255.0).round() as u8,
+            b: (compand_srgb(b).clamp(0.0, 1.0) * 255.0).round() as u8,
+            alpha: (ao * 255.0).round() as u8,
         }
     }
 }
 
 // https://en.wikipedia.org/wiki/CIE_1931_color_space
-fn g(x: f64, mu: f64, tau1: f64, tau2: f64) -> f64 {
-    let tau = if x < mu { tau1 } else { tau2 };
-
-    E.powf(-tau.powi(2) * (x - mu).powi(2) / 2.0)
+fn g(lambda: f64, mu: f64, tau_left: f64, tau_right: f64) -> f64 {
+    let tau = if lambda < mu { tau_left } else { tau_right };
+    let t = (lambda - mu) * tau;
+    (-0.5 * t * t).exp()
 }
 
 fn get_cie_xyz(lambda: f64) -> (f64, f64, f64) {
@@ -65,14 +71,37 @@ fn get_cie_xyz(lambda: f64) -> (f64, f64, f64) {
 }
 
 // https://en.wikipedia.org/wiki/SRGB#The_sRGB_transfer_function_.28.22gamma.22.29
-fn xyz_to_srgb(x: f64, y: f64, z: f64) -> Color {
-    let r_lin = 3.2406 * x - 1.5372 * y - 0.4986 * z;
-    let g_lin = -0.9689 * x + 1.8758 * y + 0.0415 * z;
-    let b_lin = 0.0557 * x - 0.2040 * y + 1.0570 * z;
+fn compand_srgb(linear: f64) -> f64 {
+    let sign = if linear < 0.0 { -1.0 } else { 1.0 };
+    let a = linear.abs();
+    let encoded = if a <= 0.003_130_8 {
+        12.92 * a
+    } else {
+        1.055 * a.powf(1.0 / 2.4) - 0.055
+    };
+    (sign * encoded).clamp(0.0, 1.0)
+}
 
-    let r = ((r_lin.clamp(0.0, 1.0)) * 255.0).round() as u8;
-    let g = ((g_lin.clamp(0.0, 1.0)) * 255.0).round() as u8;
-    let b = ((b_lin.clamp(0.0, 1.0)) * 255.0).round() as u8;
+pub fn xyz_to_srgb(x: f64, y: f64, z: f64) -> Color {
+    // 2003 IEC inverse matrix (XYZ -> linear RGB)
+    let m = Matrix3::new(
+        3.240_625_5,
+        -1.537_208_0,
+        -0.498_628_6,
+        -0.968_930_7,
+        1.875_756_1,
+        0.041_517_5,
+        0.055_710_1,
+        -0.204_021_1,
+        1.056_995_9,
+    );
+
+    let v_xyz = Vector3::new(x, y, z);
+    let v_lin = m * v_xyz;
+
+    let r = (compand_srgb(v_lin.x) * 255.0).round() as u8;
+    let g = (compand_srgb(v_lin.y) * 255.0).round() as u8;
+    let b = (compand_srgb(v_lin.z) * 255.0).round() as u8;
 
     Color {
         r,
@@ -82,20 +111,47 @@ fn xyz_to_srgb(x: f64, y: f64, z: f64) -> Color {
     }
 }
 
+fn inv_compand_srgb(u: f64) -> f64 {
+    // u in [0,1] (encoded sRGB) -> linear
+    if u <= 0.04045 {
+        u / 12.92
+    } else {
+        ((u + 0.055) / 1.055).powf(2.4)
+    }
+}
+
 fn srgb_to_xyz(color: Color) -> (f64, f64, f64) {
-    let r = color.r as f64 / 255.0;
-    let g = color.g as f64 / 255.0;
-    let b = color.b as f64 / 255.0;
+    let r_s = color.r as f64 / 255.0;
+    let g_s = color.g as f64 / 255.0;
+    let b_s = color.b as f64 / 255.0;
 
-    let x = 0.4124564 * r + 0.3575761 * g + 0.1804375 * b;
-    let y = 0.2126729 * r + 0.7151522 * g + 0.0721750 * b;
-    let z = 0.0193339 * r + 0.1191920 * g + 0.9503041 * b;
+    let r = inv_compand_srgb(r_s);
+    let g = inv_compand_srgb(g_s);
+    let b = inv_compand_srgb(b_s);
 
-    (x, y, z)
+    let m = Matrix3::new(
+        0.412_456_4,
+        0.357_576_1,
+        0.180_437_5,
+        0.212_672_9,
+        0.715_152_2,
+        0.072_175_0,
+        0.019_333_9,
+        0.119_192_0,
+        0.950_304_1,
+    );
+    let v_xyz = m * Vector3::new(r, g, b);
+    (v_xyz.x, v_xyz.y, v_xyz.z)
 }
 
 pub fn wavelength_to_rgb(lambda: f64) -> Color {
-    let (x, y, z) = get_cie_xyz(lambda);
+    let (mut x, mut y, mut z) = get_cie_xyz(lambda);
+    if y > 0.0 {
+        let s = 1.0 / y; // normalize to y=1
+        x *= s;
+        y = 1.0;
+        z *= s;
+    }
     xyz_to_srgb(x, y, z)
 }
 
@@ -110,7 +166,7 @@ mod tests {
             color,
             Color {
                 r: 255,
-                g: 42,
+                g: 140,
                 b: 0,
                 alpha: 255
             }
@@ -123,7 +179,7 @@ mod tests {
         assert_eq!(
             color,
             Color {
-                r: 44,
+                r: 255,
                 g: 0,
                 b: 255,
                 alpha: 255
