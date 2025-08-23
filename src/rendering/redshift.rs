@@ -15,7 +15,7 @@ impl<'a, G: Geometry> RedshiftComputer<'a, G> {
 
     pub fn compute_redshift(&self, y: EquationOfMotionState, observer_energy: f64) -> f64 {
         let emitter_energy = self.energy_of_stationary_emitter(y);
-        emitter_energy / observer_energy
+        observer_energy / emitter_energy
     }
 
     pub fn get_observer_energy(&self, ray: &Ray, velocity: &FourVector) -> f64 {
