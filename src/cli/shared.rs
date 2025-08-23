@@ -59,7 +59,7 @@ pub fn create_scene<G: Geometry>(
         celestial_map: texture_mapper_celestial,
     };
 
-    let mut objects = Objects::new();
+    let mut objects = Objects::new(geometry);
     for object in config.objects {
         match object {
             configuration::ObjectsConfig::Sphere {
