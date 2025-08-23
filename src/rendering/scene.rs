@@ -1,6 +1,7 @@
 use crate::geometry::geometry::Geometry;
 use crate::geometry::point::{CoordinateSystem, Point};
 use crate::geometry::spherical_coordinates_helper::spherical_to_cartesian;
+use crate::rendering::black_body_radiation::get_srgb_of_black_body_redshifted;
 use crate::rendering::camera::Camera;
 use crate::rendering::color::{wavelength_to_rgb, Color};
 use crate::rendering::integrator::StopReason::{CelestialSphereReached, HorizonReached};
@@ -92,11 +93,8 @@ impl<'a, G: Geometry> Scene<'a, G> {
             ) {
                 // TODO: use c mixed with intersection_color.
                 let redshift = self.redshift_computer.compute_redshift(y, observer_energy);
-                let tune_redshift = 1.0;
-                let redshift = (redshift - 1.0) * tune_redshift + 1.0;
-                let wavelength = 400.0 * redshift;
-                let c = wavelength_to_rgb(wavelength);
-                intersections.push((intersection_color, redshift));
+                let mut c = get_srgb_of_black_body_redshifted(10500.0, redshift);
+                intersections.push((c, redshift));
             }
         }
 
