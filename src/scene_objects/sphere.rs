@@ -1,22 +1,29 @@
 use crate::geometry::point::{CoordinateSystem, Point};
 use crate::geometry::spherical_coordinates_helper::cartesian_to_spherical;
-use crate::rendering::color::{CIETristimulus, Color};
+use crate::rendering::color::CIETristimulus;
 use crate::rendering::texture::{TextureMap, TextureMapHandle, UVCoordinates};
-use crate::scene_objects::hittable::Intersection;
+use crate::scene_objects::hittable::{Hittable, Intersection};
 use crate::scene_objects::objects::SceneObject;
 use nalgebra::Vector3;
 use std::f64::consts::PI;
 
 pub struct Sphere {
     radius: f64,
+    temperature: f64,
     texture_mapper: TextureMapHandle,
     position: Point,
 }
 
 impl Sphere {
-    pub fn new(radius: f64, texture_mapper: TextureMapHandle, position: Point) -> Self {
+    pub fn new(
+        radius: f64,
+        temperature: f64,
+        texture_mapper: TextureMapHandle,
+        position: Point,
+    ) -> Self {
         Self {
             radius,
+            temperature,
             texture_mapper,
             position,
         }
@@ -46,7 +53,7 @@ fn solve_for_t(y_start_spatial: Vector3<f64>, direction: Vector3<f64>, r: f64) -
     }
 }
 
-impl crate::scene_objects::hittable::Hittable for Sphere {
+impl Hittable for Sphere {
     // y_start and y_end have to be Cartesian.
     fn intersects(&self, y_start: &Point, y_end: &Point) -> Option<Intersection> {
         let neg_position = -self.position;
@@ -92,11 +99,10 @@ impl crate::scene_objects::hittable::Hittable for Sphere {
 
         None
     }
-}
 
-impl TextureMap for Sphere {
-    fn color_at_uv(&self, uv: UVCoordinates) -> CIETristimulus {
-        self.texture_mapper.color_at_uv(uv)
+    fn color_at_uv(&self, uv: UVCoordinates, redshift: f64) -> CIETristimulus {
+        self.texture_mapper
+            .color_at_uv(uv, self.temperature, redshift)
     }
 }
 

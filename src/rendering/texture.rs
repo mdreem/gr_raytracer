@@ -1,3 +1,4 @@
+use crate::rendering::black_body_radiation::get_cie_xyz_of_black_body_redshifted;
 use crate::rendering::color::{srgb_to_xyz, CIETristimulus, Color};
 use image::{DynamicImage, GenericImageView, ImageReader};
 use std::sync::Arc;
@@ -12,7 +13,7 @@ pub struct TextureData {
 }
 
 pub trait TextureMap: Sync {
-    fn color_at_uv(&self, uv: UVCoordinates) -> CIETristimulus;
+    fn color_at_uv(&self, uv: UVCoordinates, temperature: f64, redshift: f64) -> CIETristimulus;
 }
 
 #[derive(Clone)]
@@ -40,7 +41,7 @@ impl TextureMapper {
 }
 
 impl TextureMap for TextureMapper {
-    fn color_at_uv(&self, uv: UVCoordinates) -> CIETristimulus {
+    fn color_at_uv(&self, uv: UVCoordinates, temperature: f64, redshift: f64) -> CIETristimulus {
         let (width, height) = self.image.dimensions();
         // If mapping uv to width-1 and height-1 there are distortions horizontally across the
         // center. Maybe because in spherical coordinates u,v < 1.0, i.e. they're not inclusive.
@@ -51,7 +52,12 @@ impl TextureMap for TextureMapper {
         );
         let mut cie_tristimulus = srgb_to_xyz(&Color::new(pixel[0], pixel[1], pixel[2], pixel[3]));
         cie_tristimulus.alpha = pixel[3] as f64 / 255.0;
-        cie_tristimulus
+        cie_tristimulus;
+
+        let c = get_cie_xyz_of_black_body_redshifted(temperature * redshift);
+        let norm = c.x + c.y + c.z;
+        let r = CIETristimulus::new(c.x / norm, c.y / norm, c.z / norm, c.alpha);
+        r
     }
 }
 
@@ -68,7 +74,7 @@ impl CheckerMapper {
 }
 
 impl TextureMap for CheckerMapper {
-    fn color_at_uv(&self, uv: UVCoordinates) -> CIETristimulus {
+    fn color_at_uv(&self, uv: UVCoordinates, _temperature: f64, _redshift: f64) -> CIETristimulus {
         let ut = (uv.u * self.width).floor() as usize;
         let vt = (uv.v * self.height).floor() as usize;
 

@@ -2,7 +2,7 @@ use crate::geometry::geometry::Geometry;
 use crate::geometry::point::{CoordinateSystem, Point};
 use crate::geometry::spherical_coordinates_helper::spherical_to_cartesian;
 use crate::rendering::camera::Camera;
-use crate::rendering::color::{CIETristimulus, Color};
+use crate::rendering::color::CIETristimulus;
 use crate::rendering::integrator::StopReason::{CelestialSphereReached, HorizonReached};
 use crate::rendering::integrator::{IntegrationConfiguration, Integrator, StopReason};
 use crate::rendering::ray::{IntegratedRay, Ray};
@@ -101,9 +101,12 @@ impl<'a, G: Geometry> Scene<'a, G> {
                 }
                 CelestialSphereReached => {
                     let uv = self.get_uv_coordinates(&y);
-                    // TODO: use redshift here
-                    // let redshift = self.redshift_computer.compute_redshift(y, observer_energy);
-                    intersections.push(self.texture_data.celestial_map.color_at_uv(uv));
+                    let redshift = self.redshift_computer.compute_redshift(&y, observer_energy);
+                    intersections.push(
+                        self.texture_data
+                            .celestial_map
+                            .color_at_uv(uv, 2500.0, redshift),
+                    );
                 }
             };
         } else {
