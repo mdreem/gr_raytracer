@@ -1,5 +1,5 @@
 use crate::geometry::point::Point;
-use crate::rendering::color::Color;
+use crate::rendering::color::{CIETristimulus, Color};
 use crate::rendering::texture::TextureMap;
 use crate::scene_objects::hittable::Hittable;
 use std::sync::Arc;
@@ -21,7 +21,7 @@ impl Objects {
         self.objects.push(hittable);
     }
 
-    pub fn intersects(&self, y_start: &Point, y_end: &Point) -> Option<Color> {
+    pub fn intersects(&self, y_start: &Point, y_end: &Point) -> Option<CIETristimulus> {
         let mut resulting_color = None;
         let mut shortest_distance = f64::MAX;
         let y_start_cartesian = y_start.get_as_cartesian();

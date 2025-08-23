@@ -1,9 +1,11 @@
 use crate::geometry::geometry::Geometry;
 use crate::geometry::point::{CoordinateSystem, Point};
 use crate::geometry::spherical_coordinates_helper::spherical_to_cartesian;
-use crate::rendering::black_body_radiation::get_srgb_of_black_body_redshifted;
+use crate::rendering::black_body_radiation::{
+    get_cie_xyz_of_black_body_redshifted, get_srgb_of_black_body_redshifted,
+};
 use crate::rendering::camera::Camera;
-use crate::rendering::color::{wavelength_to_rgb, Color};
+use crate::rendering::color::{wavelength_to_rgb, CIETristimulus, Color};
 use crate::rendering::integrator::StopReason::{CelestialSphereReached, HorizonReached};
 use crate::rendering::integrator::{IntegrationConfiguration, Integrator, StopReason};
 use crate::rendering::ray::{IntegratedRay, Ray};
@@ -69,7 +71,7 @@ impl<'a, G: Geometry> Scene<'a, G> {
         self.integrator.integrate(ray)
     }
 
-    pub fn color_of_ray(&self, ray: &Ray) -> (Color, Option<f64>) {
+    pub fn color_of_ray(&self, ray: &Ray) -> (CIETristimulus, Option<f64>) {
         let (steps, stop_reason) = self.integrate_ray(ray);
         let mut y = steps[0].y;
 
@@ -93,7 +95,7 @@ impl<'a, G: Geometry> Scene<'a, G> {
             ) {
                 // TODO: use c mixed with intersection_color.
                 let redshift = self.redshift_computer.compute_redshift(y, observer_energy);
-                let mut c = get_srgb_of_black_body_redshifted(10500.0, redshift);
+                let mut c = get_cie_xyz_of_black_body_redshifted(10500.0 * redshift);
                 intersections.push((c, redshift));
             }
         }
@@ -101,7 +103,7 @@ impl<'a, G: Geometry> Scene<'a, G> {
         if let Some(reason) = stop_reason {
             match reason {
                 HorizonReached => {
-                    intersections.push((Color::new(0, 0, 0, 255), 0.0));
+                    intersections.push((CIETristimulus::new(0.0, 0.0, 0.0, 1.0), 0.0));
                 }
                 CelestialSphereReached => {
                     let uv = self.get_uv_coordinates(&y);
@@ -112,10 +114,10 @@ impl<'a, G: Geometry> Scene<'a, G> {
         } else {
             println!("ERROR: Ray did not hit anything: {:?}", ray);
         }
-        let mut result = Color::new(0, 0, 0, 255);
+        let mut result = CIETristimulus::new(0.0, 0.0, 0.0, 1.0);
 
         for (color, _) in intersections.iter().rev() {
-            result = color.blend(&result)
+            result = result.blend(&color)
         }
 
         let redshift = if intersections.is_empty() {
