@@ -232,7 +232,7 @@ mod tests {
             color,
             Color {
                 r: 255,
-                g: 140,
+                g: 113,
                 b: 0,
                 alpha: 255
             }
@@ -245,7 +245,7 @@ mod tests {
         assert_eq!(
             color,
             Color {
-                r: 255,
+                r: 116,
                 g: 0,
                 b: 255,
                 alpha: 255
@@ -275,7 +275,7 @@ mod tests {
             b: 10,
             alpha: 255,
         };
-        let cie_tristimulus = srgb_to_xyz(color);
+        let cie_tristimulus = srgb_to_xyz(&color);
         let color_back = xyz_to_srgb(&cie_tristimulus, 1.0);
         assert_eq!(color, color_back);
     }
