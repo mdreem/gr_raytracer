@@ -1,4 +1,5 @@
 use crate::geometry::geometry::Geometry;
+use crate::rendering::color::xyz_to_srgb;
 use crate::rendering::integrator::StopReason;
 use crate::rendering::ray::IntegratedRay;
 use crate::rendering::scene::Scene;
@@ -49,7 +50,8 @@ impl<'a, G: Geometry> Raytracer<'a, G> {
                 .scene
                 .camera
                 .get_ray_for((y + from_row) as i64, (x + from_col) as i64);
-            let (color, _) = self.scene.color_of_ray(&ray);
+            let (cie_tristimulus, _) = self.scene.color_of_ray(&ray);
+            let color = xyz_to_srgb(&cie_tristimulus, 1.0);
             *pixel = image::Rgba(color.get_as_array());
         });
         pb.finish();

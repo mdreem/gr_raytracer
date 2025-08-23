@@ -13,15 +13,38 @@ pub struct CIETristimulus {
     pub x: f64,
     pub y: f64,
     pub z: f64,
+    pub alpha: f64,
 }
 
 impl CIETristimulus {
-    pub fn new(x: f64, y: f64, z: f64) -> CIETristimulus {
-        CIETristimulus { x, y, z }
+    pub fn new(x: f64, y: f64, z: f64, alpha: f64) -> CIETristimulus {
+        CIETristimulus { x, y, z, alpha }
     }
 
     pub fn as_vector(&self) -> Vector3<f64> {
         Vector3::new(self.x, self.y, self.z)
+    }
+
+    pub fn blend(&self, other: &CIETristimulus) -> CIETristimulus {
+        // background = self, foreground = other  (“other over self”)
+        let ab = self.alpha.clamp(0.0, 1.0);
+        let af = other.alpha.clamp(0.0, 1.0);
+
+        let ao = af + ab * (1.0 - af);
+        if ao <= 0.0 {
+            return CIETristimulus {
+                x: 0.0,
+                y: 0.0,
+                z: 0.0,
+                alpha: 0.0,
+            };
+        }
+
+        let x = (other.x * af + self.x * ab * (1.0 - af)) / ao;
+        let y = (other.y * af + self.y * ab * (1.0 - af)) / ao;
+        let z = (other.z * af + self.z * ab * (1.0 - af)) / ao;
+
+        CIETristimulus { x, y, z, alpha: ao }
     }
 }
 
@@ -113,7 +136,7 @@ fn get_cie_xyz(lambda: f64) -> CIETristimulus {
     let y = y_bar(lambda);
     let z = z_bar(lambda);
 
-    CIETristimulus::new(x, y, z)
+    CIETristimulus::new(x, y, z, 1.0)
 }
 
 // https://en.wikipedia.org/wiki/SRGB#The_sRGB_transfer_function_.28.22gamma.22.29
@@ -169,7 +192,7 @@ fn inv_compand_srgb(u: f64) -> f64 {
     }
 }
 
-fn srgb_to_xyz(color: Color) -> CIETristimulus {
+pub fn srgb_to_xyz(color: &Color) -> CIETristimulus {
     let r_s = color.r as f64 / 255.0;
     let g_s = color.g as f64 / 255.0;
     let b_s = color.b as f64 / 255.0;
@@ -190,7 +213,7 @@ fn srgb_to_xyz(color: Color) -> CIETristimulus {
         0.950_304_1,
     );
     let v_xyz = m * Vector3::new(r, g, b);
-    CIETristimulus::new(v_xyz.x, v_xyz.y, v_xyz.z)
+    CIETristimulus::new(v_xyz.x, v_xyz.y, v_xyz.z, 1.0)
 }
 
 pub fn wavelength_to_rgb(lambda: f64) -> Color {

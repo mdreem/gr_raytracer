@@ -1,6 +1,6 @@
 use crate::geometry::point::{CoordinateSystem, Point};
 use crate::geometry::spherical_coordinates_helper::cartesian_to_spherical;
-use crate::rendering::color::Color;
+use crate::rendering::color::{CIETristimulus, Color};
 use crate::rendering::texture::{TextureMap, TextureMapHandle, UVCoordinates};
 use crate::scene_objects::hittable::Intersection;
 use crate::scene_objects::objects::SceneObject;
@@ -95,7 +95,7 @@ impl crate::scene_objects::hittable::Hittable for Sphere {
 }
 
 impl TextureMap for Sphere {
-    fn color_at_uv(&self, uv: UVCoordinates) -> Color {
+    fn color_at_uv(&self, uv: UVCoordinates) -> CIETristimulus {
         self.texture_mapper.color_at_uv(uv)
     }
 }

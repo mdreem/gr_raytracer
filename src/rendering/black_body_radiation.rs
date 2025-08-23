@@ -31,7 +31,11 @@ fn integrate_blackbody_xyz(temperature: f64) -> CIETristimulus {
         Y += radiance * y_bar(lambda / NM_TO_M) * step_size;
         Z += radiance * z_bar(lambda / NM_TO_M) * step_size;
     }
-    CIETristimulus::new(X, Y, Z)
+    CIETristimulus::new(X, Y, Z, 1.0)
+}
+
+pub fn get_cie_xyz_of_black_body_redshifted(temperature: f64) -> CIETristimulus {
+    integrate_blackbody_xyz(temperature)
 }
 
 pub fn get_srgb_of_black_body(temperature: f64) -> Color {
