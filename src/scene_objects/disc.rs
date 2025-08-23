@@ -9,6 +9,7 @@ pub struct Disc {
     center_disk_inner_radius: f64,
     center_disk_outer_radius: f64,
     texture_mapper: TextureMapHandle,
+    temperature: f64,
 }
 
 impl Disc {
@@ -16,11 +17,13 @@ impl Disc {
         center_disk_inner_radius: f64,
         center_disk_outer_radius: f64,
         texture_mapper: TextureMapHandle,
+        temperature: f64,
     ) -> Self {
         Self {
             center_disk_inner_radius,
             center_disk_outer_radius,
             texture_mapper,
+            temperature,
         }
     }
 }
@@ -76,11 +79,10 @@ impl Hittable for Disc {
             None
         }
     }
-}
 
-impl TextureMap for Disc {
-    fn color_at_uv(&self, uv: UVCoordinates) -> CIETristimulus {
-        self.texture_mapper.color_at_uv(uv)
+    fn color_at_uv(&self, uv: UVCoordinates, redshift: f64) -> CIETristimulus {
+        self.texture_mapper
+            .color_at_uv(uv, self.temperature, redshift)
     }
 }
 

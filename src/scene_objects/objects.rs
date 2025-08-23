@@ -1,14 +1,11 @@
 use crate::geometry::geometry::Geometry;
-use crate::geometry::point::Point;
-use crate::rendering::black_body_radiation::get_cie_xyz_of_black_body_redshifted;
-use crate::rendering::color::{CIETristimulus, Color};
+use crate::rendering::color::CIETristimulus;
 use crate::rendering::redshift::RedshiftComputer;
 use crate::rendering::scene::{get_position, EquationOfMotionState};
 use crate::rendering::texture::TextureMap;
 use crate::scene_objects::hittable::Hittable;
-use std::sync::Arc;
 
-pub trait SceneObject: Hittable + TextureMap {}
+pub trait SceneObject: Hittable {}
 
 pub struct Objects<'a, G: Geometry> {
     geometry: &'a G,
@@ -50,13 +47,8 @@ impl<'a, G: Geometry> Objects<'a, G> {
                 if distance < shortest_distance {
                     shortest_distance = distance;
                     let redshift = redshift_computer.compute_redshift(y_start, observer_energy);
-                    let mut c = get_cie_xyz_of_black_body_redshifted(10500.0 * redshift);
-                    let norm = c.x + c.y + c.z;
-                    let r = CIETristimulus::new(c.x / norm, c.y / norm, c.z / norm, c.alpha);
-
                     // TODO: Use texture color
-                    // resulting_color = Some(hittable.color_at_uv(intersection_data.uv));
-                    resulting_color = Some(r);
+                    resulting_color = Some(hittable.color_at_uv(intersection_data.uv, redshift));
                 }
             }
         }

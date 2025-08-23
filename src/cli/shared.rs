@@ -8,7 +8,7 @@ use crate::rendering::color::Color;
 use crate::rendering::integrator::IntegrationConfiguration;
 use crate::rendering::raytracer;
 use crate::rendering::scene::Scene;
-use crate::rendering::texture::{CheckerMapper, TextureData, TextureMapper, TextureMapperFactory};
+use crate::rendering::texture::{CheckerMapper, TextureData, TextureMapperFactory};
 use crate::scene_objects::objects::Objects;
 use crate::{configuration, scene_objects};
 use std::f64::consts::PI;
@@ -84,6 +84,7 @@ pub fn create_scene<G: Geometry>(
                 };
                 let sphere = scene_objects::sphere::Sphere::new(
                     radius,
+                    16000.0,
                     texture_mapper_sphere,
                     Point::new_cartesian(0.0, position.0, position.1, position.2),
                 );
@@ -108,8 +109,12 @@ pub fn create_scene<G: Geometry>(
                         Color::new(0, 200, 200, 255),
                     ))
                 };
-                let disc =
-                    scene_objects::disc::Disc::new(inner_radius, outer_radius, texture_mapper_disc);
+                let disc = scene_objects::disc::Disc::new(
+                    inner_radius,
+                    outer_radius,
+                    texture_mapper_disc,
+                    5000.0,
+                );
                 objects.add_object(Box::new(disc));
             }
         }
