@@ -61,11 +61,23 @@ fn g(lambda: f64, mu: f64, tau_left: f64, tau_right: f64) -> f64 {
     (-0.5 * t * t).exp()
 }
 
+pub fn x_bar(lambda: f64) -> f64 {
+    1.056 * g(lambda, 599.8, 0.0264, 0.0323) + 0.362 * g(lambda, 442.0, 0.0624, 0.0374)
+        - 0.065 * g(lambda, 501.1, 0.0490, 0.0382)
+}
+
+pub fn y_bar(lambda: f64) -> f64 {
+    0.821 * g(lambda, 568.8, 0.0213, 0.0247) + 0.286 * g(lambda, 530.9, 0.0613, 0.0322)
+}
+
+pub fn z_bar(lambda: f64) -> f64 {
+    1.217 * g(lambda, 437.0, 0.0845, 0.0278) + 0.681 * g(lambda, 459.0, 0.0385, 0.0725)
+}
+
 fn get_cie_xyz(lambda: f64) -> (f64, f64, f64) {
-    let x = 1.056 * g(lambda, 599.8, 0.0264, 0.0323) + 0.362 * g(lambda, 442.0, 0.0624, 0.0374)
-        - 0.065 * g(lambda, 501.1, 0.0490, 0.0382);
-    let y = 0.821 * g(lambda, 568.8, 0.0213, 0.0247) + 0.286 * g(lambda, 530.9, 0.0613, 0.0322);
-    let z = 1.217 * g(lambda, 437.0, 0.0845, 0.0278) + 0.681 * g(lambda, 459.0, 0.0385, 0.0725);
+    let x = x_bar(lambda);
+    let y = y_bar(lambda);
+    let z = z_bar(lambda);
 
     (x, y, z)
 }
@@ -82,7 +94,7 @@ fn compand_srgb(linear: f64) -> f64 {
     (sign * encoded).clamp(0.0, 1.0)
 }
 
-pub fn xyz_to_srgb(x: f64, y: f64, z: f64) -> Color {
+pub fn xyz_to_linear_srgb(x: f64, y: f64, z: f64) -> Vector3<f64> {
     // 2003 IEC inverse matrix (XYZ -> linear RGB)
     let m = Matrix3::new(
         3.240_625_5,
@@ -95,13 +107,22 @@ pub fn xyz_to_srgb(x: f64, y: f64, z: f64) -> Color {
         -0.204_021_1,
         1.056_995_9,
     );
+    m * Vector3::new(x, y, z)
+}
 
-    let v_xyz = Vector3::new(x, y, z);
-    let v_lin = m * v_xyz;
+pub fn xyz_to_srgb(x: f64, y: f64, z: f64, exposure: f64) -> Color {
+    let mut v_lin = xyz_to_linear_srgb(x, y, z);
+    v_lin *= exposure;
 
-    let r = (compand_srgb(v_lin.x) * 255.0).round() as u8;
-    let g = (compand_srgb(v_lin.y) * 255.0).round() as u8;
-    let b = (compand_srgb(v_lin.z) * 255.0).round() as u8;
+    let r = (compand_srgb(v_lin.x.max(0.0)) * 255.0)
+        .round()
+        .clamp(0.0, 255.0) as u8;
+    let g = (compand_srgb(v_lin.y.max(0.0)) * 255.0)
+        .round()
+        .clamp(0.0, 255.0) as u8;
+    let b = (compand_srgb(v_lin.z.max(0.0)) * 255.0)
+        .round()
+        .clamp(0.0, 255.0) as u8;
 
     Color {
         r,
@@ -152,7 +173,7 @@ pub fn wavelength_to_rgb(lambda: f64) -> Color {
         y = 1.0;
         z *= s;
     }
-    xyz_to_srgb(x, y, z)
+    xyz_to_srgb(x, y, z, 1.0)
 }
 
 #[cfg(test)]
@@ -210,7 +231,7 @@ mod tests {
             alpha: 255,
         };
         let (x, y, z) = srgb_to_xyz(color);
-        let color_back = xyz_to_srgb(x, y, z);
+        let color_back = xyz_to_srgb(x, y, z, 1.0);
         assert_eq!(color, color_back);
     }
 

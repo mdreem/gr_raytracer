@@ -1,3 +1,4 @@
+mod black_body_radiation;
 pub mod camera;
 pub mod color;
 pub mod debug;
