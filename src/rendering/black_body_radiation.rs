@@ -1,4 +1,4 @@
-use crate::rendering::color::{x_bar, xyz_to_srgb, y_bar, z_bar, Color};
+use crate::rendering::color::{x_bar, xyz_to_srgb, y_bar, z_bar, CIETristimulus, Color};
 
 const h: f64 = 6.62607015e-34;
 const c: f64 = 299792458.0;
@@ -15,7 +15,7 @@ fn planck_spectral_radiance(lambda: f64, temperature: f64) -> f64 {
     a / (lambda.powi(5) * (b.exp() - 1.0))
 }
 
-fn def_tristimulus_from_luminance(temperature: f64) -> (f64, f64, f64) {
+fn integrate_blackbody_xyz(temperature: f64) -> CIETristimulus {
     let interval = (MAX_WAVELENGTH - MIN_WAVELENGTH) * NM_TO_M; // in meters
     let step_size = 1.0 * NM_TO_M; // in meters
     let num_steps = ((interval / step_size).floor()) as usize;
@@ -31,15 +31,18 @@ fn def_tristimulus_from_luminance(temperature: f64) -> (f64, f64, f64) {
         Y += radiance * y_bar(lambda / NM_TO_M) * step_size;
         Z += radiance * z_bar(lambda / NM_TO_M) * step_size;
     }
-    (X, Y, Z)
+    CIETristimulus::new(X, Y, Z)
 }
 
-fn get_srgb_of_black_body(temperature: f64) -> Color {
-    let (x, y, z) = def_tristimulus_from_luminance(temperature);
-    xyz_to_srgb(x, y, z, 1.0 / (x + y + z))
+pub fn get_srgb_of_black_body(temperature: f64) -> Color {
+    let cie_tristimulus = integrate_blackbody_xyz(temperature);
+    xyz_to_srgb(
+        &cie_tristimulus,
+        1.0 / (cie_tristimulus.x + cie_tristimulus.y + cie_tristimulus.z),
+    )
 }
 
-fn get_srgb_of_black_body_redshifted(temperature: f64, redshift: f64) -> Color {
+pub fn get_srgb_of_black_body_redshifted(temperature: f64, redshift: f64) -> Color {
     let shifted_temperature = temperature * redshift;
     get_srgb_of_black_body(shifted_temperature)
 }
@@ -47,7 +50,7 @@ fn get_srgb_of_black_body_redshifted(temperature: f64, redshift: f64) -> Color {
 #[cfg(test)]
 mod tests {
     use crate::rendering::black_body_radiation::{
-        def_tristimulus_from_luminance, get_srgb_of_black_body, get_srgb_of_black_body_redshifted,
+        get_srgb_of_black_body, get_srgb_of_black_body_redshifted, integrate_blackbody_xyz,
     };
     use crate::rendering::color::{xyz_to_linear_srgb, Color};
     use image::{ImageFormat, Rgb};
@@ -75,8 +78,8 @@ mod tests {
             for y in 0..max_redshift_steps {
                 let redshift = 0.5 + (y as f64) * 2.0 / (max_temp_steps as f64 - 1.0);
                 let temperature = 1000.0 + (x as f64) * 10000.0 / (max_temp_steps as f64 - 1.0);
-                let color_xyz = def_tristimulus_from_luminance(temperature * redshift);
-                let color = xyz_to_linear_srgb(color_xyz.0, color_xyz.1, color_xyz.2);
+                let color_xyz = integrate_blackbody_xyz(temperature * redshift);
+                let color = xyz_to_linear_srgb(&color_xyz);
                 imgbuf.put_pixel(x, y, Rgb([color.x as f32, color.y as f32, color.z as f32]));
             }
         }

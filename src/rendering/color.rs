@@ -8,6 +8,40 @@ pub struct Color {
     pub alpha: u8,
 }
 
+#[derive(Debug, PartialEq, Copy, Clone)]
+pub struct CIETristimulus {
+    pub x: f64,
+    pub y: f64,
+    pub z: f64,
+}
+
+impl CIETristimulus {
+    pub fn new(x: f64, y: f64, z: f64) -> CIETristimulus {
+        CIETristimulus { x, y, z }
+    }
+
+    pub fn as_vector(&self) -> Vector3<f64> {
+        Vector3::new(self.x, self.y, self.z)
+    }
+}
+
+#[derive(Debug, PartialEq, Copy, Clone)]
+pub struct Chromaticity {
+    pub x: f64,
+    pub y: f64,
+    pub z: f64,
+}
+
+impl Chromaticity {
+    pub fn new(x: f64, y: f64, z: f64) -> Chromaticity {
+        Chromaticity { x, y, z }
+    }
+
+    pub fn as_vector(&self) -> Vector3<f64> {
+        Vector3::new(self.x, self.y, self.z)
+    }
+}
+
 impl Color {
     pub fn new(r: u8, g: u8, b: u8, alpha: u8) -> Color {
         Color { r, g, b, alpha }
@@ -74,12 +108,12 @@ pub fn z_bar(lambda: f64) -> f64 {
     1.217 * g(lambda, 437.0, 0.0845, 0.0278) + 0.681 * g(lambda, 459.0, 0.0385, 0.0725)
 }
 
-fn get_cie_xyz(lambda: f64) -> (f64, f64, f64) {
+fn get_cie_xyz(lambda: f64) -> CIETristimulus {
     let x = x_bar(lambda);
     let y = y_bar(lambda);
     let z = z_bar(lambda);
 
-    (x, y, z)
+    CIETristimulus::new(x, y, z)
 }
 
 // https://en.wikipedia.org/wiki/SRGB#The_sRGB_transfer_function_.28.22gamma.22.29
@@ -94,7 +128,7 @@ fn compand_srgb(linear: f64) -> f64 {
     (sign * encoded).clamp(0.0, 1.0)
 }
 
-pub fn xyz_to_linear_srgb(x: f64, y: f64, z: f64) -> Vector3<f64> {
+pub fn xyz_to_linear_srgb(cie_tristimulus: &CIETristimulus) -> Vector3<f64> {
     // 2003 IEC inverse matrix (XYZ -> linear RGB)
     let m = Matrix3::new(
         3.240_625_5,
@@ -107,22 +141,16 @@ pub fn xyz_to_linear_srgb(x: f64, y: f64, z: f64) -> Vector3<f64> {
         -0.204_021_1,
         1.056_995_9,
     );
-    m * Vector3::new(x, y, z)
+    m * cie_tristimulus.as_vector()
 }
 
-pub fn xyz_to_srgb(x: f64, y: f64, z: f64, exposure: f64) -> Color {
-    let mut v_lin = xyz_to_linear_srgb(x, y, z);
+pub fn xyz_to_srgb(cie_tristimulus: &CIETristimulus, exposure: f64) -> Color {
+    let mut v_lin = xyz_to_linear_srgb(cie_tristimulus);
     v_lin *= exposure;
 
-    let r = (compand_srgb(v_lin.x.max(0.0)) * 255.0)
-        .round()
-        .clamp(0.0, 255.0) as u8;
-    let g = (compand_srgb(v_lin.y.max(0.0)) * 255.0)
-        .round()
-        .clamp(0.0, 255.0) as u8;
-    let b = (compand_srgb(v_lin.z.max(0.0)) * 255.0)
-        .round()
-        .clamp(0.0, 255.0) as u8;
+    let r = (compand_srgb(v_lin.x.max(0.0)) * 255.0).round() as u8;
+    let g = (compand_srgb(v_lin.y.max(0.0)) * 255.0).round() as u8;
+    let b = (compand_srgb(v_lin.z.max(0.0)) * 255.0).round() as u8;
 
     Color {
         r,
@@ -141,7 +169,7 @@ fn inv_compand_srgb(u: f64) -> f64 {
     }
 }
 
-fn srgb_to_xyz(color: Color) -> (f64, f64, f64) {
+fn srgb_to_xyz(color: Color) -> CIETristimulus {
     let r_s = color.r as f64 / 255.0;
     let g_s = color.g as f64 / 255.0;
     let b_s = color.b as f64 / 255.0;
@@ -162,18 +190,12 @@ fn srgb_to_xyz(color: Color) -> (f64, f64, f64) {
         0.950_304_1,
     );
     let v_xyz = m * Vector3::new(r, g, b);
-    (v_xyz.x, v_xyz.y, v_xyz.z)
+    CIETristimulus::new(v_xyz.x, v_xyz.y, v_xyz.z)
 }
 
 pub fn wavelength_to_rgb(lambda: f64) -> Color {
-    let (mut x, mut y, mut z) = get_cie_xyz(lambda);
-    if y > 0.0 {
-        let s = 1.0 / y; // normalize to y=1
-        x *= s;
-        y = 1.0;
-        z *= s;
-    }
-    xyz_to_srgb(x, y, z, 1.0)
+    let cie_tristiumlus = get_cie_xyz(lambda);
+    xyz_to_srgb(&cie_tristiumlus, 1.0)
 }
 
 #[cfg(test)]
@@ -230,8 +252,8 @@ mod tests {
             b: 10,
             alpha: 255,
         };
-        let (x, y, z) = srgb_to_xyz(color);
-        let color_back = xyz_to_srgb(x, y, z, 1.0);
+        let cie_tristimulus = srgb_to_xyz(color);
+        let color_back = xyz_to_srgb(&cie_tristimulus, 1.0);
         assert_eq!(color, color_back);
     }
 
