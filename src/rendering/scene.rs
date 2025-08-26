@@ -105,7 +105,7 @@ impl<'a, G: Geometry> Scene<'a, G> {
                     intersections.push(
                         self.texture_data
                             .celestial_map
-                            .color_at_uv(uv, 2500.0, redshift),
+                            .color_at_uv(uv, 1.0, redshift),
                     );
                 }
             };
