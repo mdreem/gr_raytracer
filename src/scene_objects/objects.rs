@@ -61,6 +61,7 @@ mod tests {
     use super::*;
     use crate::geometry::euclidean::EuclideanSpace;
     use crate::geometry::point::Point;
+    use crate::rendering::color::Color;
     use crate::rendering::texture::CheckerMapper;
     use crate::scene_objects::hittable::Hittable;
     use crate::scene_objects::sphere::Sphere;
@@ -70,6 +71,7 @@ mod tests {
     fn create_sphere_at(x: f64, y: f64, z: f64, radius: f64, color: u8) -> Box<dyn SceneObject> {
         Box::new(Sphere::new(
             radius,
+            6000.0,
             Arc::new(CheckerMapper::new(
                 5.0,
                 5.0,
@@ -117,7 +119,7 @@ mod tests {
         let result_1 =
             objects_setup_1.intersects(&y_start, &y_end, 1.0, &RedshiftComputer::new(&geometry));
         assert!(result_1.is_some());
-        assert_abs_diff_eq!(result_1.unwrap().x, 0.278, epsilon = 1e-2);
+        assert_abs_diff_eq!(result_1.unwrap().x, 0.121, epsilon = 1e-2);
 
         let mut objects_setup_2 = Objects::new(&geometry);
         let closer_sphere = create_sphere_at(0.0, 0.0, 0.0, 2.0, 100);
@@ -128,6 +130,6 @@ mod tests {
         let result_2 =
             objects_setup_2.intersects(&y_start, &y_end, 1.0, &RedshiftComputer::new(&geometry));
         assert!(result_2.is_some());
-        assert_abs_diff_eq!(result_2.unwrap().x, 0.278, epsilon = 1e-2);
+        assert_abs_diff_eq!(result_2.unwrap().x, 0.121, epsilon = 1e-2);
     }
 }

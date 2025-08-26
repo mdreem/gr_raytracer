@@ -215,6 +215,7 @@ pub mod test_scene {
         let mut objects = scene_objects::objects::Objects::new(geometry);
         objects.add_object(Box::new(scene_objects::sphere::Sphere::new(
             center_sphere_radius,
+            6000.0,
             texture_mapper_sphere,
             Point::new_cartesian(0.0, 0.0, 0.0, 0.0),
         )));
@@ -222,6 +223,7 @@ pub mod test_scene {
             center_disk_inner_radius,
             center_disk_outer_radius,
             texture_mapper_disk,
+            6000.0,
         )));
 
         let scene = Scene::new(
@@ -245,10 +247,20 @@ mod tests {
     use crate::geometry::schwarzschild::Schwarzschild;
     use crate::geometry::spherical_coordinates_helper::cartesian_to_spherical;
     use crate::rendering::camera::Camera;
+    use crate::rendering::color;
     use crate::rendering::color::CIETristimulus;
     use crate::rendering::scene::test_scene::create_scene_with_camera;
     use crate::rendering::scene::Scene;
     use std::f64::consts::PI;
+
+    macro_rules! assert_approx_eq_cie_tristimulus {
+        ($x: expr, $y: expr, $e: expr) => {
+            approx::assert_abs_diff_eq!($x.x, $y.x, epsilon = $e);
+            approx::assert_abs_diff_eq!($x.y, $y.y, epsilon = $e);
+            approx::assert_abs_diff_eq!($x.z, $y.z, epsilon = $e);
+            approx::assert_abs_diff_eq!($x.alpha, $y.alpha, epsilon = $e);
+        };
+    }
 
     #[test]
     fn test_color_of_ray_hits_sphere() {
@@ -266,14 +278,15 @@ mod tests {
         let ray = scene.camera.get_ray_for(5, 5);
         let color = scene.color_of_ray(&ray);
 
-        assert_eq!(
+        assert_approx_eq_cie_tristimulus!(
             color,
             CIETristimulus::new(
-                0.27813592476573396,
-                0.28536499372678936,
-                0.4364990815074766,
-                1.0
-            )
+                0.052562486896837575,
+                0.0271025410675224,
+                0.002463867369774764,
+                1.0,
+            ),
+            1e-6
         );
     }
 
@@ -300,14 +313,15 @@ mod tests {
         let ray = scene.camera.get_ray_for(5, 5);
         let color = scene.color_of_ray(&ray);
 
-        assert_eq!(
+        assert_approx_eq_cie_tristimulus!(
             color,
             CIETristimulus::new(
-                0.27813592476573396,
-                0.28536499372678936,
-                0.4364990815074766,
-                1.0
-            )
+                0.052562486896837575,
+                0.0271025410675224,
+                0.002463867369774764,
+                1.0,
+            ),
+            1e-6
         );
     }
 
@@ -326,14 +340,11 @@ mod tests {
 
         let ray = scene.camera.get_ray_for(5, 5);
         let color = scene.color_of_ray(&ray);
-        assert_eq!(
+
+        assert_approx_eq_cie_tristimulus!(
             color,
-            CIETristimulus::new(
-                0.32882834826291946,
-                0.3383856312341892,
-                0.33278602050289136,
-                1.0
-            )
+            CIETristimulus::new(0.4124564, 0.2126729, 0.0193339, 1.0),
+            1e-6
         );
     }
 
@@ -356,14 +367,10 @@ mod tests {
         let a_emitter = 1.0 - radius / sphere_radius;
         let expected_redshift = (a / a_emitter).sqrt();
 
-        assert_eq!(
+        assert_approx_eq_cie_tristimulus!(
             color,
-            CIETristimulus::new(
-                0.29677218433467684,
-                0.3066953444984932,
-                0.3965324711668299,
-                1.0
-            )
+            CIETristimulus::new(0.4124564, 0.2126729, 0.0193339, 1.0),
+            1e-6
         );
     }
 
@@ -384,14 +391,15 @@ mod tests {
         let ray = scene.camera.get_ray_for(0, 0);
         let color = scene.color_of_ray(&ray);
 
-        assert_eq!(
+        assert_approx_eq_cie_tristimulus!(
             color,
             CIETristimulus::new(
                 0.04556866876322511,
                 0.09113733752645022,
                 0.015189552006485689,
                 1.0
-            )
+            ),
+            1e-6
         );
     }
 
@@ -423,9 +431,10 @@ mod tests {
         let ray = scene.camera.get_ray_for(0, 0);
         let color = scene.color_of_ray(&ray);
 
-        assert_eq!(
+        assert_approx_eq_cie_tristimulus!(
             color,
-            CIETristimulus::new(0.3575761, 0.7151522, 0.119192, 1.0)
+            CIETristimulus::new(0.3575761, 0.7151522, 0.119192, 1.0),
+            1e-6
         );
     }
 
@@ -479,14 +488,10 @@ mod tests {
         let ray = scene.camera.get_ray_for(0, 51);
         let color = scene.color_of_ray(&ray);
 
-        assert_eq!(
+        assert_approx_eq_cie_tristimulus!(
             color,
-            CIETristimulus::new(
-                0.27813592476573396,
-                0.28536499372678936,
-                0.4364990815074766,
-                1.0
-            )
+            CIETristimulus::new(0.1804375, 0.072175, 0.9503041, 1.0),
+            1e-6
         );
     }
 }

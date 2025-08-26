@@ -222,7 +222,7 @@ pub fn wavelength_to_rgb(lambda: f64) -> Color {
 }
 
 #[cfg(test)]
-mod tests {
+pub mod tests {
     use super::*;
 
     #[test]

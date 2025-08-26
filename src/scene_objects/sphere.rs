@@ -112,6 +112,7 @@ impl SceneObject for Sphere {}
 mod tests {
     use super::*;
     use crate::geometry::point::Point;
+    use crate::rendering::color::Color;
     use crate::rendering::texture::CheckerMapper;
     use crate::scene_objects::hittable::Hittable;
     use std::sync::Arc;
@@ -119,6 +120,7 @@ mod tests {
     fn create_sphere_at(x: f64, y: f64, z: f64) -> Sphere {
         Sphere::new(
             1.0,
+            6000.0,
             Arc::new(CheckerMapper::new(
                 5.0,
                 5.0,
