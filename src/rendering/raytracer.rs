@@ -1,6 +1,7 @@
 use crate::geometry::geometry::Geometry;
 use crate::rendering::color;
 use crate::rendering::color::xyz_to_srgb;
+use crate::rendering::color::CIETristimulusNormalization::NoNormalization;
 use crate::rendering::integrator::StopReason;
 use crate::rendering::ray::IntegratedRay;
 use crate::rendering::scene::Scene;
@@ -90,15 +91,13 @@ impl<'a, G: Geometry> Raytracer<'a, G> {
             println!("Creating non-HDR image");
             let buffer =
                 self.render_section_to_buffer(from_row, from_col, to_row, to_col, &|x, y, z| {
-                    let color = xyz_to_srgb(
-                        &color::CIETristimulus {
-                            x: x as f64,
-                            y: y as f64,
-                            z: z as f64,
-                            alpha: 1.0,
-                        },
-                        1.0 / (x + y + z) as f64,
-                    );
+                    let cie_tristimulus = color::CIETristimulus {
+                        x: x as f64,
+                        y: y as f64,
+                        z: z as f64,
+                        alpha: 1.0,
+                    };
+                    let color = xyz_to_srgb(&cie_tristimulus.normalize(NoNormalization), 1.0);
                     (color.r, color.g, color.b)
                 });
             let imgbuf: ImageBuffer<Rgb<u8>, Vec<u8>> =

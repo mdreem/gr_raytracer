@@ -1,4 +1,5 @@
 use crate::rendering::black_body_radiation::get_cie_xyz_of_black_body_redshifted;
+use crate::rendering::color::CIETristimulusNormalization::NoNormalization;
 use crate::rendering::color::{srgb_to_xyz, CIETristimulus, Color};
 use image::{DynamicImage, GenericImageView, ImageReader};
 use std::sync::Arc;
@@ -55,8 +56,7 @@ impl TextureMap for TextureMapper {
         cie_tristimulus;
 
         let c = get_cie_xyz_of_black_body_redshifted(temperature * redshift);
-        let norm = c.x + c.y + c.z;
-        let r = CIETristimulus::new(c.x / norm, c.y / norm, c.z / norm, c.alpha);
+        let r = c.normalize(NoNormalization);
         r
     }
 }

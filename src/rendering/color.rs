@@ -8,6 +8,12 @@ pub struct Color {
     pub alpha: u8,
 }
 
+pub enum CIETristimulusNormalization {
+    NoNormalization,
+    Chromaticity,
+    EqualLuminance,
+}
+
 #[derive(Debug, PartialEq, Copy, Clone)]
 pub struct CIETristimulus {
     pub x: f64,
@@ -45,6 +51,48 @@ impl CIETristimulus {
         let z = (other.z * af + self.z * ab * (1.0 - af)) / ao;
 
         CIETristimulus { x, y, z, alpha: ao }
+    }
+
+    pub fn normalize(&self, method: CIETristimulusNormalization) -> CIETristimulus {
+        match method {
+            CIETristimulusNormalization::NoNormalization => *self,
+            CIETristimulusNormalization::Chromaticity => {
+                let sum = self.x + self.y + self.z;
+                if sum == 0.0 {
+                    CIETristimulus {
+                        x: 0.0,
+                        y: 0.0,
+                        z: 0.0,
+                        alpha: self.alpha,
+                    }
+                } else {
+                    CIETristimulus {
+                        x: self.x / sum,
+                        y: self.y / sum,
+                        z: self.z / sum,
+                        alpha: self.alpha,
+                    }
+                }
+            }
+            CIETristimulusNormalization::EqualLuminance => {
+                if self.y == 0.0 {
+                    CIETristimulus {
+                        x: 0.0,
+                        y: 0.0,
+                        z: 0.0,
+                        alpha: self.alpha,
+                    }
+                } else {
+                    let scale = 1.0 / self.y;
+                    CIETristimulus {
+                        x: self.x * scale,
+                        y: 1.0,
+                        z: self.z * scale,
+                        alpha: self.alpha,
+                    }
+                }
+            }
+        }
     }
 }
 
