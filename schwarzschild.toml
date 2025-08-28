@@ -1,4 +1,5 @@
 celestial_texture = "resources/celestial.png"
+color_normalization = "NoNormalization"
 
 [geometry_type.Schwarzschild]
 radius = 1.0

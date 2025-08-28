@@ -4,7 +4,7 @@ use crate::geometry::four_vector::FourVector;
 use crate::geometry::geometry::Geometry;
 use crate::geometry::point::Point;
 use crate::rendering::camera::Camera;
-use crate::rendering::color::Color;
+use crate::rendering::color::{CIETristimulusNormalization, Color};
 use crate::rendering::integrator::IntegrationConfiguration;
 use crate::rendering::raytracer;
 use crate::rendering::scene::Scene;
@@ -16,8 +16,12 @@ use crate::{configuration, scene_objects};
 use std::f64::consts::PI;
 use std::sync::Arc;
 
-pub fn render<G: Geometry>(scene: Scene<G>, filename: String) {
-    let raytracer = raytracer::Raytracer::new(scene);
+pub fn render<G: Geometry>(
+    scene: Scene<G>,
+    filename: String,
+    color_normalization: CIETristimulusNormalization,
+) {
+    let raytracer = raytracer::Raytracer::new(scene, color_normalization);
     raytracer.render(filename);
 }
 

@@ -1,4 +1,5 @@
 use nalgebra::{Matrix3, Vector3};
+use serde::{Deserialize, Serialize};
 
 #[derive(Debug, PartialEq, Copy, Clone)]
 pub struct Color {
@@ -8,6 +9,7 @@ pub struct Color {
     pub alpha: u8,
 }
 
+#[derive(Deserialize, Serialize, Clone, Copy)]
 pub enum CIETristimulusNormalization {
     NoNormalization,
     Chromaticity,
