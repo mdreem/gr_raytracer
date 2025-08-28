@@ -9,21 +9,14 @@ use std::f64::consts::PI;
 
 pub struct Sphere {
     radius: f64,
-    temperature: f64,
     texture_mapper: TextureMapHandle,
     position: Point,
 }
 
 impl Sphere {
-    pub fn new(
-        radius: f64,
-        temperature: f64,
-        texture_mapper: TextureMapHandle,
-        position: Point,
-    ) -> Self {
+    pub fn new(radius: f64, texture_mapper: TextureMapHandle, position: Point) -> Self {
         Self {
             radius,
-            temperature,
             texture_mapper,
             position,
         }
@@ -101,8 +94,7 @@ impl Hittable for Sphere {
     }
 
     fn color_at_uv(&self, uv: UVCoordinates, redshift: f64) -> CIETristimulus {
-        self.texture_mapper
-            .color_at_uv(uv, self.temperature, redshift)
+        self.texture_mapper.color_at_uv(uv, redshift)
     }
 }
 
@@ -120,7 +112,6 @@ mod tests {
     fn create_sphere_at(x: f64, y: f64, z: f64) -> Sphere {
         Sphere::new(
             1.0,
-            6000.0,
             Arc::new(CheckerMapper::new(
                 5.0,
                 5.0,
