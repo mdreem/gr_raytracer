@@ -71,7 +71,6 @@ mod tests {
     fn create_sphere_at(x: f64, y: f64, z: f64, radius: f64, color: u8) -> Box<dyn SceneObject> {
         Box::new(Sphere::new(
             radius,
-            6000.0,
             Arc::new(CheckerMapper::new(
                 5.0,
                 5.0,

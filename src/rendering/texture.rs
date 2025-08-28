@@ -14,12 +14,17 @@ pub struct TextureData {
 }
 
 pub trait TextureMap: Sync {
-    fn color_at_uv(&self, uv: UVCoordinates, temperature: f64, redshift: f64) -> CIETristimulus;
+    fn color_at_uv(&self, uv: UVCoordinates, redshift: f64) -> CIETristimulus;
 }
 
 #[derive(Clone)]
 pub struct TextureMapper {
     image: DynamicImage,
+}
+
+#[derive(Clone)]
+pub struct BlackBodyMapper {
+    temperature: f64,
 }
 
 #[derive(Clone)]
@@ -42,7 +47,7 @@ impl TextureMapper {
 }
 
 impl TextureMap for TextureMapper {
-    fn color_at_uv(&self, uv: UVCoordinates, temperature: f64, redshift: f64) -> CIETristimulus {
+    fn color_at_uv(&self, uv: UVCoordinates, redshift: f64) -> CIETristimulus {
         let (width, height) = self.image.dimensions();
         // If mapping uv to width-1 and height-1 there are distortions horizontally across the
         // center. Maybe because in spherical coordinates u,v < 1.0, i.e. they're not inclusive.
@@ -53,9 +58,13 @@ impl TextureMap for TextureMapper {
         );
         let mut cie_tristimulus = srgb_to_xyz(&Color::new(pixel[0], pixel[1], pixel[2], pixel[3]));
         cie_tristimulus.alpha = pixel[3] as f64 / 255.0;
-        cie_tristimulus;
+        cie_tristimulus.normalize(NoNormalization)
+    }
+}
 
-        let c = get_cie_xyz_of_black_body_redshifted(temperature * redshift);
+impl TextureMap for BlackBodyMapper {
+    fn color_at_uv(&self, _uv: UVCoordinates, redshift: f64) -> CIETristimulus {
+        let c = get_cie_xyz_of_black_body_redshifted(self.temperature * redshift);
         let r = c.normalize(NoNormalization);
         r
     }
@@ -74,7 +83,7 @@ impl CheckerMapper {
 }
 
 impl TextureMap for CheckerMapper {
-    fn color_at_uv(&self, uv: UVCoordinates, _temperature: f64, _redshift: f64) -> CIETristimulus {
+    fn color_at_uv(&self, uv: UVCoordinates, _redshift: f64) -> CIETristimulus {
         let ut = (uv.u * self.width).floor() as usize;
         let vt = (uv.v * self.height).floor() as usize;
 
@@ -109,6 +118,22 @@ impl TextureMapperFactory {
         self.texture_map_map
             .get(&filename)
             .expect("Failed to get texture mapper")
+            .clone()
+    }
+
+    pub fn get_blackbody_mapper(&mut self) -> TextureMapHandle {
+        let key = "blackbody".to_string();
+        if self.texture_map_map.get(&key).is_none() {
+            let new_mapper = TextureMapper {
+                image: DynamicImage::new_rgb8(1, 1), // Placeholder image
+            };
+            self.texture_map_map
+                .insert(key.clone(), Arc::new(new_mapper));
+        }
+
+        self.texture_map_map
+            .get(&key)
+            .expect("Failed to get blackbody texture mapper")
             .clone()
     }
 }

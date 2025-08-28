@@ -84,7 +84,6 @@ pub fn create_scene<G: Geometry>(
                 };
                 let sphere = scene_objects::sphere::Sphere::new(
                     radius,
-                    16000.0,
                     texture_mapper_sphere,
                     Point::new_cartesian(0.0, position.0, position.1, position.2),
                 );
@@ -109,12 +108,8 @@ pub fn create_scene<G: Geometry>(
                         Color::new(0, 200, 200, 255),
                     ))
                 };
-                let disc = scene_objects::disc::Disc::new(
-                    inner_radius,
-                    outer_radius,
-                    texture_mapper_disc,
-                    5000.0,
-                );
+                let disc =
+                    scene_objects::disc::Disc::new(inner_radius, outer_radius, texture_mapper_disc);
                 objects.add_object(Box::new(disc));
             }
         }

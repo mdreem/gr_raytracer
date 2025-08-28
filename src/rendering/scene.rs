@@ -102,11 +102,7 @@ impl<'a, G: Geometry> Scene<'a, G> {
                 CelestialSphereReached => {
                     let uv = self.get_uv_coordinates(&y);
                     let redshift = self.redshift_computer.compute_redshift(&y, observer_energy);
-                    intersections.push(
-                        self.texture_data
-                            .celestial_map
-                            .color_at_uv(uv, 1.0, redshift),
-                    );
+                    intersections.push(self.texture_data.celestial_map.color_at_uv(uv, redshift));
                 }
             };
         } else {
@@ -215,7 +211,6 @@ pub mod test_scene {
         let mut objects = scene_objects::objects::Objects::new(geometry);
         objects.add_object(Box::new(scene_objects::sphere::Sphere::new(
             center_sphere_radius,
-            6000.0,
             texture_mapper_sphere,
             Point::new_cartesian(0.0, 0.0, 0.0, 0.0),
         )));
@@ -223,7 +218,6 @@ pub mod test_scene {
             center_disk_inner_radius,
             center_disk_outer_radius,
             texture_mapper_disk,
-            6000.0,
         )));
 
         let scene = Scene::new(
