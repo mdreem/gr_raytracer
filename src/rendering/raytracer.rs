@@ -1,7 +1,7 @@
 use crate::geometry::geometry::Geometry;
 use crate::rendering::color;
-use crate::rendering::color::xyz_to_srgb;
 use crate::rendering::color::CIETristimulusNormalization::NoNormalization;
+use crate::rendering::color::{xyz_to_srgb, CIETristimulusNormalization};
 use crate::rendering::integrator::StopReason;
 use crate::rendering::ray::IntegratedRay;
 use crate::rendering::scene::Scene;
@@ -13,11 +13,15 @@ use std::sync::atomic::{AtomicUsize, Ordering};
 
 pub struct Raytracer<'a, G: Geometry> {
     scene: Scene<'a, G>,
+    color_normalization: CIETristimulusNormalization,
 }
 
 impl<'a, G: Geometry> Raytracer<'a, G> {
-    pub fn new(scene: Scene<'a, G>) -> Self {
-        Self { scene }
+    pub fn new(scene: Scene<'a, G>, color_normalization: CIETristimulusNormalization) -> Self {
+        Self {
+            scene,
+            color_normalization,
+        }
     }
 
     #[allow(dead_code)] // For testing
@@ -28,14 +32,17 @@ impl<'a, G: Geometry> Raytracer<'a, G> {
         println!("color: {:?}", color);
     }
 
-    pub fn render_section_to_buffer<B: Primitive + Sync + Send>(
+    pub fn render_section_to_buffer<F, B: Primitive + Sync + Send>(
         &self,
         from_row: u32,
         from_col: u32,
         to_row: u32,
         to_col: u32,
-        buffer_transformer: &'static (dyn Fn(f32, f32, f32) -> (B, B, B) + Sync),
-    ) -> Vec<B> {
+        buffer_transformer: F,
+    ) -> Vec<B>
+    where
+        F: Fn(f32, f32, f32) -> (B, B, B) + Sync,
+    {
         let count = AtomicUsize::new(0);
         let max_count = (to_row - from_row) * (to_col - from_col);
         let mut buffer: Vec<B> = vec![B::zero(); 3 * max_count as usize];
@@ -89,15 +96,16 @@ impl<'a, G: Geometry> Raytracer<'a, G> {
                 .unwrap();
         } else {
             println!("Creating non-HDR image");
+            let color_normalization = self.color_normalization;
             let buffer =
-                self.render_section_to_buffer(from_row, from_col, to_row, to_col, &|x, y, z| {
+                self.render_section_to_buffer(from_row, from_col, to_row, to_col, |x, y, z| {
                     let cie_tristimulus = color::CIETristimulus {
                         x: x as f64,
                         y: y as f64,
                         z: z as f64,
                         alpha: 1.0,
                     };
-                    let color = xyz_to_srgb(&cie_tristimulus.normalize(NoNormalization), 1.0);
+                    let color = xyz_to_srgb(&cie_tristimulus.normalize(color_normalization), 1.0);
                     (color.r, color.g, color.b)
                 });
             let imgbuf: ImageBuffer<Rgb<u8>, Vec<u8>> =

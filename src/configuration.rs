@@ -1,20 +1,22 @@
+use crate::rendering::color::CIETristimulusNormalization;
 use serde::{Deserialize, Serialize};
 
-#[derive(Deserialize, Serialize)]
+#[derive(Deserialize, Serialize, Clone)]
 pub struct RenderConfig {
     pub geometry_type: GeometryType,
+    pub color_normalization: CIETristimulusNormalization,
     pub objects: Vec<ObjectsConfig>,
     pub celestial_texture: Option<String>,
 }
 
-#[derive(Deserialize, Serialize, Debug, PartialEq)]
+#[derive(Deserialize, Serialize, Debug, PartialEq, Clone)]
 pub enum GeometryType {
     Euclidean,
     EuclideanSpherical,
     Schwarzschild { radius: f64, horizon_epsilon: f64 },
 }
 
-#[derive(Deserialize, Serialize, Debug, PartialEq)]
+#[derive(Deserialize, Serialize, Debug, PartialEq, Clone)]
 pub enum TextureConfig {
     Bitmap {
         path: String,
@@ -30,7 +32,7 @@ pub enum TextureConfig {
     },
 }
 
-#[derive(Deserialize, Serialize, Debug)]
+#[derive(Deserialize, Serialize, Debug, Clone)]
 pub enum ObjectsConfig {
     Sphere {
         radius: f64,
@@ -47,12 +49,14 @@ pub enum ObjectsConfig {
 #[cfg(test)]
 mod tests {
     use crate::configuration::{GeometryType, ObjectsConfig, RenderConfig, TextureConfig};
+    use crate::rendering::color::CIETristimulusNormalization::NoNormalization;
 
     #[test]
     #[ignore]
     fn test_serialize() {
         let config = RenderConfig {
             celestial_texture: Some(String::from("resources/celestial_sphere.png")),
+            color_normalization: NoNormalization,
             geometry_type: GeometryType::Schwarzschild {
                 radius: 2.0,
                 horizon_epsilon: 1e-4,
@@ -94,6 +98,7 @@ mod tests {
     fn test_deserialize() {
         let toml_str = r#"
             celestial_texture = "resources/celestial_sphere.png"
+            color_normalization = "NoNormalization"
 
             [geometry_type.Schwarzschild]
             radius = 2.0
