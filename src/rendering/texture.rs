@@ -22,19 +22,6 @@ pub struct TextureMapper {
     image: DynamicImage,
 }
 
-#[derive(Clone)]
-pub struct BlackBodyMapper {
-    temperature: f64,
-}
-
-#[derive(Clone)]
-pub struct CheckerMapper {
-    width: f64,
-    height: f64,
-    c1: CIETristimulus,
-    c2: CIETristimulus,
-}
-
 impl TextureMapper {
     pub fn new(filename: String) -> TextureMapper {
         let image = ImageReader::open(filename)
@@ -62,12 +49,31 @@ impl TextureMap for TextureMapper {
     }
 }
 
+#[derive(Clone)]
+pub struct BlackBodyMapper {
+    temperature: f64,
+}
+
+impl BlackBodyMapper {
+    pub fn new(temperature: f64) -> BlackBodyMapper {
+        BlackBodyMapper { temperature }
+    }
+}
+
 impl TextureMap for BlackBodyMapper {
     fn color_at_uv(&self, _uv: UVCoordinates, redshift: f64) -> CIETristimulus {
         let c = get_cie_xyz_of_black_body_redshifted(self.temperature * redshift);
         let r = c.normalize(NoNormalization);
         r
     }
+}
+
+#[derive(Clone)]
+pub struct CheckerMapper {
+    width: f64,
+    height: f64,
+    c1: CIETristimulus,
+    c2: CIETristimulus,
 }
 
 impl CheckerMapper {

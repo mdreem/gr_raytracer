@@ -7,11 +7,15 @@ celestial_texture = "resources/celestial.png"
 [objects.Disc]
 inner_radius = 3.0
 outer_radius = 5.0
-texture = "resources/disk.png"
+
+[objects.Disc.texture.Bitmap]
+path = "resources/disk.png"
 
 [[objects]]
 
 [objects.Sphere]
 radius = 2.0
-texture = "resources/sphere.png"
 position = [0.0, 0.0, 0.0]
+
+[objects.Sphere.texture.Bitmap]
+path = "resources/sphere.png"

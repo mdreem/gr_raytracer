@@ -1,5 +1,5 @@
 use crate::cli::cli::GlobalOpts;
-use crate::configuration::RenderConfig;
+use crate::configuration::{RenderConfig, TextureConfig};
 use crate::geometry::four_vector::FourVector;
 use crate::geometry::geometry::Geometry;
 use crate::geometry::point::Point;
@@ -8,7 +8,9 @@ use crate::rendering::color::Color;
 use crate::rendering::integrator::IntegrationConfiguration;
 use crate::rendering::raytracer;
 use crate::rendering::scene::Scene;
-use crate::rendering::texture::{CheckerMapper, TextureData, TextureMapperFactory};
+use crate::rendering::texture::{
+    BlackBodyMapper, CheckerMapper, TextureData, TextureMapHandle, TextureMapperFactory,
+};
 use crate::scene_objects::objects::Objects;
 use crate::{configuration, scene_objects};
 use std::f64::consts::PI;
@@ -71,17 +73,9 @@ pub fn create_scene<G: Geometry>(
                     "Adding sphere with radius: {} at ({},{},{})",
                     radius, position.0, position.1, position.2
                 );
+                let texture_mapper_sphere =
+                    get_texture_mapper(&mut texture_mapper_factory, texture);
 
-                let texture_mapper_sphere = if let Some(texture) = texture {
-                    texture_mapper_factory.get_texture_mapper(texture)
-                } else {
-                    Arc::new(CheckerMapper::new(
-                        10.0,
-                        10.0,
-                        Color::new(200, 0, 0, 255),
-                        Color::new(0, 200, 0, 255),
-                    ))
-                };
                 let sphere = scene_objects::sphere::Sphere::new(
                     radius,
                     texture_mapper_sphere,
@@ -98,16 +92,7 @@ pub fn create_scene<G: Geometry>(
                     "Adding disc with inner radius: {}, outer radius: {}",
                     inner_radius, outer_radius
                 );
-                let texture_mapper_disc = if let Some(texture) = texture {
-                    texture_mapper_factory.get_texture_mapper(texture)
-                } else {
-                    Arc::new(CheckerMapper::new(
-                        10.0,
-                        10.0,
-                        Color::new(200, 200, 0, 255),
-                        Color::new(0, 200, 200, 255),
-                    ))
-                };
+                let texture_mapper_disc = get_texture_mapper(&mut texture_mapper_factory, texture);
                 let disc =
                     scene_objects::disc::Disc::new(inner_radius, outer_radius, texture_mapper_disc);
                 objects.add_object(Box::new(disc));
@@ -124,4 +109,26 @@ pub fn create_scene<G: Geometry>(
         false,
     );
     scene
+}
+
+fn get_texture_mapper(
+    texture_mapper_factory: &mut TextureMapperFactory,
+    texture: TextureConfig,
+) -> TextureMapHandle {
+    let texture_mapper_sphere = match texture {
+        TextureConfig::Bitmap { path } => texture_mapper_factory.get_texture_mapper(path),
+        TextureConfig::Checker {
+            width,
+            height,
+            color1,
+            color2,
+        } => Arc::new(CheckerMapper::new(
+            width,
+            height,
+            Color::new(color1.0, color1.1, color1.2, color2.2),
+            Color::new(color2.0, color2.1, color2.2, color2.2),
+        )),
+        TextureConfig::BlackBody { temperature } => Arc::new(BlackBodyMapper::new(temperature)),
+    };
+    texture_mapper_sphere
 }
