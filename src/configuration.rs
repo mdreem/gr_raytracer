@@ -5,9 +5,8 @@ use serde::{Deserialize, Serialize};
 pub struct RenderConfig {
     pub geometry_type: GeometryType,
     pub color_normalization: CIETristimulusNormalization,
-    pub celestial_color_normalization: CIETristimulusNormalization,
     pub objects: Vec<ObjectsConfig>,
-    pub celestial_texture: Option<String>,
+    pub celestial_texture: TextureConfig,
 }
 
 #[derive(Deserialize, Serialize, Debug, PartialEq, Clone)]
@@ -59,8 +58,10 @@ mod tests {
     #[ignore]
     fn test_serialize() {
         let config = RenderConfig {
-            celestial_texture: Some(String::from("resources/celestial_sphere.png")),
-            celestial_color_normalization: NoNormalization,
+            celestial_texture: TextureConfig::Bitmap {
+                path: String::from("resources/celestial_sphere.png"),
+                color_normalization: NoNormalization,
+            },
             color_normalization: NoNormalization,
             geometry_type: GeometryType::Schwarzschild {
                 radius: 2.0,
@@ -105,8 +106,10 @@ mod tests {
     #[test]
     fn test_deserialize() {
         let toml_str = r#"
-            celestial_texture = "resources/celestial_sphere.png"
-            celestial_color_normalization = "NoNormalization"
+            color_normalization = "NoNormalization"
+
+            [celestial_texture.Bitmap]
+            path = "resources/celestial_sphere.png"
             color_normalization = "NoNormalization"
 
             [geometry_type.Schwarzschild]
@@ -140,7 +143,10 @@ mod tests {
         let config: RenderConfig = toml::from_str(toml_str).unwrap();
         assert_eq!(
             config.celestial_texture,
-            Some(String::from("resources/celestial_sphere.png"))
+            TextureConfig::Bitmap {
+                path: String::from("resources/celestial_sphere.png"),
+                color_normalization: NoNormalization,
+            }
         );
 
         assert_eq!(
