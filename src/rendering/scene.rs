@@ -139,6 +139,7 @@ pub mod test_scene {
     use crate::geometry::geometry::Geometry;
     use crate::geometry::point::Point;
     use crate::rendering::camera::Camera;
+    use crate::rendering::color::CIETristimulusNormalization::NoNormalization;
     use crate::rendering::color::Color;
     use crate::rendering::scene::{IntegrationConfiguration, Scene, TextureData};
     use crate::rendering::texture::CheckerMapper;
@@ -188,18 +189,21 @@ pub mod test_scene {
             100.0,
             Color::new(0, 255, 0, 255),
             Color::new(0, 100, 0, 255),
+            NoNormalization,
         ));
         let texture_mapper_disk = Arc::new(CheckerMapper::new(
             200.0,
             10.0,
             Color::new(0, 0, 255, 255),
             Color::new(0, 0, 100, 255),
+            NoNormalization,
         ));
         let texture_mapper_sphere = Arc::new(CheckerMapper::new(
             10.0,
             10.0,
             Color::new(255, 0, 0, 255),
             Color::new(100, 0, 0, 255),
+            NoNormalization,
         ));
 
         let integration_configuration =
