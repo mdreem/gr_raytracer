@@ -266,56 +266,9 @@ pub fn srgb_to_xyz(color: &Color) -> CIETristimulus {
     CIETristimulus::new(v_xyz.x, v_xyz.y, v_xyz.z, 1.0)
 }
 
-pub fn wavelength_to_rgb(lambda: f64) -> Color {
-    let cie_tristiumlus = get_cie_xyz(lambda);
-    xyz_to_srgb(&cie_tristiumlus, 1.0)
-}
-
 #[cfg(test)]
 pub mod tests {
     use super::*;
-
-    #[test]
-    fn test_red_wavelength_to_rgb() {
-        let color = wavelength_to_rgb(600.0);
-        assert_eq!(
-            color,
-            Color {
-                r: 255,
-                g: 113,
-                b: 0,
-                alpha: 255
-            }
-        );
-    }
-
-    #[test]
-    fn test_blue_wavelength_to_rgb() {
-        let color = wavelength_to_rgb(450.0);
-        assert_eq!(
-            color,
-            Color {
-                r: 116,
-                g: 0,
-                b: 255,
-                alpha: 255
-            }
-        );
-    }
-
-    #[test]
-    fn test_green_wavelength_to_rgb() {
-        let color = wavelength_to_rgb(540.0);
-        assert_eq!(
-            color,
-            Color {
-                r: 0,
-                g: 255,
-                b: 0,
-                alpha: 255
-            }
-        );
-    }
 
     #[test]
     fn test_srgb_to_xyz() {

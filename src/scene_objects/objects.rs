@@ -2,7 +2,6 @@ use crate::geometry::geometry::Geometry;
 use crate::rendering::color::CIETristimulus;
 use crate::rendering::redshift::RedshiftComputer;
 use crate::rendering::scene::{get_position, EquationOfMotionState};
-use crate::rendering::texture::TextureMap;
 use crate::scene_objects::hittable::Hittable;
 
 pub trait SceneObject: Hittable {}
@@ -47,7 +46,6 @@ impl<'a, G: Geometry> Objects<'a, G> {
                 if distance < shortest_distance {
                     shortest_distance = distance;
                     let redshift = redshift_computer.compute_redshift(y_start, observer_energy);
-                    // TODO: Use texture color
                     resulting_color = Some(hittable.color_at_uv(intersection_data.uv, redshift));
                 }
             }
