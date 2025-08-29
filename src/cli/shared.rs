@@ -135,8 +135,8 @@ fn get_texture_mapper(
         } => Arc::new(CheckerMapper::new(
             width,
             height,
-            Color::new(color1.0, color1.1, color1.2, color2.2),
-            Color::new(color2.0, color2.1, color2.2, color2.2),
+            Color::new(color1.0, color1.1, color1.2, 255),
+            Color::new(color2.0, color2.1, color2.2, 255),
             color_normalization,
         )),
         TextureConfig::BlackBody {

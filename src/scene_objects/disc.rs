@@ -1,6 +1,6 @@
 use crate::geometry::point::Point;
 use crate::rendering::color::CIETristimulus;
-use crate::rendering::texture::{TextureMap, TextureMapHandle, UVCoordinates};
+use crate::rendering::texture::{TextureMapHandle, UVCoordinates};
 use crate::scene_objects::hittable::{Hittable, Intersection};
 use crate::scene_objects::objects::SceneObject;
 use nalgebra::Vector3;

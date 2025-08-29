@@ -1,6 +1,5 @@
 use crate::geometry::geometry::Geometry;
 use crate::rendering::color;
-use crate::rendering::color::CIETristimulusNormalization::NoNormalization;
 use crate::rendering::color::{xyz_to_srgb, CIETristimulusNormalization};
 use crate::rendering::integrator::StopReason;
 use crate::rendering::ray::IntegratedRay;
