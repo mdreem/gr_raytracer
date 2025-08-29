@@ -5,6 +5,7 @@ use serde::{Deserialize, Serialize};
 pub struct RenderConfig {
     pub geometry_type: GeometryType,
     pub color_normalization: CIETristimulusNormalization,
+    pub celestial_color_normalization: CIETristimulusNormalization,
     pub objects: Vec<ObjectsConfig>,
     pub celestial_texture: Option<String>,
 }
@@ -20,15 +21,18 @@ pub enum GeometryType {
 pub enum TextureConfig {
     Bitmap {
         path: String,
+        color_normalization: CIETristimulusNormalization,
     },
     Checker {
         width: f64,
         height: f64,
         color1: (u8, u8, u8),
         color2: (u8, u8, u8),
+        color_normalization: CIETristimulusNormalization,
     },
     BlackBody {
         temperature: f64,
+        color_normalization: CIETristimulusNormalization,
     },
 }
 
@@ -56,6 +60,7 @@ mod tests {
     fn test_serialize() {
         let config = RenderConfig {
             celestial_texture: Some(String::from("resources/celestial_sphere.png")),
+            celestial_color_normalization: NoNormalization,
             color_normalization: NoNormalization,
             geometry_type: GeometryType::Schwarzschild {
                 radius: 2.0,
@@ -67,6 +72,7 @@ mod tests {
                     position: (1.1, 2.2, 3.3),
                     texture: TextureConfig::Bitmap {
                         path: String::from("resources/sphere.png"),
+                        color_normalization: NoNormalization,
                     },
                 },
                 ObjectsConfig::Disc {
@@ -77,6 +83,7 @@ mod tests {
                         height: 0.5,
                         color1: (255, 0, 0),
                         color2: (0, 0, 255),
+                        color_normalization: NoNormalization,
                     },
                 },
                 ObjectsConfig::Sphere {
@@ -84,6 +91,7 @@ mod tests {
                     position: (4.4, 5.5, 6.6),
                     texture: TextureConfig::BlackBody {
                         temperature: 6500.0,
+                        color_normalization: NoNormalization,
                     },
                 },
             ],
@@ -98,6 +106,7 @@ mod tests {
     fn test_deserialize() {
         let toml_str = r#"
             celestial_texture = "resources/celestial_sphere.png"
+            celestial_color_normalization = "NoNormalization"
             color_normalization = "NoNormalization"
 
             [geometry_type.Schwarzschild]
@@ -112,6 +121,7 @@ mod tests {
 
             [objects.Sphere.texture.Bitmap]
             path = "resources/sphere.png"
+            color_normalization = "NoNormalization"
 
             [[objects]]
 
@@ -124,6 +134,7 @@ mod tests {
             height = 0.5
             color1 = [255, 0, 0]
             color2 = [0, 0, 255]
+            color_normalization = "NoNormalization"
         "#;
 
         let config: RenderConfig = toml::from_str(toml_str).unwrap();
@@ -153,7 +164,8 @@ mod tests {
             assert_eq!(
                 texture,
                 &TextureConfig::Bitmap {
-                    path: String::from("resources/sphere.png")
+                    path: String::from("resources/sphere.png"),
+                    color_normalization: NoNormalization,
                 }
             );
         } else {

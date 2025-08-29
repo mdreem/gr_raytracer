@@ -104,6 +104,7 @@ impl SceneObject for Sphere {}
 mod tests {
     use super::*;
     use crate::geometry::point::Point;
+    use crate::rendering::color::CIETristimulusNormalization::NoNormalization;
     use crate::rendering::color::Color;
     use crate::rendering::texture::CheckerMapper;
     use crate::scene_objects::hittable::Hittable;
@@ -117,6 +118,7 @@ mod tests {
                 5.0,
                 Color::new(100, 0, 0, 255),
                 Color::new(0, 100, 0, 255),
+                NoNormalization,
             )),
             Point::new_cartesian(0.0, x, y, z),
         )

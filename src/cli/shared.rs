@@ -4,6 +4,7 @@ use crate::geometry::four_vector::FourVector;
 use crate::geometry::geometry::Geometry;
 use crate::geometry::point::Point;
 use crate::rendering::camera::Camera;
+use crate::rendering::color::CIETristimulusNormalization::NoNormalization;
 use crate::rendering::color::{CIETristimulusNormalization, Color};
 use crate::rendering::integrator::IntegrationConfiguration;
 use crate::rendering::raytracer;
@@ -42,13 +43,14 @@ pub fn create_scene<G: Geometry>(
     let mut texture_mapper_factory = TextureMapperFactory::new();
 
     let texture_mapper_celestial = if let Some(texture) = config.celestial_texture {
-        texture_mapper_factory.get_texture_mapper(texture)
+        texture_mapper_factory.get_texture_mapper(texture, config.celestial_color_normalization)
     } else {
         Arc::new(CheckerMapper::new(
             20.0,
             20.0,
             Color::new(255, 255, 255, 255),
             Color::new(0, 0, 0, 255),
+            NoNormalization,
         ))
     };
 
@@ -120,19 +122,27 @@ fn get_texture_mapper(
     texture: TextureConfig,
 ) -> TextureMapHandle {
     let texture_mapper_sphere = match texture {
-        TextureConfig::Bitmap { path } => texture_mapper_factory.get_texture_mapper(path),
+        TextureConfig::Bitmap {
+            path,
+            color_normalization,
+        } => texture_mapper_factory.get_texture_mapper(path, color_normalization),
         TextureConfig::Checker {
             width,
             height,
             color1,
             color2,
+            color_normalization,
         } => Arc::new(CheckerMapper::new(
             width,
             height,
             Color::new(color1.0, color1.1, color1.2, color2.2),
             Color::new(color2.0, color2.1, color2.2, color2.2),
+            color_normalization,
         )),
-        TextureConfig::BlackBody { temperature } => Arc::new(BlackBodyMapper::new(temperature)),
+        TextureConfig::BlackBody {
+            temperature,
+            color_normalization,
+        } => Arc::new(BlackBodyMapper::new(temperature, color_normalization)),
     };
     texture_mapper_sphere
 }

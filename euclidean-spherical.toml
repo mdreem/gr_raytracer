@@ -1,4 +1,5 @@
 celestial_texture = "resources/celestial.png"
+celestial_color_normalization = "NoNormalization"
 color_normalization = "NoNormalization"
 
 [geometry_type.EuclideanSpherical]
@@ -11,6 +12,7 @@ outer_radius = 5.0
 
 [objects.Disc.texture.Bitmap]
 path = "resources/disk.png"
+color_normalization = "NoNormalization"
 
 [[objects]]
 
@@ -20,3 +22,4 @@ position = [0.0, 0.0, 0.0]
 
 [objects.Sphere.texture.Bitmap]
 path = "resources/sphere.png"
+color_normalization = "NoNormalization"
