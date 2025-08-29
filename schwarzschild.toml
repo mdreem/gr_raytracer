@@ -1,5 +1,7 @@
-celestial_texture = "resources/celestial.png"
-celestial_color_normalization = "NoNormalization"
+color_normalization = "NoNormalization"
+
+[celestial_texture.Bitmap]
+path = "resources/celestial.png"
 color_normalization = "NoNormalization"
 
 [geometry_type.Schwarzschild]

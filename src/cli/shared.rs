@@ -42,17 +42,8 @@ pub fn create_scene<G: Geometry>(
 
     let mut texture_mapper_factory = TextureMapperFactory::new();
 
-    let texture_mapper_celestial = if let Some(texture) = config.celestial_texture {
-        texture_mapper_factory.get_texture_mapper(texture, config.celestial_color_normalization)
-    } else {
-        Arc::new(CheckerMapper::new(
-            20.0,
-            20.0,
-            Color::new(255, 255, 255, 255),
-            Color::new(0, 0, 0, 255),
-            NoNormalization,
-        ))
-    };
+    let texture_mapper_celestial =
+        get_texture_mapper(&mut texture_mapper_factory, config.celestial_texture);
 
     let camera = Camera::new(
         camera_position,
