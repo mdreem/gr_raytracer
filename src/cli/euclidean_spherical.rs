@@ -17,9 +17,9 @@ pub fn render_euclidean_spherical(
     let camera_position = cartesian_to_spherical(&camera_position);
     let momentum = FourVector::new_spherical(1.0, 0.0, 0.0, 0.0);
     let geometry = EuclideanSpaceSpherical::new();
-    let scene = create_scene(&geometry, camera_position, momentum, opts, config);
+    let scene = create_scene(&geometry, camera_position, momentum, opts, config.clone());
 
-    render(scene, filename);
+    render(scene, filename, config.color_normalization);
 }
 
 pub fn render_euclidean_spherical_ray(
@@ -34,8 +34,8 @@ pub fn render_euclidean_spherical_ray(
     let momentum = FourVector::new_spherical(1.0, 0.0, 0.0, 0.0);
     let geometry = EuclideanSpaceSpherical::new();
 
-    let scene = create_scene(&geometry, camera_position, momentum, opts, config);
-    let raytracer = raytracer::Raytracer::new(scene);
+    let scene = create_scene(&geometry, camera_position, momentum, opts, config.clone());
+    let raytracer = raytracer::Raytracer::new(scene, config.color_normalization);
     let (integrated_ray, stop_reason) = raytracer.integrate_ray_at_point(row, col);
     println!("Stop reason: {:?}", stop_reason);
     integrated_ray.save(write, &geometry);

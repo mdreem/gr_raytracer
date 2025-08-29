@@ -1,8 +1,8 @@
 use crate::geometry::point::{CoordinateSystem, Point};
 use crate::geometry::spherical_coordinates_helper::cartesian_to_spherical;
-use crate::rendering::color::Color;
-use crate::rendering::texture::{TextureMap, TextureMapHandle, UVCoordinates};
-use crate::scene_objects::hittable::Intersection;
+use crate::rendering::color::CIETristimulus;
+use crate::rendering::texture::{TextureMapHandle, UVCoordinates};
+use crate::scene_objects::hittable::{Hittable, Intersection};
 use crate::scene_objects::objects::SceneObject;
 use nalgebra::Vector3;
 use std::f64::consts::PI;
@@ -46,7 +46,7 @@ fn solve_for_t(y_start_spatial: Vector3<f64>, direction: Vector3<f64>, r: f64) -
     }
 }
 
-impl crate::scene_objects::hittable::Hittable for Sphere {
+impl Hittable for Sphere {
     // y_start and y_end have to be Cartesian.
     fn intersects(&self, y_start: &Point, y_end: &Point) -> Option<Intersection> {
         let neg_position = -self.position;
@@ -92,11 +92,9 @@ impl crate::scene_objects::hittable::Hittable for Sphere {
 
         None
     }
-}
 
-impl TextureMap for Sphere {
-    fn color_at_uv(&self, uv: UVCoordinates) -> Color {
-        self.texture_mapper.color_at_uv(uv)
+    fn color_at_uv(&self, uv: UVCoordinates, redshift: f64) -> CIETristimulus {
+        self.texture_mapper.color_at_uv(uv, redshift)
     }
 }
 
@@ -106,6 +104,8 @@ impl SceneObject for Sphere {}
 mod tests {
     use super::*;
     use crate::geometry::point::Point;
+    use crate::rendering::color::CIETristimulusNormalization::NoNormalization;
+    use crate::rendering::color::Color;
     use crate::rendering::texture::CheckerMapper;
     use crate::scene_objects::hittable::Hittable;
     use std::sync::Arc;
@@ -118,6 +118,7 @@ mod tests {
                 5.0,
                 Color::new(100, 0, 0, 255),
                 Color::new(0, 100, 0, 255),
+                NoNormalization,
             )),
             Point::new_cartesian(0.0, x, y, z),
         )

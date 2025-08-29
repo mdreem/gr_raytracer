@@ -1,4 +1,3 @@
-use crate::geometry::four_vector::FourVector;
 use crate::geometry::spherical_coordinates_helper::{
     cartesian_to_spherical, spherical_to_cartesian,
 };

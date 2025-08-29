@@ -1,11 +1,9 @@
 use crate::geometry::point::Point;
-use crate::rendering::color::Color;
-use crate::rendering::texture::{TextureMap, TextureMapHandle, UVCoordinates};
+use crate::rendering::color::CIETristimulus;
+use crate::rendering::texture::{TextureMapHandle, UVCoordinates};
 use crate::scene_objects::hittable::{Hittable, Intersection};
 use crate::scene_objects::objects::SceneObject;
-use image::imageops::dither;
-use nalgebra::{ComplexField, Vector3};
-use std::f64::consts::PI;
+use nalgebra::Vector3;
 
 pub struct Disc {
     center_disk_inner_radius: f64,
@@ -78,11 +76,9 @@ impl Hittable for Disc {
             None
         }
     }
-}
 
-impl TextureMap for Disc {
-    fn color_at_uv(&self, uv: UVCoordinates) -> Color {
-        self.texture_mapper.color_at_uv(uv)
+    fn color_at_uv(&self, uv: UVCoordinates, redshift: f64) -> CIETristimulus {
+        self.texture_mapper.color_at_uv(uv, redshift)
     }
 }
 
