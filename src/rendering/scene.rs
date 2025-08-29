@@ -2,12 +2,12 @@ use crate::geometry::geometry::Geometry;
 use crate::geometry::point::{CoordinateSystem, Point};
 use crate::geometry::spherical_coordinates_helper::spherical_to_cartesian;
 use crate::rendering::camera::Camera;
-use crate::rendering::color::{wavelength_to_rgb, Color};
+use crate::rendering::color::CIETristimulus;
 use crate::rendering::integrator::StopReason::{CelestialSphereReached, HorizonReached};
 use crate::rendering::integrator::{IntegrationConfiguration, Integrator, StopReason};
 use crate::rendering::ray::{IntegratedRay, Ray};
 use crate::rendering::redshift::RedshiftComputer;
-use crate::rendering::texture::{TextureData, TextureMap, UVCoordinates};
+use crate::rendering::texture::{TextureData, UVCoordinates};
 use crate::scene_objects::objects::Objects;
 use nalgebra::{Const, OVector};
 use std::f64::consts::PI;
@@ -15,7 +15,7 @@ use std::fs::File;
 
 pub struct Scene<'a, G: Geometry> {
     pub integrator: Integrator<'a, G>,
-    objects: Objects,
+    objects: Objects<'a, G>,
     texture_data: TextureData,
     pub geometry: &'a G,
     pub camera: Camera,
@@ -45,7 +45,7 @@ pub fn get_position(y: &EquationOfMotionState, coordinate_system: CoordinateSyst
 impl<'a, G: Geometry> Scene<'a, G> {
     pub fn new(
         integration_configuration: IntegrationConfiguration,
-        objects: Objects,
+        objects: Objects<'a, G>,
         texture_data: TextureData,
         geometry: &'a G,
         camera: Camera,
@@ -68,7 +68,7 @@ impl<'a, G: Geometry> Scene<'a, G> {
         self.integrator.integrate(ray)
     }
 
-    pub fn color_of_ray(&self, ray: &Ray) -> (Color, Option<f64>) {
+    pub fn color_of_ray(&self, ray: &Ray) -> CIETristimulus {
         let (steps, stop_reason) = self.integrate_ray(ray);
         let mut y = steps[0].y;
 
@@ -86,48 +86,35 @@ impl<'a, G: Geometry> Scene<'a, G> {
             let last_y = y;
             y = step.y;
 
-            if let Some(intersection_color) = self.objects.intersects(
-                &get_position(&last_y, self.geometry.coordinate_system()),
-                &get_position(&y, self.geometry.coordinate_system()),
-            ) {
-                // TODO: use c mixed with intersection_color.
-                let redshift = self.redshift_computer.compute_redshift(y, observer_energy);
-                let tune_redshift = 1.0;
-                let redshift = (redshift - 1.0) * tune_redshift + 1.0;
-                let wavelength = 400.0 * redshift;
-                let c = wavelength_to_rgb(wavelength);
-                intersections.push((intersection_color, redshift));
+            if let Some(intersection_color) =
+                self.objects
+                    .intersects(&last_y, &y, observer_energy, &self.redshift_computer)
+            {
+                intersections.push(intersection_color);
             }
         }
 
         if let Some(reason) = stop_reason {
             match reason {
                 HorizonReached => {
-                    intersections.push((Color::new(0, 0, 0, 255), 0.0));
+                    intersections.push(CIETristimulus::new(0.0, 0.0, 0.0, 1.0));
                 }
                 CelestialSphereReached => {
                     let uv = self.get_uv_coordinates(&y);
-                    let redshift = self.redshift_computer.compute_redshift(y, observer_energy);
-                    intersections.push((self.texture_data.celestial_map.color_at_uv(uv), redshift));
+                    let redshift = self.redshift_computer.compute_redshift(&y, observer_energy);
+                    intersections.push(self.texture_data.celestial_map.color_at_uv(uv, redshift));
                 }
             };
         } else {
             println!("ERROR: Ray did not hit anything: {:?}", ray);
         }
-        let mut result = Color::new(0, 0, 0, 255);
+        let mut result = CIETristimulus::new(0.0, 0.0, 0.0, 1.0);
 
-        for (color, _) in intersections.iter().rev() {
-            result = color.blend(&result)
+        for color in intersections.iter().rev() {
+            result = result.blend(&color)
         }
 
-        let redshift = if intersections.is_empty() {
-            None
-        } else {
-            let (_, r) = intersections[0];
-            Some(r)
-        };
-
-        (result, redshift)
+        result
     }
 
     fn get_uv_coordinates(&self, y_far: &EquationOfMotionState) -> UVCoordinates {
@@ -152,6 +139,7 @@ pub mod test_scene {
     use crate::geometry::geometry::Geometry;
     use crate::geometry::point::Point;
     use crate::rendering::camera::Camera;
+    use crate::rendering::color::CIETristimulusNormalization::NoNormalization;
     use crate::rendering::color::Color;
     use crate::rendering::scene::{IntegrationConfiguration, Scene, TextureData};
     use crate::rendering::texture::CheckerMapper;
@@ -201,18 +189,21 @@ pub mod test_scene {
             100.0,
             Color::new(0, 255, 0, 255),
             Color::new(0, 100, 0, 255),
+            NoNormalization,
         ));
         let texture_mapper_disk = Arc::new(CheckerMapper::new(
             200.0,
             10.0,
             Color::new(0, 0, 255, 255),
             Color::new(0, 0, 100, 255),
+            NoNormalization,
         ));
         let texture_mapper_sphere = Arc::new(CheckerMapper::new(
             10.0,
             10.0,
             Color::new(255, 0, 0, 255),
             Color::new(100, 0, 0, 255),
+            NoNormalization,
         ));
 
         let integration_configuration =
@@ -221,7 +212,7 @@ pub mod test_scene {
         let texture_data = TextureData {
             celestial_map: texture_mapper_celestial,
         };
-        let mut objects = scene_objects::objects::Objects::new();
+        let mut objects = scene_objects::objects::Objects::new(geometry);
         objects.add_object(Box::new(scene_objects::sphere::Sphere::new(
             center_sphere_radius,
             texture_mapper_sphere,
@@ -254,11 +245,20 @@ mod tests {
     use crate::geometry::schwarzschild::Schwarzschild;
     use crate::geometry::spherical_coordinates_helper::cartesian_to_spherical;
     use crate::rendering::camera::Camera;
+    use crate::rendering::color;
+    use crate::rendering::color::CIETristimulus;
     use crate::rendering::scene::test_scene::create_scene_with_camera;
-    use crate::rendering::scene::{Color, Scene};
-    use crate::rendering::texture::CheckerMapper;
-    use approx::assert_abs_diff_eq;
+    use crate::rendering::scene::Scene;
     use std::f64::consts::PI;
+
+    macro_rules! assert_approx_eq_cie_tristimulus {
+        ($x: expr, $y: expr, $e: expr) => {
+            approx::assert_abs_diff_eq!($x.x, $y.x, epsilon = $e);
+            approx::assert_abs_diff_eq!($x.y, $y.y, epsilon = $e);
+            approx::assert_abs_diff_eq!($x.z, $y.z, epsilon = $e);
+            approx::assert_abs_diff_eq!($x.alpha, $y.alpha, epsilon = $e);
+        };
+    }
 
     #[test]
     fn test_color_of_ray_hits_sphere() {
@@ -274,9 +274,18 @@ mod tests {
         let scene = create_scene_with_camera(2.0, 0.2, 0.3, &space, camera, 1e-12);
 
         let ray = scene.camera.get_ray_for(5, 5);
-        let (color, _) = scene.color_of_ray(&ray);
+        let color = scene.color_of_ray(&ray);
 
-        assert_eq!(color, Color::new(100, 0, 0, 255));
+        assert_approx_eq_cie_tristimulus!(
+            color,
+            CIETristimulus::new(
+                0.052562486896837575,
+                0.0271025410675224,
+                0.002463867369774764,
+                1.0,
+            ),
+            1e-6
+        );
     }
 
     #[test]
@@ -300,9 +309,18 @@ mod tests {
         let scene = create_scene_with_camera(2.0, 0.2, 0.3, &space, camera, 1e-12);
 
         let ray = scene.camera.get_ray_for(5, 5);
-        let (color, _) = scene.color_of_ray(&ray);
+        let color = scene.color_of_ray(&ray);
 
-        assert_eq!(color, Color::new(100, 0, 0, 255));
+        assert_approx_eq_cie_tristimulus!(
+            color,
+            CIETristimulus::new(
+                0.052562486896837575,
+                0.0271025410675224,
+                0.002463867369774764,
+                1.0,
+            ),
+            1e-6
+        );
     }
 
     #[test]
@@ -319,11 +337,13 @@ mod tests {
         let scene = create_scene_with_camera(2.0, 0.2, 0.3, &geometry, camera, 1e-12);
 
         let ray = scene.camera.get_ray_for(5, 5);
-        let (color, Some(redshift)) = scene.color_of_ray(&ray) else {
-            panic!("No redshift found");
-        };
+        let color = scene.color_of_ray(&ray);
 
-        assert_eq!(color, Color::new(255, 0, 0, 255));
+        assert_approx_eq_cie_tristimulus!(
+            color,
+            CIETristimulus::new(0.4124564, 0.2126729, 0.0193339, 1.0),
+            1e-6
+        );
     }
 
     #[test]
@@ -341,15 +361,15 @@ mod tests {
         let scene = create_scene_with_camera(sphere_radius, 0.2, 0.3, &geometry, camera, 1e-12);
 
         let ray = scene.camera.get_ray_for(5, 5);
-        let (color, Some(redshift)) = scene.color_of_ray(&ray) else {
-            panic!("No redshift found");
-        };
-
+        let color = scene.color_of_ray(&ray);
         let a_emitter = 1.0 - radius / sphere_radius;
         let expected_redshift = (a / a_emitter).sqrt();
 
-        assert_abs_diff_eq!(redshift, expected_redshift, epsilon = 1e-3);
-        assert_eq!(color, Color::new(255, 0, 0, 255));
+        assert_approx_eq_cie_tristimulus!(
+            color,
+            CIETristimulus::new(0.4124564, 0.2126729, 0.0193339, 1.0),
+            1e-6
+        );
     }
 
     #[test]
@@ -367,9 +387,18 @@ mod tests {
             create_scene_with_camera(2.0, 0.2, 0.3, &space, camera, 1e-12);
 
         let ray = scene.camera.get_ray_for(0, 0);
-        let (color, _) = scene.color_of_ray(&ray);
+        let color = scene.color_of_ray(&ray);
 
-        assert_eq!(color, Color::new(0, 100, 0, 255));
+        assert_approx_eq_cie_tristimulus!(
+            color,
+            CIETristimulus::new(
+                0.04556866876322511,
+                0.09113733752645022,
+                0.015189552006485689,
+                1.0
+            ),
+            1e-6
+        );
     }
 
     #[test]
@@ -398,9 +427,13 @@ mod tests {
         let scene = create_scene_with_camera(2.0, 0.2, 0.3, &space, camera, 1e-12);
 
         let ray = scene.camera.get_ray_for(0, 0);
-        let (color, _) = scene.color_of_ray(&ray);
+        let color = scene.color_of_ray(&ray);
 
-        assert_eq!(color, Color::new(0, 255, 0, 255));
+        assert_approx_eq_cie_tristimulus!(
+            color,
+            CIETristimulus::new(0.3575761, 0.7151522, 0.119192, 1.0),
+            1e-6
+        );
     }
 
     #[test]
@@ -431,9 +464,9 @@ mod tests {
         let scene = create_scene_with_camera(2.0, 0.2, 0.3, &space, camera, 1e-12);
 
         let ray = scene.camera.get_ray_for(6, 6);
-        let (color, _) = scene.color_of_ray(&ray);
+        let color = scene.color_of_ray(&ray);
 
-        assert_eq!(color, Color::new(0, 0, 0, 255));
+        assert_eq!(color, CIETristimulus::new(0.0, 0.0, 0.0, 1.0));
     }
 
     #[test]
@@ -451,10 +484,12 @@ mod tests {
             create_scene_with_camera(1.0, 2.0, 7.0, &space, camera, 1e-12);
 
         let ray = scene.camera.get_ray_for(0, 51);
-        let (color, redshift) = scene.color_of_ray(&ray);
+        let color = scene.color_of_ray(&ray);
 
-        assert_eq!(redshift, Some(1.0));
-        // assert_eq!(color, Color::new(1, 0, 16));  // TODO: red shift is ignored for now.
-        assert_eq!(color, Color::new(0, 0, 255, 255));
+        assert_approx_eq_cie_tristimulus!(
+            color,
+            CIETristimulus::new(0.1804375, 0.072175, 0.9503041, 1.0),
+            1e-6
+        );
     }
 }

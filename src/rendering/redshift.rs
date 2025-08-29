@@ -13,9 +13,9 @@ impl<'a, G: Geometry> RedshiftComputer<'a, G> {
         Self { geometry }
     }
 
-    pub fn compute_redshift(&self, y: EquationOfMotionState, observer_energy: f64) -> f64 {
+    pub fn compute_redshift(&self, y: &EquationOfMotionState, observer_energy: f64) -> f64 {
         let emitter_energy = self.energy_of_stationary_emitter(y);
-        emitter_energy / observer_energy
+        observer_energy / emitter_energy
     }
 
     pub fn get_observer_energy(&self, ray: &Ray, velocity: &FourVector) -> f64 {
@@ -23,7 +23,7 @@ impl<'a, G: Geometry> RedshiftComputer<'a, G> {
             .inner_product(&ray.position, velocity, &ray.momentum)
     }
 
-    fn energy_of_stationary_emitter(&self, y: EquationOfMotionState) -> f64 {
+    fn energy_of_stationary_emitter(&self, y: &EquationOfMotionState) -> f64 {
         let position = Point::new(y[0], y[1], y[2], y[3], self.geometry.coordinate_system());
         let velocity = self.geometry.get_stationary_velocity_at(&position);
         let momentum = FourVector::new(y[4], y[5], y[6], y[7], self.geometry.coordinate_system());
