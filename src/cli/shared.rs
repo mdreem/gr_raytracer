@@ -8,6 +8,7 @@ use crate::rendering::color::CIETristimulusNormalization::NoNormalization;
 use crate::rendering::color::{CIETristimulusNormalization, Color};
 use crate::rendering::integrator::IntegrationConfiguration;
 use crate::rendering::raytracer;
+use crate::rendering::raytracer::RaytracerError;
 use crate::rendering::scene::Scene;
 use crate::rendering::texture::{
     BlackBodyMapper, CheckerMapper, TextureData, TextureMapHandle, TextureMapperFactory,
@@ -21,9 +22,9 @@ pub fn render<G: Geometry>(
     scene: Scene<G>,
     filename: String,
     color_normalization: CIETristimulusNormalization,
-) {
+) -> Result<(), RaytracerError> {
     let raytracer = raytracer::Raytracer::new(scene, color_normalization);
-    raytracer.render(filename);
+    raytracer.render(filename)
 }
 
 pub fn create_scene<G: Geometry>(
@@ -32,7 +33,7 @@ pub fn create_scene<G: Geometry>(
     camera_momentum: FourVector,
     opts: GlobalOpts,
     config: RenderConfig,
-) -> Scene<'_, G> {
+) -> Result<Scene<'_, G>, RaytracerError> {
     let integration_configuration = IntegrationConfiguration::new(
         opts.max_steps,
         opts.max_radius,
@@ -43,7 +44,7 @@ pub fn create_scene<G: Geometry>(
     let mut texture_mapper_factory = TextureMapperFactory::new();
 
     let texture_mapper_celestial =
-        get_texture_mapper(&mut texture_mapper_factory, config.celestial_texture);
+        get_texture_mapper(&mut texture_mapper_factory, config.celestial_texture)?;
 
     let camera = Camera::new(
         camera_position,
@@ -71,7 +72,7 @@ pub fn create_scene<G: Geometry>(
                     radius, position.0, position.1, position.2
                 );
                 let texture_mapper_sphere =
-                    get_texture_mapper(&mut texture_mapper_factory, texture);
+                    get_texture_mapper(&mut texture_mapper_factory, texture)?;
 
                 let sphere = scene_objects::sphere::Sphere::new(
                     radius,
@@ -89,7 +90,7 @@ pub fn create_scene<G: Geometry>(
                     "Adding disc with inner radius: {}, outer radius: {}",
                     inner_radius, outer_radius
                 );
-                let texture_mapper_disc = get_texture_mapper(&mut texture_mapper_factory, texture);
+                let texture_mapper_disc = get_texture_mapper(&mut texture_mapper_factory, texture)?;
                 let disc =
                     scene_objects::disc::Disc::new(inner_radius, outer_radius, texture_mapper_disc);
                 objects.add_object(Box::new(disc));
@@ -105,18 +106,18 @@ pub fn create_scene<G: Geometry>(
         camera,
         false,
     );
-    scene
+    Ok(scene)
 }
 
 fn get_texture_mapper(
     texture_mapper_factory: &mut TextureMapperFactory,
     texture: TextureConfig,
-) -> TextureMapHandle {
+) -> Result<TextureMapHandle, RaytracerError> {
     let texture_mapper_sphere = match texture {
         TextureConfig::Bitmap {
             path,
             color_normalization,
-        } => texture_mapper_factory.get_texture_mapper(path, color_normalization),
+        } => texture_mapper_factory.get_texture_mapper(path, color_normalization)?,
         TextureConfig::Checker {
             width,
             height,
@@ -135,5 +136,5 @@ fn get_texture_mapper(
             color_normalization,
         } => Arc::new(BlackBodyMapper::new(temperature, color_normalization)),
     };
-    texture_mapper_sphere
+    Ok(texture_mapper_sphere)
 }

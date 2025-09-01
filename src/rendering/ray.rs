@@ -2,6 +2,7 @@ use crate::geometry::four_vector::FourVector;
 use crate::geometry::geometry::HasCoordinateSystem;
 use crate::geometry::point::Point;
 use crate::rendering::integrator::Step;
+use crate::rendering::raytracer::RaytracerError;
 use crate::rendering::scene::get_position;
 use std::io::Write;
 use std::ops::Index;
@@ -44,10 +45,14 @@ impl IntegratedRay {
         Self { steps }
     }
 
-    pub fn save(&self, write: &mut dyn Write, geometry: &dyn HasCoordinateSystem) {
+    pub fn save(
+        &self,
+        write: &mut dyn Write,
+        geometry: &dyn HasCoordinateSystem,
+    ) -> Result<(), RaytracerError> {
         write
             .write_all(b"i,t,tau,x,y,z\n")
-            .expect("Unable to write file");
+            .map_err(RaytracerError::IoError)?;
 
         for step in &self.steps {
             let position = get_position(&step.y, geometry.coordinate_system());
@@ -60,9 +65,9 @@ impl IntegratedRay {
                     )
                     .as_bytes(),
                 )
-                .expect("Unable to write file");
+                .map_err(RaytracerError::IoError)?;
         }
-        write.flush().unwrap();
+        write.flush().map_err(RaytracerError::IoError)
     }
 
     pub fn len(&self) -> usize {

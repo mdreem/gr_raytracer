@@ -274,7 +274,6 @@ mod tests {
     use crate::rendering::scene;
     use crate::rendering::scene::test_scene::CELESTIAL_SPHERE_RADIUS;
     use crate::rendering::scene::Scene;
-    use crate::rendering::texture::CheckerMapper;
     use approx::assert_abs_diff_eq;
     use nalgebra::allocator::Allocator;
     use nalgebra::{DefaultAllocator, Dim, OVector};
@@ -480,8 +479,14 @@ mod tests {
         println!("ray_a: {:?}", ray_a);
         println!("ray_b: {:?}", ray_b);
 
-        let (trajectory_a, _) = scene.integrator.integrate(&ray_a);
-        let (trajectory_b, _) = scene.integrator.integrate(&ray_b);
+        let (trajectory_a, _) = scene
+            .integrator
+            .integrate(&ray_a)
+            .expect("unable to integrate ray_a");
+        let (trajectory_b, _) = scene
+            .integrator
+            .integrate(&ray_b)
+            .expect("unable to integrate ray_b");
         assert_eq!(trajectory_a.len(), trajectory_b.len());
 
         for i in 0..trajectory_a.len() {
@@ -602,7 +607,10 @@ mod tests {
             0.0,
             epsilon = 1e-8
         );
-        let (result_geodesic_equation, stop_reason) = scene.integrator.integrate(&ray);
+        let (result_geodesic_equation, stop_reason) = scene
+            .integrator
+            .integrate(&ray)
+            .expect("unable to integrate ray");
 
         let ts = TestSchwarzschild { radius };
         let result_r_phi_equation =

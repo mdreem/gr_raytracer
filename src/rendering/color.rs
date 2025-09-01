@@ -98,23 +98,6 @@ impl CIETristimulus {
     }
 }
 
-#[derive(Debug, PartialEq, Copy, Clone)]
-pub struct Chromaticity {
-    pub x: f64,
-    pub y: f64,
-    pub z: f64,
-}
-
-impl Chromaticity {
-    pub fn new(x: f64, y: f64, z: f64) -> Chromaticity {
-        Chromaticity { x, y, z }
-    }
-
-    pub fn as_vector(&self) -> Vector3<f64> {
-        Vector3::new(self.x, self.y, self.z)
-    }
-}
-
 impl Color {
     pub fn new(r: u8, g: u8, b: u8, alpha: u8) -> Color {
         Color { r, g, b, alpha }

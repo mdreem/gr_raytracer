@@ -13,13 +13,13 @@ pub fn render_euclidean_spherical(
     config: RenderConfig,
     camera_position: Point,
     filename: String,
-) {
+) -> Result<(), raytracer::RaytracerError> {
     let camera_position = cartesian_to_spherical(&camera_position);
     let momentum = FourVector::new_spherical(1.0, 0.0, 0.0, 0.0);
     let geometry = EuclideanSpaceSpherical::new();
-    let scene = create_scene(&geometry, camera_position, momentum, opts, config.clone());
+    let scene = create_scene(&geometry, camera_position, momentum, opts, config.clone())?;
 
-    render(scene, filename, config.color_normalization);
+    render(scene, filename, config.color_normalization)
 }
 
 pub fn render_euclidean_spherical_ray(
@@ -29,14 +29,15 @@ pub fn render_euclidean_spherical_ray(
     config: RenderConfig,
     camera_position: Point,
     write: &mut dyn Write,
-) {
+) -> Result<(), raytracer::RaytracerError> {
     let camera_position = cartesian_to_spherical(&camera_position);
     let momentum = FourVector::new_spherical(1.0, 0.0, 0.0, 0.0);
     let geometry = EuclideanSpaceSpherical::new();
 
-    let scene = create_scene(&geometry, camera_position, momentum, opts, config.clone());
+    let scene = create_scene(&geometry, camera_position, momentum, opts, config.clone())?;
     let raytracer = raytracer::Raytracer::new(scene, config.color_normalization);
-    let (integrated_ray, stop_reason) = raytracer.integrate_ray_at_point(row, col);
+    let (integrated_ray, stop_reason) = raytracer.integrate_ray_at_point(row, col)?;
     println!("Stop reason: {:?}", stop_reason);
-    integrated_ray.save(write, &geometry);
+    integrated_ray.save(write, &geometry)?;
+    Ok(())
 }
