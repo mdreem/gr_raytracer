@@ -1,14 +1,30 @@
 use crate::geometry::geometry::Geometry;
 use crate::rendering::color;
 use crate::rendering::color::{xyz_to_srgb, CIETristimulusNormalization};
-use crate::rendering::integrator::StopReason;
+use crate::rendering::integrator::{IntegrationError, StopReason};
 use crate::rendering::ray::IntegratedRay;
 use crate::rendering::scene::Scene;
-use image::{ImageBuffer, ImageFormat, Primitive, Rgb};
+use crate::rendering::texture::TextureError;
+use image::{ImageBuffer, ImageError, ImageFormat, Primitive, Rgb};
+use indicatif::style::TemplateError;
+use log::error;
 use rayon::iter::IndexedParallelIterator;
 use rayon::iter::ParallelIterator;
 use rayon::prelude::ParallelSliceMut;
+use std::io;
 use std::sync::atomic::{AtomicUsize, Ordering};
+
+#[derive(Debug)]
+pub enum RaytracerError {
+    IntegrationError(IntegrationError),
+    IoError(io::Error),
+    ConfigurationFileError(io::Error),
+    TomlError(toml::de::Error),
+    TextureError(TextureError),
+    ImageError(ImageError),
+    ImageBufferCreation,
+    ProgressBarTemplateError(TemplateError),
+}
 
 pub struct Raytracer<'a, G: Geometry> {
     scene: Scene<'a, G>,
@@ -38,7 +54,7 @@ impl<'a, G: Geometry> Raytracer<'a, G> {
         to_row: u32,
         to_col: u32,
         buffer_transformer: F,
-    ) -> Vec<B>
+    ) -> Result<Vec<B>, RaytracerError>
     where
         F: Fn(f32, f32, f32) -> (B, B, B) + Sync,
     {
@@ -49,7 +65,7 @@ impl<'a, G: Geometry> Raytracer<'a, G> {
         use indicatif::{ProgressBar, ProgressStyle};
         let pb = ProgressBar::new(max_count as u64);
         pb.set_style(ProgressStyle::with_template("🎨 {spinner:.green} [{elapsed_precise}] [{wide_bar:.blue}] {pos}/{len} ({percent_precise}%, {eta})")
-            .unwrap()
+            .map_err(RaytracerError::ProgressBarTemplateError)?
             .progress_chars("█▇▆▅▄▃▂▁  "));
 
         buffer.par_chunks_mut(3).enumerate().for_each(|(i, p)| {
@@ -63,15 +79,30 @@ impl<'a, G: Geometry> Raytracer<'a, G> {
                 .scene
                 .camera
                 .get_ray_for((y + from_row) as i64, (x + from_col) as i64);
-            let cie_tristimulus = self.scene.color_of_ray(&ray);
-            (p[0], p[1], p[2]) = buffer_transformer(
-                cie_tristimulus.x as f32,
-                cie_tristimulus.y as f32,
-                cie_tristimulus.z as f32,
-            );
+
+            match self.scene.color_of_ray(&ray) {
+                Ok(cie_tristimulus) => {
+                    (p[0], p[1], p[2]) = buffer_transformer(
+                        cie_tristimulus.x as f32,
+                        cie_tristimulus.y as f32,
+                        cie_tristimulus.z as f32,
+                    );
+                }
+                Err(err) => {
+                    p[0] = B::zero();
+                    p[1] = B::zero();
+                    p[2] = B::zero();
+                    error!(
+                        "Unable to compute color for ray at pixel ({}, {}): {:?}",
+                        x + from_col,
+                        y + from_row,
+                        err
+                    );
+                }
+            }
         });
         pb.finish();
-        buffer
+        Ok(buffer)
     }
 
     pub fn render_section(
@@ -81,18 +112,19 @@ impl<'a, G: Geometry> Raytracer<'a, G> {
         to_row: u32,
         to_col: u32,
         filename: String,
-    ) {
+    ) -> Result<(), RaytracerError> {
         if filename.ends_with(".hdr") {
             println!("Creating HDR image");
             let buffer =
                 self.render_section_to_buffer(from_row, from_col, to_row, to_col, &|x, y, z| {
                     (x, y, z)
-                });
+                })?;
             let imgbuf_hdr: ImageBuffer<Rgb<f32>, Vec<f32>> =
-                image::ImageBuffer::from_vec(to_col - from_col, to_row - from_row, buffer).unwrap();
+                image::ImageBuffer::from_vec(to_col - from_col, to_row - from_row, buffer)
+                    .ok_or(RaytracerError::ImageBufferCreation)?;
             imgbuf_hdr
                 .save_with_format(&filename, ImageFormat::Hdr)
-                .unwrap();
+                .map_err(RaytracerError::ImageError)?;
         } else {
             println!("Creating non-HDR image");
             let color_normalization = self.color_normalization;
@@ -106,31 +138,33 @@ impl<'a, G: Geometry> Raytracer<'a, G> {
                     };
                     let color = xyz_to_srgb(&cie_tristimulus.normalize(color_normalization), 1.0);
                     (color.r, color.g, color.b)
-                });
+                })?;
             let imgbuf: ImageBuffer<Rgb<u8>, Vec<u8>> =
-                image::ImageBuffer::from_vec(to_col - from_col, to_row - from_row, buffer).unwrap();
-            imgbuf.save(&filename).unwrap();
+                image::ImageBuffer::from_vec(to_col - from_col, to_row - from_row, buffer)
+                    .ok_or(RaytracerError::ImageBufferCreation)?;
+            imgbuf.save(&filename).map_err(RaytracerError::ImageError)?;
         }
 
         println!("saved image to {}", filename);
+        Ok(())
     }
 
     // TODO: maybe change image width and height types to align through the codebase
-    pub fn render(&self, filename: String) {
+    pub fn render(&self, filename: String) -> Result<(), RaytracerError> {
         self.render_section(
             0,
             0,
             self.scene.camera.rows as u32,
             self.scene.camera.columns as u32,
             filename,
-        );
+        )
     }
 
     pub fn integrate_ray_at_point(
         &self,
         row: i64,
         col: i64,
-    ) -> (IntegratedRay, Option<StopReason>) {
+    ) -> Result<(IntegratedRay, Option<StopReason>), RaytracerError> {
         let ray = self.scene.camera.get_ray_for(row, col);
         println!("ray for {}-{} is: {:?}", row, col, ray);
         self.scene.integrate_ray(&ray)

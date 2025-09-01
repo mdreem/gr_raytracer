@@ -1,3 +1,5 @@
+use crate::rendering::integrator::IntegrationError;
+use crate::rendering::raytracer::RaytracerError;
 use nalgebra::allocator::Allocator;
 use nalgebra::OVector;
 use nalgebra::{DefaultAllocator, Dim};
@@ -110,7 +112,7 @@ pub fn rkf45<D: Dim, F: OdeFunction<D>>(
     h: f64,
     epsilon: f64,
     f: &F,
-) -> (OVector<f64, D>, f64)
+) -> Result<(OVector<f64, D>, f64), RaytracerError>
 where
     DefaultAllocator: Allocator<D>,
 {
@@ -124,14 +126,16 @@ where
             h_cur = h_new / 2.0; // Halve the step size and retry.
         } else {
             // step is accepted
-            if truncation_error / epsilon < ERROR_RATIO_SMALL_ERROR {
-                return (y_new, 2.0 * h_cur);
+            return if truncation_error / epsilon < ERROR_RATIO_SMALL_ERROR {
+                Ok((y_new, 2.0 * h_cur))
             } else {
-                return (y_new, h_cur);
-            }
+                Ok((y_new, h_cur))
+            };
         }
     }
-    panic!("RKF45 did not converge after {} retries.", MAX_RETRY_STEP);
+    Err(RaytracerError::IntegrationError(
+        IntegrationError::MaxStepsReached,
+    ))
 }
 
 #[cfg(test)]
@@ -173,13 +177,13 @@ mod tests {
         let mut t = 0.0;
         let mut h = step_size;
         while t <= 25.0 {
-            (y, h) = rkf45(&y, t, h, 1e-10, &simple_equation);
+            (y, h) = rkf45(&y, t, h, 1e-10, &simple_equation).unwrap();
             t += h;
         }
         assert_abs_diff_eq!(y, solution_simple_equation(t - h), epsilon = 1e-5);
 
         while t <= 50.0 {
-            (y, h) = rkf45(&y, t, h, 1e-10, &simple_equation);
+            (y, h) = rkf45(&y, t, h, 1e-10, &simple_equation).unwrap();
             t += h;
         }
         assert_abs_diff_eq!(y, solution_simple_equation(t - h), epsilon = 1e-5);

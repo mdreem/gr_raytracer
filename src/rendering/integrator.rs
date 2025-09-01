@@ -2,6 +2,7 @@ use crate::geometry::geometry::Geometry;
 use crate::geometry::point::Point;
 use crate::rendering::integrator::StopReason::{CelestialSphereReached, HorizonReached};
 use crate::rendering::ray::{IntegratedRay, Ray};
+use crate::rendering::raytracer::RaytracerError;
 use crate::rendering::runge_kutta::rkf45;
 use crate::rendering::scene::{get_position, EquationOfMotionState};
 
@@ -58,8 +59,16 @@ impl IntegrationConfiguration {
     }
 }
 
+#[derive(Debug)]
+pub enum IntegrationError {
+    MaxStepsReached,
+}
+
 impl<G: Geometry> Integrator<'_, G> {
-    pub fn integrate(&self, ray: &Ray) -> (IntegratedRay, Option<StopReason>) {
+    pub fn integrate(
+        &self,
+        ray: &Ray,
+    ) -> Result<(IntegratedRay, Option<StopReason>), RaytracerError> {
         let mut t = 0.0;
         let direction = ray.momentum.get_as_vector();
         let mut y = EquationOfMotionState::from_column_slice(&[
@@ -85,17 +94,17 @@ impl<G: Geometry> Integrator<'_, G> {
                 h,
                 self.integration_configuration.epsilon,
                 self.geometry,
-            );
+            )?;
             t += h;
 
             result.push(Step { y, t, step: i });
             match self.should_stop(&last_y, &y) {
                 None => {}
-                Some(r) => return (IntegratedRay::new(result), Some(r)),
+                Some(r) => return Ok((IntegratedRay::new(result), Some(r))),
             }
         }
 
-        (IntegratedRay::new(result), None)
+        Ok((IntegratedRay::new(result), None))
     }
 
     fn should_stop(

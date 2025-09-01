@@ -62,7 +62,6 @@ mod tests {
     use crate::rendering::color::CIETristimulusNormalization::NoNormalization;
     use crate::rendering::color::Color;
     use crate::rendering::texture::CheckerMapper;
-    use crate::scene_objects::hittable::Hittable;
     use crate::scene_objects::sphere::Sphere;
     use approx::assert_abs_diff_eq;
     use std::sync::Arc;
