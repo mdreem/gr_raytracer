@@ -10,6 +10,7 @@ use crate::geometry::spherical_coordinates_helper::cartesian_to_spherical;
 use crate::rendering::integrator::{IntegrationConfiguration, Integrator};
 use crate::rendering::ray::Ray;
 use crate::rendering::raytracer;
+use log::info;
 use std::io::Write;
 
 pub fn render_schwarzschild(
@@ -19,7 +20,7 @@ pub fn render_schwarzschild(
     config: RenderConfig,
     camera_position: Point,
     filename: String,
-) {
+) -> Result<(), raytracer::RaytracerError> {
     let camera_position = cartesian_to_spherical(&camera_position);
 
     let r = camera_position[1];
@@ -27,9 +28,9 @@ pub fn render_schwarzschild(
     let momentum = FourVector::new_spherical(1.0 / a.sqrt(), 0.0, 0.0, 0.0);
 
     let geometry = Schwarzschild::new(radius, horizon_epsilon);
-    let scene = create_scene(&geometry, camera_position, momentum, opts, config.clone());
+    let scene = create_scene(&geometry, camera_position, momentum, opts, config.clone())?;
 
-    render(scene, filename, config.color_normalization);
+    render(scene, filename, config.color_normalization)
 }
 
 pub fn render_schwarzschild_ray(
@@ -41,18 +42,19 @@ pub fn render_schwarzschild_ray(
     config: RenderConfig,
     camera_position: Point,
     write: &mut dyn Write,
-) {
+) -> Result<(), raytracer::RaytracerError> {
     let camera_position = cartesian_to_spherical(&camera_position);
     let r = camera_position[1];
     let a = 1.0 - radius / r;
     let momentum = FourVector::new_spherical(1.0 / a.sqrt(), 0.0, 0.0, 0.0);
     let geometry = Schwarzschild::new(radius, horizon_epsilon);
 
-    let scene = create_scene(&geometry, camera_position, momentum, opts, config.clone());
+    let scene = create_scene(&geometry, camera_position, momentum, opts, config.clone())?;
     let raytracer = raytracer::Raytracer::new(scene, config.color_normalization);
-    let (integrated_ray, stop_reason) = raytracer.integrate_ray_at_point(row, col);
-    println!("Stop reason: {:?}", stop_reason);
-    integrated_ray.save(write, &geometry);
+    let (integrated_ray, stop_reason) = raytracer.integrate_ray_at_point(row, col)?;
+    info!("Stop reason: {:?}", stop_reason);
+    integrated_ray.save(write, &geometry)?;
+    Ok(())
 }
 
 pub fn render_schwarzschild_ray_at(
@@ -62,7 +64,7 @@ pub fn render_schwarzschild_ray_at(
     direction: FourVector,
     opts: GlobalOpts,
     write: &mut dyn Write,
-) {
+) -> Result<(), raytracer::RaytracerError> {
     let position_spherical = cartesian_to_spherical(&position);
     let _r = position_spherical[1];
     let theta = position_spherical[2];
@@ -79,13 +81,13 @@ pub fn render_schwarzschild_ray_at(
     let geometry = Schwarzschild::new(radius, horizon_epsilon);
 
     let tetrad = bare_spherical.get_tetrad_at(&position_spherical);
-    println!("Tetrad at position {:?}: {}", position_spherical, tetrad);
+    info!("Tetrad at position {:?}: {}", position_spherical, tetrad);
 
     let momentum = tetrad.t * 1.0 + tetrad.x * (phi_d) + tetrad.y * (-theta_d) + tetrad.z * (-r_d);
 
     let m_s = geometry.inner_product(&position_spherical, &momentum, &momentum);
 
-    println!(
+    info!(
         "Momentum at position {:?}: {:?} with m_s={}",
         position_spherical, momentum, m_s
     );
@@ -100,9 +102,10 @@ pub fn render_schwarzschild_ray_at(
     );
     let integrator = Integrator::new(&geometry, integration_configuration);
 
-    let (integrated_ray, stop_reason) = integrator.integrate(&ray);
-    println!("Stop reason: {:?}", stop_reason);
-    integrated_ray.save(write, &geometry);
+    let (integrated_ray, stop_reason) = integrator.integrate(&ray)?;
+    info!("Stop reason: {:?}", stop_reason);
+    integrated_ray.save(write, &geometry)?;
+    Ok(())
 }
 
 #[cfg(test)]
@@ -136,7 +139,8 @@ mod tests {
             direction,
             opts.clone(),
             &mut output_buffer,
-        );
+        )
+        .expect("Failed to render schwarzschild ray");
         let output = std::str::from_utf8(output_buffer.get_ref()).unwrap();
         let lines = output.split("\n").collect::<Vec<&str>>();
 
