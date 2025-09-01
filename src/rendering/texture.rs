@@ -1,7 +1,16 @@
 use crate::rendering::black_body_radiation::get_cie_xyz_of_black_body_redshifted;
 use crate::rendering::color::{srgb_to_xyz, CIETristimulus, CIETristimulusNormalization, Color};
+use crate::rendering::raytracer::RaytracerError;
+use crate::rendering::texture::TextureError::DecodeError;
 use image::{DynamicImage, GenericImageView, ImageReader};
 use std::sync::Arc;
+
+#[derive(Debug)]
+pub enum TextureError {
+    TextureFileError(String),
+    IoError(std::io::Error),
+    DecodeError(image::ImageError),
+}
 
 pub struct UVCoordinates {
     pub u: f64,
@@ -26,16 +35,18 @@ impl TextureMapper {
     pub fn new(
         filename: String,
         color_normalization: CIETristimulusNormalization,
-    ) -> TextureMapper {
+    ) -> Result<TextureMapper, RaytracerError> {
         let image = ImageReader::open(filename)
-            .expect("Failed to open image file")
+            .map_err(TextureError::IoError)
+            .map_err(RaytracerError::TextureError)?
             .decode()
-            .expect("Failed to decode image");
+            .map_err(DecodeError)
+            .map_err(RaytracerError::TextureError)?;
 
-        TextureMapper {
+        Ok(TextureMapper {
             image,
             color_normalization,
-        }
+        })
     }
 }
 
@@ -139,16 +150,18 @@ impl TextureMapperFactory {
         &mut self,
         filename: String,
         color_normalization: CIETristimulusNormalization,
-    ) -> TextureMapHandle {
+    ) -> Result<TextureMapHandle, RaytracerError> {
         if self.texture_map_map.get(&filename).is_none() {
-            let new_mapper = TextureMapper::new(filename.clone(), color_normalization);
+            let new_mapper = TextureMapper::new(filename.clone(), color_normalization)?;
             self.texture_map_map
                 .insert(filename.clone(), Arc::new(new_mapper));
         }
 
         self.texture_map_map
             .get(&filename)
-            .expect("Failed to get texture mapper")
-            .clone()
+            .cloned()
+            .ok_or(RaytracerError::TextureError(
+                TextureError::TextureFileError(filename.clone()),
+            ))
     }
 }

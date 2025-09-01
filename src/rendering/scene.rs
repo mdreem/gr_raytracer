@@ -6,6 +6,7 @@ use crate::rendering::color::CIETristimulus;
 use crate::rendering::integrator::StopReason::{CelestialSphereReached, HorizonReached};
 use crate::rendering::integrator::{IntegrationConfiguration, Integrator, StopReason};
 use crate::rendering::ray::{IntegratedRay, Ray};
+use crate::rendering::raytracer::RaytracerError;
 use crate::rendering::redshift::RedshiftComputer;
 use crate::rendering::texture::{TextureData, UVCoordinates};
 use crate::scene_objects::objects::Objects;
@@ -64,18 +65,21 @@ impl<'a, G: Geometry> Scene<'a, G> {
         }
     }
 
-    pub fn integrate_ray(&self, ray: &Ray) -> (IntegratedRay, Option<StopReason>) {
+    pub fn integrate_ray(
+        &self,
+        ray: &Ray,
+    ) -> Result<(IntegratedRay, Option<StopReason>), RaytracerError> {
         self.integrator.integrate(ray)
     }
 
-    pub fn color_of_ray(&self, ray: &Ray) -> CIETristimulus {
-        let (steps, stop_reason) = self.integrate_ray(ray);
+    pub fn color_of_ray(&self, ray: &Ray) -> Result<CIETristimulus, RaytracerError> {
+        let (steps, stop_reason) = self.integrate_ray(ray)?;
         let mut y = steps[0].y;
 
         if self.save_ray_data {
             let mut file = File::create(format!("ray-{}-{}.csv", ray.row, ray.col))
                 .expect("Unable to create file");
-            steps.save(&mut file, self.geometry);
+            steps.save(&mut file, self.geometry)?;
         }
 
         let velocity = self.camera.velocity;
@@ -114,7 +118,7 @@ impl<'a, G: Geometry> Scene<'a, G> {
             result = result.blend(&color)
         }
 
-        result
+        Ok(result)
     }
 
     fn get_uv_coordinates(&self, y_far: &EquationOfMotionState) -> UVCoordinates {
@@ -245,7 +249,6 @@ mod tests {
     use crate::geometry::schwarzschild::Schwarzschild;
     use crate::geometry::spherical_coordinates_helper::cartesian_to_spherical;
     use crate::rendering::camera::Camera;
-    use crate::rendering::color;
     use crate::rendering::color::CIETristimulus;
     use crate::rendering::scene::test_scene::create_scene_with_camera;
     use crate::rendering::scene::Scene;
@@ -274,7 +277,7 @@ mod tests {
         let scene = create_scene_with_camera(2.0, 0.2, 0.3, &space, camera, 1e-12);
 
         let ray = scene.camera.get_ray_for(5, 5);
-        let color = scene.color_of_ray(&ray);
+        let color = scene.color_of_ray(&ray).unwrap();
 
         assert_approx_eq_cie_tristimulus!(
             color,
@@ -309,7 +312,7 @@ mod tests {
         let scene = create_scene_with_camera(2.0, 0.2, 0.3, &space, camera, 1e-12);
 
         let ray = scene.camera.get_ray_for(5, 5);
-        let color = scene.color_of_ray(&ray);
+        let color = scene.color_of_ray(&ray).unwrap();
 
         assert_approx_eq_cie_tristimulus!(
             color,
@@ -337,7 +340,7 @@ mod tests {
         let scene = create_scene_with_camera(2.0, 0.2, 0.3, &geometry, camera, 1e-12);
 
         let ray = scene.camera.get_ray_for(5, 5);
-        let color = scene.color_of_ray(&ray);
+        let color = scene.color_of_ray(&ray).unwrap();
 
         assert_approx_eq_cie_tristimulus!(
             color,
@@ -361,7 +364,7 @@ mod tests {
         let scene = create_scene_with_camera(sphere_radius, 0.2, 0.3, &geometry, camera, 1e-12);
 
         let ray = scene.camera.get_ray_for(5, 5);
-        let color = scene.color_of_ray(&ray);
+        let color = scene.color_of_ray(&ray).unwrap();
         let a_emitter = 1.0 - radius / sphere_radius;
         let expected_redshift = (a / a_emitter).sqrt();
 
@@ -387,7 +390,7 @@ mod tests {
             create_scene_with_camera(2.0, 0.2, 0.3, &space, camera, 1e-12);
 
         let ray = scene.camera.get_ray_for(0, 0);
-        let color = scene.color_of_ray(&ray);
+        let color = scene.color_of_ray(&ray).unwrap();
 
         assert_approx_eq_cie_tristimulus!(
             color,
@@ -427,7 +430,7 @@ mod tests {
         let scene = create_scene_with_camera(2.0, 0.2, 0.3, &space, camera, 1e-12);
 
         let ray = scene.camera.get_ray_for(0, 0);
-        let color = scene.color_of_ray(&ray);
+        let color = scene.color_of_ray(&ray).unwrap();
 
         assert_approx_eq_cie_tristimulus!(
             color,
@@ -464,7 +467,7 @@ mod tests {
         let scene = create_scene_with_camera(2.0, 0.2, 0.3, &space, camera, 1e-12);
 
         let ray = scene.camera.get_ray_for(6, 6);
-        let color = scene.color_of_ray(&ray);
+        let color = scene.color_of_ray(&ray).unwrap();
 
         assert_eq!(color, CIETristimulus::new(0.0, 0.0, 0.0, 1.0));
     }
@@ -484,7 +487,7 @@ mod tests {
             create_scene_with_camera(1.0, 2.0, 7.0, &space, camera, 1e-12);
 
         let ray = scene.camera.get_ray_for(0, 51);
-        let color = scene.color_of_ray(&ray);
+        let color = scene.color_of_ray(&ray).unwrap();
 
         assert_approx_eq_cie_tristimulus!(
             color,

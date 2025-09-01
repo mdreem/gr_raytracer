@@ -13,6 +13,7 @@ use crate::cli::schwarzschild::{
 use crate::configuration::{GeometryType, RenderConfig};
 use crate::geometry::four_vector::FourVector;
 use crate::geometry::point::{CoordinateSystem, Point};
+use crate::rendering::raytracer::RaytracerError;
 use clap::Parser;
 use nalgebra::Vector4;
 use std::fs;
@@ -20,15 +21,20 @@ use std::fs::File;
 use std::time::Instant;
 
 fn main() {
+    run().expect("Error running raytracer");
+}
+
+fn run() -> Result<(), RaytracerError> {
     let args = App::parse();
 
     let start = Instant::now();
     match args.action {
         Action::Render { filename } => {
-            let config_file =
-                fs::read_to_string(args.config_file).expect("Unable to open configuration file");
+            let config_file = fs::read_to_string(args.config_file)
+                .map_err(RaytracerError::ConfigurationFileError)?;
 
-            let config: RenderConfig = toml::from_str(config_file.as_str()).unwrap();
+            let config: RenderConfig =
+                toml::from_str(config_file.as_str()).map_err(RaytracerError::TomlError)?;
 
             if args.global_opts.camera_position.len() != 3 {
                 panic!("Camera position must be a vector of length 3");
@@ -48,7 +54,7 @@ fn main() {
                         config,
                         Point::new_from_vector(position, CoordinateSystem::Cartesian),
                         filename,
-                    );
+                    )?;
                 }
                 GeometryType::EuclideanSpherical => {
                     println!("Rendering Euclidean spherical geometry");
@@ -57,7 +63,7 @@ fn main() {
                         config,
                         Point::new_from_vector(position, CoordinateSystem::Cartesian),
                         filename,
-                    );
+                    )?;
                 }
                 GeometryType::Schwarzschild {
                     radius,
@@ -71,15 +77,16 @@ fn main() {
                         config,
                         Point::new_from_vector(position, CoordinateSystem::Cartesian),
                         filename,
-                    );
+                    )?;
                 }
             }
         }
         Action::RenderRay { row, col, filename } => {
-            let config_file =
-                fs::read_to_string(args.config_file).expect("Unable to open configuration file");
+            let config_file = fs::read_to_string(args.config_file)
+                .map_err(RaytracerError::ConfigurationFileError)?;
 
-            let config: RenderConfig = toml::from_str(config_file.as_str()).unwrap();
+            let config: RenderConfig =
+                toml::from_str(config_file.as_str()).map_err(RaytracerError::TomlError)?;
 
             if args.global_opts.camera_position.len() != 3 {
                 panic!("Camera position must be a vector of length 3");
@@ -91,7 +98,8 @@ fn main() {
                 args.global_opts.camera_position[2],
             );
 
-            let mut file = File::create(filename.clone()).expect("Unable to create file");
+            let mut file =
+                File::create(filename.clone()).map_err(RaytracerError::ConfigurationFileError)?;
             match config.geometry_type {
                 GeometryType::Euclidean => {
                     println!("Rendering ray in Euclidean geometry");
@@ -102,7 +110,7 @@ fn main() {
                         config,
                         Point::new_from_vector(position, CoordinateSystem::Cartesian),
                         &mut file,
-                    );
+                    )?;
                     println!("Saved integrated ray to {}", filename);
                 }
                 GeometryType::EuclideanSpherical => {
@@ -114,7 +122,7 @@ fn main() {
                         config,
                         Point::new_from_vector(position, CoordinateSystem::Cartesian),
                         &mut file,
-                    );
+                    )?;
                     println!("Saved integrated ray to {}", filename);
                 }
                 GeometryType::Schwarzschild {
@@ -134,7 +142,7 @@ fn main() {
                         config,
                         Point::new_from_vector(position, CoordinateSystem::Cartesian),
                         &mut file,
-                    );
+                    )?;
                     println!("Saved integrated ray to {}", filename);
                 }
             }
@@ -150,10 +158,12 @@ fn main() {
             if direction.len() != 3 {
                 panic!("Direction must be a vector of length 3");
             }
-            let mut file = File::create(filename.clone()).expect("Unable to create file");
-            let config_file =
-                fs::read_to_string(args.config_file).expect("Unable to open configuration file");
-            let config: RenderConfig = toml::from_str(config_file.as_str()).unwrap();
+            let mut file =
+                File::create(filename.clone()).map_err(RaytracerError::ConfigurationFileError)?;
+            let config_file = fs::read_to_string(args.config_file)
+                .map_err(RaytracerError::ConfigurationFileError)?;
+            let config: RenderConfig =
+                toml::from_str(config_file.as_str()).map_err(RaytracerError::TomlError)?;
             match config.geometry_type {
                 GeometryType::Euclidean => {
                     panic!("Rendering ray at not supported in Euclidean geometry yet");
@@ -172,7 +182,7 @@ fn main() {
                         FourVector::new_cartesian(0.0, direction[0], direction[1], direction[2]),
                         args.global_opts,
                         &mut file,
-                    );
+                    )?;
                     println!("Saved integrated ray to {}", filename);
                 }
             }
@@ -181,4 +191,5 @@ fn main() {
 
     let duration = start.elapsed();
     println!("Elapsed time: {:.2?}", duration);
+    Ok(())
 }
