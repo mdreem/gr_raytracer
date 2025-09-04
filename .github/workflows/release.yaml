@@ -5,7 +5,7 @@ on:
 jobs:
   release:
     name: release ${{ matrix.target }}
-    runs-on: ubuntu-latest
+    runs-on: ${{ matrix.os }}
     strategy:
       fail-fast: false
       matrix:
@@ -22,5 +22,6 @@ jobs:
         uses: taiki-e/upload-rust-binary-action@v1
         with:
           include: "README.md,LICENSE,schwarzschild.toml,euclidean-spherical.toml,euclidean.toml"
+          target: ${{ matrix.target }}
           token: ${{ secrets.GITHUB_TOKEN }}
           bin: 'gr_raytracer'
