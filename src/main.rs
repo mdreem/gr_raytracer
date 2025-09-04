@@ -15,12 +15,14 @@ use crate::geometry::four_vector::FourVector;
 use crate::geometry::point::{CoordinateSystem, Point};
 use crate::rendering::raytracer::RaytracerError;
 use clap::Parser;
+use log::info;
 use nalgebra::Vector4;
 use std::fs;
 use std::fs::File;
 use std::time::Instant;
 
 fn main() {
+    env_logger::Builder::from_env(env_logger::Env::default().default_filter_or("info")).init();
     run().expect("Error running raytracer");
 }
 
@@ -48,7 +50,7 @@ fn run() -> Result<(), RaytracerError> {
 
             match config.geometry_type {
                 GeometryType::Euclidean => {
-                    println!("Rendering Euclidean geometry");
+                    info!("Rendering Euclidean geometry");
                     render_euclidean(
                         args.global_opts,
                         config,
@@ -57,7 +59,7 @@ fn run() -> Result<(), RaytracerError> {
                     )?;
                 }
                 GeometryType::EuclideanSpherical => {
-                    println!("Rendering Euclidean spherical geometry");
+                    info!("Rendering Euclidean spherical geometry");
                     render_euclidean_spherical(
                         args.global_opts,
                         config,
@@ -69,7 +71,7 @@ fn run() -> Result<(), RaytracerError> {
                     radius,
                     horizon_epsilon,
                 } => {
-                    println!("Rendering Schwarzschild geometry with radius: {}", radius);
+                    info!("Rendering Schwarzschild geometry with radius: {}", radius);
                     render_schwarzschild(
                         radius,
                         horizon_epsilon,
@@ -102,7 +104,7 @@ fn run() -> Result<(), RaytracerError> {
                 File::create(filename.clone()).map_err(RaytracerError::ConfigurationFileError)?;
             match config.geometry_type {
                 GeometryType::Euclidean => {
-                    println!("Rendering ray in Euclidean geometry");
+                    info!("Rendering ray in Euclidean geometry");
                     render_euclidean_ray(
                         row,
                         col,
@@ -111,10 +113,10 @@ fn run() -> Result<(), RaytracerError> {
                         Point::new_from_vector(position, CoordinateSystem::Cartesian),
                         &mut file,
                     )?;
-                    println!("Saved integrated ray to {}", filename);
+                    info!("Saved integrated ray to {}", filename);
                 }
                 GeometryType::EuclideanSpherical => {
-                    println!("Rendering ray in Euclidean spherical geometry");
+                    info!("Rendering ray in Euclidean spherical geometry");
                     render_euclidean_spherical_ray(
                         row,
                         col,
@@ -123,13 +125,13 @@ fn run() -> Result<(), RaytracerError> {
                         Point::new_from_vector(position, CoordinateSystem::Cartesian),
                         &mut file,
                     )?;
-                    println!("Saved integrated ray to {}", filename);
+                    info!("Saved integrated ray to {}", filename);
                 }
                 GeometryType::Schwarzschild {
                     radius,
                     horizon_epsilon,
                 } => {
-                    println!(
+                    info!(
                         "Rendering ray in Schwarzschild geometry with radius: {}",
                         radius
                     );
@@ -143,7 +145,7 @@ fn run() -> Result<(), RaytracerError> {
                         Point::new_from_vector(position, CoordinateSystem::Cartesian),
                         &mut file,
                     )?;
-                    println!("Saved integrated ray to {}", filename);
+                    info!("Saved integrated ray to {}", filename);
                 }
             }
         }
@@ -183,13 +185,13 @@ fn run() -> Result<(), RaytracerError> {
                         args.global_opts,
                         &mut file,
                     )?;
-                    println!("Saved integrated ray to {}", filename);
+                    info!("Saved integrated ray to {}", filename);
                 }
             }
         }
     }
 
     let duration = start.elapsed();
-    println!("Elapsed time: {:.2?}", duration);
+    info!("Elapsed time: {:.2?}", duration);
     Ok(())
 }

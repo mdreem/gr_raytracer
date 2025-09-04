@@ -7,7 +7,7 @@ use crate::rendering::scene::Scene;
 use crate::rendering::texture::TextureError;
 use image::{ImageBuffer, ImageError, ImageFormat, Primitive, Rgb};
 use indicatif::style::TemplateError;
-use log::error;
+use log::{debug, error, info};
 use rayon::iter::IndexedParallelIterator;
 use rayon::iter::ParallelIterator;
 use rayon::prelude::ParallelSliceMut;
@@ -42,9 +42,9 @@ impl<'a, G: Geometry> Raytracer<'a, G> {
     #[allow(dead_code)] // For testing
     pub fn render_ray_at(&self, row: i64, col: i64) {
         let ray = self.scene.camera.get_ray_for(row, col);
-        println!("ray: {:?}", ray);
+        debug!("ray: {:?}", ray);
         let color = self.scene.color_of_ray(&ray);
-        println!("color: {:?}", color);
+        debug!("color: {:?}", color);
     }
 
     pub fn render_section_to_buffer<F, B: Primitive + Sync + Send>(
@@ -114,7 +114,7 @@ impl<'a, G: Geometry> Raytracer<'a, G> {
         filename: String,
     ) -> Result<(), RaytracerError> {
         if filename.ends_with(".hdr") {
-            println!("Creating HDR image");
+            info!("Creating HDR image");
             let buffer =
                 self.render_section_to_buffer(from_row, from_col, to_row, to_col, &|x, y, z| {
                     (x, y, z)
@@ -126,7 +126,7 @@ impl<'a, G: Geometry> Raytracer<'a, G> {
                 .save_with_format(&filename, ImageFormat::Hdr)
                 .map_err(RaytracerError::ImageError)?;
         } else {
-            println!("Creating non-HDR image");
+            info!("Creating non-HDR image");
             let color_normalization = self.color_normalization;
             let buffer =
                 self.render_section_to_buffer(from_row, from_col, to_row, to_col, |x, y, z| {
@@ -145,7 +145,7 @@ impl<'a, G: Geometry> Raytracer<'a, G> {
             imgbuf.save(&filename).map_err(RaytracerError::ImageError)?;
         }
 
-        println!("saved image to {}", filename);
+        info!("saved image to {}", filename);
         Ok(())
     }
 
@@ -166,7 +166,7 @@ impl<'a, G: Geometry> Raytracer<'a, G> {
         col: i64,
     ) -> Result<(IntegratedRay, Option<StopReason>), RaytracerError> {
         let ray = self.scene.camera.get_ray_for(row, col);
-        println!("ray for {}-{} is: {:?}", row, col, ray);
+        info!("ray for {}-{} is: {:?}", row, col, ray);
         self.scene.integrate_ray(&ray)
     }
 }

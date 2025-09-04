@@ -10,6 +10,7 @@ use crate::rendering::raytracer::RaytracerError;
 use crate::rendering::redshift::RedshiftComputer;
 use crate::rendering::texture::{TextureData, UVCoordinates};
 use crate::scene_objects::objects::Objects;
+use log::error;
 use nalgebra::{Const, OVector};
 use std::f64::consts::PI;
 use std::fs::File;
@@ -110,7 +111,7 @@ impl<'a, G: Geometry> Scene<'a, G> {
                 }
             };
         } else {
-            println!("ERROR: Ray did not hit anything: {:?}", ray);
+            error!("Ray did not hit anything: {:?}", ray);
         }
         let mut result = CIETristimulus::new(0.0, 0.0, 0.0, 1.0);
 

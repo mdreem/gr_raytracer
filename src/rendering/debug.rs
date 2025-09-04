@@ -1,6 +1,7 @@
 use crate::geometry::geometry::Geometry;
 use crate::geometry::point::Point;
 use crate::rendering::camera::Camera;
+use log::info;
 use std::fs::File;
 use std::io::Write;
 
@@ -36,5 +37,5 @@ pub fn save_rays_to_file<G: Geometry>(
             .expect("Unable to write file");
         }
     }
-    println!("Finished writing rays.");
+    info!("Finished writing rays.");
 }
