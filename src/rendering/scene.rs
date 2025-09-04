@@ -256,7 +256,7 @@ mod tests {
     use std::f64::consts::PI;
 
     macro_rules! assert_approx_eq_cie_tristimulus {
-        ($x: expr, $y: expr, $e: expr) => {
+        ($x: expr_2021, $y: expr_2021, $e: expr_2021) => {
             approx::assert_abs_diff_eq!($x.x, $y.x, epsilon = $e);
             approx::assert_abs_diff_eq!($x.y, $y.y, epsilon = $e);
             approx::assert_abs_diff_eq!($x.z, $y.z, epsilon = $e);
