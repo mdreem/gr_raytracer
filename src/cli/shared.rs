@@ -15,6 +15,7 @@ use crate::rendering::texture::{
 };
 use crate::scene_objects::objects::Objects;
 use crate::{configuration, scene_objects};
+use log::debug;
 use std::f64::consts::PI;
 use std::sync::Arc;
 
@@ -67,7 +68,7 @@ pub fn create_scene<G: Geometry>(
                 position,
                 texture,
             } => {
-                println!(
+                debug!(
                     "Adding sphere with radius: {} at ({},{},{})",
                     radius, position.0, position.1, position.2
                 );
@@ -86,7 +87,7 @@ pub fn create_scene<G: Geometry>(
                 outer_radius,
                 texture,
             } => {
-                println!(
+                debug!(
                     "Adding disc with inner radius: {}, outer radius: {}",
                     inner_radius, outer_radius
                 );

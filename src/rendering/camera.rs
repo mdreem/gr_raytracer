@@ -2,6 +2,7 @@ use crate::geometry::four_vector::FourVector;
 use crate::geometry::geometry::{Geometry, Tetrad};
 use crate::geometry::point::Point;
 use crate::rendering::ray::Ray;
+use log::debug;
 
 #[derive(Debug, Clone)]
 pub struct Camera {
@@ -21,7 +22,7 @@ pub fn lorentz_transform_tetrad<G: Geometry>(
 ) -> Tetrad {
     let lorentz = geometry.lorentz_transformation(position, velocity);
 
-    println!("lorentz transformation: {:?}", lorentz);
+    debug!("lorentz transformation: {:?}", lorentz);
 
     let t_vec = lorentz * tetrad.t.get_as_vector();
     let x_vec = lorentz * tetrad.x.get_as_vector();
@@ -72,9 +73,9 @@ impl Camera {
         geometry: &G,
     ) -> Camera {
         let original_tetrad = geometry.get_tetrad_at(&position);
-        println!("original_tetrad: {}", original_tetrad);
+        debug!("original_tetrad: {}", original_tetrad);
         let tetrad = lorentz_transform_tetrad(geometry, &original_tetrad, &position, &velocity);
-        println!("tetrad: {}", tetrad);
+        debug!("tetrad: {}", tetrad);
         Self {
             position,
             velocity,

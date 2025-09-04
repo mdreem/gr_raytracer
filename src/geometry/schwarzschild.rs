@@ -275,6 +275,7 @@ mod tests {
     use crate::rendering::scene::test_scene::CELESTIAL_SPHERE_RADIUS;
     use crate::rendering::scene::Scene;
     use approx::assert_abs_diff_eq;
+    use log::info;
     use nalgebra::allocator::Allocator;
     use nalgebra::{DefaultAllocator, Dim, OVector};
     use std::f64::consts::PI;
@@ -638,7 +639,7 @@ mod tests {
             file.write_all(format!("{},{}\n", step.r, step.phi).as_bytes())
                 .expect("Unable to write file");
         }
-        println!("Finished writing trajectory to {}.", filename);
+        info!("Finished writing trajectory to {}.", filename);
     }
 
     fn collect_points_step(steps: &IntegratedRay) -> Vec<MatchedPoint> {
