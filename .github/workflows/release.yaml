@@ -17,12 +17,10 @@ jobs:
           - target: x86_64-apple-darwin
             archive: zip
     steps:
-      - uses: actions/checkout@master
+      - uses: actions/checkout@v4
       - name: Compile and release
-        uses: rust-build/rust-build.action@v1.4.5
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        uses: taiki-e/upload-rust-binary-action@v1
         with:
-          RUSTTARGET: ${{ matrix.target }}
-          ARCHIVE_TYPES: ${{ matrix.archive }}
-          EXTRA_FILES: "README.md LICENSE schwarzschild.toml euclidean-spherical.toml euclidean.toml"
+          include: "README.md,LICENSE,schwarzschild.toml,euclidean-spherical.toml,euclidean.toml"
+          token: ${{ secrets.GITHUB_TOKEN }}
+          bin: 'gr_raytracer'
