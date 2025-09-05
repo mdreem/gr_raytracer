@@ -4,12 +4,18 @@ use crate::geometry::geometry::{
 };
 use crate::geometry::point::CoordinateSystem::Spherical;
 use crate::geometry::point::{CoordinateSystem, Point};
+use crate::rendering::ray::Ray;
 use crate::rendering::runge_kutta::OdeFunction;
 use crate::rendering::scene::EquationOfMotionState;
 use nalgebra::{Const, Matrix4, OVector};
 
 #[derive(Clone, Debug)]
 pub struct Schwarzschild {
+    radius: f64,
+    horizon_epsilon: f64,
+}
+
+struct SchwarzschildSolver {
     radius: f64,
     horizon_epsilon: f64,
 }
@@ -23,14 +29,14 @@ impl Schwarzschild {
     }
 }
 
-impl OdeFunction<Const<8>> for Schwarzschild {
+impl OdeFunction<Const<8>> for SchwarzschildSolver {
     // TODO: maybe just have geodesic being used in solver. This doesn't need to be that generic here.
     fn apply(&self, t: f64, y: &OVector<f64, Const<8>>) -> OVector<f64, Const<8>> {
         self.geodesic(t, y)
     }
 }
 
-impl GeodesicSolver for Schwarzschild {
+impl GeodesicSolver for SchwarzschildSolver {
     fn geodesic(&self, _: f64, y: &EquationOfMotionState) -> EquationOfMotionState {
         let _t = y[0];
         let r = y[1];
@@ -148,6 +154,13 @@ impl Geometry for Schwarzschild {
 
     fn inside_horizon(&self, position: &Point) -> bool {
         position[1] <= self.radius + self.horizon_epsilon
+    }
+
+    fn get_geodesic_solver(&self, _ray: &Ray) -> Box<dyn GeodesicSolver> {
+        Box::new(SchwarzschildSolver {
+            radius: self.radius,
+            horizon_epsilon: self.horizon_epsilon,
+        })
     }
 }
 
