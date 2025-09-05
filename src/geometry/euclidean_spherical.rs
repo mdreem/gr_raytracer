@@ -4,9 +4,12 @@ use crate::geometry::geometry::{
 };
 use crate::geometry::point::CoordinateSystem::Spherical;
 use crate::geometry::point::{CoordinateSystem, Point};
+use crate::rendering::ray::Ray;
 use crate::rendering::runge_kutta::OdeFunction;
 use crate::rendering::scene::EquationOfMotionState;
 use nalgebra::{Const, Matrix4, OVector};
+
+pub struct EuclideanSpaceSphericalSolver {}
 
 #[derive(Clone)]
 pub struct EuclideanSpaceSpherical {}
@@ -17,14 +20,14 @@ impl EuclideanSpaceSpherical {
     }
 }
 
-impl OdeFunction<Const<8>> for EuclideanSpaceSpherical {
+impl OdeFunction<Const<8>> for EuclideanSpaceSphericalSolver {
     // TODO: maybe just have geodesic being used in solver. This doesn't need to be that generic here.
     fn apply(&self, t: f64, y: &OVector<f64, Const<8>>) -> OVector<f64, Const<8>> {
         self.geodesic(t, y)
     }
 }
 
-impl GeodesicSolver for EuclideanSpaceSpherical {
+impl GeodesicSolver for EuclideanSpaceSphericalSolver {
     fn geodesic(&self, _: f64, y: &EquationOfMotionState) -> EquationOfMotionState {
         let _t = y[0];
         let r = y[1];
@@ -101,6 +104,10 @@ impl Geometry for EuclideanSpaceSpherical {
 
     fn inside_horizon(&self, _position: &Point) -> bool {
         false
+    }
+
+    fn get_geodesic_solver(&self, _ray: &Ray) -> Box<dyn GeodesicSolver> {
+        Box::new(EuclideanSpaceSphericalSolver {})
     }
 }
 

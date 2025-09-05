@@ -1,5 +1,6 @@
 use crate::geometry::four_vector::FourVector;
 use crate::geometry::point::{CoordinateSystem, Point};
+use crate::rendering::ray::Ray;
 use crate::rendering::runge_kutta::OdeFunction;
 use crate::rendering::scene::EquationOfMotionState;
 use nalgebra::{Const, Matrix4};
@@ -43,7 +44,7 @@ impl Display for Tetrad {
     }
 }
 
-pub trait GeodesicSolver {
+pub trait GeodesicSolver: OdeFunction<Const<8>> {
     fn geodesic(&self, t: f64, y: &EquationOfMotionState) -> EquationOfMotionState;
 }
 
@@ -55,11 +56,10 @@ pub trait InnerProduct {
     fn inner_product(&self, position: &Point, v: &FourVector, w: &FourVector) -> f64;
 }
 
-pub trait Geometry:
-    GeodesicSolver + InnerProduct + HasCoordinateSystem + Clone + Sync + OdeFunction<Const<8>>
-{
+pub trait Geometry: InnerProduct + HasCoordinateSystem + Clone + Sync {
     fn get_tetrad_at(&self, position: &Point) -> Tetrad;
     fn lorentz_transformation(&self, position: &Point, velocity: &FourVector) -> Matrix4<f64>;
     fn get_stationary_velocity_at(&self, position: &Point) -> FourVector;
     fn inside_horizon(&self, position: &Point) -> bool;
+    fn get_geodesic_solver(&self, ray: &Ray) -> Box<dyn GeodesicSolver>;
 }

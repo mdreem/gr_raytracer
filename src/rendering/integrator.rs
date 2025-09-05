@@ -81,6 +81,7 @@ impl<G: Geometry> Integrator<'_, G> {
             direction[2],
             direction[3],
         ]);
+        let geodesic_solver = self.geometry.get_geodesic_solver(&ray);
 
         let mut result: Vec<Step> = Vec::with_capacity(self.integration_configuration.max_steps);
         result.push(Step { y, t, step: 0 });
@@ -93,7 +94,7 @@ impl<G: Geometry> Integrator<'_, G> {
                 t,
                 h,
                 self.integration_configuration.epsilon,
-                self.geometry,
+                &*geodesic_solver,
             )?;
             t += h;
 
