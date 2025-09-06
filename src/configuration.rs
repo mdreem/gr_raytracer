@@ -13,7 +13,15 @@ pub struct RenderConfig {
 pub enum GeometryType {
     Euclidean,
     EuclideanSpherical,
-    Schwarzschild { radius: f64, horizon_epsilon: f64 },
+    Schwarzschild {
+        radius: f64,
+        horizon_epsilon: f64,
+    },
+    Kerr {
+        radius: f64,
+        a: f64,
+        horizon_epsilon: f64,
+    },
 }
 
 #[derive(Deserialize, Serialize, Debug, PartialEq, Clone)]
