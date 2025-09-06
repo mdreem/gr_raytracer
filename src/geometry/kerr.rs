@@ -8,7 +8,7 @@ use crate::rendering::ray::Ray;
 use crate::rendering::runge_kutta::OdeFunction;
 use crate::rendering::scene::EquationOfMotionState;
 use log::debug;
-use nalgebra::{Const, Matrix4, OVector, Vector4};
+use nalgebra::{ComplexField, Const, Matrix4, OVector, Vector4};
 
 #[derive(Clone, Debug)]
 pub struct Kerr {
@@ -172,19 +172,43 @@ impl Geometry for Kerr {
     fn get_tetrad_at(&self, position: &Point) -> Tetrad {
         let metric = metric(self.radius, self.a, position[1], position[2], position[3]);
 
-        println!("metric at position {:?}: {:?}", position, metric);
+        let v0 = Vector4::new(-1.0 /(-metric[(0, 0)]).sqrt(), 0.0, 0.0, 0.0);
+        debug!("norm v0: {}", (v0.transpose() * metric * v0).x);
 
-        let a = Vector4::new(1.0, 0.0, 0.0, 0.0).transpose()
-            * metric
-            * Vector4::new(1.0, 0.0, 0.0, 0.0);
-        println!("a: {:?}", a);
+        let w1 = Vector4::new(0.0, 1.0, 0.0, 0.0);
+        let w2 = Vector4::new(0.0, 0.0, 1.0, 0.0);
+        let w3 = Vector4::new(0.0, 0.0, 0.0, 1.0);
+
+        // k=1
+        let lambda_1_0 = (v0.transpose() * metric * w1).x / (v0.transpose() * metric * v0).x;
+        let v1_raw = w1 - lambda_1_0 * v0;
+        let v1_norm = (v1_raw.transpose() * metric * v1_raw).x;
+        let v1 = v1_raw / v1_norm.sqrt();
+        debug!("norm v1: {}", (v1.transpose() * metric * v1).x);
+
+        // k=2
+        let lambda_2_0 = (v0.transpose() * metric * w2).x / (v0.transpose() * metric * v0).x;
+        let lambda_2_1 = (v1.transpose() * metric * w2).x / (v1.transpose() * metric * v1).x;
+        let v2_raw = w2 - lambda_2_0 * v0 - lambda_2_1 * v1;
+        let v2_norm = (v2_raw.transpose() * metric * v2_raw).x;
+        let v2 = v2_raw / v2_norm.sqrt();
+        debug!("norm v2: {}", (v2.transpose() * metric * v2).x);
+
+        // k=3
+        let lambda_3_0 = (v0.transpose() * metric * w3).x / (v0.transpose() * metric * v0).x;
+        let lambda_3_1 = (v1.transpose() * metric * w3).x / (v1.transpose() * metric * v1).x;
+        let lambda_3_2 = (v2.transpose() * metric * w3).x / (v2.transpose() * metric * v2).x;
+        let v3_raw = w3 - lambda_3_0 * v0 - lambda_3_1 * v1 - lambda_3_2 * v2;
+        let v3_norm = (v3_raw.transpose() * metric * v3_raw).x;
+        let v3 = v3_raw / v3_norm.sqrt();
+        debug!("norm v3: {}", (v3.transpose() * metric * v3).x);
 
         Tetrad::new(
             position.clone(),
-            FourVector::new_cartesian(1.0 / a.x, 0.0, 0.0, 0.0),
-            FourVector::new_cartesian(0.0, 1.0, 0.0, 0.0),
-            FourVector::new_cartesian(0.0, 0.0, 1.0, 0.0),
-            FourVector::new_cartesian(0.0, 0.0, 0.0, 1.0),
+            FourVector::new_cartesian(v0[0], v0[1], v0[2], v0[3]),
+            FourVector::new_cartesian(v1[0], v1[1], v1[2], v1[3]),
+            FourVector::new_cartesian(v2[0], v2[1], v2[2], v2[3]),
+            FourVector::new_cartesian(v3[0], v3[1], v3[2], v3[3]),
         )
     }
 
@@ -345,7 +369,6 @@ mod test_kerr {
 
 #[cfg(test)]
 mod tests {
-
     use crate::geometry::four_vector::FourVector;
     use crate::geometry::geometry::{Geometry, InnerProduct};
     use crate::geometry::kerr::test_kerr::TestKerr;
@@ -376,7 +399,6 @@ mod tests {
         let tetrad = geometry.get_tetrad_at(&position);
 
         let k = tetrad.t + (-tetrad.z);
-        println!("k: {:?}", k);
         let s = geometry.inner_product(&position, &k, &k);
         assert_abs_diff_eq!(s, 0.0);
 
