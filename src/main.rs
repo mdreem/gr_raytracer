@@ -7,6 +7,7 @@ mod scene_objects;
 use crate::cli::cli::{Action, App};
 use crate::cli::euclidean::{render_euclidean, render_euclidean_ray};
 use crate::cli::euclidean_spherical::{render_euclidean_spherical, render_euclidean_spherical_ray};
+use crate::cli::kerr::{render_kerr, render_kerr_ray, render_kerr_ray_at};
 use crate::cli::schwarzschild::{
     render_schwarzschild, render_schwarzschild_ray, render_schwarzschild_ray_at,
 };
@@ -81,6 +82,22 @@ fn run() -> Result<(), RaytracerError> {
                         filename,
                     )?;
                 }
+                GeometryType::Kerr {
+                    radius,
+                    a,
+                    horizon_epsilon,
+                } => {
+                    info!("Rendering Kerr geometry with radius: {}", radius);
+                    render_kerr(
+                        radius,
+                        a,
+                        horizon_epsilon,
+                        args.global_opts,
+                        config,
+                        Point::new_from_vector(position, CoordinateSystem::Cartesian),
+                        filename,
+                    )?;
+                }
             }
         }
         Action::RenderRay { row, col, filename } => {
@@ -147,6 +164,25 @@ fn run() -> Result<(), RaytracerError> {
                     )?;
                     info!("Saved integrated ray to {}", filename);
                 }
+                GeometryType::Kerr {
+                    radius,
+                    a,
+                    horizon_epsilon,
+                } => {
+                    info!("Rendering ray in Kerr geometry with radius: {}", radius);
+                    render_kerr_ray(
+                        radius,
+                        a,
+                        horizon_epsilon,
+                        row,
+                        col,
+                        args.global_opts,
+                        config,
+                        Point::new_from_vector(position, CoordinateSystem::Cartesian),
+                        &mut file,
+                    )?;
+                    info!("Saved integrated ray to {}", filename);
+                }
             }
         }
         Action::RenderRayAt {
@@ -179,6 +215,22 @@ fn run() -> Result<(), RaytracerError> {
                 } => {
                     render_schwarzschild_ray_at(
                         radius,
+                        horizon_epsilon,
+                        Point::new_cartesian(0.0, position[0], position[1], position[2]),
+                        FourVector::new_cartesian(0.0, direction[0], direction[1], direction[2]),
+                        args.global_opts,
+                        &mut file,
+                    )?;
+                    info!("Saved integrated ray to {}", filename);
+                }
+                GeometryType::Kerr {
+                    radius,
+                    a,
+                    horizon_epsilon,
+                } => {
+                    render_kerr_ray_at(
+                        radius,
+                        a,
                         horizon_epsilon,
                         Point::new_cartesian(0.0, position[0], position[1], position[2]),
                         FourVector::new_cartesian(0.0, direction[0], direction[1], direction[2]),
