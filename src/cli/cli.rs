@@ -14,7 +14,7 @@ pub struct GlobalOpts {
     pub max_radius: f64,
     #[arg(long, default_value = "0.00001")]
     pub epsilon: f64,
-    #[arg(short, long, value_delimiter = ',', default_value = "0.0,0.8,-18.0")]
+    #[arg(short, long, value_delimiter = ',', default_value = "18.0,0.0,0.8")]
     pub camera_position: Vec<f64>,
 }
 
