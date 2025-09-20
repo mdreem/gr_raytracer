@@ -65,9 +65,7 @@ impl Geometry for EuclideanSpace {
             theta.cos() * phi.sin(),
             -theta.sin(),
         );
-        let e_phi =
-            FourVector::new_cartesian(0.0, -theta.sin() * phi.sin(), theta.sin() * phi.cos(), 0.0)
-                / theta.sin();
+        let e_phi = FourVector::new_cartesian(0.0, -phi.sin(), phi.cos(), 0.0);
 
         Tetrad::new(position.clone(), e_t, e_phi, -e_theta, -e_r)
     }
