@@ -59,8 +59,8 @@ impl Hittable for Sphere {
         if (r_start >= self.radius.powi(2) && r_end <= self.radius.powi(2))
             || (r_start <= self.radius.powi(2) && r_end >= self.radius.powi(2))
         {
-            let y_start_spatial = y_start_shifted.get_spatial_vector();
-            let y_end_spatial = y_end_shifted.get_spatial_vector();
+            let y_start_spatial = y_start_shifted.get_spatial_vector_cartesian();
+            let y_end_spatial = y_end_shifted.get_spatial_vector_cartesian();
             let direction = y_end_spatial - y_start_spatial;
 
             let t = match solve_for_t(y_start_spatial, direction, self.radius) {

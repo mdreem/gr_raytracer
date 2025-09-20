@@ -1,5 +1,5 @@
 use crate::rendering::black_body_radiation::get_cie_xyz_of_black_body_redshifted;
-use crate::rendering::color::{srgb_to_xyz, CIETristimulus, CIETristimulusNormalization, Color};
+use crate::rendering::color::{CIETristimulus, CIETristimulusNormalization, Color, srgb_to_xyz};
 use crate::rendering::raytracer::RaytracerError;
 use crate::rendering::texture::TextureError::DecodeError;
 use image::{DynamicImage, GenericImageView, ImageReader};
