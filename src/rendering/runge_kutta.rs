@@ -1,7 +1,7 @@
 use crate::rendering::integrator::IntegrationError;
 use crate::rendering::raytracer::RaytracerError;
-use nalgebra::allocator::Allocator;
 use nalgebra::OVector;
+use nalgebra::allocator::Allocator;
 use nalgebra::{DefaultAllocator, Dim};
 
 pub trait OdeFunction<D: Dim>
@@ -140,7 +140,7 @@ where
 
 #[cfg(test)]
 mod tests {
-    use crate::rendering::runge_kutta::{rkf45, OdeFunction};
+    use crate::rendering::runge_kutta::{OdeFunction, rkf45};
     use approx::assert_abs_diff_eq;
     use nalgebra::{Const, OVector, Vector2};
 
