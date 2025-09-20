@@ -1,4 +1,5 @@
 use crate::geometry::point::{CoordinateSystem, Point};
+use nalgebra::RealField;
 
 // The order of the components is: (r, theta, phi)
 pub fn cartesian_to_spherical(cartesian: &Point) -> Point {
@@ -12,8 +13,8 @@ pub fn cartesian_to_spherical(cartesian: &Point) -> Point {
         return Point::new(t, 0.0, 0.0, 0.0, CoordinateSystem::Spherical);
     }
 
-    let theta = (y / r).acos();
-    let phi = z.atan2(x);
+    let theta = (z / r).acos();
+    let phi = y.atan2(x);
 
     Point::new(t, r, theta, phi, CoordinateSystem::Spherical)
 }
@@ -25,8 +26,8 @@ pub fn spherical_to_cartesian(spherical: &Point) -> Point {
     let phi = spherical[3];
 
     let x = r * theta.sin() * phi.cos();
-    let y = r * theta.cos();
-    let z = r * theta.sin() * phi.sin();
+    let y = r * theta.sin() * phi.sin();
+    let z = r * theta.cos();
 
     Point::new(t, x, y, z, CoordinateSystem::Cartesian)
 }

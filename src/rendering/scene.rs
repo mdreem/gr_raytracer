@@ -250,10 +250,36 @@ mod tests {
     use crate::geometry::schwarzschild::Schwarzschild;
     use crate::geometry::spherical_coordinates_helper::cartesian_to_spherical;
     use crate::rendering::camera::Camera;
-    use crate::rendering::color::CIETristimulus;
-    use crate::rendering::scene::test_scene::create_scene_with_camera;
+    use crate::rendering::color::{CIETristimulus, xyz_to_linear_srgb, xyz_to_srgb};
     use crate::rendering::scene::Scene;
+    use crate::rendering::scene::test_scene::create_scene_with_camera;
     use std::f64::consts::PI;
+
+    const CELESTIAL_SPHERE_COLOR_1: CIETristimulus = CIETristimulus {
+        x: 0.04556866876322511,
+        y: 0.09113733752645022,
+        z: 0.015189552006485689,
+        alpha: 1.0,
+    };
+    const CELESTIAL_SPHERE_COLOR_2: CIETristimulus = CIETristimulus {
+        x: 0.3575761,
+        y: 0.7151522,
+        z: 0.119192,
+        alpha: 1.0,
+    };
+
+    const SPHERE_COLOR_1: CIETristimulus = CIETristimulus {
+        x: 0.052562486896837575,
+        y: 0.0271025410675224,
+        z: 0.002463867369774764,
+        alpha: 1.0,
+    };
+    const SPHERE_COLOR_2: CIETristimulus = CIETristimulus {
+        x: 0.4124564,
+        y: 0.2126729,
+        z: 0.0193339,
+        alpha: 1.0,
+    };
 
     macro_rules! assert_approx_eq_cie_tristimulus {
         ($x: expr_2021, $y: expr_2021, $e: expr_2021) => {
@@ -267,7 +293,7 @@ mod tests {
     #[test]
     fn test_color_of_ray_hits_sphere() {
         let camera = Camera::new(
-            Point::new(0.0, 0.0, 0.0, -10.0, CoordinateSystem::Cartesian),
+            Point::new(0.0, 10.0, 0.0, 0.0, CoordinateSystem::Cartesian),
             FourVector::new_cartesian(1.0, 0.0, 0.0, 0.0),
             PI / 2.0,
             11,
@@ -280,16 +306,7 @@ mod tests {
         let ray = scene.camera.get_ray_for(5, 5);
         let color = scene.color_of_ray(&ray).unwrap();
 
-        assert_approx_eq_cie_tristimulus!(
-            color,
-            CIETristimulus::new(
-                0.052562486896837575,
-                0.0271025410675224,
-                0.002463867369774764,
-                1.0,
-            ),
-            1e-6
-        );
+        assert_approx_eq_cie_tristimulus!(color, SPHERE_COLOR_2, 1e-6);
     }
 
     #[test]
@@ -379,7 +396,7 @@ mod tests {
     #[test]
     fn test_color_of_ray_misses_sphere() {
         let camera = Camera::new(
-            Point::new(0.0, 0.0, 0.0, -10.0, CoordinateSystem::Cartesian),
+            Point::new(0.0, 10.0, 0.0, 0.0, CoordinateSystem::Cartesian),
             FourVector::new_spherical(1.0, 0.0, 0.0, 0.0),
             PI / 2.0,
             11,
@@ -393,25 +410,16 @@ mod tests {
         let ray = scene.camera.get_ray_for(0, 0);
         let color = scene.color_of_ray(&ray).unwrap();
 
-        assert_approx_eq_cie_tristimulus!(
-            color,
-            CIETristimulus::new(
-                0.04556866876322511,
-                0.09113733752645022,
-                0.015189552006485689,
-                1.0
-            ),
-            1e-6
-        );
+        assert_approx_eq_cie_tristimulus!(color, CELESTIAL_SPHERE_COLOR_2, 1e-6);
     }
 
     #[test]
     fn test_color_of_ray_misses_sphere_schwarzschild() {
         let position = cartesian_to_spherical(&Point::new(
             0.0,
+            10.0,
             0.0,
             0.0,
-            -10.0,
             CoordinateSystem::Cartesian,
         ));
         let radius = 2.0;
@@ -433,11 +441,7 @@ mod tests {
         let ray = scene.camera.get_ray_for(0, 0);
         let color = scene.color_of_ray(&ray).unwrap();
 
-        assert_approx_eq_cie_tristimulus!(
-            color,
-            CIETristimulus::new(0.3575761, 0.7151522, 0.119192, 1.0),
-            1e-6
-        );
+        assert_approx_eq_cie_tristimulus!(color, CELESTIAL_SPHERE_COLOR_1, 1e-6);
     }
 
     #[test]
@@ -476,7 +480,7 @@ mod tests {
     #[test]
     fn test_intersects_with_disk() {
         let camera = Camera::new(
-            Point::new(0.0, 0.0, 0.8, -7.0, CoordinateSystem::Cartesian),
+            Point::new(0.0, 7.0, 0.0, 0.8, CoordinateSystem::Cartesian),
             FourVector::new_cartesian(1.0, 0.0, 0.0, 0.0),
             PI / 4.0,
             101,

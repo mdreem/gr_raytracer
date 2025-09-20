@@ -18,7 +18,7 @@ There are various predefined geometries, defined via TOML-files:
 These can be used to render an image of the described setup via
 
 ```ah
-cargo run --release -- --width=1500 --height=1500 --camera-position=0.0,0.8,-10.0  --config-file schwarzschild.toml render --filename=render.png
+cargo run --release -- --width=1500 --height=1500 --camera-position=10.0,0.0,0.8  --config-file schwarzschild.toml render --filename=render.png
 ```
 
 where `--width` and `--height` define the resolution, the camera position can be adapted via `--camera-position`.

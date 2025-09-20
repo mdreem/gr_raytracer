@@ -32,10 +32,10 @@ impl Hittable for Disc {
     // both coordinates.
     fn intersects(&self, y_start: &Point, y_end: &Point) -> Option<Intersection> {
         // z x y
-        let normal = Vector3::new(0.0, 1.0, 0.0);
+        let normal = Vector3::new(0.0, 0.0, 1.0);
         let center = Vector3::new(0.0, 0.0, 0.0);
-        let y_start_spatial = y_start.get_spatial_vector();
-        let y_end_spatial = y_end.get_spatial_vector();
+        let y_start_spatial = y_start.get_spatial_vector_cartesian();
+        let y_end_spatial = y_end.get_spatial_vector_cartesian();
         let direction = y_end_spatial - y_start_spatial;
 
         let p1 = (center - y_start_spatial).dot(&normal);
@@ -56,7 +56,7 @@ impl Hittable for Disc {
         {
             let vector_in_plane = intersection_point - center;
 
-            let phi = vector_in_plane[2].atan2(vector_in_plane[0]); // phi in x-z plane.
+            let phi = vector_in_plane[1].atan2(vector_in_plane[0]); // phi in x-y plane.
             let r = (rr.sqrt() - self.center_disk_inner_radius)
                 / (self.center_disk_outer_radius - self.center_disk_inner_radius);
 

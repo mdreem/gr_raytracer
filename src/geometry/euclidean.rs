@@ -50,9 +50,9 @@ impl Geometry for EuclideanSpace {
         Tetrad::new(
             position.clone(),
             FourVector::new_cartesian(1.0, 0.0, 0.0, 0.0),
-            FourVector::new_cartesian(0.0, 1.0, 0.0, 0.0),
             FourVector::new_cartesian(0.0, 0.0, 1.0, 0.0),
             FourVector::new_cartesian(0.0, 0.0, 0.0, 1.0),
+            -FourVector::new_cartesian(0.0, 1.0, 0.0, 0.0),
         )
     }
 

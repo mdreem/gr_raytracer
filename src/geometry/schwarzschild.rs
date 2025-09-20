@@ -152,8 +152,8 @@ impl Geometry for Schwarzschild {
 mod test_schwarzschild {
     use crate::geometry::four_vector::FourVector;
     use crate::geometry::point::Point;
-    use crate::geometry::schwarzschild::tests::rk4;
     use crate::geometry::schwarzschild::Schwarzschild;
+    use crate::geometry::schwarzschild::tests::rk4;
     use crate::rendering::runge_kutta::OdeFunction;
     use crate::rendering::scene::test_scene::CELESTIAL_SPHERE_RADIUS;
     use nalgebra::{Const, OVector, Vector2};
@@ -262,9 +262,9 @@ mod tests {
     use crate::geometry::geometry::{Geometry, InnerProduct};
     use crate::geometry::point::Point;
     use crate::geometry::schwarzschild::test_schwarzschild::{
-        get_energy_from_r, get_energy_from_t, TestSchwarzschild,
+        TestSchwarzschild, get_energy_from_r, get_energy_from_t,
     };
-    use crate::geometry::schwarzschild::{test_schwarzschild, Schwarzschild};
+    use crate::geometry::schwarzschild::{Schwarzschild, test_schwarzschild};
     use crate::geometry::spherical_coordinates_helper::cartesian_to_spherical;
     use crate::rendering::camera::Camera;
     use crate::rendering::debug::save_rays_to_file;
@@ -272,8 +272,8 @@ mod tests {
     use crate::rendering::ray::{IntegratedRay, Ray};
     use crate::rendering::runge_kutta::OdeFunction;
     use crate::rendering::scene;
-    use crate::rendering::scene::test_scene::CELESTIAL_SPHERE_RADIUS;
     use crate::rendering::scene::Scene;
+    use crate::rendering::scene::test_scene::CELESTIAL_SPHERE_RADIUS;
     use approx::assert_abs_diff_eq;
     use log::info;
     use nalgebra::allocator::Allocator;
@@ -423,7 +423,7 @@ mod tests {
 
     #[test]
     fn test_ray_null_condition_momentum() {
-        let position = cartesian_to_spherical(&Point::new_cartesian(2.0, 0.0, 0.0, 5.0));
+        let position = cartesian_to_spherical(&Point::new_cartesian(2.0, 5.0, 0.0, 0.0));
         let radius = 2.0;
         let geometry = Schwarzschild::new(radius, 1e-4);
         let camera = create_camera(position, radius);
@@ -442,7 +442,7 @@ mod tests {
 
     #[test]
     fn test_ray_compare_conserved_quantities_in_equatorial_plane() {
-        let position = cartesian_to_spherical(&Point::new_cartesian(2.0, 0.0, 0.0, 5.0));
+        let position = cartesian_to_spherical(&Point::new_cartesian(2.0, 5.0, 0.0, 0.0));
         let radius = 2.0;
         let geometry = Schwarzschild::new(radius, 1e-4);
         let camera = create_camera(position, radius);
@@ -463,7 +463,7 @@ mod tests {
 
     #[test]
     fn test_trajectories_equal_with_rotated_momentum() {
-        let position = cartesian_to_spherical(&Point::new_cartesian(2.0, 0.0, 0.0, 5.0));
+        let position = cartesian_to_spherical(&Point::new_cartesian(2.0, 10.0, 0.0, 0.0));
         let radius = 2.0;
         let geometry = Schwarzschild::new(radius, 1e-4);
         let camera = create_camera(position, radius);
@@ -494,9 +494,16 @@ mod tests {
             let step_a = &trajectory_a[i];
             let step_b = &trajectory_b[i];
 
-            assert_abs_diff_eq!(step_a.y[1], step_b.y[1], epsilon = 1e-5);
-            assert_abs_diff_eq!(step_a.y[2], step_b.y[3], epsilon = 1e-5);
-            assert_abs_diff_eq!(step_a.y[3], step_b.y[2], epsilon = 1e-5);
+            let step_a_cartesian =
+                Point::new_spherical(step_a.y[0], step_a.y[1], step_a.y[2], step_a.y[3])
+                    .get_as_cartesian();
+            let step_b_cartesian =
+                Point::new_spherical(step_b.y[0], step_b.y[1], step_b.y[2], step_b.y[3])
+                    .get_as_cartesian();
+
+            assert_abs_diff_eq!(step_a_cartesian[0], step_b_cartesian[0], epsilon = 1e-5);
+            assert_abs_diff_eq!(step_a_cartesian[1], -step_b_cartesian[2], epsilon = 1e-5);
+            assert_abs_diff_eq!(step_a_cartesian[2], -step_b_cartesian[1], epsilon = 1e-5);
         }
     }
 
@@ -553,7 +560,7 @@ mod tests {
 
     #[test]
     #[ignore] // TODO: ensure this works better. The photon anyway will reach the horizon, as this
-              // cannot be numerically perfectly achieved. It still may be a good corner case.
+    // cannot be numerically perfectly achieved. It still may be a good corner case.
     fn compare_trajectories_critical() {
         let radius = 1.0;
 
