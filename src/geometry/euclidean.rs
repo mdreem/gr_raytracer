@@ -45,15 +45,38 @@ impl InnerProduct for EuclideanSpace {
 }
 
 impl Geometry for EuclideanSpace {
-    // TODO: take into account rotations.
+    /// Returns a local tetrad (orthonormal basis) at the given position.
+    ///
+    /// The tetrad is constructed from the spherical coordinate unit vectors as follows:
+    /// - x-axis: eφ (unit vector in the increasing φ direction)
+    /// - y-axis: -eθ (negative unit vector in the θ direction)
+    /// - z-axis: -er (negative unit vector in the radial direction)
+    ///
+    /// This mapping (x = eφ, y = −eθ, z = −er) should match the one used in the Schwarzschild geometry.
+    /// The time-like basis vector is e_t.
     fn get_tetrad_at(&self, position: &Point) -> Tetrad {
-        Tetrad::new(
-            position.clone(),
-            FourVector::new_cartesian(1.0, 0.0, 0.0, 0.0),
-            FourVector::new_cartesian(0.0, 0.0, 1.0, 0.0),
-            FourVector::new_cartesian(0.0, 0.0, 0.0, 1.0),
-            -FourVector::new_cartesian(0.0, 1.0, 0.0, 0.0),
-        )
+        let point_in_spherical = position.get_as_spherical();
+
+        let _r = point_in_spherical.x;
+        let theta = point_in_spherical.y;
+        let phi = point_in_spherical.z;
+
+        let e_t = FourVector::new_cartesian(1.0, 0.0, 0.0, 0.0);
+        let e_r = FourVector::new_cartesian(
+            0.0,
+            theta.sin() * phi.cos(),
+            theta.sin() * phi.sin(),
+            theta.cos(),
+        );
+        let e_theta = FourVector::new_cartesian(
+            0.0,
+            theta.cos() * phi.cos(),
+            theta.cos() * phi.sin(),
+            -theta.sin(),
+        );
+        let e_phi = FourVector::new_cartesian(0.0, -phi.sin(), phi.cos(), 0.0);
+
+        Tetrad::new(position.clone(), e_t, e_phi, -e_theta, -e_r)
     }
 
     fn lorentz_transformation(&self, position: &Point, t_velocity: &FourVector) -> Matrix4<f64> {
