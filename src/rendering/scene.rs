@@ -306,7 +306,7 @@ mod tests {
         let ray = scene.camera.get_ray_for(5, 5);
         let color = scene.color_of_ray(&ray).unwrap();
 
-        assert_approx_eq_cie_tristimulus!(color, SPHERE_COLOR_2, 1e-6);
+        assert_approx_eq_cie_tristimulus!(color, SPHERE_COLOR_1, 1e-6);
     }
 
     #[test]
