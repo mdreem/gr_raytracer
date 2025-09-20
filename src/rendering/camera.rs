@@ -73,7 +73,52 @@ impl Camera {
         geometry: &G,
     ) -> Camera {
         let original_tetrad = geometry.get_tetrad_at(&position);
+        debug!("position: {:?}", position);
         debug!("original_tetrad: {}", original_tetrad);
+        debug!("inner product checks:");
+        debug!(
+            "  inner product t.t: {}",
+            geometry.inner_product(&position, &original_tetrad.t, &original_tetrad.t)
+        );
+        debug!(
+            "  inner product x.x: {}",
+            geometry.inner_product(&position, &original_tetrad.x, &original_tetrad.x)
+        );
+        debug!(
+            "  inner product y.y: {}",
+            geometry.inner_product(&position, &original_tetrad.y, &original_tetrad.y)
+        );
+        debug!(
+            "  inner product z.z: {}",
+            geometry.inner_product(&position, &original_tetrad.z, &original_tetrad.z)
+        );
+        debug!("");
+        debug!(
+            "  inner product t.x: {}",
+            geometry.inner_product(&position, &original_tetrad.t, &original_tetrad.x)
+        );
+        debug!(
+            "  inner product t.y: {}",
+            geometry.inner_product(&position, &original_tetrad.t, &original_tetrad.y)
+        );
+        debug!(
+            "  inner product t.z: {}",
+            geometry.inner_product(&position, &original_tetrad.t, &original_tetrad.z)
+        );
+        debug!("");
+        debug!(
+            "  inner product x.y: {}",
+            geometry.inner_product(&position, &original_tetrad.x, &original_tetrad.y)
+        );
+        debug!(
+            "  inner product x.z: {}",
+            geometry.inner_product(&position, &original_tetrad.x, &original_tetrad.z)
+        );
+        debug!("");
+        debug!(
+            "  inner product y.z: {}",
+            geometry.inner_product(&position, &original_tetrad.y, &original_tetrad.z)
+        );
         let tetrad = lorentz_transform_tetrad(geometry, &original_tetrad, &position, &velocity);
         debug!("tetrad: {}", tetrad);
         Self {
