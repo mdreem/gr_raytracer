@@ -1,4 +1,4 @@
-use crate::rendering::color::{x_bar, xyz_to_srgb, y_bar, z_bar, CIETristimulus, Color};
+use crate::rendering::color::{CIETristimulus, Color, x_bar, xyz_to_srgb, y_bar, z_bar};
 
 const h: f64 = 6.62607015e-34;
 const c: f64 = 299792458.0;
@@ -56,7 +56,7 @@ mod tests {
     use crate::rendering::black_body_radiation::{
         get_srgb_of_black_body, get_srgb_of_black_body_redshifted, integrate_blackbody_xyz,
     };
-    use crate::rendering::color::{xyz_to_linear_srgb, Color};
+    use crate::rendering::color::{Color, xyz_to_linear_srgb};
     use image::{ImageFormat, Rgb};
 
     #[test]

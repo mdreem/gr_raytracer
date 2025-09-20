@@ -4,7 +4,7 @@ use crate::rendering::integrator::StopReason::{CelestialSphereReached, HorizonRe
 use crate::rendering::ray::{IntegratedRay, Ray};
 use crate::rendering::raytracer::RaytracerError;
 use crate::rendering::runge_kutta::rkf45;
-use crate::rendering::scene::{get_position, EquationOfMotionState};
+use crate::rendering::scene::{EquationOfMotionState, get_position};
 
 #[derive(Debug)]
 pub struct Step {

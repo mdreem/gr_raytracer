@@ -1,7 +1,7 @@
 use crate::geometry::geometry::Geometry;
 use crate::rendering::color::CIETristimulus;
 use crate::rendering::redshift::RedshiftComputer;
-use crate::rendering::scene::{get_position, EquationOfMotionState};
+use crate::rendering::scene::{EquationOfMotionState, get_position};
 use crate::scene_objects::hittable::Hittable;
 
 pub trait SceneObject: Hittable {}
