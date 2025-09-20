@@ -45,15 +45,31 @@ impl InnerProduct for EuclideanSpace {
 }
 
 impl Geometry for EuclideanSpace {
-    // TODO: take into account rotations.
     fn get_tetrad_at(&self, position: &Point) -> Tetrad {
-        Tetrad::new(
-            position.clone(),
-            FourVector::new_cartesian(1.0, 0.0, 0.0, 0.0),
-            FourVector::new_cartesian(0.0, 0.0, 1.0, 0.0),
-            FourVector::new_cartesian(0.0, 0.0, 0.0, 1.0),
-            -FourVector::new_cartesian(0.0, 1.0, 0.0, 0.0),
-        )
+        let point_in_spherical = position.get_as_spherical();
+
+        let r = point_in_spherical.x;
+        let theta = point_in_spherical.y;
+        let phi = point_in_spherical.z;
+
+        let e_t = FourVector::new_cartesian(1.0, 0.0, 0.0, 0.0);
+        let e_r = FourVector::new_cartesian(
+            0.0,
+            theta.sin() * phi.cos(),
+            theta.sin() * phi.sin(),
+            theta.cos(),
+        );
+        let e_theta = FourVector::new_cartesian(
+            0.0,
+            theta.cos() * phi.cos(),
+            theta.cos() * phi.sin(),
+            -theta.sin(),
+        );
+        let e_phi =
+            FourVector::new_cartesian(0.0, -theta.sin() * phi.sin(), theta.sin() * phi.cos(), 0.0)
+                / theta.sin();
+
+        Tetrad::new(position.clone(), e_t, e_phi, -e_theta, -e_r)
     }
 
     fn lorentz_transformation(&self, position: &Point, t_velocity: &FourVector) -> Matrix4<f64> {
