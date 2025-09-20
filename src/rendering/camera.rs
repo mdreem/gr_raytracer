@@ -173,7 +173,7 @@ mod tests {
 
     #[test]
     fn test_get_direction_for() {
-        let position = Point::new(0.0, 0.0, 0.0, 1.0, CoordinateSystem::Cartesian);
+        let position = Point::new(0.0, 1.0, 0.0, 0.0, CoordinateSystem::Cartesian);
         let camera = Camera::new(
             position.clone(),
             FourVector::new_cartesian(1.0, 0.0, 0.0, 0.0),
