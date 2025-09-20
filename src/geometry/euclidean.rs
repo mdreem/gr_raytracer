@@ -45,10 +45,19 @@ impl InnerProduct for EuclideanSpace {
 }
 
 impl Geometry for EuclideanSpace {
+    /// Returns a local tetrad (orthonormal basis) at the given position.
+    ///
+    /// The tetrad is constructed from the spherical coordinate unit vectors as follows:
+    /// - x-axis: eφ (unit vector in the increasing φ direction)
+    /// - y-axis: -eθ (negative unit vector in the θ direction)
+    /// - z-axis: -er (negative unit vector in the radial direction)
+    ///
+    /// This mapping (x = eφ, y = −eθ, z = −er) should match the one used in the Schwarzschild geometry.
+    /// The time-like basis vector is e_t.
     fn get_tetrad_at(&self, position: &Point) -> Tetrad {
         let point_in_spherical = position.get_as_spherical();
 
-        let r = point_in_spherical.x;
+        let _r = point_in_spherical.x;
         let theta = point_in_spherical.y;
         let phi = point_in_spherical.z;
 
