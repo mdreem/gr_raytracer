@@ -82,10 +82,11 @@ impl InnerProduct for Schwarzschild {
     }
 }
 
+// TODO: take into account rotations.
 // All coordinates here are spherical coordinates.
 impl Geometry for Schwarzschild {
-    // TODO: take into account rotations.
     fn get_tetrad_at(&self, position: &Point) -> Tetrad {
+        assert_eq!(position.coordinate_system, Spherical);
         let r = position[1];
         let theta = position[2];
         let _phi = position[3];
@@ -103,6 +104,7 @@ impl Geometry for Schwarzschild {
     }
 
     fn lorentz_transformation(&self, position: &Point, velocity: &FourVector) -> Matrix4<f64> {
+        assert_eq!(position.coordinate_system, Spherical);
         let mut matrix = Matrix4::zeros();
         let tetrad_t = self.get_tetrad_at(position).t;
 
