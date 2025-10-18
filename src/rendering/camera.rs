@@ -24,6 +24,7 @@ pub fn lorentz_transform_tetrad<G: Geometry>(
 
     debug!("lorentz transformation: {:?}", lorentz);
 
+    // TODO: Move matrix multiplication to FourVector.
     let t_vec = lorentz * tetrad.t.get_as_vector();
     let x_vec = lorentz * tetrad.x.get_as_vector();
     let y_vec = lorentz * tetrad.y.get_as_vector();
