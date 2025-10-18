@@ -68,6 +68,7 @@ impl HasCoordinateSystem for Schwarzschild {
 
 impl InnerProduct for Schwarzschild {
     fn inner_product(&self, position: &Point, v: &FourVector, w: &FourVector) -> f64 {
+        assert_eq!(position.coordinate_system, Spherical);
         let r = position[1];
         let theta = position[2];
         let _phi = position[3];
