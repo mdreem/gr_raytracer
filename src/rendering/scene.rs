@@ -450,18 +450,12 @@ mod tests {
             0.0,
             0.0,
             0.0,
-            -10.0,
+            10.0,
             CoordinateSystem::Cartesian,
         ));
 
         let camera = Camera::new(
-            Point::new(
-                0.0,
-                spatial_position[0],
-                spatial_position[1],
-                spatial_position[2],
-                CoordinateSystem::Cartesian,
-            ),
+            spatial_position,
             FourVector::new_spherical(1.0, 0.0, 0.0, 0.0),
             PI / 2.0,
             11,
