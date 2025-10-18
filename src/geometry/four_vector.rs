@@ -2,7 +2,7 @@ use crate::geometry::point::CoordinateSystem;
 use nalgebra::{Vector3, Vector4};
 use std::ops::{Add, Div, Index, Mul, Neg};
 
-#[derive(Clone, Copy, Debug)]
+#[derive(Clone, Copy, Debug, PartialEq)]
 pub struct FourVector {
     pub coordinate_system: CoordinateSystem,
     pub vector: Vector4<f64>,
