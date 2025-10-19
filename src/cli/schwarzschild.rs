@@ -129,6 +129,9 @@ mod tests {
             step_size: 0.01,
             epsilon: 1e-5,
             height: 400,
+            phi: 0.0,
+            theta: 0.0,
+            psi: 0.0,
             camera_position: vec![],
         };
         let mut output_buffer = BufWriter::new(Vec::new());

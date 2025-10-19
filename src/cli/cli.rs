@@ -2,9 +2,9 @@ use clap::{Args, Parser, Subcommand};
 
 #[derive(Debug, Args, Clone)]
 pub struct GlobalOpts {
-    #[arg(short, long, default_value = "500")]
+    #[arg(long, default_value = "500")]
     pub width: i64,
-    #[arg(short, long, default_value = "500")]
+    #[arg(long, default_value = "500")]
     pub height: i64,
     #[arg(long, default_value = "0.01")]
     pub step_size: f64,
@@ -14,8 +14,14 @@ pub struct GlobalOpts {
     pub max_radius: f64,
     #[arg(long, default_value = "0.00001")]
     pub epsilon: f64,
-    #[arg(short, long, value_delimiter = ',', default_value = "18.0,0.0,0.8")]
+    #[arg(long, value_delimiter = ',', default_value = "18.0,0.0,0.8")]
     pub camera_position: Vec<f64>,
+    #[arg(long, default_value = "0.0")]
+    pub phi: f64,
+    #[arg(long, default_value = "0.0")]
+    pub theta: f64,
+    #[arg(long, default_value = "0.0")]
+    pub psi: f64,
 }
 
 #[derive(Parser)]
