@@ -128,6 +128,9 @@ mod tests {
             PI / 2.0,
             rows,
             cols,
+            0.0,
+            0.0,
+            0.0,
             &EuclideanSpaceSpherical::new(),
         );
 
