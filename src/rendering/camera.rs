@@ -63,6 +63,13 @@ pub fn lorentz_transform_tetrad<G: Geometry>(
     )
 }
 
+fn rotate(v1: FourVector, v2: FourVector, angle: f64) -> (FourVector, FourVector) {
+    let v1_rotated = angle.cos() * v1 + angle.sin() * v2;
+    let v2_rotated = -angle.sin() * v1 + angle.cos() * v2;
+
+    (v1_rotated, v2_rotated)
+}
+
 impl Camera {
     // Position is given in cartesian coordinates.
     pub fn new<G: Geometry>(
@@ -71,6 +78,9 @@ impl Camera {
         alpha: f64,
         rows: i64,
         columns: i64,
+        phi: f64,
+        theta: f64,
+        psi: f64,
         geometry: &G,
     ) -> Camera {
         let original_tetrad = geometry.get_tetrad_at(&position);
@@ -120,8 +130,21 @@ impl Camera {
             "  inner product y.z: {}",
             geometry.inner_product(&position, &original_tetrad.y, &original_tetrad.z)
         );
-        let tetrad = lorentz_transform_tetrad(geometry, &original_tetrad, &position, &velocity);
-        debug!("tetrad: {}", tetrad);
+        let lorentz_transformed_tetrad =
+            lorentz_transform_tetrad(geometry, &original_tetrad, &position, &velocity);
+        debug!("lorentz transformed tetrad: {}", lorentz_transformed_tetrad);
+
+        let (a_prime, b_prime) = rotate(
+            lorentz_transformed_tetrad.x,
+            lorentz_transformed_tetrad.y,
+            phi,
+        );
+        let (z, a_two_prime) = rotate(lorentz_transformed_tetrad.z, a_prime, theta);
+        let (x, y) = rotate(a_two_prime, b_prime, psi);
+
+        let tetrad = Tetrad::new(position.clone(), lorentz_transformed_tetrad.t, x, y, z);
+        debug!("rotated tetrad: {}", tetrad);
+
         Self {
             position,
             velocity,
@@ -181,6 +204,9 @@ mod tests {
             PI / 2.0,
             11,
             11,
+            0.0,
+            0.0,
+            0.0,
             &EuclideanSpace::new(),
         );
         let geometry = EuclideanSpace::new();

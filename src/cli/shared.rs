@@ -53,6 +53,9 @@ pub fn create_scene<G: Geometry>(
         PI / 4.0,
         opts.height,
         opts.width,
+        0.0,
+        0.0,
+        0.0,
         geometry,
     );
 

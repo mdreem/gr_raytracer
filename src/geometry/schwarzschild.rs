@@ -379,6 +379,9 @@ mod tests {
             PI / 2.0,
             rows,
             cols,
+            0.0,
+            0.0,
+            0.0,
             &Schwarzschild::new(2.0, 1e-4),
         );
 
@@ -399,6 +402,9 @@ mod tests {
             PI / 2.0,
             11,
             11,
+            0.0,
+            0.0,
+            0.0,
             &Schwarzschild::new(2.0, 1e-4),
         );
 
@@ -419,6 +425,9 @@ mod tests {
             PI / 2.0,
             11,
             11,
+            0.0,
+            0.0,
+            0.0,
             &Schwarzschild::new(radius, 1e-4),
         );
         camera

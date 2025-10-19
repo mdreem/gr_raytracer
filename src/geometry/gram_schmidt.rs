@@ -10,7 +10,7 @@ fn proj<G: Geometry>(geometry: &G, position: &Point, u: &FourVector, v: &FourVec
     (p1 / p2) * u.clone()
 }
 
-fn gram_schmidt<G: Geometry>(
+pub fn gram_schmidt<G: Geometry>(
     geometry: &G,
     position: &Point,
     vectors: &[FourVector],
