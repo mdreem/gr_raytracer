@@ -168,6 +168,9 @@ pub mod test_scene {
             PI / 4.0,
             500,
             500,
+            0.0,
+            0.0,
+            0.0,
             geometry,
         );
 
@@ -298,6 +301,9 @@ mod tests {
             PI / 2.0,
             11,
             11,
+            0.0,
+            0.0,
+            0.0,
             &EuclideanSpace::new(),
         );
         let space = EuclideanSpace::new();
@@ -324,6 +330,9 @@ mod tests {
             PI / 2.0,
             11,
             11,
+            0.0,
+            0.0,
+            0.0,
             &EuclideanSpaceSpherical::new(),
         );
         let space = EuclideanSpaceSpherical::new();
@@ -354,7 +363,17 @@ mod tests {
 
         let geometry = Schwarzschild::new(radius, 1e-4);
 
-        let camera = Camera::new(position, velocity, PI / 2.0, 11, 11, &geometry);
+        let camera = Camera::new(
+            position,
+            velocity,
+            PI / 2.0,
+            11,
+            11,
+            0.0,
+            0.0,
+            0.0,
+            &geometry,
+        );
         let scene = create_scene_with_camera(2.0, 0.2, 0.3, &geometry, camera, 1e-12);
 
         let ray = scene.camera.get_ray_for(5, 5);
@@ -378,7 +397,17 @@ mod tests {
 
         let geometry = Schwarzschild::new(radius, 1e-4);
 
-        let camera = Camera::new(position, velocity, PI / 2.0, 11, 11, &geometry);
+        let camera = Camera::new(
+            position,
+            velocity,
+            PI / 2.0,
+            11,
+            11,
+            0.0,
+            0.0,
+            0.0,
+            &geometry,
+        );
         let scene = create_scene_with_camera(sphere_radius, 0.2, 0.3, &geometry, camera, 1e-12);
 
         let ray = scene.camera.get_ray_for(5, 5);
@@ -401,6 +430,9 @@ mod tests {
             PI / 2.0,
             11,
             11,
+            0.0,
+            0.0,
+            0.0,
             &EuclideanSpace::new(),
         );
         let space = EuclideanSpace::new();
@@ -433,6 +465,9 @@ mod tests {
             PI / 2.0,
             11,
             11,
+            0.0,
+            0.0,
+            0.0,
             &Schwarzschild::new(radius, 1e-4),
         );
         let space = Schwarzschild::new(radius, 1e-4);
@@ -460,6 +495,9 @@ mod tests {
             PI / 2.0,
             11,
             11,
+            0.0,
+            0.0,
+            0.0,
             &Schwarzschild::new(2.0, 1e-4),
         );
         let space = Schwarzschild::new(2.0, 1e-4);
@@ -479,6 +517,9 @@ mod tests {
             PI / 4.0,
             101,
             101,
+            0.0,
+            0.0,
+            0.0,
             &EuclideanSpace::new(),
         );
         let space = EuclideanSpace::new();
