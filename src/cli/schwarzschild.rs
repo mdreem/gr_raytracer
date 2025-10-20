@@ -10,7 +10,7 @@ use crate::geometry::spherical_coordinates_helper::cartesian_to_spherical;
 use crate::rendering::integrator::{IntegrationConfiguration, Integrator};
 use crate::rendering::ray::Ray;
 use crate::rendering::raytracer;
-use log::info;
+use log::{debug, info};
 use std::io::Write;
 
 pub fn render_schwarzschild(
@@ -26,8 +26,14 @@ pub fn render_schwarzschild(
     let r = camera_position[1];
     let a = 1.0 - radius / r;
     let momentum = FourVector::new_spherical(1.0 / a.sqrt(), 0.0, 0.0, 0.0);
+    debug!("momentum: {:?}", momentum);
 
     let geometry = Schwarzschild::new(radius, horizon_epsilon);
+    debug!(
+        "m_s: {}",
+        geometry.inner_product(&camera_position, &momentum, &momentum)
+    );
+
     let scene = create_scene(&geometry, camera_position, momentum, opts, config.clone())?;
 
     render(scene, filename, config.color_normalization)

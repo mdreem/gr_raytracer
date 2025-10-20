@@ -7,6 +7,7 @@ use crate::geometry::point::{CoordinateSystem, Point};
 use crate::rendering::ray::Ray;
 use crate::rendering::runge_kutta::OdeFunction;
 use crate::rendering::scene::EquationOfMotionState;
+use log::trace;
 use nalgebra::{Const, Matrix4, OVector};
 
 struct EuclideanSpacedSolver {}
@@ -27,8 +28,11 @@ impl OdeFunction<Const<8>> for EuclideanSpacedSolver {
 }
 
 impl GeodesicSolver for EuclideanSpacedSolver {
-    fn geodesic(&self, _: f64, y: &EquationOfMotionState) -> EquationOfMotionState {
-        EquationOfMotionState::from_column_slice(&[y[4], y[5], y[6], y[7], 0.0, 0.0, 0.0, 0.0])
+    fn geodesic(&self, _: f64, y_state: &EquationOfMotionState) -> EquationOfMotionState {
+        trace!("y_state = {:?}", y_state);
+        EquationOfMotionState::from_column_slice(&[
+            y_state[4], y_state[5], y_state[6], y_state[7], 0.0, 0.0, 0.0, 0.0,
+        ])
     }
 }
 
@@ -120,6 +124,10 @@ impl Geometry for EuclideanSpace {
     }
 
     fn inside_horizon(&self, _position: &Point) -> bool {
+        false
+    }
+
+    fn closed_orbit(&self, _position: &Point, _step_index: usize, _max_steps: usize) -> bool {
         false
     }
 

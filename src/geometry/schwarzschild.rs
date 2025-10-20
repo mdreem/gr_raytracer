@@ -7,6 +7,7 @@ use crate::geometry::point::{CoordinateSystem, Point};
 use crate::rendering::ray::Ray;
 use crate::rendering::runge_kutta::OdeFunction;
 use crate::rendering::scene::EquationOfMotionState;
+use log::debug;
 use nalgebra::{Const, Matrix4, OVector};
 
 #[derive(Clone, Debug)]
@@ -104,7 +105,7 @@ impl Geometry for Schwarzschild {
             *position,
             FourVector::new_spherical(1.0 / a, -rr0.sqrt(), 0.0, 0.0),
             FourVector::new_spherical(0.0, 0.0, 0.0, 1.0 / (r * theta.sin())), // Phi
-            -FourVector::new_spherical(0.0, 0.0, 1.0 / r, 0.0),                // Theta
+            FourVector::new_spherical(0.0, 0.0, 1.0 / r, 0.0),                 // Theta
             -FourVector::new_spherical(-rr0.sqrt() / a, 1.0, 0.0, 0.0),        // R
         )
     }
@@ -122,6 +123,15 @@ impl Geometry for Schwarzschild {
 
         let metric_diag =
             Point::new_spherical(a, -1.0 / a, -r * r, -r * r * theta.sin() * theta.sin());
+
+        debug!(
+            "scalar prod tetrad_t: {:?}",
+            self.inner_product(position, &tetrad_t, &tetrad_t)
+        );
+        debug!(
+            "scalar prod velocity: {:?}",
+            self.inner_product(position, velocity, velocity)
+        );
 
         let mut gamma = 0.0;
         for i in 0..4 {
@@ -154,6 +164,10 @@ impl Geometry for Schwarzschild {
 
     fn inside_horizon(&self, position: &Point) -> bool {
         position[1] <= self.radius + self.horizon_epsilon
+    }
+
+    fn closed_orbit(&self, _position: &Point, _step_index: usize, _max_steps: usize) -> bool {
+        false
     }
 
     fn get_geodesic_solver(&self, _ray: &Ray) -> Box<dyn GeodesicSolver> {
@@ -428,7 +442,7 @@ mod tests {
         );
     }
 
-    fn create_camera(position: Point, radius: f64) -> Camera {
+    fn create_camera(position: Point, radius: f64, phi: f64, theta: f64, psi: f64) -> Camera {
         let r = position[1];
         let a = 1.0 - radius / r;
         let velocity = FourVector::new_spherical(1.0 / a, -(radius / r).sqrt(), 0.0, 0.0); // we have a freely falling observer here.
@@ -438,9 +452,9 @@ mod tests {
             PI / 2.0,
             11,
             11,
-            0.0,
-            0.0,
-            0.0,
+            phi,
+            theta,
+            psi,
             &Schwarzschild::new(radius, 1e-4),
         );
         camera
@@ -451,7 +465,7 @@ mod tests {
         let position = cartesian_to_spherical(&Point::new_cartesian(2.0, 5.0, 0.0, 0.0));
         let radius = 2.0;
         let geometry = Schwarzschild::new(radius, 1e-4);
-        let camera = create_camera(position, radius);
+        let camera = create_camera(position, radius, 0.0, 0.0, 0.0);
 
         for i in 1..11 {
             let ray = camera.get_ray_for(6, i);
@@ -470,7 +484,7 @@ mod tests {
         let position = cartesian_to_spherical(&Point::new_cartesian(2.0, 5.0, 0.0, 0.0));
         let radius = 2.0;
         let geometry = Schwarzschild::new(radius, 1e-4);
-        let camera = create_camera(position, radius);
+        let camera = create_camera(position, radius, 0.0, 0.0, 0.0);
 
         for i in 0..10 {
             let ray = camera.get_ray_for(5, i);
@@ -491,19 +505,19 @@ mod tests {
         let position = cartesian_to_spherical(&Point::new_cartesian(2.0, 10.0, 0.0, 0.0));
         let radius = 2.0;
         let geometry = Schwarzschild::new(radius, 1e-4);
-        let camera = create_camera(position, radius);
+        let camera = create_camera(position, radius, 0.0, 0.0, 0.0);
         let scene: Scene<Schwarzschild> =
             scene::test_scene::create_scene_with_camera(1.0, 2.0, 7.0, &geometry, camera, 1e-5);
 
         let ray_a = scene.camera.get_ray_for(5, 10);
         let ray_b = scene.camera.get_ray_for(0, 5);
 
-        // ensure rays are rotated by 90 degrees.
-        assert_abs_diff_eq!(ray_a.momentum.vector[2], ray_b.momentum.vector[3]);
-        assert_abs_diff_eq!(ray_a.momentum.vector[3], ray_b.momentum.vector[2]);
-
         println!("ray_a: {:?}", ray_a);
         println!("ray_b: {:?}", ray_b);
+
+        // ensure rays are rotated by 90 degrees.
+        assert_abs_diff_eq!(ray_a.momentum.vector[2], ray_b.momentum.vector[3]);
+        assert_abs_diff_eq!(ray_a.momentum.vector[3], -ray_b.momentum.vector[2]);
 
         let (trajectory_a, _) = scene
             .integrator
@@ -527,7 +541,7 @@ mod tests {
                     .get_as_cartesian();
 
             assert_abs_diff_eq!(step_a_cartesian[0], step_b_cartesian[0], epsilon = 1e-5);
-            assert_abs_diff_eq!(step_a_cartesian[1], -step_b_cartesian[2], epsilon = 1e-5);
+            assert_abs_diff_eq!(step_a_cartesian[1], step_b_cartesian[2], epsilon = 1e-5);
             assert_abs_diff_eq!(step_a_cartesian[2], -step_b_cartesian[1], epsilon = 1e-5);
         }
     }

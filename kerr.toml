@@ -6,7 +6,7 @@ color_normalization = "NoNormalization"
 
 [geometry_type.Kerr]
 radius = 1.0
-a=0.0
+a=0.5
 horizon_epsilon = 1e-4
 
 [[objects]]
