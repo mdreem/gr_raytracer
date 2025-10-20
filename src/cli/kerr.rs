@@ -11,7 +11,7 @@ use crate::geometry::spherical_coordinates_helper::cartesian_to_spherical;
 use crate::rendering::integrator::{IntegrationConfiguration, Integrator};
 use crate::rendering::ray::Ray;
 use crate::rendering::raytracer;
-use log::info;
+use log::{debug, info, trace};
 use std::io::Write;
 
 pub fn render_kerr(
@@ -24,9 +24,15 @@ pub fn render_kerr(
     filename: String,
 ) -> Result<(), raytracer::RaytracerError> {
     let f = compute_f(radius, a, camera_position);
-    let momentum = FourVector::new_cartesian(1.0, 0.0, 0.0, 0.0); // TODO: adapt to Kerr
+    println!("f: {}", f);
+    let momentum = FourVector::new_cartesian(1.0 / (1.0 - f).sqrt(), 0.0, 0.0, 0.0);
+    debug!("momentum: {:?}", momentum);
 
     let geometry = Kerr::new(radius, a, horizon_epsilon);
+    debug!(
+        "m_s: {}",
+        geometry.inner_product(&camera_position, &momentum, &momentum)
+    );
     let scene = create_scene(&geometry, camera_position, momentum, opts, config.clone())?;
 
     render(scene, filename, config.color_normalization)
@@ -44,8 +50,12 @@ pub fn render_kerr_ray(
     write: &mut dyn Write,
 ) -> Result<(), raytracer::RaytracerError> {
     let f = compute_f(radius, a, camera_position);
-    let momentum = FourVector::new_spherical(1.0 / f.sqrt(), 0.0, 0.0, 0.0);
+    let momentum = FourVector::new_cartesian(1.0 / (1.0 - f).sqrt(), 0.0, 0.0, 0.0);
     let geometry = Kerr::new(radius, a, horizon_epsilon);
+    debug!(
+        "m_s: {}",
+        geometry.inner_product(&camera_position, &momentum, &momentum)
+    );
 
     let scene = create_scene(&geometry, camera_position, momentum, opts, config.clone())?;
     let raytracer = raytracer::Raytracer::new(scene, config.color_normalization);
@@ -60,10 +70,11 @@ fn compute_f(radius: f64, a: f64, camera_position: Point) -> f64 {
     let y = camera_position[2];
     let z = camera_position[3];
     let rho_sqr = x * x + y * y + z * z;
-    let r_sqr = 0.5
-        * (rho_sqr - a * a + ((rho_sqr - a * a) * (rho_sqr - a * a) + 4.0 * a * a * z * z).sqrt());
+    let term = ((rho_sqr - a * a).powi(2) + 4.0 * a * a * z * z).sqrt();
+    let r_sqr = 0.5 * (rho_sqr - a * a + term);
     let r = r_sqr.sqrt();
     let f = (r * r * r * radius) / (r * r * r * r + a * a * z * z);
+    trace!("f: {}", f);
     f
 }
 
@@ -72,21 +83,19 @@ pub fn render_kerr_ray_at(
     a: f64,
     horizon_epsilon: f64,
     position: Point,
-    _direction: FourVector,
+    direction: FourVector,
     opts: GlobalOpts,
     write: &mut dyn Write,
 ) -> Result<(), raytracer::RaytracerError> {
-    let x = position[1];
-    let y = position[2];
-    let z = position[3];
-
-    let bare_cartesian = EuclideanSpace::new(); // TODO: Use Kerr here.
     let geometry = Kerr::new(radius, a, horizon_epsilon);
 
-    let tetrad = bare_cartesian.get_tetrad_at(&position);
+    let tetrad = geometry.get_tetrad_at(&position);
     info!("Tetrad at position {:?}: {}", position, tetrad);
 
-    let momentum = tetrad.t * 1.0 + tetrad.x * z + tetrad.y * y + tetrad.z * z;
+    let momentum = tetrad.t * 1.0
+        + tetrad.x * direction[1]
+        + tetrad.y * direction[2]
+        + tetrad.z * direction[3];
 
     let m_s = geometry.inner_product(&position, &momentum, &momentum);
 
@@ -117,6 +126,7 @@ mod tests {
     use crate::cli::kerr::render_kerr_ray_at;
     use crate::geometry::four_vector::FourVector;
     use crate::geometry::point::Point;
+    use std::f64::consts::PI;
     use std::io::BufWriter;
 
     #[test]
@@ -133,6 +143,9 @@ mod tests {
             step_size: 0.01,
             epsilon: 1e-5,
             height: 400,
+            phi: 0.0,
+            theta: PI / 2.0,
+            psi: PI / 2.0,
             camera_position: vec![],
         };
         let mut output_buffer = BufWriter::new(Vec::new());

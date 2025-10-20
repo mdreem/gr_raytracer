@@ -36,10 +36,10 @@ impl Tetrad {
 impl Display for Tetrad {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         write!(f, "Tetrad\n")?;
-        write!(f, "  t: {:?}\n", self.t)?;
-        write!(f, "  x: {:?}\n", self.x)?;
-        write!(f, "  y: {:?}\n", self.y)?;
-        write!(f, "  z: {:?}\n", self.z)?;
+        write!(f, "  t: {:?}\n", self.t,)?;
+        write!(f, "  x: {:?}\n", self.x,)?;
+        write!(f, "  y: {:?}\n", self.y,)?;
+        write!(f, "  z: {:?}\n", self.z,)?;
         Ok(())
     }
 }
@@ -61,5 +61,6 @@ pub trait Geometry: InnerProduct + HasCoordinateSystem + Clone + Sync {
     fn lorentz_transformation(&self, position: &Point, velocity: &FourVector) -> Matrix4<f64>;
     fn get_stationary_velocity_at(&self, position: &Point) -> FourVector;
     fn inside_horizon(&self, position: &Point) -> bool;
+    fn closed_orbit(&self, position: &Point, step_index: usize, max_steps: usize) -> bool;
     fn get_geodesic_solver(&self, ray: &Ray) -> Box<dyn GeodesicSolver>;
 }

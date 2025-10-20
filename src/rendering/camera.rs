@@ -2,14 +2,14 @@ use crate::geometry::four_vector::FourVector;
 use crate::geometry::geometry::{Geometry, Tetrad};
 use crate::geometry::point::Point;
 use crate::rendering::ray::Ray;
-use log::debug;
+use log::{debug, trace};
 
 #[derive(Debug, Clone)]
 pub struct Camera {
     alpha: f64,
     pub rows: i64,
     pub columns: i64,
-    position: Point,
+    pub position: Point,
     pub velocity: FourVector,
     tetrad: Tetrad,
 }
@@ -86,64 +86,60 @@ impl Camera {
         let original_tetrad = geometry.get_tetrad_at(&position);
         debug!("position: {:?}", position);
         debug!("original_tetrad: {}", original_tetrad);
-        debug!("inner product checks:");
+        debug!("inner product checks for tetrad:");
         debug!(
-            "  inner product t.t: {}",
+            "  inner product t.t: {:.5}",
             geometry.inner_product(&position, &original_tetrad.t, &original_tetrad.t)
         );
         debug!(
-            "  inner product x.x: {}",
+            "  inner product x.x: {:.5}",
             geometry.inner_product(&position, &original_tetrad.x, &original_tetrad.x)
         );
         debug!(
-            "  inner product y.y: {}",
+            "  inner product y.y: {:.5}",
             geometry.inner_product(&position, &original_tetrad.y, &original_tetrad.y)
         );
         debug!(
-            "  inner product z.z: {}",
+            "  inner product z.z: {:.5}",
             geometry.inner_product(&position, &original_tetrad.z, &original_tetrad.z)
         );
         debug!("");
         debug!(
-            "  inner product t.x: {}",
+            "  inner product t.x: {:.5}",
             geometry.inner_product(&position, &original_tetrad.t, &original_tetrad.x)
         );
         debug!(
-            "  inner product t.y: {}",
+            "  inner product t.y: {:.5}",
             geometry.inner_product(&position, &original_tetrad.t, &original_tetrad.y)
         );
         debug!(
-            "  inner product t.z: {}",
+            "  inner product t.z: {:.5}",
             geometry.inner_product(&position, &original_tetrad.t, &original_tetrad.z)
         );
         debug!("");
         debug!(
-            "  inner product x.y: {}",
+            "  inner product x.y: {:.5}",
             geometry.inner_product(&position, &original_tetrad.x, &original_tetrad.y)
         );
         debug!(
-            "  inner product x.z: {}",
+            "  inner product x.z: {:.5}",
             geometry.inner_product(&position, &original_tetrad.x, &original_tetrad.z)
         );
         debug!("");
         debug!(
-            "  inner product y.z: {}",
+            "  inner product y.z: {:.5}",
             geometry.inner_product(&position, &original_tetrad.y, &original_tetrad.z)
         );
-        let lorentz_transformed_tetrad =
-            lorentz_transform_tetrad(geometry, &original_tetrad, &position, &velocity);
-        debug!("lorentz transformed tetrad: {}", lorentz_transformed_tetrad);
 
-        let (a_prime, b_prime) = rotate(
-            lorentz_transformed_tetrad.x,
-            lorentz_transformed_tetrad.y,
-            phi,
-        );
-        let (z, a_two_prime) = rotate(lorentz_transformed_tetrad.z, a_prime, theta);
+        let (a_prime, b_prime) = rotate(original_tetrad.x, original_tetrad.y, phi);
+        let (z, a_two_prime) = rotate(original_tetrad.z, a_prime, theta);
         let (x, y) = rotate(a_two_prime, b_prime, psi);
 
-        let tetrad = Tetrad::new(position.clone(), lorentz_transformed_tetrad.t, x, y, z);
-        debug!("rotated tetrad: {}", tetrad);
+        let rotated_tetrad = Tetrad::new(position.clone(), original_tetrad.t, x, y, z);
+        debug!("rotated tetrad: {}", rotated_tetrad);
+
+        let tetrad = lorentz_transform_tetrad(geometry, &rotated_tetrad, &position, &velocity);
+        debug!("lorentz transformed tetrad: {}", tetrad);
 
         Self {
             position,
@@ -173,6 +169,7 @@ impl Camera {
 
     pub fn get_ray_for(&self, row: i64, column: i64) -> Ray {
         let direction = self.get_direction_for(row, column);
+        trace!("direction ({}|{}): {:?}", row, column, direction);
         let momentum = direction + self.tetrad.t; // Add T-component of the tetrad to get the momentum.
         Ray::new(
             row,
@@ -188,9 +185,15 @@ impl Camera {
 #[cfg(test)]
 mod tests {
     use crate::geometry::euclidean::EuclideanSpace;
+    use crate::geometry::euclidean_spherical::EuclideanSpaceSpherical;
     use crate::geometry::four_vector::FourVector;
-    use crate::geometry::geometry::InnerProduct;
+    use crate::geometry::geometry::{Geometry, InnerProduct};
+    use crate::geometry::kerr::Kerr;
     use crate::geometry::point::{CoordinateSystem, Point};
+    use crate::geometry::schwarzschild::Schwarzschild;
+    use crate::geometry::spherical_coordinates_helper::{
+        cartesian_to_spherical, spherical_to_cartesian,
+    };
     use crate::rendering::camera::Camera;
     use approx::assert_abs_diff_eq;
     use std::f64::consts::PI;
@@ -257,5 +260,94 @@ mod tests {
         let bottom_right_corner_scalar =
             geometry.inner_product(&position, &bottom_right_corner, &bottom_right_corner);
         assert_abs_diff_eq!(bottom_right_corner_scalar, -1.0);
+    }
+
+    #[test]
+    fn test_get_ray_for_different_geometries_euclidean() {
+        let position = Point::new_cartesian(0.0, 0.0, 1.0, 0.0);
+        let velocity = FourVector::new_cartesian(1.0, 0.0, 0.0, 0.0);
+
+        let geometry_euclidean = EuclideanSpace::new();
+        let camera_euclidean = Camera::new(
+            position.clone(),
+            velocity.clone(),
+            PI / 2.0,
+            100,
+            100,
+            0.0,
+            PI / 2.0,
+            PI / 2.0,
+            &geometry_euclidean,
+        );
+
+        let geometry_euclidean_spherical = EuclideanSpaceSpherical::new();
+        let camera_euclidean_spherical = Camera::new(
+            cartesian_to_spherical(&position.clone()),
+            velocity.clone(),
+            PI / 2.0,
+            100,
+            100,
+            0.0,
+            PI / 2.0,
+            PI / 2.0,
+            &geometry_euclidean_spherical,
+        );
+
+        for _row in 0..100 {
+            for _col in 0..100 {
+                let ray_euclidean = camera_euclidean.get_ray_for(_row, _col);
+                let ray_euclidean_spherical = camera_euclidean_spherical.get_ray_for(_row, _col);
+                assert_abs_diff_eq!(
+                    ray_euclidean.position.vector,
+                    spherical_to_cartesian(&ray_euclidean_spherical.position).vector,
+                    epsilon = 1e-10
+                );
+            }
+        }
+    }
+
+    #[test]
+    fn test_get_ray_for_different_geometries_schwarzschild() {
+        let position = Point::new_cartesian(0.0, 0.0, 1.0, 0.0);
+        let velocity = FourVector::new_cartesian(1.0, 0.0, 0.0, 0.0);
+
+        let geometry_euclidean = EuclideanSpace::new();
+        let camera_euclidean = Camera::new(
+            position.clone(),
+            velocity.clone(),
+            PI / 2.0,
+            100,
+            100,
+            0.0,
+            PI / 2.0,
+            PI / 2.0,
+            &geometry_euclidean,
+        );
+
+        let geometry_euclidean_schwarzschild = Schwarzschild::new(0.0, 0.0);
+        let camera_euclidean_schwarzschild = Camera::new(
+            cartesian_to_spherical(&position.clone()),
+            velocity.clone(),
+            PI / 2.0,
+            100,
+            100,
+            0.0,
+            PI / 2.0,
+            PI / 2.0,
+            &geometry_euclidean_schwarzschild,
+        );
+
+        for _row in 0..100 {
+            for _col in 0..100 {
+                let ray_euclidean = camera_euclidean.get_ray_for(_row, _col);
+                let ray_euclidean_schwarzschild =
+                    camera_euclidean_schwarzschild.get_ray_for(_row, _col);
+                assert_abs_diff_eq!(
+                    ray_euclidean.position.vector,
+                    spherical_to_cartesian(&ray_euclidean_schwarzschild.position).vector,
+                    epsilon = 1e-10
+                );
+            }
+        }
     }
 }

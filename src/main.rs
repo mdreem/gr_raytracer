@@ -191,10 +191,13 @@ fn run() -> Result<(), RaytracerError> {
             filename,
         } => {
             if position.len() != 3 {
-                panic!("Position must be a vector of length 3");
+                panic!("Position must be a vector of length 3, got {:?}", position);
             }
             if direction.len() != 3 {
-                panic!("Direction must be a vector of length 3");
+                panic!(
+                    "Direction must be a vector of length 3, got {:?}",
+                    direction
+                );
             }
             let mut file =
                 File::create(filename.clone()).map_err(RaytracerError::ConfigurationFileError)?;

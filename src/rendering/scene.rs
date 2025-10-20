@@ -109,9 +109,24 @@ impl<'a, G: Geometry> Scene<'a, G> {
                     let redshift = self.redshift_computer.compute_redshift(&y, observer_energy);
                     intersections.push(self.texture_data.celestial_map.color_at_uv(uv, redshift));
                 }
+                StopReason::CoordinateIsNan => {
+                    error!(
+                        "Ray hit NaN coordinates: {:?} with {} steps.",
+                        ray,
+                        steps.len()
+                    );
+                }
+                StopReason::ClosedOrbitDetected => {
+                    intersections.push(CIETristimulus::new(0.0, 0.0, 0.0, 1.0));
+                }
             };
         } else {
-            error!("Ray did not hit anything: {:?}", ray);
+            error!(
+                "Ray did not hit anything: {:?} at {:?} with {} steps.",
+                ray,
+                steps.iter().last(),
+                steps.len()
+            );
         }
         let mut result = CIETristimulus::new(0.0, 0.0, 0.0, 1.0);
 
@@ -466,8 +481,8 @@ mod tests {
             11,
             11,
             0.0,
-            0.0,
-            0.0,
+            PI / 2.0,
+            PI / 2.0,
             &Schwarzschild::new(radius, 1e-4),
         );
         let space = Schwarzschild::new(radius, 1e-4);
@@ -476,7 +491,7 @@ mod tests {
         let ray = scene.camera.get_ray_for(0, 0);
         let color = scene.color_of_ray(&ray).unwrap();
 
-        assert_approx_eq_cie_tristimulus!(color, CELESTIAL_SPHERE_COLOR_1, 1e-6);
+        assert_approx_eq_cie_tristimulus!(color, CELESTIAL_SPHERE_COLOR_2, 1e-6);
     }
 
     #[test]

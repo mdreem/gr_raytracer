@@ -1,10 +1,13 @@
 use crate::geometry::geometry::Geometry;
 use crate::geometry::point::Point;
-use crate::rendering::integrator::StopReason::{CelestialSphereReached, HorizonReached};
+use crate::rendering::integrator::StopReason::{
+    CelestialSphereReached, CoordinateIsNan, HorizonReached,
+};
 use crate::rendering::ray::{IntegratedRay, Ray};
 use crate::rendering::raytracer::RaytracerError;
 use crate::rendering::runge_kutta::rkf45;
 use crate::rendering::scene::{EquationOfMotionState, get_position};
+use log::debug;
 
 #[derive(Debug)]
 pub struct Step {
@@ -17,6 +20,8 @@ pub struct Step {
 pub enum StopReason {
     HorizonReached,
     CelestialSphereReached,
+    CoordinateIsNan,
+    ClosedOrbitDetected,
 }
 
 pub struct Integrator<'a, G: Geometry> {
@@ -99,7 +104,7 @@ impl<G: Geometry> Integrator<'_, G> {
             t += h;
 
             result.push(Step { y, t, step: i });
-            match self.should_stop(&last_y, &y) {
+            match self.should_stop(&last_y, &y, i) {
                 None => {}
                 Some(r) => return Ok((IntegratedRay::new(result), Some(r))),
             }
@@ -112,7 +117,17 @@ impl<G: Geometry> Integrator<'_, G> {
         &self,
         _last_y: &EquationOfMotionState,
         cur_y: &EquationOfMotionState,
+        step_index: usize,
     ) -> Option<StopReason> {
+        if cur_y[0].is_nan() || cur_y[1].is_nan() || cur_y[2].is_nan() || cur_y[3].is_nan() {
+            debug!("last_y: {:?}", _last_y);
+            debug!(
+                "spherical last_y: {:?}",
+                get_position(_last_y, self.geometry.coordinate_system()).get_as_spherical()
+            );
+            return Some(CoordinateIsNan);
+        }
+
         if self.geometry.inside_horizon(&Point::new(
             cur_y[0],
             cur_y[1],
@@ -121,6 +136,20 @@ impl<G: Geometry> Integrator<'_, G> {
             self.geometry.coordinate_system(),
         )) {
             return Some(HorizonReached);
+        }
+
+        if self.geometry.closed_orbit(
+            &Point::new(
+                cur_y[0],
+                cur_y[1],
+                cur_y[2],
+                cur_y[3],
+                self.geometry.coordinate_system(),
+            ),
+            step_index,
+            self.integration_configuration.max_steps,
+        ) {
+            return Some(StopReason::ClosedOrbitDetected);
         }
 
         // iterate until the celestial plane distance has been reached.

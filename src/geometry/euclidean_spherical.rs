@@ -106,6 +106,10 @@ impl Geometry for EuclideanSpaceSpherical {
         false
     }
 
+    fn closed_orbit(&self, _position: &Point, _step_index: usize, _max_steps: usize) -> bool {
+        false
+    }
+
     fn get_geodesic_solver(&self, _ray: &Ray) -> Box<dyn GeodesicSolver> {
         Box::new(EuclideanSpaceSphericalSolver {})
     }
