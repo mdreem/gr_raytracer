@@ -27,6 +27,12 @@ impl OdeFunction<Const<8>> for EuclideanSpacedSolver {
     }
 }
 
+impl HasCoordinateSystem for EuclideanSpacedSolver {
+    fn coordinate_system(&self) -> CoordinateSystem {
+        Cartesian
+    }
+}
+
 impl GeodesicSolver for EuclideanSpacedSolver {
     fn geodesic(&self, _: f64, y_state: &EquationOfMotionState) -> EquationOfMotionState {
         trace!("y_state = {:?}", y_state);

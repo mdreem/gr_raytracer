@@ -4,7 +4,7 @@ use crate::geometry::spherical_coordinates_helper::spherical_to_cartesian;
 use crate::rendering::camera::Camera;
 use crate::rendering::color::CIETristimulus;
 use crate::rendering::integrator::StopReason::{CelestialSphereReached, HorizonReached};
-use crate::rendering::integrator::{IntegrationConfiguration, Integrator, StopReason};
+use crate::rendering::integrator::{IntegrationConfiguration, Integrator, Step, StopReason};
 use crate::rendering::ray::{IntegratedRay, Ray};
 use crate::rendering::raytracer::RaytracerError;
 use crate::rendering::redshift::RedshiftComputer;
@@ -31,16 +31,13 @@ pub type EquationOfMotionState = OVector<f64, Const<8>>;
 pub fn get_position(y: &EquationOfMotionState, coordinate_system: CoordinateSystem) -> Point {
     match coordinate_system {
         CoordinateSystem::Cartesian => Point::new_cartesian(y[0], y[1], y[2], y[3]),
-        CoordinateSystem::Spherical => {
-            let t_vec = spherical_to_cartesian(&Point::new(
-                y[0],
-                y[1],
-                y[2],
-                y[3],
-                CoordinateSystem::Spherical,
-            ));
-            Point::new_cartesian(t_vec[0], t_vec[1], t_vec[2], t_vec[3]) // TODO: try to do all of this without this conversion.
-        }
+        CoordinateSystem::Spherical => spherical_to_cartesian(&Point::new(
+            y[0],
+            y[1],
+            y[2],
+            y[3],
+            CoordinateSystem::Spherical,
+        )),
     }
 }
 
@@ -75,7 +72,6 @@ impl<'a, G: Geometry> Scene<'a, G> {
 
     pub fn color_of_ray(&self, ray: &Ray) -> Result<CIETristimulus, RaytracerError> {
         let (steps, stop_reason) = self.integrate_ray(ray)?;
-        let mut y = steps[0].y;
 
         if self.save_ray_data {
             let mut file = File::create(format!("ray-{}-{}.csv", ray.row, ray.col))
@@ -87,17 +83,18 @@ impl<'a, G: Geometry> Scene<'a, G> {
         let observer_energy = self.redshift_computer.get_observer_energy(ray, &velocity);
 
         let mut intersections = Vec::new();
-        for step in steps.iter().skip(1) {
-            let last_y = y;
-            y = step.y;
+        for step_window in steps.steps.windows(2) {
+            let last_step = &step_window[0];
+            let step = &step_window[1];
 
             if let Some(intersection_color) =
                 self.objects
-                    .intersects(&last_y, &y, observer_energy, &self.redshift_computer)
+                    .intersects(last_step, step, observer_energy, &self.redshift_computer)
             {
                 intersections.push(intersection_color);
             }
         }
+        let last_step = steps.steps.last().expect("No steps found");
 
         if let Some(reason) = stop_reason {
             match reason {
@@ -105,8 +102,10 @@ impl<'a, G: Geometry> Scene<'a, G> {
                     intersections.push(CIETristimulus::new(0.0, 0.0, 0.0, 1.0));
                 }
                 CelestialSphereReached => {
-                    let uv = self.get_uv_coordinates(&y);
-                    let redshift = self.redshift_computer.compute_redshift(&y, observer_energy);
+                    let uv = self.get_uv_coordinates(&last_step);
+                    let redshift = self
+                        .redshift_computer
+                        .compute_redshift(&last_step, observer_energy);
                     intersections.push(self.texture_data.celestial_map.color_at_uv(uv, redshift));
                 }
                 StopReason::CoordinateIsNan => {
@@ -137,9 +136,8 @@ impl<'a, G: Geometry> Scene<'a, G> {
         Ok(result)
     }
 
-    fn get_uv_coordinates(&self, y_far: &EquationOfMotionState) -> UVCoordinates {
-        let point_on_celestial_sphere =
-            get_position(y_far, self.geometry.coordinate_system()).get_as_spherical();
+    fn get_uv_coordinates(&self, step_far: &Step) -> UVCoordinates {
+        let point_on_celestial_sphere = step_far.x.get_as_spherical();
 
         let theta = point_on_celestial_sphere[1];
         let phi = point_on_celestial_sphere[2];

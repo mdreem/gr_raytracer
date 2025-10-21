@@ -37,6 +37,12 @@ impl OdeFunction<Const<8>> for SchwarzschildSolver {
     }
 }
 
+impl HasCoordinateSystem for SchwarzschildSolver {
+    fn coordinate_system(&self) -> CoordinateSystem {
+        Spherical
+    }
+}
+
 impl GeodesicSolver for SchwarzschildSolver {
     fn geodesic(&self, _: f64, y: &EquationOfMotionState) -> EquationOfMotionState {
         let _t = y[0];
@@ -75,7 +81,7 @@ impl HasCoordinateSystem for Schwarzschild {
 
 impl InnerProduct for Schwarzschild {
     fn inner_product(&self, position: &Point, v: &FourVector, w: &FourVector) -> f64 {
-        assert_eq!(position.coordinate_system, Spherical);
+        debug_assert_eq!(position.coordinate_system, Spherical);
         let r = position[1];
         let theta = position[2];
         let _phi = position[3];
@@ -534,11 +540,11 @@ mod tests {
             let step_b = &trajectory_b[i];
 
             let step_a_cartesian =
-                Point::new_spherical(step_a.y[0], step_a.y[1], step_a.y[2], step_a.y[3])
-                    .get_as_cartesian();
+                Point::new_spherical(step_a.x[0], step_a.x[1], step_a.x[2], step_a.x[3])
+                    .get_spatial_vector_cartesian();
             let step_b_cartesian =
-                Point::new_spherical(step_b.y[0], step_b.y[1], step_b.y[2], step_b.y[3])
-                    .get_as_cartesian();
+                Point::new_spherical(step_b.x[0], step_b.x[1], step_b.x[2], step_b.x[3])
+                    .get_spatial_vector_cartesian();
 
             assert_abs_diff_eq!(step_a_cartesian[0], step_b_cartesian[0], epsilon = 1e-5);
             assert_abs_diff_eq!(step_a_cartesian[1], step_b_cartesian[2], epsilon = 1e-5);
@@ -576,7 +582,7 @@ mod tests {
         let result = compute_compared_trajectories(radius, e, l, 450);
 
         assert_abs_diff_eq!(
-            result.result_geodesic_equation.last().unwrap().y[1],
+            result.result_geodesic_equation.last().unwrap().x[1],
             CELESTIAL_SPHERE_RADIUS,
             epsilon = 100.0
         );
@@ -692,8 +698,8 @@ mod tests {
         steps
             .iter()
             .map(|step| MatchedPoint {
-                r: step.y[1],
-                phi: step.y[3],
+                r: step.x[1],
+                phi: step.x[3],
             })
             .collect()
     }

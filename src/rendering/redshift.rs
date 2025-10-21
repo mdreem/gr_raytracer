@@ -1,8 +1,7 @@
 use crate::geometry::four_vector::FourVector;
 use crate::geometry::geometry::Geometry;
-use crate::geometry::point::Point;
+use crate::rendering::integrator::Step;
 use crate::rendering::ray::Ray;
-use crate::rendering::scene::EquationOfMotionState;
 
 pub struct RedshiftComputer<'a, G: Geometry> {
     geometry: &'a G,
@@ -13,8 +12,8 @@ impl<'a, G: Geometry> RedshiftComputer<'a, G> {
         Self { geometry }
     }
 
-    pub fn compute_redshift(&self, y: &EquationOfMotionState, observer_energy: f64) -> f64 {
-        let emitter_energy = self.energy_of_stationary_emitter(y);
+    pub fn compute_redshift(&self, step: &Step, observer_energy: f64) -> f64 {
+        let emitter_energy = self.energy_of_stationary_emitter(step);
         observer_energy / emitter_energy
     }
 
@@ -23,10 +22,10 @@ impl<'a, G: Geometry> RedshiftComputer<'a, G> {
             .inner_product(&ray.position, velocity, &ray.momentum)
     }
 
-    fn energy_of_stationary_emitter(&self, y: &EquationOfMotionState) -> f64 {
-        let position = Point::new(y[0], y[1], y[2], y[3], self.geometry.coordinate_system());
+    fn energy_of_stationary_emitter(&self, step: &Step) -> f64 {
+        let position = step.x;
         let velocity = self.geometry.get_stationary_velocity_at(&position);
-        let momentum = FourVector::new(y[4], y[5], y[6], y[7], self.geometry.coordinate_system());
+        let momentum = step.p;
         self.geometry.inner_product(&position, &velocity, &momentum)
     }
 }

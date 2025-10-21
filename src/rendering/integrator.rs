@@ -1,3 +1,4 @@
+use crate::geometry::four_vector::FourVector;
 use crate::geometry::geometry::Geometry;
 use crate::geometry::point::Point;
 use crate::rendering::integrator::StopReason::{
@@ -11,7 +12,8 @@ use log::debug;
 
 #[derive(Debug)]
 pub struct Step {
-    pub y: EquationOfMotionState,
+    pub x: Point,
+    pub p: FourVector,
     pub t: f64,
     pub step: usize,
 }
@@ -79,7 +81,9 @@ impl<G: Geometry> Integrator<'_, G> {
         let mut y = geodesic_solver.create_initial_state(&ray);
 
         let mut result: Vec<Step> = Vec::with_capacity(self.integration_configuration.max_steps);
-        result.push(Step { y, t, step: 0 });
+        let x = Point::new(y[0], y[1], y[2], y[3], self.geometry.coordinate_system());
+        let p = geodesic_solver.momentum_from_state(&y);
+        result.push(Step { x, p, t, step: 0 });
 
         let mut h = self.integration_configuration.step_size;
         for i in 1..self.integration_configuration.max_steps {
@@ -93,7 +97,9 @@ impl<G: Geometry> Integrator<'_, G> {
             )?;
             t += h;
 
-            result.push(Step { y, t, step: i });
+            let x = Point::new(y[0], y[1], y[2], y[3], self.geometry.coordinate_system());
+            let p = geodesic_solver.momentum_from_state(&y);
+            result.push(Step { x, p, t, step: i });
             match self.should_stop(&last_y, &y, i) {
                 None => {}
                 Some(r) => return Ok((IntegratedRay::new(result), Some(r))),

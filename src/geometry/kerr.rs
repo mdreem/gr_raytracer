@@ -1,3 +1,4 @@
+use crate::configuration::GeometryType::Euclidean;
 use crate::geometry::four_vector::FourVector;
 use crate::geometry::geometry::{
     GeodesicSolver, Geometry, HasCoordinateSystem, InnerProduct, Tetrad,
@@ -138,6 +139,12 @@ impl KerrSolver {
     }
 }
 
+impl HasCoordinateSystem for KerrSolver {
+    fn coordinate_system(&self) -> CoordinateSystem {
+        Cartesian
+    }
+}
+
 impl GeodesicSolver for KerrSolver {
     /// Hamiltonian geodesics
     /// H(x, p) = 0.5 * g^{\mu\nu} p_\mu p_\nu
@@ -208,6 +215,22 @@ impl GeodesicSolver for KerrSolver {
             momentum_covariant[2],
             momentum_covariant[3],
         ])
+    }
+
+    fn momentum_from_state(&self, y: &EquationOfMotionState) -> FourVector {
+        let covariant_metric = metric(self.radius, self.a, y[1], y[2], y[3]);
+        let contravariant_metric = covariant_metric
+            .try_inverse()
+            .expect("Metric should be invertible");
+        let covariant = Vector4::new(y[4], y[5], y[6], y[7]);
+        let contravariant = contravariant_metric * covariant;
+
+        FourVector::new_cartesian(
+            contravariant[0],
+            contravariant[1],
+            contravariant[2],
+            contravariant[3],
+        )
     }
 }
 
@@ -574,9 +597,9 @@ mod tests {
             let step_a = &trajectory_a[i];
             let step_b = &trajectory_b[i];
 
-            assert_abs_diff_eq!(step_a.y[1], step_b.y[1], epsilon = 1e-5);
-            assert_abs_diff_eq!(step_a.y[2], -step_b.y[3], epsilon = 1e-5);
-            assert_abs_diff_eq!(step_a.y[3], step_b.y[2], epsilon = 1e-5);
+            assert_abs_diff_eq!(step_a.x[1], step_b.x[1], epsilon = 1e-5);
+            assert_abs_diff_eq!(step_a.x[2], -step_b.x[3], epsilon = 1e-5);
+            assert_abs_diff_eq!(step_a.x[3], step_b.x[2], epsilon = 1e-5);
         }
     }
 }
