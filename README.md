@@ -5,7 +5,8 @@ based on the principles of general relativity and uses numerical methods to solv
 
 It is inspired by the
 paper [Seeing relativity -- I. Ray tracing in a Schwarzschild metric to explore the maximal analytic extension of the metric and making a proper rendering of the stars](https://arxiv.org/abs/1511.06025)
-and takes various formulas from it. Additional inspiration came from [BlackHoleViz_v2](https://github.com/HollowaySean/BlackHoleViz_v2).
+and takes various formulas from it. Additional inspiration came
+from [BlackHoleViz_v2](https://github.com/HollowaySean/BlackHoleViz_v2).
 
 # How to render an image
 
@@ -65,3 +66,28 @@ This shows a Schwarzschild black hole with a spherical object behind it and its 
 https://github.com/user-attachments/assets/6907c6a2-970a-4d19-be60-5e0f6f340709
 
 The background is: https://commons.wikimedia.org/wiki/File:Messier_object_025.jpg
+
+# Examples
+
+## Kerr black hole with accretion disk
+
+The parameters are
+
+```sh
+gr_raytracer --width=500 --height=500 --max-steps=1000000 --camera-position=-10,0,0.5 --theta=1.57 --psi=1.57 --phi=0 --config-file kerr.toml render
+```
+
+Note the large number of max-steps required to get a good image, due to the complex light paths around a Kerr black
+hole.
+
+### Example 1
+
+Example of a Kerr black hole with a radius r_s = 1.0 and a = 0.5.
+
+![alt text](./images/render_kerr_checker_texture.png "Kerr black hole with a radius r_s = 1.0 and a = 0.5")
+
+### Example 2
+
+Example of a Kerr black hole with a radius r_s = 1.0 and a = 0.51.
+
+![alt text](./images/render_kerr_large_a_checker_texture.png "Kerr black hole with a radius r_s = 1.0 and a = 0.51")
