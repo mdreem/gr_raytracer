@@ -75,18 +75,8 @@ impl<G: Geometry> Integrator<'_, G> {
         ray: &Ray,
     ) -> Result<(IntegratedRay, Option<StopReason>), RaytracerError> {
         let mut t = 0.0;
-        let direction = ray.momentum.get_as_vector();
-        let mut y = EquationOfMotionState::from_column_slice(&[
-            ray.position[0],
-            ray.position[1],
-            ray.position[2],
-            ray.position[3],
-            direction[0],
-            direction[1],
-            direction[2],
-            direction[3],
-        ]);
         let geodesic_solver = self.geometry.get_geodesic_solver(&ray);
+        let mut y = geodesic_solver.create_initial_state(&ray);
 
         let mut result: Vec<Step> = Vec::with_capacity(self.integration_configuration.max_steps);
         result.push(Step { y, t, step: 0 });
