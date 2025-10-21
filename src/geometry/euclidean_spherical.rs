@@ -27,6 +27,12 @@ impl OdeFunction<Const<8>> for EuclideanSpaceSphericalSolver {
     }
 }
 
+impl HasCoordinateSystem for EuclideanSpaceSphericalSolver {
+    fn coordinate_system(&self) -> CoordinateSystem {
+        Spherical
+    }
+}
+
 impl GeodesicSolver for EuclideanSpaceSphericalSolver {
     fn geodesic(&self, _: f64, y: &EquationOfMotionState) -> EquationOfMotionState {
         let _t = y[0];

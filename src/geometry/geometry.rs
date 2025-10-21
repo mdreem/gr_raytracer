@@ -44,7 +44,7 @@ impl Display for Tetrad {
     }
 }
 
-pub trait GeodesicSolver: OdeFunction<Const<8>> {
+pub trait GeodesicSolver: OdeFunction<Const<8>> + HasCoordinateSystem {
     fn geodesic(&self, t: f64, y: &EquationOfMotionState) -> EquationOfMotionState;
     fn create_initial_state(&self, ray: &Ray) -> EquationOfMotionState {
         EquationOfMotionState::from_column_slice(&[
@@ -57,6 +57,9 @@ pub trait GeodesicSolver: OdeFunction<Const<8>> {
             ray.momentum[2],
             ray.momentum[3],
         ])
+    }
+    fn momentum_from_state(&self, y: &EquationOfMotionState) -> FourVector {
+        FourVector::new(y[4], y[5], y[6], y[7], self.coordinate_system())
     }
 }
 

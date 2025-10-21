@@ -3,7 +3,6 @@ use crate::geometry::geometry::HasCoordinateSystem;
 use crate::geometry::point::Point;
 use crate::rendering::integrator::Step;
 use crate::rendering::raytracer::RaytracerError;
-use crate::rendering::scene::get_position;
 use std::io::Write;
 use std::ops::Index;
 
@@ -55,7 +54,7 @@ impl IntegratedRay {
             .map_err(RaytracerError::IoError)?;
 
         for step in &self.steps {
-            let position = get_position(&step.y, geometry.coordinate_system());
+            let position = step.x.to_cartesian();
 
             write
                 .write_all(

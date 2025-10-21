@@ -1,13 +1,10 @@
 use crate::cli::cli::GlobalOpts;
 use crate::cli::shared::{create_scene, render};
 use crate::configuration::RenderConfig;
-use crate::geometry::euclidean::EuclideanSpace;
-use crate::geometry::euclidean_spherical::EuclideanSpaceSpherical;
 use crate::geometry::four_vector::FourVector;
 use crate::geometry::geometry::{Geometry, InnerProduct};
 use crate::geometry::kerr::Kerr;
 use crate::geometry::point::Point;
-use crate::geometry::spherical_coordinates_helper::cartesian_to_spherical;
 use crate::rendering::integrator::{IntegrationConfiguration, Integrator};
 use crate::rendering::ray::Ray;
 use crate::rendering::raytracer;
