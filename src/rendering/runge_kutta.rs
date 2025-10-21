@@ -65,11 +65,11 @@ const CONVERGENCY_ORDER: f64 = 5.0;
 const ERROR_RATIO_SMALL_ERROR: f64 = 1e-5;
 const MAX_RETRY_STEP: i32 = 100;
 
-fn rkf45_step<D: Dim, F: OdeFunction<D>>(
+fn rkf45_step<D: Dim>(
     y: &OVector<f64, D>,
     t: f64,
     h: f64,
-    f: &F,
+    f: &dyn OdeFunction<D>,
 ) -> (OVector<f64, D>, f64)
 where
     DefaultAllocator: Allocator<D>,
@@ -106,12 +106,12 @@ where
     (y_new, truncation_error)
 }
 
-pub fn rkf45<D: Dim, F: OdeFunction<D>>(
+pub fn rkf45<D: Dim>(
     y: &OVector<f64, D>,
     t: f64,
     h: f64,
     epsilon: f64,
-    f: &F,
+    f: &dyn OdeFunction<D>,
 ) -> Result<(OVector<f64, D>, f64), RaytracerError>
 where
     DefaultAllocator: Allocator<D>,

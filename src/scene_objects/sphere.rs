@@ -49,9 +49,14 @@ fn solve_for_t(y_start_spatial: Vector3<f64>, direction: Vector3<f64>, r: f64) -
 impl Hittable for Sphere {
     // y_start and y_end have to be Cartesian.
     fn intersects(&self, y_start: &Point, y_end: &Point) -> Option<Intersection> {
+        debug_assert_eq!(self.position.coordinate_system, CoordinateSystem::Cartesian);
+
+        let y_start_cartesian = y_start.to_cartesian();
+        let y_end_cartesian = y_end.to_cartesian();
+
         let neg_position = -self.position;
-        let y_start_shifted = y_start + &neg_position;
-        let y_end_shifted = y_end + &neg_position;
+        let y_start_shifted = y_start_cartesian + neg_position;
+        let y_end_shifted = y_end_cartesian + neg_position;
         let r_start = y_start_shifted.radial_distance_spatial_part_squared();
         let r_end = y_end_shifted.radial_distance_spatial_part_squared();
 

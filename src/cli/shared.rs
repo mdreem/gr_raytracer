@@ -4,7 +4,6 @@ use crate::geometry::four_vector::FourVector;
 use crate::geometry::geometry::Geometry;
 use crate::geometry::point::Point;
 use crate::rendering::camera::Camera;
-use crate::rendering::color::CIETristimulusNormalization::NoNormalization;
 use crate::rendering::color::{CIETristimulusNormalization, Color};
 use crate::rendering::integrator::IntegrationConfiguration;
 use crate::rendering::raytracer;

@@ -1,6 +1,7 @@
 use crate::geometry::four_vector::FourVector;
 use crate::geometry::geometry::Geometry;
 use crate::geometry::point::Point;
+use log::trace;
 use std::ops::Mul;
 
 fn proj<G: Geometry>(geometry: &G, position: &Point, u: &FourVector, v: &FourVector) -> FourVector {
@@ -26,7 +27,7 @@ pub fn gram_schmidt<G: Geometry>(
         }
 
         let norm = geometry.inner_product(position, &w, &w).abs().sqrt();
-        println!("norm = {:?}", norm);
+        trace!("norm of {:?}: {}", w, norm);
         orthonormal_vectors.push((1.0 / norm) * w);
     }
 

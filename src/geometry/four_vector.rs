@@ -1,4 +1,6 @@
-use crate::geometry::point::CoordinateSystem;
+use crate::geometry::point::CoordinateSystem::Cartesian;
+use crate::geometry::point::{CoordinateSystem, Point};
+use crate::geometry::spherical_coordinates_helper::spherical_to_cartesian;
 use nalgebra::{Vector3, Vector4};
 use std::ops::{Add, Div, Index, Mul, Neg};
 
@@ -23,6 +25,7 @@ impl Add for FourVector {
     type Output = Self;
 
     fn add(self, rhs: Self) -> Self::Output {
+        debug_assert_eq!(self.coordinate_system, rhs.coordinate_system);
         FourVector {
             coordinate_system: self.coordinate_system,
             vector: self.vector + rhs.vector,
