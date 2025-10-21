@@ -1,8 +1,10 @@
+use crate::geometry::point::CoordinateSystem::Cartesian;
 use crate::geometry::spherical_coordinates_helper::{
     cartesian_to_spherical, spherical_to_cartesian,
 };
 use nalgebra::{Vector3, Vector4};
 use std::cmp::PartialEq;
+use std::f64::consts::PI;
 use std::ops::{Add, Index, Neg};
 
 #[derive(Clone, Copy, Debug, PartialEq)]
@@ -21,6 +23,7 @@ impl Neg for Point {
     type Output = Self;
 
     fn neg(self) -> Self::Output {
+        debug_assert_eq!(self.coordinate_system, Cartesian); // Negation is only works like this for Cartesian coordinates
         Point {
             coordinate_system: self.coordinate_system,
             vector: self.vector.neg(),
@@ -32,6 +35,7 @@ impl Add for Point {
     type Output = Self;
 
     fn add(self, rhs: Self) -> Self::Output {
+        debug_assert_eq!(self.coordinate_system, rhs.coordinate_system);
         Point {
             coordinate_system: self.coordinate_system,
             vector: self.vector + rhs.vector,
@@ -43,11 +47,22 @@ impl Add for &Point {
     type Output = Point;
 
     fn add(self, rhs: Self) -> Self::Output {
+        debug_assert_eq!(self.coordinate_system, rhs.coordinate_system);
         Point {
             coordinate_system: self.coordinate_system,
             vector: self.vector + rhs.vector,
         }
     }
+}
+
+/// Wrap any angle to the half-open interval [0, Pi)
+fn wrap_theta(theta: f64) -> f64 {
+    theta.rem_euclid(PI)
+}
+
+/// Wrap any angle to the half-open interval (-Pi/2, Pi/2]
+fn wrap_phi(phi: f64) -> f64 {
+    (phi + PI).rem_euclid(2.0 * PI) - PI
 }
 
 impl Point {
@@ -92,15 +107,10 @@ impl Point {
         }
     }
 
-    pub fn get_as_cartesian(self) -> Vector3<f64> {
+    pub fn to_cartesian(self) -> Point {
         match self.coordinate_system {
-            CoordinateSystem::Cartesian => {
-                Vector3::new(self.vector[1], self.vector[2], self.vector[3])
-            }
-            CoordinateSystem::Spherical => {
-                let v = spherical_to_cartesian(&self);
-                Vector3::new(v[1], v[2], v[3])
-            }
+            CoordinateSystem::Cartesian => self.clone(),
+            CoordinateSystem::Spherical => spherical_to_cartesian(&self),
         }
     }
 
@@ -111,9 +121,11 @@ impl Point {
                 let v = cartesian_to_spherical(&self);
                 Vector3::new(v[1], v[2], v[3])
             }
-            CoordinateSystem::Spherical => {
-                Vector3::new(self.vector[1], self.vector[2], self.vector[3])
-            }
+            CoordinateSystem::Spherical => Vector3::new(
+                self.vector[1],
+                wrap_theta(self.vector[2]),
+                wrap_phi(self.vector[3]),
+            ),
         }
     }
 
