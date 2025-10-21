@@ -140,6 +140,9 @@ impl KerrSolver {
 
 impl GeodesicSolver for KerrSolver {
     /// Hamiltonian geodesics
+    /// H(x, p) = 0.5 * g^{\mu\nu} p_\mu p_\nu
+    /// d x^\mu / d\lambda = \partial H / \partial p_\mu = g^{\mu\nu} p_\nu
+    /// d p_\mu / d\lambda = - \partial H / \partial x^\mu = -0.5 * \partial g^{\alpha\beta} / \partial x^\mu * p_\alpha p_\beta
     fn geodesic(&self, _: f64, y_state: &EquationOfMotionState) -> EquationOfMotionState {
         let _t = y_state[0];
         let x = y_state[1];
@@ -162,7 +165,7 @@ impl GeodesicSolver for KerrSolver {
             .expect("Metric should be invertible");
         trace!("contravariant_metric = {:?}", contravariant_metric);
 
-        assert!(!p_t.is_nan());
+        debug_assert!(!p_t.is_nan());
 
         // Compute dot{x}^\mu.
         let xdot = contravariant_metric * p;
@@ -182,6 +185,29 @@ impl GeodesicSolver for KerrSolver {
         let a_z = -0.5 * (p.transpose() * d_gcontra_dz * p)[(0, 0)];
 
         EquationOfMotionState::from_column_slice(&[dt, dx, dy, dz, a_t, a_x, a_y, a_z])
+    }
+
+    fn create_initial_state(&self, ray: &Ray) -> EquationOfMotionState {
+        let (x, y, z) = (ray.position[1], ray.position[2], ray.position[3]);
+        let covariant_metric = metric(self.radius, self.a, x, y, z);
+        trace!("covariant_metric = {:?}", covariant_metric);
+        let contravariant_metric = covariant_metric
+            .try_inverse()
+            .expect("Metric should be invertible");
+        trace!("contravariant_metric = {:?}", contravariant_metric);
+
+        let momentum_covariant = contravariant_metric * ray.momentum.vector;
+
+        EquationOfMotionState::from_column_slice(&[
+            ray.position[0],
+            ray.position[1],
+            ray.position[2],
+            ray.position[3],
+            momentum_covariant[0],
+            momentum_covariant[1],
+            momentum_covariant[2],
+            momentum_covariant[3],
+        ])
     }
 }
 

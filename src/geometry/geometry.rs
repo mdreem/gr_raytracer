@@ -3,7 +3,7 @@ use crate::geometry::point::{CoordinateSystem, Point};
 use crate::rendering::ray::Ray;
 use crate::rendering::runge_kutta::OdeFunction;
 use crate::rendering::scene::EquationOfMotionState;
-use nalgebra::{Const, Matrix4};
+use nalgebra::{Const, Matrix4, Vector4};
 use std::fmt::{Display, Formatter};
 
 #[derive(Debug, Clone)]
@@ -46,6 +46,18 @@ impl Display for Tetrad {
 
 pub trait GeodesicSolver: OdeFunction<Const<8>> {
     fn geodesic(&self, t: f64, y: &EquationOfMotionState) -> EquationOfMotionState;
+    fn create_initial_state(&self, ray: &Ray) -> EquationOfMotionState {
+        EquationOfMotionState::from_column_slice(&[
+            ray.position[0],
+            ray.position[1],
+            ray.position[2],
+            ray.position[3],
+            ray.momentum[0],
+            ray.momentum[1],
+            ray.momentum[2],
+            ray.momentum[3],
+        ])
+    }
 }
 
 pub trait HasCoordinateSystem {
