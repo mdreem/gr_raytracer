@@ -86,8 +86,21 @@ Example of a Kerr black hole with a radius r_s = 1.0 and a = 0.5.
 
 ![alt text](./images/render_kerr_checker_texture.png "Kerr black hole with a radius r_s = 1.0 and a = 0.5")
 
+#### Trajectories
+
+Create a trajectory near the horizon like this:
+
+```sh
+gr_raytracer --width=501 --height=501 --max-steps=1000000 --camera-position=-5,0,0.5 --theta=1.57 --psi=1.57 --phi=0 --config-file kerr.toml render-ray --col=162 --row=250
+```
+
+Example of a trajectory of Kerr black hole with a radius r_s = 1.0 and a = 0.5 near the horizon.
+
+![alt text](./images/kerr_trajectory_near_horizon.png "Trajectory of Kerr black hole with a radius r_s = 1.0 and a = 0.5 near the horizon")
+
 ### Example 2
 
 Example of a Kerr black hole with a radius r_s = 1.0 and a = 0.51.
 
 ![alt text](./images/render_kerr_large_a_checker_texture.png "Kerr black hole with a radius r_s = 1.0 and a = 0.51")
+
