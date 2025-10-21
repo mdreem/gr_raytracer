@@ -10,7 +10,7 @@ use crate::rendering::raytracer::RaytracerError;
 use crate::rendering::redshift::RedshiftComputer;
 use crate::rendering::texture::{TextureData, UVCoordinates};
 use crate::scene_objects::objects::Objects;
-use log::error;
+use log::{error, trace};
 use nalgebra::{Const, OVector};
 use std::f64::consts::PI;
 use std::fs::File;
@@ -69,6 +69,16 @@ impl<'a, G: Geometry> Scene<'a, G> {
     }
 
     pub fn color_of_ray(&self, ray: &Ray) -> Result<CIETristimulus, RaytracerError> {
+        let m_s = self
+            .geometry
+            .inner_product(&ray.position, &ray.momentum, &ray.momentum);
+        if !m_s.abs().lt(&1e-10) {
+            error!(
+                "Ray at ({}|{}) does not fulfill light-like condition: {}",
+                ray.row, ray.col, m_s
+            );
+        }
+
         let (steps, stop_reason) = self.integrate_ray(ray)?;
 
         if self.save_ray_data {
