@@ -198,12 +198,8 @@ impl GeodesicSolver for KerrSolver {
         let (x, y, z) = (ray.position[1], ray.position[2], ray.position[3]);
         let covariant_metric = metric(self.radius, self.a, x, y, z);
         trace!("covariant_metric = {:?}", covariant_metric);
-        let contravariant_metric = covariant_metric
-            .try_inverse()
-            .expect("Metric should be invertible");
-        trace!("contravariant_metric = {:?}", contravariant_metric);
 
-        let momentum_covariant = contravariant_metric * ray.momentum.vector;
+        let momentum_covariant = covariant_metric * ray.momentum.vector;
 
         EquationOfMotionState::from_column_slice(&[
             ray.position[0],
