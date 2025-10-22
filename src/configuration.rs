@@ -189,7 +189,7 @@ mod tests {
         if let ObjectsConfig::Disc {
             inner_radius,
             outer_radius,
-            texture,
+            texture: _,
         } = &config.objects[1]
         {
             assert_eq!(*inner_radius, 1.0);

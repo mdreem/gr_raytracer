@@ -18,7 +18,6 @@ pub struct Schwarzschild {
 
 struct SchwarzschildSolver {
     radius: f64,
-    horizon_epsilon: f64,
 }
 
 impl Schwarzschild {
@@ -179,7 +178,6 @@ impl Geometry for Schwarzschild {
     fn get_geodesic_solver(&self, _ray: &Ray) -> Box<dyn GeodesicSolver> {
         Box::new(SchwarzschildSolver {
             radius: self.radius,
-            horizon_epsilon: self.horizon_epsilon,
         })
     }
 }
@@ -237,7 +235,6 @@ mod test_schwarzschild {
     pub struct Step {
         pub phi: f64,
         pub u: f64,
-        du_dphi: f64,
     }
 
     impl OdeFunction<Const<2>> for TestSchwarzschild {
@@ -266,21 +263,13 @@ mod test_schwarzschild {
             let mut y = Vector2::new(u0, du_dphi0);
             let mut t = 0.0;
 
-            let mut result = vec![Step {
-                phi: 0.0,
-                u: u0,
-                du_dphi: 0.0,
-            }];
+            let mut result = vec![Step { phi: 0.0, u: u0 }];
 
             for _ in 1..max_steps {
                 y = rk4(&y, t, step_size, self);
                 t += step_size;
 
-                result.push(Step {
-                    phi: t,
-                    u: y[0],
-                    du_dphi: y[1],
-                });
+                result.push(Step { phi: t, u: y[0] });
 
                 if y[0].recip() >= CELESTIAL_SPHERE_RADIUS {
                     break;
@@ -654,7 +643,7 @@ mod tests {
             l / (r * r),
         );
 
-        let ray = Ray::new(0, 0, 1000, 1000, position, momentum);
+        let ray = Ray::new(0, 0, position, momentum);
         assert_abs_diff_eq!(
             geometry.inner_product(&position, &ray.momentum, &ray.momentum),
             0.0,

@@ -40,12 +40,6 @@ const B_6_4: f64 = 4.0 / 27.0;
 
 const B_6_5: f64 = 5.0 / 144.0;
 
-const C_1: f64 = 1.0 / 9.0;
-const C_2: f64 = 0.0;
-const C_3: f64 = 9.0 / 20.0;
-const C_4: f64 = 16.0 / 45.0;
-const C_5: f64 = 1.0 / 12.0;
-
 const CH_1: f64 = 47.0 / 450.0;
 const CH_2: f64 = 0.0;
 const CH_3: f64 = 12.0 / 25.0;

@@ -171,14 +171,7 @@ impl Camera {
         let direction = self.get_direction_for(row, column);
         trace!("direction ({}|{}): {:?}", row, column, direction);
         let momentum = direction + self.tetrad.t; // Add T-component of the tetrad to get the momentum.
-        Ray::new(
-            row,
-            column,
-            self.rows,
-            self.columns,
-            self.position,
-            momentum,
-        )
+        Ray::new(row, column, self.position, momentum)
     }
 }
 
@@ -187,8 +180,7 @@ mod tests {
     use crate::geometry::euclidean::EuclideanSpace;
     use crate::geometry::euclidean_spherical::EuclideanSpaceSpherical;
     use crate::geometry::four_vector::FourVector;
-    use crate::geometry::geometry::{Geometry, InnerProduct};
-    use crate::geometry::kerr::Kerr;
+    use crate::geometry::geometry::InnerProduct;
     use crate::geometry::point::{CoordinateSystem, Point};
     use crate::geometry::schwarzschild::Schwarzschild;
     use crate::geometry::spherical_coordinates_helper::{

@@ -1,5 +1,4 @@
 use crate::geometry::geometry::Geometry;
-use crate::geometry::point::Point;
 use crate::rendering::color::CIETristimulus;
 use crate::rendering::integrator::Step;
 use crate::rendering::redshift::RedshiftComputer;
@@ -29,8 +28,8 @@ impl<'a, G: Geometry> Objects<'a, G> {
         y_start: &Step,
         y_end: &Step,
         observer_energy: f64,
-        redshift_computer: &RedshiftComputer<'a, G>,
     ) -> Option<CIETristimulus> {
+        let redshift_computer = RedshiftComputer::new(self.geometry);
         let mut resulting_color = None;
         let mut shortest_distance = f64::MAX;
 
@@ -107,12 +106,7 @@ mod tests {
             p: FourVector::new_cartesian(1.0, 0.0, 0.0, 0.0),
         };
 
-        let result = objects.intersects(
-            &step_start,
-            &step_end,
-            1.0,
-            &RedshiftComputer::new(&geometry),
-        );
+        let result = objects.intersects(&step_start, &step_end, 1.0);
         assert!(result.is_some());
     }
 
@@ -139,12 +133,7 @@ mod tests {
         objects_setup_1.add_object(farther_sphere);
         objects_setup_1.add_object(closer_sphere);
 
-        let result_1 = objects_setup_1.intersects(
-            &step_start,
-            &step_end,
-            1.0,
-            &RedshiftComputer::new(&geometry),
-        );
+        let result_1 = objects_setup_1.intersects(&step_start, &step_end, 1.0);
         assert!(result_1.is_some());
         assert_abs_diff_eq!(result_1.unwrap().x, 0.121, epsilon = 1e-2);
 
@@ -154,12 +143,7 @@ mod tests {
         objects_setup_2.add_object(closer_sphere);
         objects_setup_2.add_object(farther_sphere);
 
-        let result_2 = objects_setup_2.intersects(
-            &step_start,
-            &step_end,
-            1.0,
-            &RedshiftComputer::new(&geometry),
-        );
+        let result_2 = objects_setup_2.intersects(&step_start, &step_end, 1.0);
         assert!(result_2.is_some());
         assert_abs_diff_eq!(result_2.unwrap().x, 0.121, epsilon = 1e-2);
     }

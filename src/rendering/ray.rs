@@ -1,5 +1,4 @@
 use crate::geometry::four_vector::FourVector;
-use crate::geometry::geometry::HasCoordinateSystem;
 use crate::geometry::point::Point;
 use crate::rendering::integrator::Step;
 use crate::rendering::raytracer::RaytracerError;
@@ -12,23 +11,12 @@ pub struct Ray {
     pub momentum: FourVector,
     pub row: i64,
     pub col: i64,
-    pub width: i64,
-    pub height: i64,
 }
 impl Ray {
-    pub fn new(
-        row: i64,
-        col: i64,
-        width: i64,
-        height: i64,
-        position: Point,
-        momentum: FourVector,
-    ) -> Self {
+    pub fn new(row: i64, col: i64, position: Point, momentum: FourVector) -> Self {
         Self {
             row,
             col,
-            width,
-            height,
             position,
             momentum,
         }
@@ -44,11 +32,7 @@ impl IntegratedRay {
         Self { steps }
     }
 
-    pub fn save(
-        &self,
-        write: &mut dyn Write,
-        geometry: &dyn HasCoordinateSystem,
-    ) -> Result<(), RaytracerError> {
+    pub fn save(&self, write: &mut dyn Write) -> Result<(), RaytracerError> {
         write
             .write_all(b"i,t,tau,x,y,z\n")
             .map_err(RaytracerError::IoError)?;

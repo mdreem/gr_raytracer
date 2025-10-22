@@ -102,46 +102,6 @@ impl Color {
     pub fn new(r: u8, g: u8, b: u8, alpha: u8) -> Color {
         Color { r, g, b, alpha }
     }
-
-    pub fn get_as_array(&self) -> [u8; 4] {
-        [self.r, self.g, self.b, self.alpha]
-    }
-
-    pub fn blend(&self, other: &Color) -> Color {
-        let (r0, g0, b0) = (
-            inv_compand_srgb(self.r as f64 / 255.0),
-            inv_compand_srgb(self.g as f64 / 255.0),
-            inv_compand_srgb(self.b as f64 / 255.0),
-        );
-        let (r1, g1, b1) = (
-            inv_compand_srgb(other.r as f64 / 255.0),
-            inv_compand_srgb(other.g as f64 / 255.0),
-            inv_compand_srgb(other.b as f64 / 255.0),
-        );
-
-        let a0 = self.alpha as f64 / 255.0;
-        let a1 = other.alpha as f64 / 255.0;
-        let ao = a0 + a1 * (1.0 - a0);
-        if ao == 0.0 {
-            return Color {
-                r: 0,
-                g: 0,
-                b: 0,
-                alpha: 0,
-            };
-        }
-
-        let r = (r0 * a0 + r1 * a1 * (1.0 - a0)) / ao;
-        let g = (g0 * a0 + g1 * a1 * (1.0 - a0)) / ao;
-        let b = (b0 * a0 + b1 * a1 * (1.0 - a0)) / ao;
-
-        Color {
-            r: (compand_srgb(r).clamp(0.0, 1.0) * 255.0).round() as u8,
-            g: (compand_srgb(g).clamp(0.0, 1.0) * 255.0).round() as u8,
-            b: (compand_srgb(b).clamp(0.0, 1.0) * 255.0).round() as u8,
-            alpha: (ao * 255.0).round() as u8,
-        }
-    }
 }
 
 // https://en.wikipedia.org/wiki/CIE_1931_color_space
@@ -162,14 +122,6 @@ pub fn y_bar(lambda: f64) -> f64 {
 
 pub fn z_bar(lambda: f64) -> f64 {
     1.217 * g(lambda, 437.0, 0.0845, 0.0278) + 0.681 * g(lambda, 459.0, 0.0385, 0.0725)
-}
-
-fn get_cie_xyz(lambda: f64) -> CIETristimulus {
-    let x = x_bar(lambda);
-    let y = y_bar(lambda);
-    let z = z_bar(lambda);
-
-    CIETristimulus::new(x, y, z, 1.0)
 }
 
 // https://en.wikipedia.org/wiki/SRGB#The_sRGB_transfer_function_.28.22gamma.22.29
@@ -252,6 +204,7 @@ pub fn srgb_to_xyz(color: &Color) -> CIETristimulus {
 #[cfg(test)]
 pub mod tests {
     use super::*;
+    use approx::assert_abs_diff_eq;
 
     #[test]
     fn test_srgb_to_xyz() {
@@ -267,26 +220,38 @@ pub mod tests {
     }
 
     #[test]
-    fn blend_first_color_stays() {
-        let color1 = Color::new(100, 200, 250, 255);
-        let color2 = Color::new(0, 0, 0, 255);
-        let blended_color = color1.blend(&color2);
+    fn cie_blend_retains_background_when_foreground_transparent() {
+        let background = CIETristimulus::new(0.2, 0.4, 0.6, 1.0);
+        let foreground = CIETristimulus::new(0.8, 0.1, 0.3, 0.0);
+        let blended = background.blend(&foreground);
 
-        assert_eq!(blended_color.r, 100);
-        assert_eq!(blended_color.g, 200);
-        assert_eq!(blended_color.b, 250);
-        assert_eq!(blended_color.alpha, 255);
+        assert_abs_diff_eq!(blended.x, background.x);
+        assert_abs_diff_eq!(blended.y, background.y);
+        assert_abs_diff_eq!(blended.z, background.z);
+        assert_abs_diff_eq!(blended.alpha, background.alpha);
     }
 
     #[test]
-    fn blend_two_fully_transparent_colors() {
-        let color1 = Color::new(100, 200, 250, 0);
-        let color2 = Color::new(0, 0, 0, 0);
-        let blended_color = color1.blend(&color2);
+    fn cie_blend_two_fully_transparent_colors() {
+        let background = CIETristimulus::new(0.2, 0.4, 0.6, 0.0);
+        let foreground = CIETristimulus::new(0.8, 0.1, 0.3, 0.0);
+        let blended = background.blend(&foreground);
 
-        assert_eq!(blended_color.r, 0);
-        assert_eq!(blended_color.g, 0);
-        assert_eq!(blended_color.b, 0);
-        assert_eq!(blended_color.alpha, 0);
+        assert_abs_diff_eq!(blended.x, 0.0);
+        assert_abs_diff_eq!(blended.y, 0.0);
+        assert_abs_diff_eq!(blended.z, 0.0);
+        assert_abs_diff_eq!(blended.alpha, 0.0);
+    }
+
+    #[test]
+    fn cie_blend_mixes_channels() {
+        let background = CIETristimulus::new(0.2, 0.4, 0.6, 1.0);
+        let foreground = CIETristimulus::new(0.6, 0.4, 0.2, 0.5);
+        let blended = background.blend(&foreground);
+
+        assert_abs_diff_eq!(blended.x, 0.4);
+        assert_abs_diff_eq!(blended.y, 0.4);
+        assert_abs_diff_eq!(blended.z, 0.4);
+        assert_abs_diff_eq!(blended.alpha, 1.0);
     }
 }

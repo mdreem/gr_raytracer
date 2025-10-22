@@ -1,8 +1,8 @@
-use crate::rendering::color::{CIETristimulus, Color, x_bar, xyz_to_srgb, y_bar, z_bar};
+use crate::rendering::color::{CIETristimulus, x_bar, y_bar, z_bar};
 
-const h: f64 = 6.62607015e-34;
-const c: f64 = 299792458.0;
-const kB: f64 = 1.380649e-23;
+const PLANCK_CONSTANT: f64 = 6.626_070_15e-34;
+const SPEED_OF_LIGHT: f64 = 299_792_458.0;
+const BOLTZMANN_CONSTANT: f64 = 1.380_649e-23;
 
 const MIN_WAVELENGTH: f64 = 380.0; // nm
 const MAX_WAVELENGTH: f64 = 830.0; // nm
@@ -10,8 +10,8 @@ const NM_TO_M: f64 = 1e-9;
 
 // Planck law is written using meters.
 fn planck_spectral_radiance(lambda: f64, temperature: f64) -> f64 {
-    let a = 2.0 * h * c * c;
-    let b = h * c / (lambda * kB * temperature);
+    let a = 2.0 * PLANCK_CONSTANT * SPEED_OF_LIGHT * SPEED_OF_LIGHT;
+    let b = PLANCK_CONSTANT * SPEED_OF_LIGHT / (lambda * BOLTZMANN_CONSTANT * temperature);
     a / (lambda.powi(5) * (b.exp() - 1.0))
 }
 
@@ -20,44 +20,39 @@ fn integrate_blackbody_xyz(temperature: f64) -> CIETristimulus {
     let step_size = 1.0 * NM_TO_M; // in meters
     let num_steps = ((interval / step_size).floor()) as usize;
 
-    let mut X = 0.0;
-    let mut Y = 0.0;
-    let mut Z = 0.0;
+    let mut x_accum = 0.0;
+    let mut y_accum = 0.0;
+    let mut z_accum = 0.0;
 
     for i in 0..(num_steps as usize) {
         let lambda = MIN_WAVELENGTH * NM_TO_M + (i as f64 + 0.5) * step_size;
         let radiance = planck_spectral_radiance(lambda, temperature);
-        X += radiance * x_bar(lambda / NM_TO_M) * step_size;
-        Y += radiance * y_bar(lambda / NM_TO_M) * step_size;
-        Z += radiance * z_bar(lambda / NM_TO_M) * step_size;
+        x_accum += radiance * x_bar(lambda / NM_TO_M) * step_size;
+        y_accum += radiance * y_bar(lambda / NM_TO_M) * step_size;
+        z_accum += radiance * z_bar(lambda / NM_TO_M) * step_size;
     }
-    CIETristimulus::new(X, Y, Z, 1.0)
+    CIETristimulus::new(x_accum, y_accum, z_accum, 1.0)
 }
 
 pub fn get_cie_xyz_of_black_body_redshifted(temperature: f64) -> CIETristimulus {
     integrate_blackbody_xyz(temperature)
 }
 
-pub fn get_srgb_of_black_body(temperature: f64) -> Color {
-    let cie_tristimulus = integrate_blackbody_xyz(temperature);
-    xyz_to_srgb(
-        &cie_tristimulus,
-        1.0 / (cie_tristimulus.x + cie_tristimulus.y + cie_tristimulus.z),
-    )
-}
-
-pub fn get_srgb_of_black_body_redshifted(temperature: f64, redshift: f64) -> Color {
-    let shifted_temperature = temperature * redshift;
-    get_srgb_of_black_body(shifted_temperature)
-}
-
 #[cfg(test)]
 mod tests {
-    use crate::rendering::black_body_radiation::{
-        get_srgb_of_black_body, get_srgb_of_black_body_redshifted, integrate_blackbody_xyz,
-    };
-    use crate::rendering::color::{Color, xyz_to_linear_srgb};
+    use super::integrate_blackbody_xyz;
+    use crate::rendering::color::{Color, xyz_to_linear_srgb, xyz_to_srgb};
     use image::{ImageFormat, Rgb};
+
+    fn get_srgb_of_black_body(temperature: f64) -> Color {
+        get_srgb_of_black_body_redshifted(temperature, 1.0)
+    }
+
+    fn get_srgb_of_black_body_redshifted(temperature: f64, redshift: f64) -> Color {
+        let cie_tristimulus = integrate_blackbody_xyz(temperature * redshift);
+        let exposure = 1.0 / (cie_tristimulus.x + cie_tristimulus.y + cie_tristimulus.z);
+        xyz_to_srgb(&cie_tristimulus, exposure)
+    }
 
     #[test]
     fn test_black_body_radiation_red() {
@@ -104,7 +99,7 @@ mod tests {
                 let redshift = 0.5 + (y as f64) * 2.0 / (max_temp_steps as f64 - 1.0);
                 let temperature = 1000.0 + (x as f64) * 10000.0 / (max_temp_steps as f64 - 1.0);
                 let color = get_srgb_of_black_body_redshifted(temperature, redshift);
-                imgbuf.put_pixel(x, y, image::Rgba(color.get_as_array()));
+                imgbuf.put_pixel(x, y, image::Rgba([color.r, color.g, color.b, color.alpha]));
             }
             println!("line: {}", x)
         }
