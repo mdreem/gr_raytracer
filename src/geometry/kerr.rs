@@ -1,10 +1,11 @@
 use crate::geometry::four_vector::FourVector;
 use crate::geometry::geometry::{
-    GeodesicSolver, Geometry, HasCoordinateSystem, InnerProduct, Tetrad,
+    GeodesicSolver, Geometry, HasCoordinateSystem, InnerProduct, Signature,
 };
 use crate::geometry::gram_schmidt::gram_schmidt;
 use crate::geometry::point::CoordinateSystem::Cartesian;
 use crate::geometry::point::{CoordinateSystem, Point};
+use crate::geometry::tetrad::Tetrad;
 use crate::rendering::ray::Ray;
 use crate::rendering::runge_kutta::OdeFunction;
 use crate::rendering::scene::EquationOfMotionState;
@@ -189,6 +190,9 @@ impl GeodesicSolver for KerrSolver {
         let a_y = -0.5 * (p.transpose() * d_gcontra_dy * p)[(0, 0)];
         let a_z = -0.5 * (p.transpose() * d_gcontra_dz * p)[(0, 0)];
 
+        let hamiltonian = 0.5 * (p.transpose() * contravariant_metric * p)[(0, 0)];
+        trace!("Hamiltonian H = {}", hamiltonian);
+
         EquationOfMotionState::from_column_slice(&[dt, dx, dy, dz, a_t, a_x, a_y, a_z])
     }
 
@@ -238,6 +242,12 @@ impl InnerProduct for Kerr {
     fn inner_product(&self, position: &Point, v: &FourVector, w: &FourVector) -> f64 {
         let metric = metric(self.radius, self.a, position[1], position[2], position[3]);
         (v.vector.transpose() * metric * w.vector).x
+    }
+}
+
+impl Signature for Kerr {
+    fn signature(&self) -> [f64; 4] {
+        [-1.0, 1.0, 1.0, 1.0]
     }
 }
 

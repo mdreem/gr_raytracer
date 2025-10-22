@@ -1,6 +1,7 @@
 use crate::geometry::four_vector::FourVector;
-use crate::geometry::geometry::{Geometry, Tetrad};
+use crate::geometry::geometry::Geometry;
 use crate::geometry::point::Point;
+use crate::geometry::tetrad::{Tetrad, TetradValidator};
 use crate::rendering::ray::Ray;
 use log::{debug, trace};
 
@@ -71,7 +72,6 @@ fn rotate(v1: FourVector, v2: FourVector, angle: f64) -> (FourVector, FourVector
 }
 
 impl Camera {
-    // Position is given in cartesian coordinates.
     pub fn new<G: Geometry>(
         position: Point,
         velocity: FourVector,
@@ -84,52 +84,9 @@ impl Camera {
         geometry: &G,
     ) -> Camera {
         let original_tetrad = geometry.get_tetrad_at(&position);
-        debug!("position: {:?}", position);
-        debug!("original_tetrad: {}", original_tetrad);
-        debug!("inner product checks for tetrad:");
-        debug!(
-            "  inner product t.t: {:.5}",
-            geometry.inner_product(&position, &original_tetrad.t, &original_tetrad.t)
-        );
-        debug!(
-            "  inner product x.x: {:.5}",
-            geometry.inner_product(&position, &original_tetrad.x, &original_tetrad.x)
-        );
-        debug!(
-            "  inner product y.y: {:.5}",
-            geometry.inner_product(&position, &original_tetrad.y, &original_tetrad.y)
-        );
-        debug!(
-            "  inner product z.z: {:.5}",
-            geometry.inner_product(&position, &original_tetrad.z, &original_tetrad.z)
-        );
-        debug!("");
-        debug!(
-            "  inner product t.x: {:.5}",
-            geometry.inner_product(&position, &original_tetrad.t, &original_tetrad.x)
-        );
-        debug!(
-            "  inner product t.y: {:.5}",
-            geometry.inner_product(&position, &original_tetrad.t, &original_tetrad.y)
-        );
-        debug!(
-            "  inner product t.z: {:.5}",
-            geometry.inner_product(&position, &original_tetrad.t, &original_tetrad.z)
-        );
-        debug!("");
-        debug!(
-            "  inner product x.y: {:.5}",
-            geometry.inner_product(&position, &original_tetrad.x, &original_tetrad.y)
-        );
-        debug!(
-            "  inner product x.z: {:.5}",
-            geometry.inner_product(&position, &original_tetrad.x, &original_tetrad.z)
-        );
-        debug!("");
-        debug!(
-            "  inner product y.z: {:.5}",
-            geometry.inner_product(&position, &original_tetrad.y, &original_tetrad.z)
-        );
+
+        let tetrad_validator = TetradValidator::new(geometry.clone());
+        tetrad_validator.validate(&original_tetrad);
 
         let (a_prime, b_prime) = rotate(original_tetrad.x, original_tetrad.y, phi);
         let (z, a_two_prime) = rotate(original_tetrad.z, a_prime, theta);
