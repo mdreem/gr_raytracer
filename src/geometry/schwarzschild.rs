@@ -44,6 +44,9 @@ impl HasCoordinateSystem for SchwarzschildSolver {
 }
 
 impl GeodesicSolver for SchwarzschildSolver {
+    /// Geodesic equations for Schwarzschild metric in spherical coordinates (t, r, θ, φ).
+    ///
+    /// The signature used is (+, -, -, -).
     fn geodesic(&self, _: f64, y: &EquationOfMotionState) -> EquationOfMotionState {
         let _t = y[0];
         let r = y[1];
@@ -102,6 +105,10 @@ impl Signature for Schwarzschild {
 }
 
 impl Geometry for Schwarzschild {
+    /// Computes orthonormal tetrad for an observer at position.
+    ///
+    /// Note: The timelike basis vector e_t corresponds to a freely falling observer.
+    /// See https://arxiv.org/abs/1511.06025 for details.
     fn get_tetrad_at(&self, position: &Point) -> Tetrad {
         assert_eq!(position.coordinate_system, Spherical);
         let r = position[1];
