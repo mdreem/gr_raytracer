@@ -177,7 +177,8 @@ mod tests {
             0.0,
             0.0,
             &geometry,
-        );
+        )
+        .unwrap();
         save_rays_to_file(rows, cols, &position, geometry, camera);
     }
 }

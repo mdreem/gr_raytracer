@@ -467,9 +467,6 @@ mod tests {
         let position = Point::new_cartesian(0.0, 0.0, 0.0, -10.0);
         let radius = 2.0;
         let geometry = Kerr::new(radius, NO_ANGULAR_MOMENTUM, 1e-4);
-        // let r = position[1];
-        // let a = 1.0 - radius / r;
-        // let velocity = FourVector::new_spherical(1.0 / a, -(radius / r).sqrt(), 0.0, 0.0); // we have a freely falling observer here.
         let velocity = FourVector::new_cartesian(1.0, 0.0, 0.0, 0.0);
         let camera = Camera::new(
             position,
@@ -481,7 +478,8 @@ mod tests {
             PI / 2.0,
             PI / 2.0,
             &Kerr::new(2.0, NO_ANGULAR_MOMENTUM, 1e-4),
-        );
+        )
+        .unwrap();
 
         save_rays_to_file(rows, cols, &position, geometry, camera);
     }
@@ -505,7 +503,8 @@ mod tests {
             PI / 2.0,
             PI / 2.0,
             &Kerr::new(2.0, NO_ANGULAR_MOMENTUM, 1e-4),
-        );
+        )
+        .unwrap();
 
         let ray = camera.get_ray_for(1, 6);
         assert_abs_diff_eq!(
@@ -530,7 +529,8 @@ mod tests {
             PI / 2.0,
             PI / 2.0,
             &Kerr::new(radius, NO_ANGULAR_MOMENTUM, 1e-4),
-        );
+        )
+        .unwrap();
         camera
     }
 

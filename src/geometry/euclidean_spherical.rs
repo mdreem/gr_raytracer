@@ -156,7 +156,8 @@ mod tests {
             0.0,
             0.0,
             &EuclideanSpaceSpherical::new(),
-        );
+        )
+        .unwrap();
 
         save_rays_to_file(
             rows,

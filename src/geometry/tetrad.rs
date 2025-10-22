@@ -1,6 +1,7 @@
 use crate::geometry::four_vector::FourVector;
 use crate::geometry::geometry::Geometry;
 use crate::geometry::point::Point;
+use crate::rendering::camera::CameraError;
 use log::debug;
 use std::fmt::{Display, Formatter};
 
@@ -56,7 +57,7 @@ impl<G: Geometry> TetradValidator<G> {
         TetradValidator { geometry }
     }
 
-    pub fn validate(&self, tetrad: &Tetrad) -> bool {
+    pub fn validate(&self, tetrad: &Tetrad) -> Result<(), CameraError> {
         let t_t = self
             .geometry
             .inner_product(&tetrad.position, &tetrad.t, &tetrad.t);
@@ -121,6 +122,10 @@ impl<G: Geometry> TetradValidator<G> {
         debug!("");
         debug!("  is_orthonormal: {:?}", is_orthonormal);
 
-        is_orthonormal
+        if !is_orthonormal {
+            return Err(CameraError::TetradNotOrthonormal);
+        }
+
+        Ok(())
     }
 }
