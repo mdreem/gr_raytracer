@@ -116,7 +116,7 @@ impl Geometry for Schwarzschild {
             FourVector::new_spherical(1.0 / a, -rr0.sqrt(), 0.0, 0.0),
             FourVector::new_spherical(0.0, 0.0, 0.0, 1.0 / (r * theta.sin())), // Phi
             FourVector::new_spherical(0.0, 0.0, 1.0 / r, 0.0),                 // Theta
-            FourVector::new_spherical(-rr0.sqrt() / a, 1.0, 0.0, 0.0),        // R
+            FourVector::new_spherical(-rr0.sqrt() / a, 1.0, 0.0, 0.0),         // R
         )
     }
 
@@ -410,7 +410,8 @@ mod tests {
             0.0,
             0.0,
             &Schwarzschild::new(2.0, 1e-4),
-        );
+        )
+        .unwrap();
 
         save_rays_to_file(rows, cols, &position, geometry, camera);
     }
@@ -433,12 +434,14 @@ mod tests {
             0.0,
             0.0,
             &Schwarzschild::new(2.0, 1e-4),
-        );
+        )
+        .unwrap();
 
         let ray = camera.get_ray_for(1, 6);
         assert_abs_diff_eq!(
             geometry.inner_product(&position, &ray.momentum, &ray.momentum),
-            0.0, epsilon = 1e-10
+            0.0,
+            epsilon = 1e-10
         );
     }
 
@@ -456,7 +459,8 @@ mod tests {
             theta,
             psi,
             &Schwarzschild::new(radius, 1e-4),
-        );
+        )
+        .unwrap();
         camera
     }
 

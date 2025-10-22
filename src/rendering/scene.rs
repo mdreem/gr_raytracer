@@ -10,7 +10,7 @@ use crate::rendering::raytracer::RaytracerError;
 use crate::rendering::redshift::RedshiftComputer;
 use crate::rendering::texture::{TextureData, UVCoordinates};
 use crate::scene_objects::objects::Objects;
-use log::{error};
+use log::error;
 use nalgebra::{Const, OVector};
 use std::f64::consts::PI;
 use std::fs::File;
@@ -167,7 +167,7 @@ pub mod test_scene {
     use crate::geometry::point::Point;
     use crate::rendering::camera::Camera;
     use crate::rendering::color::CIETristimulusNormalization::NoNormalization;
-    use crate::rendering::color::{srgb_to_xyz, Color};
+    use crate::rendering::color::{Color, srgb_to_xyz};
     use crate::rendering::scene::{IntegrationConfiguration, Scene, TextureData};
     use crate::rendering::texture::CheckerMapper;
     use crate::scene_objects;
@@ -194,7 +194,8 @@ pub mod test_scene {
             0.0,
             0.0,
             geometry,
-        );
+        )
+        .unwrap();
 
         create_scene_with_camera(
             center_sphere_radius,
@@ -221,8 +222,14 @@ pub mod test_scene {
             Color::new(0, 100, 0, 255),
             NoNormalization,
         ));
-        println!("color celestial 1: {:?}",  srgb_to_xyz(&Color::new(0, 255, 0, 255)));
-        println!("color celestial 2: {:?}",  srgb_to_xyz(&Color::new(0, 100, 0, 255)));
+        println!(
+            "color celestial 1: {:?}",
+            srgb_to_xyz(&Color::new(0, 255, 0, 255))
+        );
+        println!(
+            "color celestial 2: {:?}",
+            srgb_to_xyz(&Color::new(0, 100, 0, 255))
+        );
         let texture_mapper_disk = Arc::new(CheckerMapper::new(
             200.0,
             10.0,
@@ -230,8 +237,14 @@ pub mod test_scene {
             Color::new(0, 0, 100, 255),
             NoNormalization,
         ));
-        println!("color disk 1: {:?}",  srgb_to_xyz(&Color::new(0, 0, 255, 255)));
-        println!("color disk 2: {:?}",  srgb_to_xyz(&Color::new(0, 0, 100, 255)));
+        println!(
+            "color disk 1: {:?}",
+            srgb_to_xyz(&Color::new(0, 0, 255, 255))
+        );
+        println!(
+            "color disk 2: {:?}",
+            srgb_to_xyz(&Color::new(0, 0, 100, 255))
+        );
         let texture_mapper_sphere = Arc::new(CheckerMapper::new(
             10.0,
             10.0,
@@ -239,8 +252,14 @@ pub mod test_scene {
             Color::new(100, 0, 0, 255),
             NoNormalization,
         ));
-        println!("color sphere 1: {:?}",  srgb_to_xyz(&Color::new(255, 0, 0, 255)));
-        println!("color sphere 2: {:?}",  srgb_to_xyz(&Color::new(100, 0, 0, 255)));
+        println!(
+            "color sphere 1: {:?}",
+            srgb_to_xyz(&Color::new(255, 0, 0, 255))
+        );
+        println!(
+            "color sphere 2: {:?}",
+            srgb_to_xyz(&Color::new(100, 0, 0, 255))
+        );
 
         let integration_configuration =
             IntegrationConfiguration::new(30000, CELESTIAL_SPHERE_RADIUS, 0.001, epsilon);
@@ -335,7 +354,8 @@ mod tests {
             0.0,
             0.0,
             &EuclideanSpace::new(),
-        );
+        )
+        .unwrap();
         let space = EuclideanSpace::new();
         let scene = create_scene_with_camera(2.0, 0.2, 0.3, &space, camera, 1e-12);
 
@@ -364,7 +384,8 @@ mod tests {
             0.0,
             0.0,
             &EuclideanSpaceSpherical::new(),
-        );
+        )
+        .unwrap();
         let space = EuclideanSpaceSpherical::new();
         let scene = create_scene_with_camera(2.0, 0.2, 0.3, &space, camera, 1e-12);
 
@@ -403,17 +424,14 @@ mod tests {
             0.0,
             0.0,
             &geometry,
-        );
+        )
+        .unwrap();
         let scene = create_scene_with_camera(2.0, 0.2, 0.3, &geometry, camera, 1e-12);
 
         let ray = scene.camera.get_ray_for(5, 5);
         let color = scene.color_of_ray(&ray).unwrap();
 
-        assert_approx_eq_cie_tristimulus!(
-            color,
-            SPHERE_COLOR_2,
-            1e-6
-        );
+        assert_approx_eq_cie_tristimulus!(color, SPHERE_COLOR_2, 1e-6);
     }
 
     #[test]
@@ -437,16 +455,13 @@ mod tests {
             0.0,
             0.0,
             &geometry,
-        );
+        )
+        .unwrap();
         let scene = create_scene_with_camera(sphere_radius, 0.2, 0.3, &geometry, camera, 1e-12);
 
         let ray = scene.camera.get_ray_for(5, 5);
         let color = scene.color_of_ray(&ray).unwrap();
-        assert_approx_eq_cie_tristimulus!(
-            color,
-            SPHERE_COLOR_2,
-            1e-6
-        );
+        assert_approx_eq_cie_tristimulus!(color, SPHERE_COLOR_2, 1e-6);
     }
 
     #[test]
@@ -461,7 +476,8 @@ mod tests {
             0.0,
             0.0,
             &EuclideanSpace::new(),
-        );
+        )
+        .unwrap();
         let space = EuclideanSpace::new();
         let scene: Scene<EuclideanSpace> =
             create_scene_with_camera(2.0, 0.2, 0.3, &space, camera, 1e-12);
@@ -496,7 +512,8 @@ mod tests {
             PI / 2.0,
             PI / 2.0,
             &Schwarzschild::new(radius, 1e-4),
-        );
+        )
+        .unwrap();
         let space = Schwarzschild::new(radius, 1e-4);
         let scene = create_scene_with_camera(2.0, 0.2, 0.3, &space, camera, 1e-12);
 
@@ -508,29 +525,29 @@ mod tests {
 
     #[test]
     fn test_color_of_ray_hits_horizon_schwarzschild() {
-        let spatial_position = cartesian_to_spherical(&Point::new(
-            0.0,
-            0.0,
-            0.0,
-            10.0,
-            CoordinateSystem::Cartesian,
-        ));
+        let camera_position = cartesian_to_spherical(&Point::new_cartesian(0.0, -10.0, 0.0, 0.0));
+
+        let radius = 1.0;
+        let r = camera_position[1];
+        let a = 1.0 - radius / r;
+        let momentum = FourVector::new_spherical(-1.0 / a.sqrt(), 0.0, 0.0, 0.0);
 
         let camera = Camera::new(
-            spatial_position,
-            FourVector::new_spherical(1.0, 0.0, 0.0, 0.0),
+            camera_position,
+            momentum,
             PI / 2.0,
             11,
             11,
+            PI / 2.0,
             0.0,
-            0.0,
-            0.0,
-            &Schwarzschild::new(2.0, 1e-4),
-        );
-        let space = Schwarzschild::new(2.0, 1e-4);
-        let scene = create_scene_with_camera(2.0, 0.2, 0.3, &space, camera, 1e-12);
+            PI / 2.0,
+            &Schwarzschild::new(radius, 1e-4),
+        )
+        .unwrap();
+        let space = Schwarzschild::new(radius, 1e-4);
+        let scene = create_scene_with_camera(0.5, 0.2, 0.3, &space, camera, 1e-12);
 
-        let ray = scene.camera.get_ray_for(6, 6);
+        let ray = scene.camera.get_ray_for(5, 5);
         let color = scene.color_of_ray(&ray).unwrap();
 
         assert_eq!(color, CIETristimulus::new(0.0, 0.0, 0.0, 1.0));
@@ -548,7 +565,8 @@ mod tests {
             0.0,
             0.0,
             &EuclideanSpace::new(),
-        );
+        )
+        .unwrap();
         let space = EuclideanSpace::new();
         let scene: Scene<EuclideanSpace> =
             create_scene_with_camera(1.0, 2.0, 7.0, &space, camera, 1e-12);

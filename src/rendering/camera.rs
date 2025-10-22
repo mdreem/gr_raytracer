@@ -5,6 +5,11 @@ use crate::geometry::tetrad::{Tetrad, TetradValidator};
 use crate::rendering::ray::Ray;
 use log::{debug, trace};
 
+#[derive(Debug, PartialEq)]
+pub enum CameraError {
+    TetradNotOrthonormal,
+}
+
 #[derive(Debug, Clone)]
 pub struct Camera {
     alpha: f64,
@@ -82,11 +87,11 @@ impl Camera {
         theta: f64,
         psi: f64,
         geometry: &G,
-    ) -> Camera {
+    ) -> Result<Camera, CameraError> {
         let original_tetrad = geometry.get_tetrad_at(&position);
 
         let tetrad_validator = TetradValidator::new(geometry.clone());
-        tetrad_validator.validate(&original_tetrad);
+        tetrad_validator.validate(&original_tetrad)?;
 
         let (a_prime, b_prime) = rotate(original_tetrad.x, original_tetrad.y, phi);
         let (z, a_two_prime) = rotate(original_tetrad.z, a_prime, theta);
@@ -97,15 +102,16 @@ impl Camera {
 
         let tetrad = lorentz_transform_tetrad(geometry, &rotated_tetrad, &position, &velocity);
         debug!("lorentz transformed tetrad: {}", tetrad);
+        tetrad_validator.validate(&tetrad)?;
 
-        Self {
+        Ok(Self {
             position,
             velocity,
             alpha,
             rows,
             columns,
             tetrad,
-        }
+        })
     }
 
     // row, column range from 1..R, 1..C in https://arxiv.org/abs/1511.06025, but here we work
@@ -160,7 +166,8 @@ mod tests {
             0.0,
             0.0,
             &EuclideanSpace::new(),
-        );
+        )
+        .unwrap();
         let geometry = EuclideanSpace::new();
 
         let top_left_corner = camera.get_direction_for(0, 0);
@@ -227,7 +234,8 @@ mod tests {
             PI / 2.0,
             PI / 2.0,
             &geometry_euclidean,
-        );
+        )
+        .unwrap();
 
         let geometry_euclidean_spherical = EuclideanSpaceSpherical::new();
         let camera_euclidean_spherical = Camera::new(
@@ -240,7 +248,8 @@ mod tests {
             PI / 2.0,
             PI / 2.0,
             &geometry_euclidean_spherical,
-        );
+        )
+        .unwrap();
 
         for _row in 0..100 {
             for _col in 0..100 {
@@ -271,7 +280,8 @@ mod tests {
             PI / 2.0,
             PI / 2.0,
             &geometry_euclidean,
-        );
+        )
+        .unwrap();
 
         let geometry_euclidean_schwarzschild = Schwarzschild::new(0.0, 0.0);
         let camera_euclidean_schwarzschild = Camera::new(
@@ -284,7 +294,8 @@ mod tests {
             PI / 2.0,
             PI / 2.0,
             &geometry_euclidean_schwarzschild,
-        );
+        )
+        .unwrap();
 
         for _row in 0..100 {
             for _col in 0..100 {
