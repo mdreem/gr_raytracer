@@ -104,3 +104,8 @@ Example of a Kerr black hole with a radius r_s = 1.0 and a = 0.51.
 
 ![alt text](./images/render_kerr_large_a_checker_texture.png "Kerr black hole with a radius r_s = 1.0 and a = 0.51")
 
+## Animation of increasing spin parameter a of Kerr black hole
+
+This animations shows a Kerr black hole with r_s = 1.0 and increasing spin parameter a from 0.0 to 0.5.
+
+![alt text](./images/kerr_animation.gif "Kerr black hole with a radius r_s = 1.0 and a = 0.0 to 0.5")
