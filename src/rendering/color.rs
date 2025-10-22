@@ -103,10 +103,12 @@ impl Color {
         Color { r, g, b, alpha }
     }
 
+    #[cfg(test)]
     pub fn get_as_array(&self) -> [u8; 4] {
         [self.r, self.g, self.b, self.alpha]
     }
 
+    #[cfg(test)]
     pub fn blend(&self, other: &Color) -> Color {
         let (r0, g0, b0) = (
             inv_compand_srgb(self.r as f64 / 255.0),
@@ -162,14 +164,6 @@ pub fn y_bar(lambda: f64) -> f64 {
 
 pub fn z_bar(lambda: f64) -> f64 {
     1.217 * g(lambda, 437.0, 0.0845, 0.0278) + 0.681 * g(lambda, 459.0, 0.0385, 0.0725)
-}
-
-fn get_cie_xyz(lambda: f64) -> CIETristimulus {
-    let x = x_bar(lambda);
-    let y = y_bar(lambda);
-    let z = z_bar(lambda);
-
-    CIETristimulus::new(x, y, z, 1.0)
 }
 
 // https://en.wikipedia.org/wiki/SRGB#The_sRGB_transfer_function_.28.22gamma.22.29

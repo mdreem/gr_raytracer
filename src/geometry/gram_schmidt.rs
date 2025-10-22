@@ -2,7 +2,6 @@ use crate::geometry::four_vector::FourVector;
 use crate::geometry::geometry::Geometry;
 use crate::geometry::point::Point;
 use log::trace;
-use std::ops::Mul;
 
 fn proj<G: Geometry>(geometry: &G, position: &Point, u: &FourVector, v: &FourVector) -> FourVector {
     let p1 = geometry.inner_product(position, v, u);

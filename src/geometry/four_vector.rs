@@ -1,6 +1,4 @@
-use crate::geometry::point::CoordinateSystem::Cartesian;
-use crate::geometry::point::{CoordinateSystem, Point};
-use crate::geometry::spherical_coordinates_helper::spherical_to_cartesian;
+use crate::geometry::point::CoordinateSystem;
 use nalgebra::{Vector3, Vector4};
 use std::ops::{Add, Div, Index, Mul, Neg};
 

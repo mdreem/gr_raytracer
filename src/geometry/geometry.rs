@@ -3,7 +3,7 @@ use crate::geometry::point::{CoordinateSystem, Point};
 use crate::rendering::ray::Ray;
 use crate::rendering::runge_kutta::OdeFunction;
 use crate::rendering::scene::EquationOfMotionState;
-use nalgebra::{Const, Matrix4, Vector4};
+use nalgebra::{Const, Matrix4};
 use std::fmt::{Display, Formatter};
 
 #[derive(Debug, Clone)]
@@ -36,6 +36,7 @@ impl Tetrad {
 impl Display for Tetrad {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         write!(f, "Tetrad\n")?;
+        write!(f, "  position: {:?}\n", self.position)?;
         write!(f, "  t: {:?}\n", self.t,)?;
         write!(f, "  x: {:?}\n", self.x,)?;
         write!(f, "  y: {:?}\n", self.y,)?;
