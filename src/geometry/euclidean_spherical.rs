@@ -1,9 +1,10 @@
 use crate::geometry::four_vector::FourVector;
 use crate::geometry::geometry::{
-    GeodesicSolver, Geometry, HasCoordinateSystem, InnerProduct, Tetrad,
+    GeodesicSolver, Geometry, HasCoordinateSystem, InnerProduct, Signature,
 };
 use crate::geometry::point::CoordinateSystem::Spherical;
 use crate::geometry::point::{CoordinateSystem, Point};
+use crate::geometry::tetrad::Tetrad;
 use crate::rendering::ray::Ray;
 use crate::rendering::runge_kutta::OdeFunction;
 use crate::rendering::scene::EquationOfMotionState;
@@ -75,6 +76,12 @@ impl InnerProduct for EuclideanSpaceSpherical {
             - v.vector[1] * w.vector[1]
             - r * r * v.vector[2] * w.vector[2]
             - r * r * theta.sin() * theta.sin() * v.vector[3] * w.vector[3]
+    }
+}
+
+impl Signature for EuclideanSpaceSpherical {
+    fn signature(&self) -> [f64; 4] {
+        [1.0, -1.0, -1.0, -1.0]
     }
 }
 

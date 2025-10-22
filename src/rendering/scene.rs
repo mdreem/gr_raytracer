@@ -10,7 +10,7 @@ use crate::rendering::raytracer::RaytracerError;
 use crate::rendering::redshift::RedshiftComputer;
 use crate::rendering::texture::{TextureData, UVCoordinates};
 use crate::scene_objects::objects::Objects;
-use log::{error, trace};
+use log::{error};
 use nalgebra::{Const, OVector};
 use std::f64::consts::PI;
 use std::fs::File;
@@ -19,6 +19,7 @@ pub struct Scene<'a, G: Geometry> {
     pub integrator: Integrator<'a, G>,
     objects: Objects<'a, G>,
     texture_data: TextureData,
+    pub geometry: &'a G,
     pub camera: Camera,
     save_ray_data: bool,
     redshift_computer: RedshiftComputer<'a, G>,
@@ -55,6 +56,7 @@ impl<'a, G: Geometry> Scene<'a, G> {
             integrator,
             objects,
             texture_data,
+            geometry,
             camera,
             save_ray_data,
             redshift_computer: RedshiftComputer::new(geometry),

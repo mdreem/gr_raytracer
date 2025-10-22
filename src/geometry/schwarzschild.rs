@@ -1,9 +1,10 @@
 use crate::geometry::four_vector::FourVector;
 use crate::geometry::geometry::{
-    GeodesicSolver, Geometry, HasCoordinateSystem, InnerProduct, Tetrad,
+    GeodesicSolver, Geometry, HasCoordinateSystem, InnerProduct, Signature,
 };
 use crate::geometry::point::CoordinateSystem::Spherical;
 use crate::geometry::point::{CoordinateSystem, Point};
+use crate::geometry::tetrad::Tetrad;
 use crate::rendering::ray::Ray;
 use crate::rendering::runge_kutta::OdeFunction;
 use crate::rendering::scene::EquationOfMotionState;
@@ -94,8 +95,12 @@ impl InnerProduct for Schwarzschild {
     }
 }
 
-// TODO: take into account rotations.
-// All coordinates here are spherical coordinates.
+impl Signature for Schwarzschild {
+    fn signature(&self) -> [f64; 4] {
+        [1.0, -1.0, -1.0, -1.0]
+    }
+}
+
 impl Geometry for Schwarzschild {
     fn get_tetrad_at(&self, position: &Point) -> Tetrad {
         assert_eq!(position.coordinate_system, Spherical);

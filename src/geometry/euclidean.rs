@@ -1,9 +1,10 @@
 use crate::geometry::four_vector::FourVector;
 use crate::geometry::geometry::{
-    GeodesicSolver, Geometry, HasCoordinateSystem, InnerProduct, Tetrad,
+    GeodesicSolver, Geometry, HasCoordinateSystem, InnerProduct, Signature,
 };
 use crate::geometry::point::CoordinateSystem::Cartesian;
 use crate::geometry::point::{CoordinateSystem, Point};
+use crate::geometry::tetrad::Tetrad;
 use crate::rendering::ray::Ray;
 use crate::rendering::runge_kutta::OdeFunction;
 use crate::rendering::scene::EquationOfMotionState;
@@ -54,6 +55,12 @@ impl InnerProduct for EuclideanSpace {
             + (-1.0) * v.vector[1] * w.vector[1]
             + (-1.0) * v.vector[2] * w.vector[2]
             + (-1.0) * v.vector[3] * w.vector[3]
+    }
+}
+
+impl Signature for EuclideanSpace {
+    fn signature(&self) -> [f64; 4] {
+        [1.0, -1.0, -1.0, -1.0]
     }
 }
 
