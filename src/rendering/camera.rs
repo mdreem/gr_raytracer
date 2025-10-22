@@ -1,8 +1,14 @@
 use crate::geometry::four_vector::FourVector;
-use crate::geometry::geometry::{Geometry, Tetrad};
+use crate::geometry::geometry::Geometry;
 use crate::geometry::point::Point;
+use crate::geometry::tetrad::{Tetrad, TetradValidator};
 use crate::rendering::ray::Ray;
 use log::{debug, trace};
+
+#[derive(Debug, PartialEq)]
+pub enum CameraError {
+    TetradNotOrthonormal,
+}
 
 #[derive(Debug, Clone)]
 pub struct Camera {
@@ -71,7 +77,6 @@ fn rotate(v1: FourVector, v2: FourVector, angle: f64) -> (FourVector, FourVector
 }
 
 impl Camera {
-    // Position is given in cartesian coordinates.
     pub fn new<G: Geometry>(
         position: Point,
         velocity: FourVector,
@@ -82,54 +87,11 @@ impl Camera {
         theta: f64,
         psi: f64,
         geometry: &G,
-    ) -> Camera {
+    ) -> Result<Camera, CameraError> {
         let original_tetrad = geometry.get_tetrad_at(&position);
-        debug!("position: {:?}", position);
-        debug!("original_tetrad: {}", original_tetrad);
-        debug!("inner product checks for tetrad:");
-        debug!(
-            "  inner product t.t: {:.5}",
-            geometry.inner_product(&position, &original_tetrad.t, &original_tetrad.t)
-        );
-        debug!(
-            "  inner product x.x: {:.5}",
-            geometry.inner_product(&position, &original_tetrad.x, &original_tetrad.x)
-        );
-        debug!(
-            "  inner product y.y: {:.5}",
-            geometry.inner_product(&position, &original_tetrad.y, &original_tetrad.y)
-        );
-        debug!(
-            "  inner product z.z: {:.5}",
-            geometry.inner_product(&position, &original_tetrad.z, &original_tetrad.z)
-        );
-        debug!("");
-        debug!(
-            "  inner product t.x: {:.5}",
-            geometry.inner_product(&position, &original_tetrad.t, &original_tetrad.x)
-        );
-        debug!(
-            "  inner product t.y: {:.5}",
-            geometry.inner_product(&position, &original_tetrad.t, &original_tetrad.y)
-        );
-        debug!(
-            "  inner product t.z: {:.5}",
-            geometry.inner_product(&position, &original_tetrad.t, &original_tetrad.z)
-        );
-        debug!("");
-        debug!(
-            "  inner product x.y: {:.5}",
-            geometry.inner_product(&position, &original_tetrad.x, &original_tetrad.y)
-        );
-        debug!(
-            "  inner product x.z: {:.5}",
-            geometry.inner_product(&position, &original_tetrad.x, &original_tetrad.z)
-        );
-        debug!("");
-        debug!(
-            "  inner product y.z: {:.5}",
-            geometry.inner_product(&position, &original_tetrad.y, &original_tetrad.z)
-        );
+
+        let tetrad_validator = TetradValidator::new(geometry.clone());
+        tetrad_validator.validate(&original_tetrad)?;
 
         let (a_prime, b_prime) = rotate(original_tetrad.x, original_tetrad.y, phi);
         let (z, a_two_prime) = rotate(original_tetrad.z, a_prime, theta);
@@ -140,19 +102,34 @@ impl Camera {
 
         let tetrad = lorentz_transform_tetrad(geometry, &rotated_tetrad, &position, &velocity);
         debug!("lorentz transformed tetrad: {}", tetrad);
+        tetrad_validator.validate(&tetrad)?;
 
-        Self {
+        Ok(Self {
             position,
             velocity,
             alpha,
             rows,
             columns,
             tetrad,
-        }
+        })
     }
 
-    // row, column range from 1..R, 1..C in https://arxiv.org/abs/1511.06025, but here we work
-    // with 0-based indices. This needs to be accounted for below.
+    /// Generates ray direction using pinhole camera projection.
+    ///
+    /// Algorithm (from https://arxiv.org/abs/1511.06025):
+    /// 1. Map pixel (row, col) to image plane coordinates (i', j')
+    /// 2. Construct spacelike vector: w = e_z + i' e_x + j' e_y
+    /// 3. Project to null direction: k = -e_z + 2w / (-w·w)
+    ///
+    /// This ensures k·k = 0 (null geodesic) in the observer's tetrad frame.
+    ///
+    /// Coordinate convention:
+    /// - e_x: vertical (up) in image
+    /// - e_y: horizontal (right) in image
+    /// - e_z: camera forward direction
+    ///
+    /// row, column range from 1..R, 1..C in https://arxiv.org/abs/1511.06025, but here we work
+    /// with 0-based indices. This needs to be accounted for below.
     fn get_direction_for(&self, row: i64, column: i64) -> FourVector {
         let shifted_column = (column + 1) as f64; // Convert to 1-based index.
         let shifted_row = (row + 1) as f64; // Convert to 1-based index.
@@ -203,7 +180,8 @@ mod tests {
             0.0,
             0.0,
             &EuclideanSpace::new(),
-        );
+        )
+        .unwrap();
         let geometry = EuclideanSpace::new();
 
         let top_left_corner = camera.get_direction_for(0, 0);
@@ -270,7 +248,8 @@ mod tests {
             PI / 2.0,
             PI / 2.0,
             &geometry_euclidean,
-        );
+        )
+        .unwrap();
 
         let geometry_euclidean_spherical = EuclideanSpaceSpherical::new();
         let camera_euclidean_spherical = Camera::new(
@@ -283,7 +262,8 @@ mod tests {
             PI / 2.0,
             PI / 2.0,
             &geometry_euclidean_spherical,
-        );
+        )
+        .unwrap();
 
         for _row in 0..100 {
             for _col in 0..100 {
@@ -314,7 +294,8 @@ mod tests {
             PI / 2.0,
             PI / 2.0,
             &geometry_euclidean,
-        );
+        )
+        .unwrap();
 
         let geometry_euclidean_schwarzschild = Schwarzschild::new(0.0, 0.0);
         let camera_euclidean_schwarzschild = Camera::new(
@@ -327,7 +308,8 @@ mod tests {
             PI / 2.0,
             PI / 2.0,
             &geometry_euclidean_schwarzschild,
-        );
+        )
+        .unwrap();
 
         for _row in 0..100 {
             for _col in 0..100 {
