@@ -368,24 +368,13 @@ mod tests {
     use crate::geometry::geometry::{Geometry, InnerProduct};
     use crate::geometry::kerr::Kerr;
     use crate::geometry::point::Point;
-    use crate::geometry::spherical_coordinates_helper::{
-        cartesian_to_spherical, spherical_to_cartesian,
-    };
+    use crate::geometry::spherical_coordinates_helper::cartesian_to_spherical;
     use crate::rendering::camera::Camera;
     use crate::rendering::debug::save_rays_to_file;
-    use crate::rendering::integrator::StopReason;
-    use crate::rendering::ray::{IntegratedRay, Ray};
-    use crate::rendering::runge_kutta::OdeFunction;
     use crate::rendering::scene;
     use crate::rendering::scene::Scene;
-    use crate::rendering::scene::test_scene::CELESTIAL_SPHERE_RADIUS;
     use approx::assert_abs_diff_eq;
-    use log::info;
-    use nalgebra::allocator::Allocator;
-    use nalgebra::{DefaultAllocator, Dim, OVector};
     use std::f64::consts::PI;
-    use std::fs::File;
-    use std::io::Write;
 
     #[test]
     fn test_tetrad_orthonormal() {

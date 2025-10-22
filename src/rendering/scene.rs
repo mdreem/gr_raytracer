@@ -263,17 +263,11 @@ mod tests {
     use crate::geometry::schwarzschild::Schwarzschild;
     use crate::geometry::spherical_coordinates_helper::cartesian_to_spherical;
     use crate::rendering::camera::Camera;
-    use crate::rendering::color::{CIETristimulus, xyz_to_linear_srgb, xyz_to_srgb};
+    use crate::rendering::color::CIETristimulus;
     use crate::rendering::scene::Scene;
     use crate::rendering::scene::test_scene::create_scene_with_camera;
     use std::f64::consts::PI;
 
-    const CELESTIAL_SPHERE_COLOR_1: CIETristimulus = CIETristimulus {
-        x: 0.04556866876322511,
-        y: 0.09113733752645022,
-        z: 0.015189552006485689,
-        alpha: 1.0,
-    };
     const CELESTIAL_SPHERE_COLOR_2: CIETristimulus = CIETristimulus {
         x: 0.3575761,
         y: 0.7151522,
@@ -285,12 +279,6 @@ mod tests {
         x: 0.052562486896837575,
         y: 0.0271025410675224,
         z: 0.002463867369774764,
-        alpha: 1.0,
-    };
-    const SPHERE_COLOR_2: CIETristimulus = CIETristimulus {
-        x: 0.4124564,
-        y: 0.2126729,
-        z: 0.0193339,
         alpha: 1.0,
     };
 
@@ -422,9 +410,6 @@ mod tests {
 
         let ray = scene.camera.get_ray_for(5, 5);
         let color = scene.color_of_ray(&ray).unwrap();
-        let a_emitter = 1.0 - radius / sphere_radius;
-        let expected_redshift = (a / a_emitter).sqrt();
-
         assert_approx_eq_cie_tristimulus!(
             color,
             CIETristimulus::new(0.4124564, 0.2126729, 0.0193339, 1.0),
