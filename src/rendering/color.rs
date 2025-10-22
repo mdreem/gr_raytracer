@@ -204,10 +204,7 @@ pub fn srgb_to_xyz(color: &Color) -> CIETristimulus {
 #[cfg(test)]
 pub mod tests {
     use super::*;
-
-    fn approx_eq(a: f64, b: f64) {
-        assert!((a - b).abs() < 1.0e-12, "{} != {}", a, b);
-    }
+    use approx::assert_abs_diff_eq;
 
     #[test]
     fn test_srgb_to_xyz() {
@@ -228,10 +225,10 @@ pub mod tests {
         let foreground = CIETristimulus::new(0.8, 0.1, 0.3, 0.0);
         let blended = background.blend(&foreground);
 
-        approx_eq(blended.x, background.x);
-        approx_eq(blended.y, background.y);
-        approx_eq(blended.z, background.z);
-        approx_eq(blended.alpha, background.alpha);
+        assert_abs_diff_eq!(blended.x, background.x);
+        assert_abs_diff_eq!(blended.y, background.y);
+        assert_abs_diff_eq!(blended.z, background.z);
+        assert_abs_diff_eq!(blended.alpha, background.alpha);
     }
 
     #[test]
@@ -240,10 +237,10 @@ pub mod tests {
         let foreground = CIETristimulus::new(0.8, 0.1, 0.3, 0.0);
         let blended = background.blend(&foreground);
 
-        approx_eq(blended.x, 0.0);
-        approx_eq(blended.y, 0.0);
-        approx_eq(blended.z, 0.0);
-        approx_eq(blended.alpha, 0.0);
+        assert_abs_diff_eq!(blended.x, 0.0);
+        assert_abs_diff_eq!(blended.y, 0.0);
+        assert_abs_diff_eq!(blended.z, 0.0);
+        assert_abs_diff_eq!(blended.alpha, 0.0);
     }
 
     #[test]
@@ -252,9 +249,9 @@ pub mod tests {
         let foreground = CIETristimulus::new(0.6, 0.4, 0.2, 0.5);
         let blended = background.blend(&foreground);
 
-        approx_eq(blended.x, 0.4);
-        approx_eq(blended.y, 0.4);
-        approx_eq(blended.z, 0.4);
-        approx_eq(blended.alpha, 1.0);
+        assert_abs_diff_eq!(blended.x, 0.4);
+        assert_abs_diff_eq!(blended.y, 0.4);
+        assert_abs_diff_eq!(blended.z, 0.4);
+        assert_abs_diff_eq!(blended.alpha, 1.0);
     }
 }
