@@ -1,4 +1,5 @@
 use crate::geometry::geometry::Geometry;
+use crate::rendering::camera::CameraError;
 use crate::rendering::color;
 use crate::rendering::color::{CIETristimulusNormalization, xyz_to_srgb};
 use crate::rendering::integrator::{IntegrationError, StopReason};
@@ -24,6 +25,7 @@ pub enum RaytracerError {
     ImageError(ImageError),
     ImageBufferCreation,
     ProgressBarTemplateError(TemplateError),
+    CameraError(CameraError),
 }
 
 pub struct Raytracer<'a, G: Geometry> {

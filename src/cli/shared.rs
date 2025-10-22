@@ -56,7 +56,8 @@ pub fn create_scene<G: Geometry>(
         opts.theta,
         opts.psi,
         geometry,
-    );
+    )
+    .map_err(RaytracerError::CameraError)?;
 
     let texture_data = TextureData {
         celestial_map: texture_mapper_celestial,

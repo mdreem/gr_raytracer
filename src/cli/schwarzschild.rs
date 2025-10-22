@@ -25,7 +25,7 @@ pub fn render_schwarzschild(
 
     let r = camera_position[1];
     let a = 1.0 - radius / r;
-    let momentum = FourVector::new_spherical(1.0 / a.sqrt(), 0.0, 0.0, 0.0);
+    let momentum = FourVector::new_spherical(-1.0 / a.sqrt(), 0.0, 0.0, 0.0);
     debug!("momentum: {:?}", momentum);
 
     let geometry = Schwarzschild::new(radius, horizon_epsilon);
@@ -52,7 +52,7 @@ pub fn render_schwarzschild_ray(
     let camera_position = cartesian_to_spherical(&camera_position);
     let r = camera_position[1];
     let a = 1.0 - radius / r;
-    let momentum = FourVector::new_spherical(1.0 / a.sqrt(), 0.0, 0.0, 0.0);
+    let momentum = FourVector::new_spherical(-1.0 / a.sqrt(), 0.0, 0.0, 0.0);
     let geometry = Schwarzschild::new(radius, horizon_epsilon);
 
     let scene = create_scene(&geometry, camera_position, momentum, opts, config.clone())?;
