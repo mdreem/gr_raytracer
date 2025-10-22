@@ -40,23 +40,25 @@ pub fn get_cie_xyz_of_black_body_redshifted(temperature: f64) -> CIETristimulus 
 
 #[cfg(test)]
 mod tests {
-    use crate::rendering::black_body_radiation::integrate_blackbody_xyz;
+    use super::integrate_blackbody_xyz;
     use crate::rendering::color::{Color, xyz_to_linear_srgb, xyz_to_srgb};
     use image::{ImageFormat, Rgb};
 
+    fn get_srgb_of_black_body(temperature: f64) -> Color {
+        let cie_tristimulus = integrate_blackbody_xyz(temperature);
+        let exposure = 1.0 / (cie_tristimulus.x + cie_tristimulus.y + cie_tristimulus.z);
+        xyz_to_srgb(&cie_tristimulus, exposure)
+    }
+
     #[test]
     fn test_black_body_radiation_red() {
-        let cie_tristimulus = integrate_blackbody_xyz(1000.0);
-        let exposure = 1.0 / (cie_tristimulus.x + cie_tristimulus.y + cie_tristimulus.z);
-        let color = xyz_to_srgb(&cie_tristimulus, exposure);
+        let color = get_srgb_of_black_body(1000.0);
         assert_eq!(color, Color::new(255, 60, 0, 255));
     }
 
     #[test]
     fn test_black_body_radiation_blue() {
-        let cie_tristimulus = integrate_blackbody_xyz(10000.0);
-        let exposure = 1.0 / (cie_tristimulus.x + cie_tristimulus.y + cie_tristimulus.z);
-        let color = xyz_to_srgb(&cie_tristimulus, exposure);
+        let color = get_srgb_of_black_body(10000.0);
         assert_eq!(color, Color::new(137, 146, 172, 255));
     }
 
