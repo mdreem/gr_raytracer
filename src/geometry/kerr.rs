@@ -1,16 +1,15 @@
-use crate::configuration::GeometryType::Euclidean;
 use crate::geometry::four_vector::FourVector;
 use crate::geometry::geometry::{
     GeodesicSolver, Geometry, HasCoordinateSystem, InnerProduct, Tetrad,
 };
 use crate::geometry::gram_schmidt::gram_schmidt;
-use crate::geometry::point::CoordinateSystem::{Cartesian, Spherical};
+use crate::geometry::point::CoordinateSystem::Cartesian;
 use crate::geometry::point::{CoordinateSystem, Point};
 use crate::rendering::ray::Ray;
 use crate::rendering::runge_kutta::OdeFunction;
 use crate::rendering::scene::EquationOfMotionState;
 use log::{debug, trace};
-use nalgebra::{ComplexField, Const, Matrix4, OVector, Vector3, Vector4};
+use nalgebra::{Const, Matrix4, OVector, Vector3, Vector4};
 
 #[derive(Clone, Debug)]
 pub struct Kerr {
@@ -22,7 +21,6 @@ pub struct Kerr {
 struct KerrSolver {
     radius: f64,
     a: f64,
-    horizon_epsilon: f64,
 }
 
 fn compute_r_sqr(a: f64, x: f64, y: f64, z: f64) -> f64 {
@@ -30,7 +28,7 @@ fn compute_r_sqr(a: f64, x: f64, y: f64, z: f64) -> f64 {
     0.5 * (rho_sqr - a * a + ((rho_sqr - a * a) * (rho_sqr - a * a) + 4.0 * a * a * z * z).sqrt())
 }
 
-fn k_vector(radius: f64, a: f64, x: f64, y: f64, z: f64) -> Vector4<f64> {
+fn k_vector(a: f64, x: f64, y: f64, z: f64) -> Vector4<f64> {
     let r_sqr = compute_r_sqr(a, x, y, z);
     let r = r_sqr.sqrt();
 
@@ -48,7 +46,7 @@ fn metric(radius: f64, a: f64, x: f64, y: f64, z: f64) -> Matrix4<f64> {
     let r = r_sqr.sqrt();
     let f = (r * r * r * radius) / (r * r * r * r + a * a * z * z);
 
-    let k = k_vector(radius, a, x, y, z);
+    let k = k_vector(a, x, y, z);
     let k_0 = k[0];
     let k_x = k[1];
     let k_y = k[2];
@@ -253,7 +251,7 @@ impl Geometry for Kerr {
         let r = r_sqr.sqrt();
         let f = (r * r * r * self.radius) / (r * r * r * r + self.a * self.a * z * z);
 
-        let k = k_vector(self.radius, self.a, x, y, z);
+        let k = k_vector(self.a, x, y, z);
         let k_x = k[1];
         let k_y = k[2];
         let k_z = k[3];
@@ -360,7 +358,6 @@ impl Geometry for Kerr {
         Box::new(KerrSolver {
             radius: self.radius,
             a: self.a,
-            horizon_epsilon: self.horizon_epsilon,
         })
     }
 }
@@ -371,24 +368,13 @@ mod tests {
     use crate::geometry::geometry::{Geometry, InnerProduct};
     use crate::geometry::kerr::Kerr;
     use crate::geometry::point::Point;
-    use crate::geometry::spherical_coordinates_helper::{
-        cartesian_to_spherical, spherical_to_cartesian,
-    };
+    use crate::geometry::spherical_coordinates_helper::cartesian_to_spherical;
     use crate::rendering::camera::Camera;
     use crate::rendering::debug::save_rays_to_file;
-    use crate::rendering::integrator::StopReason;
-    use crate::rendering::ray::{IntegratedRay, Ray};
-    use crate::rendering::runge_kutta::OdeFunction;
     use crate::rendering::scene;
     use crate::rendering::scene::Scene;
-    use crate::rendering::scene::test_scene::CELESTIAL_SPHERE_RADIUS;
     use approx::assert_abs_diff_eq;
-    use log::info;
-    use nalgebra::allocator::Allocator;
-    use nalgebra::{DefaultAllocator, Dim, OVector};
     use std::f64::consts::PI;
-    use std::fs::File;
-    use std::io::Write;
 
     #[test]
     fn test_tetrad_orthonormal() {

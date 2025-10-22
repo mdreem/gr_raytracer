@@ -19,7 +19,6 @@ pub struct Scene<'a, G: Geometry> {
     pub integrator: Integrator<'a, G>,
     objects: Objects<'a, G>,
     texture_data: TextureData,
-    pub geometry: &'a G,
     pub camera: Camera,
     save_ray_data: bool,
     redshift_computer: RedshiftComputer<'a, G>,
@@ -56,7 +55,6 @@ impl<'a, G: Geometry> Scene<'a, G> {
             integrator,
             objects,
             texture_data,
-            geometry,
             camera,
             save_ray_data,
             redshift_computer: RedshiftComputer::new(geometry),
@@ -76,7 +74,7 @@ impl<'a, G: Geometry> Scene<'a, G> {
         if self.save_ray_data {
             let mut file = File::create(format!("ray-{}-{}.csv", ray.row, ray.col))
                 .expect("Unable to create file");
-            steps.save(&mut file, self.geometry)?;
+            steps.save(&mut file)?;
         }
 
         let velocity = self.camera.velocity;
@@ -88,8 +86,7 @@ impl<'a, G: Geometry> Scene<'a, G> {
             let step = &step_window[1];
 
             if let Some(intersection_color) =
-                self.objects
-                    .intersects(last_step, step, observer_energy, &self.redshift_computer)
+                self.objects.intersects(last_step, step, observer_energy)
             {
                 intersections.push(intersection_color);
             }
@@ -266,17 +263,11 @@ mod tests {
     use crate::geometry::schwarzschild::Schwarzschild;
     use crate::geometry::spherical_coordinates_helper::cartesian_to_spherical;
     use crate::rendering::camera::Camera;
-    use crate::rendering::color::{CIETristimulus, xyz_to_linear_srgb, xyz_to_srgb};
+    use crate::rendering::color::CIETristimulus;
     use crate::rendering::scene::Scene;
     use crate::rendering::scene::test_scene::create_scene_with_camera;
     use std::f64::consts::PI;
 
-    const CELESTIAL_SPHERE_COLOR_1: CIETristimulus = CIETristimulus {
-        x: 0.04556866876322511,
-        y: 0.09113733752645022,
-        z: 0.015189552006485689,
-        alpha: 1.0,
-    };
     const CELESTIAL_SPHERE_COLOR_2: CIETristimulus = CIETristimulus {
         x: 0.3575761,
         y: 0.7151522,
@@ -288,12 +279,6 @@ mod tests {
         x: 0.052562486896837575,
         y: 0.0271025410675224,
         z: 0.002463867369774764,
-        alpha: 1.0,
-    };
-    const SPHERE_COLOR_2: CIETristimulus = CIETristimulus {
-        x: 0.4124564,
-        y: 0.2126729,
-        z: 0.0193339,
         alpha: 1.0,
     };
 
@@ -425,9 +410,6 @@ mod tests {
 
         let ray = scene.camera.get_ray_for(5, 5);
         let color = scene.color_of_ray(&ray).unwrap();
-        let a_emitter = 1.0 - radius / sphere_radius;
-        let expected_redshift = (a / a_emitter).sqrt();
-
         assert_approx_eq_cie_tristimulus!(
             color,
             CIETristimulus::new(0.4124564, 0.2126729, 0.0193339, 1.0),

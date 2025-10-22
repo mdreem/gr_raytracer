@@ -59,7 +59,7 @@ pub fn render_schwarzschild_ray(
     let raytracer = raytracer::Raytracer::new(scene, config.color_normalization);
     let (integrated_ray, stop_reason) = raytracer.integrate_ray_at_point(row, col)?;
     info!("Stop reason: {:?}", stop_reason);
-    integrated_ray.save(write, &geometry)?;
+    integrated_ray.save(write)?;
     Ok(())
 }
 
@@ -98,7 +98,7 @@ pub fn render_schwarzschild_ray_at(
         position_spherical, momentum, m_s
     );
 
-    let ray = Ray::new(0, 0, opts.width, opts.height, position_spherical, momentum);
+    let ray = Ray::new(0, 0, position_spherical, momentum);
 
     let integration_configuration = IntegrationConfiguration::new(
         opts.max_steps,
@@ -110,7 +110,7 @@ pub fn render_schwarzschild_ray_at(
 
     let (integrated_ray, stop_reason) = integrator.integrate(&ray)?;
     info!("Stop reason: {:?}", stop_reason);
-    integrated_ray.save(write, &geometry)?;
+    integrated_ray.save(write)?;
     Ok(())
 }
 
