@@ -45,7 +45,11 @@ mod tests {
     use image::{ImageFormat, Rgb};
 
     fn get_srgb_of_black_body(temperature: f64) -> Color {
-        let cie_tristimulus = integrate_blackbody_xyz(temperature);
+        get_srgb_of_black_body_redshifted(temperature, 1.0)
+    }
+
+    fn get_srgb_of_black_body_redshifted(temperature: f64, redshift: f64) -> Color {
+        let cie_tristimulus = integrate_blackbody_xyz(temperature * redshift);
         let exposure = 1.0 / (cie_tristimulus.x + cie_tristimulus.y + cie_tristimulus.z);
         xyz_to_srgb(&cie_tristimulus, exposure)
     }
@@ -94,9 +98,7 @@ mod tests {
             for y in 0..max_redshift_steps {
                 let redshift = 0.5 + (y as f64) * 2.0 / (max_temp_steps as f64 - 1.0);
                 let temperature = 1000.0 + (x as f64) * 10000.0 / (max_temp_steps as f64 - 1.0);
-                let cie_tristimulus = integrate_blackbody_xyz(temperature * redshift);
-                let exposure = 1.0 / (cie_tristimulus.x + cie_tristimulus.y + cie_tristimulus.z);
-                let color = xyz_to_srgb(&cie_tristimulus, exposure);
+                let color = get_srgb_of_black_body_redshifted(temperature, redshift);
                 imgbuf.put_pixel(x, y, image::Rgba([color.r, color.g, color.b, color.alpha]));
             }
             println!("line: {}", x)
