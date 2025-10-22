@@ -12,6 +12,7 @@ use crate::rendering::scene::Scene;
 use crate::rendering::texture::{
     BlackBodyMapper, CheckerMapper, TextureData, TextureMapHandle, TextureMapperFactory,
 };
+use crate::rendering::tone_mapping::ToneMappingConfig;
 use crate::scene_objects::objects::Objects;
 use crate::{configuration, scene_objects};
 use log::debug;
@@ -22,8 +23,9 @@ pub fn render<G: Geometry>(
     scene: Scene<G>,
     filename: String,
     color_normalization: CIETristimulusNormalization,
+    tone_mapping: ToneMappingConfig,
 ) -> Result<(), RaytracerError> {
-    let raytracer = raytracer::Raytracer::new(scene, color_normalization);
+    let raytracer = raytracer::Raytracer::new(scene, color_normalization, tone_mapping);
     raytracer.render(filename)
 }
 

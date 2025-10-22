@@ -1,10 +1,13 @@
 use crate::rendering::color::CIETristimulusNormalization;
+use crate::rendering::tone_mapping::ToneMappingConfig;
 use serde::{Deserialize, Serialize};
 
 #[derive(Deserialize, Serialize, Clone)]
 pub struct RenderConfig {
     pub geometry_type: GeometryType,
     pub color_normalization: CIETristimulusNormalization,
+    #[serde(default)]
+    pub tone_mapping: ToneMappingConfig,
     pub objects: Vec<ObjectsConfig>,
     pub celestial_texture: TextureConfig,
 }
@@ -71,6 +74,7 @@ mod tests {
                 color_normalization: NoNormalization,
             },
             color_normalization: NoNormalization,
+            tone_mapping: crate::rendering::tone_mapping::ToneMappingConfig::ACES { exposure: 1.5 },
             geometry_type: GeometryType::Schwarzschild {
                 radius: 2.0,
                 horizon_epsilon: 1e-4,

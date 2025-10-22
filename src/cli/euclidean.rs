@@ -18,7 +18,12 @@ pub fn render_euclidean(
     let momentum = FourVector::new_cartesian(1.0, 0.0, 0.0, 0.0);
     let scene = create_scene(&geometry, camera_position, momentum, opts, config.clone())?;
 
-    render(scene, filename, config.color_normalization)
+    render(
+        scene,
+        filename,
+        config.color_normalization,
+        config.tone_mapping,
+    )
 }
 
 pub fn render_euclidean_ray(
@@ -33,7 +38,11 @@ pub fn render_euclidean_ray(
     let momentum = FourVector::new_cartesian(1.0, 0.0, 0.0, 0.0);
 
     let scene = create_scene(&geometry, camera_position, momentum, opts, config.clone())?;
-    let raytracer = raytracer::Raytracer::new(scene, config.color_normalization);
+    let raytracer = raytracer::Raytracer::new(
+        scene,
+        config.color_normalization,
+        config.tone_mapping,
+    );
     let (integrated_ray, stop_reason) = raytracer.integrate_ray_at_point(row, col)?;
     debug!("Stop reason: {:?}", stop_reason);
     integrated_ray.save(write)?;

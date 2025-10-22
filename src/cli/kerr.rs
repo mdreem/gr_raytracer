@@ -32,7 +32,12 @@ pub fn render_kerr(
     );
     let scene = create_scene(&geometry, camera_position, momentum, opts, config.clone())?;
 
-    render(scene, filename, config.color_normalization)
+    render(
+        scene,
+        filename,
+        config.color_normalization,
+        config.tone_mapping,
+    )
 }
 
 pub fn render_kerr_ray(
@@ -55,7 +60,11 @@ pub fn render_kerr_ray(
     );
 
     let scene = create_scene(&geometry, camera_position, momentum, opts, config.clone())?;
-    let raytracer = raytracer::Raytracer::new(scene, config.color_normalization);
+    let raytracer = raytracer::Raytracer::new(
+        scene,
+        config.color_normalization,
+        config.tone_mapping,
+    );
     let (integrated_ray, stop_reason) = raytracer.integrate_ray_at_point(row, col)?;
     info!("Stop reason: {:?}", stop_reason);
     integrated_ray.save(write)?;

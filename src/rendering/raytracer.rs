@@ -1,10 +1,13 @@
 use crate::geometry::geometry::Geometry;
 use crate::rendering::color;
-use crate::rendering::color::{CIETristimulusNormalization, xyz_to_srgb};
+use crate::rendering::color::{
+    xyz_to_srgb, xyz_to_srgb_with_tone_mapping, CIETristimulusNormalization,
+};
 use crate::rendering::integrator::{IntegrationError, StopReason};
 use crate::rendering::ray::IntegratedRay;
 use crate::rendering::scene::Scene;
 use crate::rendering::texture::TextureError;
+use crate::rendering::tone_mapping::ToneMappingConfig;
 use image::{ImageBuffer, ImageError, ImageFormat, Primitive, Rgb};
 use indicatif::style::TemplateError;
 use log::{debug, error, info};
@@ -29,13 +32,19 @@ pub enum RaytracerError {
 pub struct Raytracer<'a, G: Geometry> {
     scene: Scene<'a, G>,
     color_normalization: CIETristimulusNormalization,
+    tone_mapping: ToneMappingConfig,
 }
 
 impl<'a, G: Geometry> Raytracer<'a, G> {
-    pub fn new(scene: Scene<'a, G>, color_normalization: CIETristimulusNormalization) -> Self {
+    pub fn new(
+        scene: Scene<'a, G>,
+        color_normalization: CIETristimulusNormalization,
+        tone_mapping: ToneMappingConfig,
+    ) -> Self {
         Self {
             scene,
             color_normalization,
+            tone_mapping,
         }
     }
 
@@ -126,8 +135,9 @@ impl<'a, G: Geometry> Raytracer<'a, G> {
                 .save_with_format(&filename, ImageFormat::Hdr)
                 .map_err(RaytracerError::ImageError)?;
         } else {
-            info!("Creating non-HDR image");
+            info!("Creating non-HDR image with tone mapping");
             let color_normalization = self.color_normalization;
+            let tone_mapping = self.tone_mapping;
             let buffer =
                 self.render_section_to_buffer(from_row, from_col, to_row, to_col, |x, y, z| {
                     let cie_tristimulus = color::CIETristimulus {
@@ -136,7 +146,8 @@ impl<'a, G: Geometry> Raytracer<'a, G> {
                         z: z as f64,
                         alpha: 1.0,
                     };
-                    let color = xyz_to_srgb(&cie_tristimulus.normalize(color_normalization), 1.0);
+                    let normalized = cie_tristimulus.normalize(color_normalization);
+                    let color = xyz_to_srgb_with_tone_mapping(&normalized, tone_mapping);
                     (color.r, color.g, color.b)
                 })?;
             let imgbuf: ImageBuffer<Rgb<u8>, Vec<u8>> =

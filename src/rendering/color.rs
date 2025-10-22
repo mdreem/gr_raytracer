@@ -1,3 +1,4 @@
+use crate::rendering::tone_mapping::{apply_tone_mapping, ToneMappingConfig};
 use nalgebra::{Matrix3, Vector3};
 use serde::{Deserialize, Serialize};
 
@@ -159,6 +160,48 @@ pub fn xyz_to_srgb(cie_tristimulus: &CIETristimulus, exposure: f64) -> Color {
     let r = (compand_srgb(v_lin.x.max(0.0)) * 255.0).round() as u8;
     let g = (compand_srgb(v_lin.y.max(0.0)) * 255.0).round() as u8;
     let b = (compand_srgb(v_lin.z.max(0.0)) * 255.0).round() as u8;
+
+    Color {
+        r,
+        g,
+        b,
+        alpha: 255,
+    }
+}
+
+/// Converts XYZ tristimulus to sRGB with HDR tone mapping.
+///
+/// This is the physically accurate rendering path:
+/// 1. Convert XYZ → linear RGB (wide gamut)
+/// 2. Apply tone mapping (compress HDR → LDR while preserving contrast)
+/// 3. Apply sRGB gamma correction (display encoding)
+///
+/// Recommended for black hole rendering where brightness varies by orders of magnitude.
+///
+/// # Arguments
+/// * `cie_tristimulus` - CIE XYZ color (use NoNormalization for physical accuracy)
+/// * `tone_mapping` - Tone mapping operator and parameters
+///
+/// # Example
+/// ```ignore
+/// let xyz = CIETristimulus::new(10.5, 8.3, 2.1, 1.0); // HDR color
+/// let config = ToneMappingConfig::ACES { exposure: 1.0 };
+/// let srgb = xyz_to_srgb_with_tone_mapping(&xyz, config);
+/// ```
+pub fn xyz_to_srgb_with_tone_mapping(
+    cie_tristimulus: &CIETristimulus,
+    tone_mapping: ToneMappingConfig,
+) -> Color {
+    // Step 1: Convert XYZ → linear RGB (can exceed [0,1] for HDR)
+    let v_lin = xyz_to_linear_srgb(cie_tristimulus);
+
+    // Step 2: Apply tone mapping (maps HDR → [0,1] with good contrast)
+    let v_tone_mapped = apply_tone_mapping(v_lin, tone_mapping);
+
+    // Step 3: Apply sRGB gamma correction and convert to 8-bit
+    let r = (compand_srgb(v_tone_mapped.x.max(0.0)) * 255.0).round() as u8;
+    let g = (compand_srgb(v_tone_mapped.y.max(0.0)) * 255.0).round() as u8;
+    let b = (compand_srgb(v_tone_mapped.z.max(0.0)) * 255.0).round() as u8;
 
     Color {
         r,

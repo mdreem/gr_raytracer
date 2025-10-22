@@ -9,3 +9,4 @@ pub mod redshift;
 pub mod runge_kutta;
 pub mod scene;
 pub mod texture;
+pub mod tone_mapping;
