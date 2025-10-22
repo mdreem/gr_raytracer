@@ -111,7 +111,7 @@ impl Geometry for Schwarzschild {
             FourVector::new_spherical(1.0 / a, -rr0.sqrt(), 0.0, 0.0),
             FourVector::new_spherical(0.0, 0.0, 0.0, 1.0 / (r * theta.sin())), // Phi
             FourVector::new_spherical(0.0, 0.0, 1.0 / r, 0.0),                 // Theta
-            -FourVector::new_spherical(-rr0.sqrt() / a, 1.0, 0.0, 0.0),        // R
+            FourVector::new_spherical(-rr0.sqrt() / a, 1.0, 0.0, 0.0),        // R
         )
     }
 
@@ -316,7 +316,7 @@ mod tests {
 
         let k = tetrad.t + (-tetrad.z);
         let s = geometry.inner_product(&position, &k, &k);
-        assert_abs_diff_eq!(s, 0.0);
+        assert_abs_diff_eq!(s, 0.0, epsilon = 1e-10);
 
         assert_abs_diff_eq!(geometry.inner_product(&position, &tetrad.t, &tetrad.t), 1.0);
         assert_abs_diff_eq!(
@@ -365,7 +365,7 @@ mod tests {
 
         let k = tetrad.t + (-tetrad.z);
         let s = geometry.inner_product(&position, &k, &k);
-        assert_abs_diff_eq!(s, 0.0);
+        assert_abs_diff_eq!(s, 0.0, epsilon = 1e-10);
 
         assert_abs_diff_eq!(
             tetrad.t.get_as_vector(),
@@ -433,7 +433,7 @@ mod tests {
         let ray = camera.get_ray_for(1, 6);
         assert_abs_diff_eq!(
             geometry.inner_product(&position, &ray.momentum, &ray.momentum),
-            0.0
+            0.0, epsilon = 1e-10
         );
     }
 

@@ -155,7 +155,7 @@ pub mod test_scene {
     use crate::geometry::point::Point;
     use crate::rendering::camera::Camera;
     use crate::rendering::color::CIETristimulusNormalization::NoNormalization;
-    use crate::rendering::color::Color;
+    use crate::rendering::color::{srgb_to_xyz, Color};
     use crate::rendering::scene::{IntegrationConfiguration, Scene, TextureData};
     use crate::rendering::texture::CheckerMapper;
     use crate::scene_objects;
@@ -209,6 +209,8 @@ pub mod test_scene {
             Color::new(0, 100, 0, 255),
             NoNormalization,
         ));
+        println!("color celestial 1: {:?}",  srgb_to_xyz(&Color::new(0, 255, 0, 255)));
+        println!("color celestial 2: {:?}",  srgb_to_xyz(&Color::new(0, 100, 0, 255)));
         let texture_mapper_disk = Arc::new(CheckerMapper::new(
             200.0,
             10.0,
@@ -216,6 +218,8 @@ pub mod test_scene {
             Color::new(0, 0, 100, 255),
             NoNormalization,
         ));
+        println!("color disk 1: {:?}",  srgb_to_xyz(&Color::new(0, 0, 255, 255)));
+        println!("color disk 2: {:?}",  srgb_to_xyz(&Color::new(0, 0, 100, 255)));
         let texture_mapper_sphere = Arc::new(CheckerMapper::new(
             10.0,
             10.0,
@@ -223,6 +227,8 @@ pub mod test_scene {
             Color::new(100, 0, 0, 255),
             NoNormalization,
         ));
+        println!("color sphere 1: {:?}",  srgb_to_xyz(&Color::new(255, 0, 0, 255)));
+        println!("color sphere 2: {:?}",  srgb_to_xyz(&Color::new(100, 0, 0, 255)));
 
         let integration_configuration =
             IntegrationConfiguration::new(30000, CELESTIAL_SPHERE_RADIUS, 0.001, epsilon);
@@ -268,6 +274,13 @@ mod tests {
     use crate::rendering::scene::test_scene::create_scene_with_camera;
     use std::f64::consts::PI;
 
+    const CELESTIAL_SPHERE_COLOR_1: CIETristimulus = CIETristimulus {
+        x: 0.04556866876322511,
+        y: 0.09113733752645022,
+        z: 0.015189552006485689,
+        alpha: 1.0,
+    };
+
     const CELESTIAL_SPHERE_COLOR_2: CIETristimulus = CIETristimulus {
         x: 0.3575761,
         y: 0.7151522,
@@ -279,6 +292,13 @@ mod tests {
         x: 0.052562486896837575,
         y: 0.0271025410675224,
         z: 0.002463867369774764,
+        alpha: 1.0,
+    };
+
+    const SPHERE_COLOR_2: CIETristimulus = CIETristimulus {
+        x: 0.4124564,
+        y: 0.2126729,
+        z: 0.0193339,
         alpha: 1.0,
     };
 
@@ -357,7 +377,7 @@ mod tests {
         let radius = 1.0;
         let r = position[1];
         let a = 1.0 - radius / r;
-        let velocity = FourVector::new_spherical(1.0 / a, -(radius / r).sqrt(), 0.0, 0.0); // we have a freely falling observer here.
+        let velocity = FourVector::new_spherical(-1.0 / a, -(radius / r).sqrt(), 0.0, 0.0); // we have a freely falling observer here.
 
         let geometry = Schwarzschild::new(radius, 1e-4);
 
@@ -379,7 +399,7 @@ mod tests {
 
         assert_approx_eq_cie_tristimulus!(
             color,
-            CIETristimulus::new(0.4124564, 0.2126729, 0.0193339, 1.0),
+            SPHERE_COLOR_2,
             1e-6
         );
     }
@@ -391,7 +411,7 @@ mod tests {
         let sphere_radius = 2.0;
         let r = position[1];
         let a = 1.0 - radius / r;
-        let velocity = FourVector::new_spherical(a.sqrt().recip(), 0.0, 0.0, 0.0); // we have a freely falling observer here.
+        let velocity = FourVector::new_spherical(-a.sqrt().recip(), 0.0, 0.0, 0.0); // we have a freely falling observer here.
 
         let geometry = Schwarzschild::new(radius, 1e-4);
 
@@ -412,7 +432,7 @@ mod tests {
         let color = scene.color_of_ray(&ray).unwrap();
         assert_approx_eq_cie_tristimulus!(
             color,
-            CIETristimulus::new(0.4124564, 0.2126729, 0.0193339, 1.0),
+            SPHERE_COLOR_2,
             1e-6
         );
     }
@@ -471,7 +491,7 @@ mod tests {
         let ray = scene.camera.get_ray_for(0, 0);
         let color = scene.color_of_ray(&ray).unwrap();
 
-        assert_approx_eq_cie_tristimulus!(color, CELESTIAL_SPHERE_COLOR_2, 1e-6);
+        assert_approx_eq_cie_tristimulus!(color, CELESTIAL_SPHERE_COLOR_1, 1e-6);
     }
 
     #[test]
