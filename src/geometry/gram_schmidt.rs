@@ -102,8 +102,8 @@ mod tests {
         let point_in_spherical = cartesian_to_spherical(&position);
         println!("{:?}", point_in_spherical);
         let r = point_in_spherical.vector[1];
-        let theta = point_in_spherical.vector[2];
-        let phi = point_in_spherical.vector[3];
+        let _theta = point_in_spherical.vector[2];
+        let _phi = point_in_spherical.vector[3];
 
         let a = 1.0 - r_s / r;
 
@@ -159,7 +159,7 @@ mod tests {
         println!("{:?}", point_in_spherical);
         let r = point_in_spherical.vector[1];
         let theta = point_in_spherical.vector[2];
-        let phi = point_in_spherical.vector[3];
+        let _phi = point_in_spherical.vector[3];
 
         let a = 1.0 - r_s / r;
 
@@ -185,7 +185,7 @@ mod tests {
         );
         println!("{:?}", orthonormal_vectors);
 
-        let geometry = EuclideanSpace::new();
+        let _geometry = EuclideanSpace::new();
 
         assert_eq!(orthonormal_vectors[0], e_t_expected);
         assert_eq!(orthonormal_vectors[1], e_1_expected);

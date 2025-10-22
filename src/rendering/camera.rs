@@ -180,8 +180,7 @@ mod tests {
     use crate::geometry::euclidean::EuclideanSpace;
     use crate::geometry::euclidean_spherical::EuclideanSpaceSpherical;
     use crate::geometry::four_vector::FourVector;
-    use crate::geometry::geometry::{Geometry, InnerProduct};
-    use crate::geometry::kerr::Kerr;
+    use crate::geometry::geometry::InnerProduct;
     use crate::geometry::point::{CoordinateSystem, Point};
     use crate::geometry::schwarzschild::Schwarzschild;
     use crate::geometry::spherical_coordinates_helper::{
