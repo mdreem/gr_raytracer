@@ -1,6 +1,5 @@
 use crate::geometry::point::{CoordinateSystem, Point};
 use log::trace;
-use nalgebra::RealField;
 
 // The order of the components is: (r, theta, phi)
 pub fn cartesian_to_spherical(cartesian: &Point) -> Point {

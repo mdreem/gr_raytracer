@@ -18,7 +18,6 @@ pub struct Schwarzschild {
 
 struct SchwarzschildSolver {
     radius: f64,
-    horizon_epsilon: f64,
 }
 
 impl Schwarzschild {
@@ -179,7 +178,6 @@ impl Geometry for Schwarzschild {
     fn get_geodesic_solver(&self, _ray: &Ray) -> Box<dyn GeodesicSolver> {
         Box::new(SchwarzschildSolver {
             radius: self.radius,
-            horizon_epsilon: self.horizon_epsilon,
         })
     }
 }
@@ -654,7 +652,7 @@ mod tests {
             l / (r * r),
         );
 
-        let ray = Ray::new(0, 0, 1000, 1000, position, momentum);
+        let ray = Ray::new(0, 0, position, momentum);
         assert_abs_diff_eq!(
             geometry.inner_product(&position, &ray.momentum, &ray.momentum),
             0.0,

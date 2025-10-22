@@ -58,7 +58,7 @@ pub fn render_kerr_ray(
     let raytracer = raytracer::Raytracer::new(scene, config.color_normalization);
     let (integrated_ray, stop_reason) = raytracer.integrate_ray_at_point(row, col)?;
     info!("Stop reason: {:?}", stop_reason);
-    integrated_ray.save(write, &geometry)?;
+    integrated_ray.save(write)?;
     Ok(())
 }
 
@@ -101,7 +101,7 @@ pub fn render_kerr_ray_at(
         position, momentum, m_s
     );
 
-    let ray = Ray::new(0, 0, opts.width, opts.height, position, momentum);
+    let ray = Ray::new(0, 0, position, momentum);
 
     let integration_configuration = IntegrationConfiguration::new(
         opts.max_steps,
@@ -113,7 +113,7 @@ pub fn render_kerr_ray_at(
 
     let (integrated_ray, stop_reason) = integrator.integrate(&ray)?;
     info!("Stop reason: {:?}", stop_reason);
-    integrated_ray.save(write, &geometry)?;
+    integrated_ray.save(write)?;
     Ok(())
 }
 

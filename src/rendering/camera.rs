@@ -171,14 +171,7 @@ impl Camera {
         let direction = self.get_direction_for(row, column);
         trace!("direction ({}|{}): {:?}", row, column, direction);
         let momentum = direction + self.tetrad.t; // Add T-component of the tetrad to get the momentum.
-        Ray::new(
-            row,
-            column,
-            self.rows,
-            self.columns,
-            self.position,
-            momentum,
-        )
+        Ray::new(row, column, self.position, momentum)
     }
 }
 

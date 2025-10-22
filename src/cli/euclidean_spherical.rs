@@ -39,6 +39,6 @@ pub fn render_euclidean_spherical_ray(
     let raytracer = raytracer::Raytracer::new(scene, config.color_normalization);
     let (integrated_ray, stop_reason) = raytracer.integrate_ray_at_point(row, col)?;
     debug!("Stop reason: {:?}", stop_reason);
-    integrated_ray.save(write, &geometry)?;
+    integrated_ray.save(write)?;
     Ok(())
 }

@@ -19,7 +19,6 @@ pub struct Scene<'a, G: Geometry> {
     pub integrator: Integrator<'a, G>,
     objects: Objects<'a, G>,
     texture_data: TextureData,
-    pub geometry: &'a G,
     pub camera: Camera,
     save_ray_data: bool,
     redshift_computer: RedshiftComputer<'a, G>,
@@ -56,7 +55,6 @@ impl<'a, G: Geometry> Scene<'a, G> {
             integrator,
             objects,
             texture_data,
-            geometry,
             camera,
             save_ray_data,
             redshift_computer: RedshiftComputer::new(geometry),
@@ -76,7 +74,7 @@ impl<'a, G: Geometry> Scene<'a, G> {
         if self.save_ray_data {
             let mut file = File::create(format!("ray-{}-{}.csv", ray.row, ray.col))
                 .expect("Unable to create file");
-            steps.save(&mut file, self.geometry)?;
+            steps.save(&mut file)?;
         }
 
         let velocity = self.camera.velocity;
@@ -88,8 +86,7 @@ impl<'a, G: Geometry> Scene<'a, G> {
             let step = &step_window[1];
 
             if let Some(intersection_color) =
-                self.objects
-                    .intersects(last_step, step, observer_energy, &self.redshift_computer)
+                self.objects.intersects(last_step, step, observer_energy)
             {
                 intersections.push(intersection_color);
             }
