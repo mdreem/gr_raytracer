@@ -3,6 +3,8 @@ use crate::rendering::color::{CIETristimulus, CIETristimulusNormalization, Color
 use crate::rendering::raytracer::RaytracerError;
 use crate::rendering::texture::TextureError::DecodeError;
 use image::{DynamicImage, GenericImageView, ImageReader};
+use nalgebra::Vector2;
+use std::ops::{Add, Mul};
 use std::sync::Arc;
 
 #[derive(Debug)]
@@ -48,20 +50,42 @@ impl TextureMapper {
             color_normalization,
         })
     }
+
+    /// https://en.wikipedia.org/wiki/Bilinear_interpolation
+    fn bilinear(&self, uv: &UVCoordinates) -> CIETristimulus {
+        let (width, height) = self.image.dimensions();
+        let p_x = (width as f64) * uv.u;
+        let p_y = (height as f64) * uv.v;
+
+        // c01 ------- c11
+        //  |           |
+        //  |           |
+        // c00 ------- c10
+        let p_x_floor = (p_x.floor() as u32).min(width - 1);
+        let p_y_floor = (p_y.floor() as u32).min(height - 1);
+        let p_x_ceil = (p_x.ceil() as u32).min(width - 1);
+        let p_y_ceil = (p_y.ceil() as u32).min(height - 1);
+
+        let c00 = CIETristimulus::from_rgba(&self.image.get_pixel(p_x_floor, p_y_floor));
+        let c01 = CIETristimulus::from_rgba(&self.image.get_pixel(p_x_floor, p_y_ceil));
+        let c11 = CIETristimulus::from_rgba(&self.image.get_pixel(p_x_ceil, p_y_ceil));
+        let c10 = CIETristimulus::from_rgba(&self.image.get_pixel(p_x_ceil, p_y_floor));
+
+        let dx = p_x - (p_x_floor as f64);
+        let dy = p_y - (p_y_floor as f64);
+
+        let w00 = (1.0 - dx) * (1.0 - dy);
+        let w01 = (1.0 - dx) * dy;
+        let w10 = dx * (1.0 - dy);
+        let w11 = dx * dy;
+
+        w00 * c00 + w10 * c10 + w01 * c01 + w11 * c11
+    }
 }
 
 impl TextureMap for TextureMapper {
     fn color_at_uv(&self, uv: UVCoordinates, _redshift: f64) -> CIETristimulus {
-        let (width, height) = self.image.dimensions();
-        // If mapping uv to width-1 and height-1 there are distortions horizontally across the
-        // center. Maybe because in spherical coordinates u,v < 1.0, i.e. they're not inclusive.
-        // Doing it this way seems to stabilize it.
-        let pixel = self.image.get_pixel(
-            (((width as f64) * uv.u) as u32).min(width - 1),
-            (((height as f64) * uv.v) as u32).min(height - 1),
-        );
-        let mut cie_tristimulus = srgb_to_xyz(&Color::new(pixel[0], pixel[1], pixel[2], pixel[3]));
-        cie_tristimulus.alpha = pixel[3] as f64 / 255.0;
+        let cie_tristimulus = self.bilinear(&uv);
         cie_tristimulus.normalize(self.color_normalization)
     }
 }

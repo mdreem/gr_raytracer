@@ -1,5 +1,7 @@
+use image::Rgba;
 use nalgebra::{Matrix3, Vector3};
 use serde::{Deserialize, Serialize};
+use std::ops::{Add, Mul};
 
 #[derive(Debug, PartialEq, Copy, Clone)]
 pub struct Color {
@@ -25,6 +27,15 @@ pub struct CIETristimulus {
 }
 
 impl CIETristimulus {
+    pub fn from_rgba(rgba: &Rgba<u8>) -> CIETristimulus {
+        CIETristimulus::from_color(&Color::from_rgba(rgba))
+    }
+
+    pub fn from_color(color: &Color) -> CIETristimulus {
+        let mut cie_tristimulus = srgb_to_xyz(color);
+        cie_tristimulus.alpha = color.alpha as f64 / 255.0;
+        cie_tristimulus
+    }
     pub fn new(x: f64, y: f64, z: f64, alpha: f64) -> CIETristimulus {
         CIETristimulus { x, y, z, alpha }
     }
@@ -98,7 +109,42 @@ impl CIETristimulus {
     }
 }
 
+impl Mul<CIETristimulus> for f64 {
+    type Output = CIETristimulus;
+
+    fn mul(self, rhs: CIETristimulus) -> Self::Output {
+        CIETristimulus {
+            x: self * rhs.x,
+            y: self * rhs.y,
+            z: self * rhs.z,
+            alpha: rhs.alpha,
+        }
+    }
+}
+
+impl Add for CIETristimulus {
+    type Output = CIETristimulus;
+
+    /// Component-wise addition. Used for bilinear interpolation.
+    fn add(self, rhs: Self) -> Self::Output {
+        CIETristimulus {
+            x: self.x + rhs.x,
+            y: self.y + rhs.y,
+            z: self.z + rhs.z,
+            alpha: self.alpha + rhs.alpha,
+        }
+    }
+}
+
 impl Color {
+    pub fn from_rgba(color: &Rgba<u8>) -> Color {
+        Color {
+            r: color[0],
+            g: color[1],
+            b: color[2],
+            alpha: color[3],
+        }
+    }
     pub fn new(r: u8, g: u8, b: u8, alpha: u8) -> Color {
         Color { r, g, b, alpha }
     }
