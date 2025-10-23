@@ -90,7 +90,7 @@ impl Hittable for Sphere {
             let v = theta / PI;
 
             return Some(Intersection {
-                uv: UVCoordinates { u, v: 1.0 - v },
+                uv: UVCoordinates { u: 1.0 - u, v },
                 intersection_point: point_on_sphere,
             });
         }

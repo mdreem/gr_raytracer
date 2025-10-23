@@ -3,8 +3,6 @@ use crate::rendering::color::{CIETristimulus, CIETristimulusNormalization, Color
 use crate::rendering::raytracer::RaytracerError;
 use crate::rendering::texture::TextureError::DecodeError;
 use image::{DynamicImage, GenericImageView, ImageReader};
-use nalgebra::Vector2;
-use std::ops::{Add, Mul};
 use std::sync::Arc;
 
 #[derive(Debug)]
