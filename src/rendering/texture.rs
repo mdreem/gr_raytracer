@@ -187,3 +187,90 @@ impl TextureMapperFactory {
             ))
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use crate::rendering::color::CIETristimulus;
+    use crate::rendering::texture::{TextureMap, TextureMapper};
+
+    fn get_red() -> CIETristimulus {
+        CIETristimulus::from_rgba(&image::Rgba([255, 0, 0, 255]))
+    }
+
+    fn get_blue() -> CIETristimulus {
+        CIETristimulus::from_rgba(&image::Rgba([0, 0, 255, 255]))
+    }
+
+    fn create_texture_mapper() -> TextureMapper {
+        let image_buffer = image::ImageBuffer::from_fn(2, 2, |x, y| {
+            if (x + y) % 2 == 0 {
+                image::Rgba([255, 0, 0, 128])
+            } else {
+                image::Rgba([0, 0, 255, 128])
+            }
+        });
+
+        let dynamic_image = image::DynamicImage::ImageRgba8(image_buffer);
+        let texture_mapper = TextureMapper {
+            image: dynamic_image,
+            color_normalization: super::CIETristimulusNormalization::NoNormalization,
+        };
+        texture_mapper
+    }
+
+    #[test]
+    fn test_texture_mapper_top_left_corner() {
+        let texture_mapper = create_texture_mapper();
+        let uv = super::UVCoordinates { u: 0.0, v: 0.0 };
+        let color = texture_mapper.color_at_uv(uv, 1.0);
+        assert_eq!(color.x, get_red().x);
+        assert_eq!(color.y, get_red().y);
+        assert_eq!(color.z, get_red().z);
+        assert_eq!(color.alpha, 128.0 / 255.0);
+    }
+
+    #[test]
+    fn test_texture_mapper_bottom_right_corner() {
+        let texture_mapper = create_texture_mapper();
+        let uv = super::UVCoordinates { u: 0.999, v: 0.999 };
+        let color = texture_mapper.color_at_uv(uv, 1.0);
+        assert_eq!(color.x, get_red().x);
+        assert_eq!(color.y, get_red().y);
+        assert_eq!(color.z, get_red().z);
+        assert_eq!(color.alpha, 128.0 / 255.0);
+    }
+
+    #[test]
+    fn test_texture_mapper_bottom_left_corner() {
+        let texture_mapper = create_texture_mapper();
+        let uv = super::UVCoordinates { u: 0.0, v: 0.999 };
+        let color = texture_mapper.color_at_uv(uv, 1.0);
+        assert_eq!(color.x, get_blue().x);
+        assert_eq!(color.y, get_blue().y);
+        assert_eq!(color.z, get_blue().z);
+        assert_eq!(color.alpha, 128.0 / 255.0);
+    }
+
+    #[test]
+    fn test_texture_mapper_top_right_corner() {
+        let texture_mapper = create_texture_mapper();
+        let uv = super::UVCoordinates { u: 0.999, v: 0.0 };
+        let color = texture_mapper.color_at_uv(uv, 1.0);
+
+        assert_eq!(color.x, get_blue().x);
+        assert_eq!(color.y, get_blue().y);
+        assert_eq!(color.z, get_blue().z);
+        assert_eq!(color.alpha, 128.0 / 255.0);
+    }
+
+    #[test]
+    fn test_texture_mapper_almost_top_left_corner() {
+        let texture_mapper = create_texture_mapper();
+        let uv = super::UVCoordinates { u: 0.25, v: 0.25 };
+        let color = texture_mapper.color_at_uv(uv, 1.0);
+        assert_eq!(color.x, (get_red().x + get_blue().x) / 2.0);
+        assert_eq!(color.y, (get_red().y + get_blue().y) / 2.0);
+        assert_eq!(color.z, (get_red().z + get_blue().z) / 2.0);
+        assert_eq!(color.alpha, 128.0 / 255.0);
+    }
+}
