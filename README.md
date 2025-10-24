@@ -47,7 +47,7 @@ CSV files in the directory `rays/`.
 ## Plot of a Schwarzschild black hole with a accretion disk
 
 Plot of the Schwarzschild solution with a accretion disk using a checkerboard texture to visualize the relations.
-![alt text](./images/render_checker_texture.png "Black Hole with accretion disk")
+![alt text](./images/render_schwarzschild_checker_texture.png "Black Hole with accretion disk")
 
 ## Video of rays in a Schwarzschild metric
 
@@ -74,7 +74,7 @@ The background is: https://commons.wikimedia.org/wiki/File:Messier_object_025.jp
 The parameters are
 
 ```sh
-gr_raytracer --width=500 --height=500 --max-steps=1000000 --camera-position=-10,0,0.5 --theta=1.57 --psi=1.57 --phi=0 --config-file kerr.toml render
+gr_raytracer --width=500 --height=500 --max-steps=1000000 --camera-position=-10,0,-0.5 --theta=1.52 --psi=-1.57 --phi=0 --config-file kerr.toml render
 ```
 
 Note the large number of max-steps required to get a good image, due to the complex light paths around a Kerr black

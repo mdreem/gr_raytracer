@@ -8,7 +8,7 @@ def create_checkerboard(rows, cols, square_size, colors, texts, output_file):
     img = Image.new("RGB", (width, height), "white")
     draw = ImageDraw.Draw(img)
 
-    font = ImageFont.truetype("Arial.ttf", 35)
+    font = ImageFont.truetype("Arial.ttf", 80)
 
     for row in range(rows):
         for col in range(cols):
@@ -32,7 +32,7 @@ def create_checkerboard(rows, cols, square_size, colors, texts, output_file):
 
 rows = 8
 cols = 8
-square_size = 1024 // 8
+square_size = 2048 // 8
 texts = [[f"{chr(65 + row)}{col + 1}" for col in range(cols)] for row in range(rows)]
 
 output_file = "celestial.png"
