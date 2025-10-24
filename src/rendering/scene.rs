@@ -153,10 +153,7 @@ impl<'a, G: Geometry> Scene<'a, G> {
 
         let u = (PI + phi) / (2.0 * PI);
         let v = theta / PI;
-        UVCoordinates {
-            u: 1.0 - u,
-            v: 1.0 - v,
-        }
+        UVCoordinates { u: 1.0 - u, v }
     }
 }
 
@@ -319,7 +316,7 @@ mod tests {
         alpha: 1.0,
     };
 
-    const SPHERE_COLOR_1: CIETristimulus = CIETristimulus {
+    const _SPHERE_COLOR_1: CIETristimulus = CIETristimulus {
         x: 0.052562486896837575,
         y: 0.0271025410675224,
         z: 0.002463867369774764,
@@ -362,7 +359,7 @@ mod tests {
         let ray = scene.camera.get_ray_for(5, 5);
         let color = scene.color_of_ray(&ray).unwrap();
 
-        assert_approx_eq_cie_tristimulus!(color, SPHERE_COLOR_1, 1e-6);
+        assert_approx_eq_cie_tristimulus!(color, SPHERE_COLOR_2, 1e-6);
     }
 
     #[test]
@@ -485,7 +482,7 @@ mod tests {
         let ray = scene.camera.get_ray_for(0, 0);
         let color = scene.color_of_ray(&ray).unwrap();
 
-        assert_approx_eq_cie_tristimulus!(color, CELESTIAL_SPHERE_COLOR_2, 1e-6);
+        assert_approx_eq_cie_tristimulus!(color, CELESTIAL_SPHERE_COLOR_1, 1e-6);
     }
 
     #[test]
@@ -520,7 +517,7 @@ mod tests {
         let ray = scene.camera.get_ray_for(0, 0);
         let color = scene.color_of_ray(&ray).unwrap();
 
-        assert_approx_eq_cie_tristimulus!(color, CELESTIAL_SPHERE_COLOR_1, 1e-6);
+        assert_approx_eq_cie_tristimulus!(color, CELESTIAL_SPHERE_COLOR_2, 1e-6);
     }
 
     #[test]

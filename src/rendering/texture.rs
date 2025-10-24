@@ -48,20 +48,42 @@ impl TextureMapper {
             color_normalization,
         })
     }
+
+    /// https://en.wikipedia.org/wiki/Bilinear_interpolation
+    fn bilinear(&self, uv: &UVCoordinates) -> CIETristimulus {
+        let (width, height) = self.image.dimensions();
+        let p_x = (width as f64) * uv.u;
+        let p_y = (height as f64) * uv.v;
+
+        // c01 ------- c11
+        //  |           |
+        //  |           |
+        // c00 ------- c10
+        let p_x_floor = (p_x.floor() as u32).min(width - 1);
+        let p_y_floor = (p_y.floor() as u32).min(height - 1);
+        let p_x_ceil = (p_x.ceil() as u32).min(width - 1);
+        let p_y_ceil = (p_y.ceil() as u32).min(height - 1);
+
+        let c00 = CIETristimulus::from_rgba(&self.image.get_pixel(p_x_floor, p_y_floor));
+        let c01 = CIETristimulus::from_rgba(&self.image.get_pixel(p_x_floor, p_y_ceil));
+        let c11 = CIETristimulus::from_rgba(&self.image.get_pixel(p_x_ceil, p_y_ceil));
+        let c10 = CIETristimulus::from_rgba(&self.image.get_pixel(p_x_ceil, p_y_floor));
+
+        let dx = p_x - (p_x_floor as f64);
+        let dy = p_y - (p_y_floor as f64);
+
+        let w00 = (1.0 - dx) * (1.0 - dy);
+        let w01 = (1.0 - dx) * dy;
+        let w10 = dx * (1.0 - dy);
+        let w11 = dx * dy;
+
+        w00 * c00 + w10 * c10 + w01 * c01 + w11 * c11
+    }
 }
 
 impl TextureMap for TextureMapper {
     fn color_at_uv(&self, uv: UVCoordinates, _redshift: f64) -> CIETristimulus {
-        let (width, height) = self.image.dimensions();
-        // If mapping uv to width-1 and height-1 there are distortions horizontally across the
-        // center. Maybe because in spherical coordinates u,v < 1.0, i.e. they're not inclusive.
-        // Doing it this way seems to stabilize it.
-        let pixel = self.image.get_pixel(
-            (((width as f64) * uv.u) as u32).min(width - 1),
-            (((height as f64) * uv.v) as u32).min(height - 1),
-        );
-        let mut cie_tristimulus = srgb_to_xyz(&Color::new(pixel[0], pixel[1], pixel[2], pixel[3]));
-        cie_tristimulus.alpha = pixel[3] as f64 / 255.0;
+        let cie_tristimulus = self.bilinear(&uv);
         cie_tristimulus.normalize(self.color_normalization)
     }
 }
@@ -163,5 +185,92 @@ impl TextureMapperFactory {
             .ok_or(RaytracerError::TextureError(
                 TextureError::TextureFileError(filename.clone()),
             ))
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use crate::rendering::color::CIETristimulus;
+    use crate::rendering::texture::{TextureMap, TextureMapper};
+
+    fn get_red() -> CIETristimulus {
+        CIETristimulus::from_rgba(&image::Rgba([255, 0, 0, 255]))
+    }
+
+    fn get_blue() -> CIETristimulus {
+        CIETristimulus::from_rgba(&image::Rgba([0, 0, 255, 255]))
+    }
+
+    fn create_texture_mapper() -> TextureMapper {
+        let image_buffer = image::ImageBuffer::from_fn(2, 2, |x, y| {
+            if (x + y) % 2 == 0 {
+                image::Rgba([255, 0, 0, 128])
+            } else {
+                image::Rgba([0, 0, 255, 128])
+            }
+        });
+
+        let dynamic_image = image::DynamicImage::ImageRgba8(image_buffer);
+        let texture_mapper = TextureMapper {
+            image: dynamic_image,
+            color_normalization: super::CIETristimulusNormalization::NoNormalization,
+        };
+        texture_mapper
+    }
+
+    #[test]
+    fn test_texture_mapper_top_left_corner() {
+        let texture_mapper = create_texture_mapper();
+        let uv = super::UVCoordinates { u: 0.0, v: 0.0 };
+        let color = texture_mapper.color_at_uv(uv, 1.0);
+        assert_eq!(color.x, get_red().x);
+        assert_eq!(color.y, get_red().y);
+        assert_eq!(color.z, get_red().z);
+        assert_eq!(color.alpha, 128.0 / 255.0);
+    }
+
+    #[test]
+    fn test_texture_mapper_bottom_right_corner() {
+        let texture_mapper = create_texture_mapper();
+        let uv = super::UVCoordinates { u: 0.999, v: 0.999 };
+        let color = texture_mapper.color_at_uv(uv, 1.0);
+        assert_eq!(color.x, get_red().x);
+        assert_eq!(color.y, get_red().y);
+        assert_eq!(color.z, get_red().z);
+        assert_eq!(color.alpha, 128.0 / 255.0);
+    }
+
+    #[test]
+    fn test_texture_mapper_bottom_left_corner() {
+        let texture_mapper = create_texture_mapper();
+        let uv = super::UVCoordinates { u: 0.0, v: 0.999 };
+        let color = texture_mapper.color_at_uv(uv, 1.0);
+        assert_eq!(color.x, get_blue().x);
+        assert_eq!(color.y, get_blue().y);
+        assert_eq!(color.z, get_blue().z);
+        assert_eq!(color.alpha, 128.0 / 255.0);
+    }
+
+    #[test]
+    fn test_texture_mapper_top_right_corner() {
+        let texture_mapper = create_texture_mapper();
+        let uv = super::UVCoordinates { u: 0.999, v: 0.0 };
+        let color = texture_mapper.color_at_uv(uv, 1.0);
+
+        assert_eq!(color.x, get_blue().x);
+        assert_eq!(color.y, get_blue().y);
+        assert_eq!(color.z, get_blue().z);
+        assert_eq!(color.alpha, 128.0 / 255.0);
+    }
+
+    #[test]
+    fn test_texture_mapper_almost_top_left_corner() {
+        let texture_mapper = create_texture_mapper();
+        let uv = super::UVCoordinates { u: 0.25, v: 0.25 };
+        let color = texture_mapper.color_at_uv(uv, 1.0);
+        assert_eq!(color.x, (get_red().x + get_blue().x) / 2.0);
+        assert_eq!(color.y, (get_red().y + get_blue().y) / 2.0);
+        assert_eq!(color.z, (get_red().z + get_blue().z) / 2.0);
+        assert_eq!(color.alpha, 128.0 / 255.0);
     }
 }
