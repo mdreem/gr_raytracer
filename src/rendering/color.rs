@@ -117,7 +117,7 @@ impl Mul<CIETristimulus> for f64 {
             x: self * rhs.x,
             y: self * rhs.y,
             z: self * rhs.z,
-            alpha: rhs.alpha,
+            alpha: self * rhs.alpha,
         }
     }
 }
