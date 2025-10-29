@@ -7,7 +7,7 @@ edition = "2024"
 nalgebra = "0.34.1"
 image = "0.25.5"
 rayon = "1.10.0"
-clap = { version = "4.5.50", features = ["derive"] }
+clap = { version = "4.5.51", features = ["derive"] }
 toml = "0.9.8"
 serde = { version = "1.0.228", features = ["derive"] }
 indicatif = "0.18.2"
