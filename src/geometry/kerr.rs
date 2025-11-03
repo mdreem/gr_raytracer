@@ -14,8 +14,8 @@ use nalgebra::{Const, Matrix4, OVector, Vector3, Vector4};
 
 #[derive(Clone, Debug)]
 pub struct Kerr {
-    radius: f64,
-    a: f64,
+    pub radius: f64,
+    pub a: f64,
     horizon_epsilon: f64,
 }
 
