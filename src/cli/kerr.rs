@@ -95,10 +95,15 @@ pub fn render_kerr_ray_at(
     let tetrad = geometry.get_tetrad_at(&position);
     info!("Tetrad at position {:?}: {}", position, tetrad);
 
+    let space_part = tetrad.x * direction[1] + tetrad.y * direction[2] + tetrad.z * direction[3];
+    let norm_space_part = geometry
+        .inner_product(&position, &space_part, &space_part)
+        .sqrt();
+
     let momentum = tetrad.t * 1.0
-        + tetrad.x * direction[1]
-        + tetrad.y * direction[2]
-        + tetrad.z * direction[3];
+        + tetrad.x * direction[1] / norm_space_part
+        + tetrad.y * direction[2] / norm_space_part
+        + tetrad.z * direction[3] / norm_space_part;
 
     let m_s = geometry.inner_product(&position, &momentum, &momentum);
 
@@ -120,6 +125,19 @@ pub fn render_kerr_ray_at(
     let (integrated_ray, stop_reason) = integrator.integrate(&ray)?;
     info!("Stop reason: {:?}", stop_reason);
     integrated_ray.save(write)?;
+
+    let final_step_position = integrated_ray.steps.last().unwrap().x;
+    let final_step_momentum = integrated_ray.steps.last().unwrap().p;
+    let final_m_s = geometry.inner_product(
+        &final_step_position,
+        &final_step_momentum,
+        &final_step_momentum,
+    );
+    info!(
+        "Final step momentum at position {:?}: {:?} with m_s={}",
+        final_step_position, final_step_momentum, final_m_s
+    );
+
     Ok(())
 }
 
