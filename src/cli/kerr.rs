@@ -5,7 +5,7 @@ use crate::geometry::four_vector::FourVector;
 use crate::geometry::geometry::{Geometry, InnerProduct};
 use crate::geometry::kerr::Kerr;
 use crate::geometry::point::Point;
-use crate::rendering::integrator::{IntegrationConfiguration, Integrator};
+use crate::rendering::integrator::{IntegrationConfiguration, IntegrationError, Integrator};
 use crate::rendering::ray::Ray;
 use crate::rendering::raytracer;
 use crate::rendering::raytracer::RaytracerError;
@@ -126,8 +126,14 @@ pub fn render_kerr_ray_at(
     info!("Stop reason: {:?}", stop_reason);
     integrated_ray.save(write)?;
 
-    let final_step_position = integrated_ray.steps.last().unwrap().x;
-    let final_step_momentum = integrated_ray.steps.last().unwrap().p;
+    let (final_step_position, final_step_momentum) = match integrated_ray.steps.last() {
+        Some(step) => (step.x, step.p),
+        None => {
+            return Err(RaytracerError::IntegrationError(
+                IntegrationError::NoStepsProduced,
+            ));
+        }
+    };
     let final_m_s = geometry.inner_product(
         &final_step_position,
         &final_step_momentum,

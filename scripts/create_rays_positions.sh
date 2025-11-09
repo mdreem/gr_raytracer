@@ -40,7 +40,7 @@ run_schwarzschild() {
   local pos_z
   pos_z=$(echo "$i - $shift_parameter" | bc -l)
   formatted=$(printf "%07.2f" "$i")
-  $command --width 401 --height 401 --max-radius=13 --max-steps=1000000 --theta=0.0 --psi=1.57 --phi=1.57 --config-file schwarzschild.toml render-ray-at --position=-5,0,"${pos_z}" --direction=1.0,0.0,0.0 --filename "rays/ray-${formatted}.csv" &> /tmp/create_rays_log
+  $command --width 401 --height 401 --max-radius=13 --max-steps=1000000 --theta=0.0 --psi=1.57 --phi=1.57 --config-file schwarzschild.toml render-ray-at --position=-5,0,"${pos_z}" --direction=-1.0,0.0,0.0 --filename "rays/ray-${formatted}.csv" &> /tmp/create_rays_log
 }
 
 mkdir -p rays

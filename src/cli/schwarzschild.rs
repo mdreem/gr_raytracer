@@ -1,7 +1,6 @@
 use crate::cli::cli::GlobalOpts;
 use crate::cli::shared::{create_scene, render};
 use crate::configuration::RenderConfig;
-use crate::geometry::euclidean_spherical::EuclideanSpaceSpherical;
 use crate::geometry::four_vector::FourVector;
 use crate::geometry::geometry::{Geometry, InnerProduct};
 use crate::geometry::point::Point;
@@ -10,8 +9,32 @@ use crate::geometry::spherical_coordinates_helper::cartesian_to_spherical;
 use crate::rendering::integrator::{IntegrationConfiguration, Integrator};
 use crate::rendering::ray::Ray;
 use crate::rendering::raytracer;
+use crate::rendering::raytracer::RaytracerError;
+use crate::rendering::scene::Scene;
 use log::{debug, info};
 use std::io::Write;
+
+fn create_schwarzschild_scene<'a>(
+    geometry: &'a Schwarzschild,
+    radius: f64,
+    opts: GlobalOpts,
+    config: &RenderConfig,
+    camera_position: Point,
+) -> Result<Scene<'a, Schwarzschild>, RaytracerError> {
+    let camera_position = cartesian_to_spherical(&camera_position);
+
+    let r = camera_position[1];
+    let a = 1.0 - radius / r;
+    let momentum = FourVector::new_spherical(-1.0 / a.sqrt(), 0.0, 0.0, 0.0);
+    debug!("momentum: {:?}", momentum);
+
+    debug!(
+        "m_s: {}",
+        geometry.inner_product(&camera_position, &momentum, &momentum)
+    );
+    let scene = create_scene(geometry, camera_position, momentum, opts, config.clone())?;
+    Ok(scene)
+}
 
 pub fn render_schwarzschild(
     radius: f64,
@@ -20,21 +43,10 @@ pub fn render_schwarzschild(
     config: RenderConfig,
     camera_position: Point,
     filename: String,
-) -> Result<(), raytracer::RaytracerError> {
-    let camera_position = cartesian_to_spherical(&camera_position);
-
-    let r = camera_position[1];
-    let a = 1.0 - radius / r;
-    let momentum = FourVector::new_spherical(-1.0 / a.sqrt(), 0.0, 0.0, 0.0);
-    debug!("momentum: {:?}", momentum);
-
+) -> Result<(), RaytracerError> {
     let geometry = Schwarzschild::new(radius, horizon_epsilon);
-    debug!(
-        "m_s: {}",
-        geometry.inner_product(&camera_position, &momentum, &momentum)
-    );
 
-    let scene = create_scene(&geometry, camera_position, momentum, opts, config.clone())?;
+    let scene = create_schwarzschild_scene(&geometry, radius, opts, &config, camera_position)?;
 
     render(scene, filename, config.color_normalization)
 }
@@ -48,14 +60,11 @@ pub fn render_schwarzschild_ray(
     config: RenderConfig,
     camera_position: Point,
     write: &mut dyn Write,
-) -> Result<(), raytracer::RaytracerError> {
-    let camera_position = cartesian_to_spherical(&camera_position);
-    let r = camera_position[1];
-    let a = 1.0 - radius / r;
-    let momentum = FourVector::new_spherical(-1.0 / a.sqrt(), 0.0, 0.0, 0.0);
+) -> Result<(), RaytracerError> {
     let geometry = Schwarzschild::new(radius, horizon_epsilon);
 
-    let scene = create_scene(&geometry, camera_position, momentum, opts, config.clone())?;
+    let scene = create_schwarzschild_scene(&geometry, radius, opts, &config, camera_position)?;
+
     let raytracer = raytracer::Raytracer::new(scene, config.color_normalization);
     let (integrated_ray, stop_reason) = raytracer.integrate_ray_at_point(row, col)?;
     info!("Stop reason: {:?}", stop_reason);
@@ -70,7 +79,7 @@ pub fn render_schwarzschild_ray_at(
     direction: FourVector,
     opts: GlobalOpts,
     write: &mut dyn Write,
-) -> Result<(), raytracer::RaytracerError> {
+) -> Result<(), RaytracerError> {
     let position_spherical = cartesian_to_spherical(&position);
     let _r = position_spherical[1];
     let theta = position_spherical[2];
@@ -83,10 +92,9 @@ pub fn render_schwarzschild_ray_at(
         - theta.sin() * direction[3];
     let phi_d = -phi.sin() * direction[1] + phi.cos() * direction[2];
 
-    let bare_spherical = EuclideanSpaceSpherical::new(); // TODO: Use Schwarzschild here.
     let geometry = Schwarzschild::new(radius, horizon_epsilon);
 
-    let tetrad = bare_spherical.get_tetrad_at(&position_spherical);
+    let tetrad = geometry.get_tetrad_at(&position_spherical);
     info!("Tetrad at position {:?}: {}", position_spherical, tetrad);
 
     let momentum = tetrad.t * 1.0 + tetrad.x * (phi_d) + tetrad.y * (-theta_d) + tetrad.z * (-r_d);
