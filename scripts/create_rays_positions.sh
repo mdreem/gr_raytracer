@@ -1,6 +1,6 @@
 #!/bin/bash
 
-set -euo pipefail
+set -euo pipefail -x
 
 geometry=${1:-}
 if [ -z "$geometry" ]; then
@@ -21,18 +21,26 @@ esac
 
 shift || true
 
-command=${1:-"cargo run --release --"}
+shift_parameter=${1:-0}
+
+command=${2:-"cargo run --release --"}
 
 run_kerr() {
+  local i="$1"
   local formatted
   formatted=$(printf "%07.2f" "$i")
-  $command --width 401 --height 401 --max-radius=13 --max-steps=1000000 --theta=1.57 --psi=1.57 --phi=0 --config-file kerr.toml render-ray-at --position=-5,0,${i} --direction=1.0,0.0,0.0 --filename "rays/ray-${formatted}.csv" &> /tmp/create_rays_log
+  local pos_z
+  pos_z=$(echo "$i - $shift_parameter" | bc -l)
+  $command --width 401 --height 401 --max-radius=13 --max-steps=1000000 --theta=1.57 --psi=1.57 --phi=0 --config-file kerr.toml render-ray-at --position=-5,0,"${pos_z}" --direction=1.0,0.0,0.0 --filename "rays/ray-${formatted}.csv" &> /tmp/create_rays_log
 }
 
 run_schwarzschild() {
+  local i="$1"
   local formatted
+  local pos_z
+  pos_z=$(echo "$i - $shift_parameter" | bc -l)
   formatted=$(printf "%07.2f" "$i")
-  $command --width 401 --height 401 --max-radius=13 --max-steps=1000000 --theta=0.0 --psi=1.57 --phi=1.57 --config-file schwarzschild.toml render-ray-at --position=-5,0,${i} --direction=1.0,0.0,0.0 --filename "rays/ray-${formatted}.csv" &> /tmp/create_rays_log
+  $command --width 401 --height 401 --max-radius=13 --max-steps=1000000 --theta=0.0 --psi=1.57 --phi=1.57 --config-file schwarzschild.toml render-ray-at --position=-5,0,"${pos_z}" --direction=1.0,0.0,0.0 --filename "rays/ray-${formatted}.csv" &> /tmp/create_rays_log
 }
 
 mkdir -p rays
@@ -40,10 +48,10 @@ for i in $(seq 0 0.1 10); do
   echo "Creating ray $i"
   case "$geometry" in
     schwarzschild)
-      run_schwarzschild
+      run_schwarzschild "$i"
       ;;
     kerr)
-      run_kerr
+      run_kerr "$i"
       ;;
   esac
 done
