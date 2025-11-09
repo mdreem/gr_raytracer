@@ -8,6 +8,10 @@ import numpy as np
 NUM_STEPS = 200
 RUN_TIME = 0.4
 
+X_AXIS_IN_CSV = "z"
+Y_AXIS_IN_CSV = "x"
+
+
 @dataclasses.dataclass
 class Interpolators:
     global_t_points: np.ndarray
@@ -65,7 +69,7 @@ class AnimateRays(Scene):
             path = TracedPath(dot.get_center, stroke_color=color, stroke_width=2)
 
             # Set initial position
-            dot.move_to([df.iloc[0]["y"], df.iloc[0]["z"], 0])
+            dot.move_to([df.iloc[0][X_AXIS_IN_CSV], df.iloc[0][Y_AXIS_IN_CSV], 0])
 
             dots.append(dot)
             paths.append(path)
@@ -125,17 +129,17 @@ class AnimateRays(Scene):
             t_points = df["t"].values
             x_interp = interp1d(
                 t_points,
-                df["y"].values,
+                df[X_AXIS_IN_CSV].values,
                 kind="linear",
                 bounds_error=False,
-                fill_value=df["y"].values[-1],
+                fill_value=df[X_AXIS_IN_CSV].values[-1],
             )
             y_interp = interp1d(
                 t_points,
-                df["z"].values,
+                df[Y_AXIS_IN_CSV].values,
                 kind="linear",
                 bounds_error=False,
-                fill_value=df["z"].values[-1],
+                fill_value=df[Y_AXIS_IN_CSV].values[-1],
             )
             interpolators.append(
                 Interpolators(
