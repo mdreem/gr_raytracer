@@ -8,8 +8,8 @@ import numpy as np
 NUM_STEPS = 200
 RUN_TIME = 0.4
 
-X_AXIS_IN_CSV = "x"
-Y_AXIS_IN_CSV = "z"
+X_AXIS_IN_CSV = "z"
+Y_AXIS_IN_CSV = "x"
 
 
 @dataclasses.dataclass
