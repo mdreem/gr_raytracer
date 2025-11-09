@@ -69,6 +69,7 @@ impl IntegrationConfiguration {
 #[derive(Debug)]
 pub enum IntegrationError {
     MaxStepsReached,
+    NoStepsProduced,
 }
 
 impl<G: Geometry> Integrator<'_, G> {

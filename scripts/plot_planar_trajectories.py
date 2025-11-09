@@ -27,7 +27,7 @@ def read_trajectories(file_paths):
                 )  # Store with filename for labeling
             elif "x" in df.columns and "y" in df.columns:
                 x = df["x"].values
-                y = df["y"].values
+                y = df["z"].values
 
                 # Store Cartesian coordinates directly
                 trajectories.append((x, y, os.path.basename(file_path)))

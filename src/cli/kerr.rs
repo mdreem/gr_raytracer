@@ -5,11 +5,45 @@ use crate::geometry::four_vector::FourVector;
 use crate::geometry::geometry::{Geometry, InnerProduct};
 use crate::geometry::kerr::Kerr;
 use crate::geometry::point::Point;
-use crate::rendering::integrator::{IntegrationConfiguration, Integrator};
+use crate::rendering::integrator::{IntegrationConfiguration, IntegrationError, Integrator};
 use crate::rendering::ray::Ray;
 use crate::rendering::raytracer;
-use log::{debug, info, trace};
+use crate::rendering::raytracer::RaytracerError;
+use crate::rendering::scene::Scene;
+use log::{info, trace};
 use std::io::Write;
+
+fn compute_f(geometry: &Kerr, camera_position: Point) -> f64 {
+    let a = geometry.a;
+    let radius = geometry.radius;
+    let x = camera_position[1];
+    let y = camera_position[2];
+    let z = camera_position[3];
+    let rho_sqr = x * x + y * y + z * z;
+    let term = ((rho_sqr - a * a).powi(2) + 4.0 * a * a * z * z).sqrt();
+    let r_sqr = 0.5 * (rho_sqr - a * a + term);
+    let r = r_sqr.sqrt();
+    let f = (r * r * r * radius) / (r * r * r * r + a * a * z * z);
+    trace!("f: {}", f);
+    f
+}
+
+fn create_kerr_scene<'a>(
+    geometry: &'a Kerr,
+    opts: GlobalOpts,
+    config: &'a RenderConfig,
+    camera_position: Point,
+) -> Result<Scene<'a, Kerr>, RaytracerError> {
+    let f = compute_f(geometry, camera_position);
+    let momentum = FourVector::new_cartesian(1.0 / (1.0 - f).sqrt(), 0.0, 0.0, 0.0);
+    let m_s = geometry.inner_product(&camera_position, &momentum, &momentum);
+    info!(
+        "Momentum at position {:?}: {:?} with m_s={}",
+        camera_position, momentum, m_s
+    );
+    let scene = create_scene(geometry, camera_position, momentum, opts, config.clone())?;
+    Ok(scene)
+}
 
 pub fn render_kerr(
     radius: f64,
@@ -19,18 +53,9 @@ pub fn render_kerr(
     config: RenderConfig,
     camera_position: Point,
     filename: String,
-) -> Result<(), raytracer::RaytracerError> {
-    let f = compute_f(radius, a, camera_position);
-    println!("f: {}", f);
-    let momentum = FourVector::new_cartesian(1.0 / (1.0 - f).sqrt(), 0.0, 0.0, 0.0);
-    debug!("momentum: {:?}", momentum);
-
+) -> Result<(), RaytracerError> {
     let geometry = Kerr::new(radius, a, horizon_epsilon);
-    debug!(
-        "m_s: {}",
-        geometry.inner_product(&camera_position, &momentum, &momentum)
-    );
-    let scene = create_scene(&geometry, camera_position, momentum, opts, config.clone())?;
+    let scene = create_kerr_scene(&geometry, opts, &config, camera_position)?;
 
     render(scene, filename, config.color_normalization)
 }
@@ -45,34 +70,15 @@ pub fn render_kerr_ray(
     config: RenderConfig,
     camera_position: Point,
     write: &mut dyn Write,
-) -> Result<(), raytracer::RaytracerError> {
-    let f = compute_f(radius, a, camera_position);
-    let momentum = FourVector::new_cartesian(1.0 / (1.0 - f).sqrt(), 0.0, 0.0, 0.0);
+) -> Result<(), RaytracerError> {
     let geometry = Kerr::new(radius, a, horizon_epsilon);
-    debug!(
-        "m_s: {}",
-        geometry.inner_product(&camera_position, &momentum, &momentum)
-    );
+    let scene = create_kerr_scene(&geometry, opts, &config, camera_position)?;
 
-    let scene = create_scene(&geometry, camera_position, momentum, opts, config.clone())?;
     let raytracer = raytracer::Raytracer::new(scene, config.color_normalization);
     let (integrated_ray, stop_reason) = raytracer.integrate_ray_at_point(row, col)?;
     info!("Stop reason: {:?}", stop_reason);
     integrated_ray.save(write)?;
     Ok(())
-}
-
-fn compute_f(radius: f64, a: f64, camera_position: Point) -> f64 {
-    let x = camera_position[1];
-    let y = camera_position[2];
-    let z = camera_position[3];
-    let rho_sqr = x * x + y * y + z * z;
-    let term = ((rho_sqr - a * a).powi(2) + 4.0 * a * a * z * z).sqrt();
-    let r_sqr = 0.5 * (rho_sqr - a * a + term);
-    let r = r_sqr.sqrt();
-    let f = (r * r * r * radius) / (r * r * r * r + a * a * z * z);
-    trace!("f: {}", f);
-    f
 }
 
 pub fn render_kerr_ray_at(
@@ -83,16 +89,21 @@ pub fn render_kerr_ray_at(
     direction: FourVector,
     opts: GlobalOpts,
     write: &mut dyn Write,
-) -> Result<(), raytracer::RaytracerError> {
+) -> Result<(), RaytracerError> {
     let geometry = Kerr::new(radius, a, horizon_epsilon);
 
     let tetrad = geometry.get_tetrad_at(&position);
     info!("Tetrad at position {:?}: {}", position, tetrad);
 
+    let space_part = tetrad.x * direction[1] + tetrad.y * direction[2] + tetrad.z * direction[3];
+    let norm_space_part = geometry
+        .inner_product(&position, &space_part, &space_part)
+        .sqrt();
+
     let momentum = tetrad.t * 1.0
-        + tetrad.x * direction[1]
-        + tetrad.y * direction[2]
-        + tetrad.z * direction[3];
+        + tetrad.x * direction[1] / norm_space_part
+        + tetrad.y * direction[2] / norm_space_part
+        + tetrad.z * direction[3] / norm_space_part;
 
     let m_s = geometry.inner_product(&position, &momentum, &momentum);
 
@@ -114,6 +125,25 @@ pub fn render_kerr_ray_at(
     let (integrated_ray, stop_reason) = integrator.integrate(&ray)?;
     info!("Stop reason: {:?}", stop_reason);
     integrated_ray.save(write)?;
+
+    let (final_step_position, final_step_momentum) = match integrated_ray.steps.last() {
+        Some(step) => (step.x, step.p),
+        None => {
+            return Err(RaytracerError::IntegrationError(
+                IntegrationError::NoStepsProduced,
+            ));
+        }
+    };
+    let final_m_s = geometry.inner_product(
+        &final_step_position,
+        &final_step_momentum,
+        &final_step_momentum,
+    );
+    info!(
+        "Final step momentum at position {:?}: {:?} with m_s={}",
+        final_step_position, final_step_momentum, final_m_s
+    );
+
     Ok(())
 }
 
