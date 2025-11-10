@@ -27,6 +27,7 @@ pub enum GeometryType {
 #[derive(Deserialize, Serialize, Debug, PartialEq, Clone)]
 pub enum TextureConfig {
     Bitmap {
+        beaming_exponent: f64,
         path: String,
         color_normalization: CIETristimulusNormalization,
     },
