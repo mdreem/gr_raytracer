@@ -119,9 +119,14 @@ fn get_texture_mapper(
 ) -> Result<TextureMapHandle, RaytracerError> {
     let texture_mapper_sphere = match texture {
         TextureConfig::Bitmap {
+            beaming_exponent,
             path,
             color_normalization,
-        } => texture_mapper_factory.get_texture_mapper(path, color_normalization)?,
+        } => texture_mapper_factory.get_texture_mapper(
+            beaming_exponent,
+            path,
+            color_normalization,
+        )?,
         TextureConfig::Checker {
             width,
             height,
