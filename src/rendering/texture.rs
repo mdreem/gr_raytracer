@@ -27,12 +27,14 @@ pub trait TextureMap: Sync {
 
 #[derive(Clone)]
 pub struct TextureMapper {
+    beaming_exponent: f64,
     image: DynamicImage,
     color_normalization: CIETristimulusNormalization,
 }
 
 impl TextureMapper {
     pub fn new(
+        beaming_exponent: f64,
         filename: String,
         color_normalization: CIETristimulusNormalization,
     ) -> Result<TextureMapper, RaytracerError> {
@@ -44,6 +46,7 @@ impl TextureMapper {
             .map_err(RaytracerError::TextureError)?;
 
         Ok(TextureMapper {
+            beaming_exponent,
             image,
             color_normalization,
         })
@@ -82,9 +85,16 @@ impl TextureMapper {
 }
 
 impl TextureMap for TextureMapper {
-    fn color_at_uv(&self, uv: UVCoordinates, _redshift: f64) -> CIETristimulus {
+    fn color_at_uv(&self, uv: UVCoordinates, redshift: f64) -> CIETristimulus {
+        let beaming_factor = redshift.powf(self.beaming_exponent);
         let cie_tristimulus = self.bilinear(&uv);
-        cie_tristimulus.normalize(self.color_normalization)
+        let cie_tristimulus_beamed = CIETristimulus {
+            x: cie_tristimulus.x * beaming_factor,
+            y: cie_tristimulus.y * beaming_factor,
+            z: cie_tristimulus.z * beaming_factor,
+            alpha: cie_tristimulus.alpha,
+        };
+        cie_tristimulus_beamed.normalize(self.color_normalization)
     }
 }
 
@@ -170,11 +180,13 @@ impl TextureMapperFactory {
 
     pub fn get_texture_mapper(
         &mut self,
+        beaming_exponent: f64,
         filename: String,
         color_normalization: CIETristimulusNormalization,
     ) -> Result<TextureMapHandle, RaytracerError> {
         if self.texture_map_map.get(&filename).is_none() {
-            let new_mapper = TextureMapper::new(filename.clone(), color_normalization)?;
+            let new_mapper =
+                TextureMapper::new(beaming_exponent, filename.clone(), color_normalization)?;
             self.texture_map_map
                 .insert(filename.clone(), Arc::new(new_mapper));
         }

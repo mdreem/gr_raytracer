@@ -1,7 +1,8 @@
 color_normalization = "NoNormalization"
 
 [celestial_texture.Bitmap]
-path = "resources/celestial.png"
+beaming_exponent = 3.0
+path = "resources/Messier_object_025.jpg"
 color_normalization = "NoNormalization"
 
 [geometry_type.Schwarzschild]
@@ -11,11 +12,12 @@ horizon_epsilon = 1e-4
 [[objects]]
 
 [objects.Disc]
-inner_radius = 3.0
+inner_radius = 1.5
 outer_radius = 5.0
 
 [objects.Disc.texture.Bitmap]
-path = "resources/disk.png"
+beaming_exponent = 3.0
+path = "resources/orange.png"
 color_normalization = "NoNormalization"
 
 [[objects]]
@@ -25,5 +27,6 @@ radius = 2.0
 position = [0.0, 0.0, 20.0]
 
 [objects.Sphere.texture.Bitmap]
-path = "resources/sphere.png"
+beaming_exponent = 3.0
+path = "resources/orange.png"
 color_normalization = "NoNormalization"
