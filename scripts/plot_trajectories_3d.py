@@ -1,6 +1,7 @@
 import argparse
 import pandas as pd
 import matplotlib.pyplot as plt
+import numpy as np
 
 def set_axes_equal(ax, xs, ys, zs):
     xr = xs.max() - xs.min()
@@ -23,27 +24,36 @@ def main():
     fig = plt.figure()
     ax = fig.add_subplot(111, projection='3d')
 
-    # Lists to compute global axis bounds
     all_x, all_y, all_z = [], [], []
+
+    u = np.linspace(0, 2*np.pi, 50)
+    v = np.linspace(0, np.pi, 50)
+    r = 1.0
+    xs = r * np.outer(np.cos(u), np.sin(v))
+    ys = r * np.outer(np.sin(u), np.sin(v))
+    zs = r * np.outer(np.ones_like(u), np.cos(v))
+
+    ax.plot_surface(xs, ys, zs, alpha=0.3, linewidth=0, rstride=1, cstride=1)
 
     for path in args.csv:
         df = pd.read_csv(path)[['x', 'y', 'z']].dropna()
 
-        x, y, z = df['x'].values, df['y'].values, df['z'].values
+        x = df['x'].values
+        y = df['y'].values
+        z = df['z'].values
 
-        ax.plot(x, y, z, linewidth=1.5, label=f"{path}")
-        ax.scatter(x[0], y[0], z[0], s=30)        # start
-        ax.scatter(x[-1], y[-1], z[-1], s=30)    # end
+        ax.plot(x, y, z, linewidth=1.5, label=path)
+        ax.scatter(x[0], y[0], z[0], s=30)
+        ax.scatter(x[-1], y[-1], z[-1], s=30)
 
         all_x.append(x)
         all_y.append(y)
         all_z.append(z)
 
-    # Compute global axis bounds
-    import numpy as np
     all_x = np.concatenate(all_x)
     all_y = np.concatenate(all_y)
     all_z = np.concatenate(all_z)
+
     set_axes_equal(ax, all_x, all_y, all_z)
 
     ax.set_xlabel('x')
