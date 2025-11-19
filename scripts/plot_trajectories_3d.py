@@ -1,7 +1,7 @@
 import argparse
 import pandas as pd
 import matplotlib.pyplot as plt
-from mpl_toolkits.mplot3d import Axes3D
+import numpy as np
 
 def set_axes_equal(ax, xs, ys, zs):
     xr = xs.max() - xs.min()
@@ -16,20 +16,50 @@ def set_axes_equal(ax, xs, ys, zs):
     ax.set_zlim(zm - m/2, zm + m/2)
 
 def main():
-    p = argparse.ArgumentParser(description="Plot a 3D trajectory from a CSV with x,y,z columns.")
-    p.add_argument("csv", help="Path to CSV file")
+    p = argparse.ArgumentParser(description="Plot multiple 3D trajectories from CSVs with x,y,z columns.")
+    p.add_argument("csv", nargs="+", help="Path(s) to CSV file(s)")
     p.add_argument("--save", default=None, help="Optional path to save the figure (e.g., plot.png)")
     args = p.parse_args()
 
-    df = pd.read_csv(args.csv)[['x', 'y', 'z']].dropna()
-
     fig = plt.figure()
     ax = fig.add_subplot(111, projection='3d')
-    ax.plot(df['x'].values, df['y'].values, df['z'].values, linewidth=1.5)
-    ax.scatter(df['x'].iloc[0], df['y'].iloc[0], df['z'].iloc[0], s=30, label='start')
-    ax.scatter(df['x'].iloc[-1], df['y'].iloc[-1], df['z'].iloc[-1], s=30, label='end')
-    ax.set_xlabel('x'); ax.set_ylabel('y'); ax.set_zlabel('z'); ax.legend()
-    set_axes_equal(ax, df['x'].values, df['y'].values, df['z'].values)
+
+    all_x, all_y, all_z = [], [], []
+
+    u = np.linspace(0, 2*np.pi, 50)
+    v = np.linspace(0, np.pi, 50)
+    r = 1.0
+    xs = r * np.outer(np.cos(u), np.sin(v))
+    ys = r * np.outer(np.sin(u), np.sin(v))
+    zs = r * np.outer(np.ones_like(u), np.cos(v))
+
+    ax.plot_surface(xs, ys, zs, alpha=0.3, linewidth=0, rstride=1, cstride=1)
+
+    for path in args.csv:
+        df = pd.read_csv(path)[['x', 'y', 'z']].dropna()
+
+        x = df['x'].values
+        y = df['y'].values
+        z = df['z'].values
+
+        ax.plot(x, y, z, linewidth=1.5, label=path)
+        ax.scatter(x[0], y[0], z[0], s=30)
+        ax.scatter(x[-1], y[-1], z[-1], s=30)
+
+        all_x.append(x)
+        all_y.append(y)
+        all_z.append(z)
+
+    all_x = np.concatenate(all_x)
+    all_y = np.concatenate(all_y)
+    all_z = np.concatenate(all_z)
+
+    set_axes_equal(ax, all_x, all_y, all_z)
+
+    ax.set_xlabel('x')
+    ax.set_ylabel('y')
+    ax.set_zlabel('z')
+    ax.legend()
     plt.tight_layout()
 
     if args.save:
