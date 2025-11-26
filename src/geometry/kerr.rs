@@ -87,6 +87,42 @@ impl Kerr {
             horizon_epsilon,
         }
     }
+
+    fn jacobian_spherical_to_cartesian(&self, position: &Point) -> Matrix4<f64> {
+        let spherical = position.get_as_spherical();
+
+        let r = spherical[0];
+        let theta = spherical[1];
+        let phi = spherical[2];
+
+        let (st, ct) = (theta.sin(), theta.cos());
+        let (sp, cp) = (phi.sin(), phi.cos());
+
+        let data = vec![
+            // row 0: t = t
+            1.0,
+            0.0,
+            0.0,
+            0.0,
+            // row 1: x(r,θ,φ)
+            0.0,
+            st * cp,
+            r * ct * cp,
+            -r * st * sp,
+            // row 2: y(r,θ,φ)
+            0.0,
+            st * sp,
+            r * ct * sp,
+            r * st * cp,
+            // row 3: z(r,θ,φ)
+            0.0,
+            ct,
+            -r * st,
+            0.0,
+        ];
+
+        Matrix4::from_row_slice(&data)
+    }
 }
 
 impl OdeFunction<Const<8>> for KerrSolver {
@@ -345,9 +381,26 @@ impl Geometry for Kerr {
         FourVector::new_cartesian((1.0 - f).sqrt().recip(), 0.0, 0.0, 0.0)
     }
 
-    fn get_circular_orbit_velocity_at(&self, _position: &Point) -> FourVector {
-        FourVector::new_cartesian(1.0, 0.0, 0.0, 0.0)
-        // TODO: implement proper circular orbit velocity for Kerr.
+    fn get_circular_orbit_velocity_at(&self, position: &Point) -> FourVector {
+        let position_spherical = position.get_as_spherical();
+        let r = position_spherical[0];
+        let r0 = self.radius;
+        let omega = -(r0 / (2.0 * r * r * r)).sqrt();
+
+        let ut = (1.0 - r0 / r - r * r * omega * omega).recip().sqrt();
+        let uphi = omega * ut;
+
+        let velocity_spherical = FourVector::new_spherical(ut, 0.0, 0.0, uphi);
+
+        let jacobian = self.jacobian_spherical_to_cartesian(position);
+        let velocity_cartesian = jacobian * velocity_spherical.vector;
+
+        FourVector::new_cartesian(
+            velocity_cartesian[0],
+            velocity_cartesian[1],
+            velocity_cartesian[2],
+            velocity_cartesian[3],
+        )
     }
 
     fn inside_horizon(&self, position: &Point) -> bool {
