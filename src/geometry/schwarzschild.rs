@@ -188,7 +188,7 @@ impl Geometry for Schwarzschild {
         let ut = (1.0 - r0 / r - r * r * omega * omega).recip().sqrt();
         let uphi = omega * ut;
 
-        FourVector::new_cartesian(ut, 0.0, 0.0, uphi)
+        FourVector::new_spherical(ut, 0.0, 0.0, uphi)
     }
 
     fn inside_horizon(&self, position: &Point) -> bool {

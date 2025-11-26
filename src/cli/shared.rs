@@ -128,12 +128,14 @@ fn get_texture_mapper(
             color_normalization,
         )?,
         TextureConfig::Checker {
+            beaming_exponent,
             width,
             height,
             color1,
             color2,
             color_normalization,
         } => Arc::new(CheckerMapper::new(
+            beaming_exponent,
             width,
             height,
             Color::new(color1.0, color1.1, color1.2, 255),
@@ -141,9 +143,14 @@ fn get_texture_mapper(
             color_normalization,
         )),
         TextureConfig::BlackBody {
+            beaming_exponent,
             temperature,
             color_normalization,
-        } => Arc::new(BlackBodyMapper::new(temperature, color_normalization)),
+        } => Arc::new(BlackBodyMapper::new(
+            beaming_exponent,
+            temperature,
+            color_normalization,
+        )),
     };
     Ok(texture_mapper_sphere)
 }

@@ -32,6 +32,7 @@ pub enum TextureConfig {
         color_normalization: CIETristimulusNormalization,
     },
     Checker {
+        beaming_exponent: f64,
         width: f64,
         height: f64,
         color1: (u8, u8, u8),
@@ -39,6 +40,7 @@ pub enum TextureConfig {
         color_normalization: CIETristimulusNormalization,
     },
     BlackBody {
+        beaming_exponent: f64,
         temperature: f64,
         color_normalization: CIETristimulusNormalization,
     },
