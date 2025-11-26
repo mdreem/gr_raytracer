@@ -179,6 +179,18 @@ impl Geometry for Schwarzschild {
         FourVector::new_spherical(a.sqrt().recip(), 0.0, 0.0, 0.0)
     }
 
+    // This is based on assume stable circular orbits in the equatorial plane.
+    fn get_circular_orbit_velocity_at(&self, position: &Point) -> FourVector {
+        let r = position[1];
+        let r0 = self.radius;
+        let omega = (r0 / (2.0 * r * r * r)).sqrt();
+
+        let ut = (1.0 - r0 / r - r * r * omega * omega).recip().sqrt();
+        let uphi = omega * ut;
+
+        FourVector::new_cartesian(ut, 0.0, 0.0, uphi)
+    }
+
     fn inside_horizon(&self, position: &Point) -> bool {
         position[1] <= self.radius + self.horizon_epsilon
     }

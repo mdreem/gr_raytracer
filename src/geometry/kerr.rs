@@ -345,6 +345,11 @@ impl Geometry for Kerr {
         FourVector::new_cartesian((1.0 - f).sqrt().recip(), 0.0, 0.0, 0.0)
     }
 
+    fn get_circular_orbit_velocity_at(&self, _position: &Point) -> FourVector {
+        FourVector::new_cartesian(1.0, 0.0, 0.0, 0.0)
+        // TODO: implement proper circular orbit velocity for Kerr.
+    }
+
     fn inside_horizon(&self, position: &Point) -> bool {
         if self.a > self.radius {
             return false;
