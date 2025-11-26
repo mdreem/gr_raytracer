@@ -1,6 +1,8 @@
+use crate::geometry::geometry::Geometry;
 use crate::geometry::point::{CoordinateSystem, Point};
 use crate::geometry::spherical_coordinates_helper::cartesian_to_spherical;
 use crate::rendering::color::CIETristimulus;
+use crate::rendering::integrator::Step;
 use crate::rendering::texture::{TextureMapHandle, UVCoordinates};
 use crate::scene_objects::hittable::{Hittable, Intersection};
 use crate::scene_objects::objects::SceneObject;
@@ -100,6 +102,13 @@ impl Hittable for Sphere {
 
     fn color_at_uv(&self, uv: UVCoordinates, redshift: f64) -> CIETristimulus {
         self.texture_mapper.color_at_uv(uv, redshift)
+    }
+
+    fn energy_of_emitter(&self, geometry: &dyn Geometry, step: &Step) -> f64 {
+        let position = step.x;
+        let velocity = geometry.get_stationary_velocity_at(&position);
+        let momentum = step.p;
+        geometry.inner_product(&position, &velocity, &momentum)
     }
 }
 

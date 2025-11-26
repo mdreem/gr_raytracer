@@ -17,6 +17,10 @@ impl<'a, G: Geometry> RedshiftComputer<'a, G> {
         (observer_energy / emitter_energy).abs()
     }
 
+    pub fn compute_redshift_from_energies(&self, emitter_energy: f64, observer_energy: f64) -> f64 {
+        (observer_energy / emitter_energy).abs()
+    }
+
     pub fn get_observer_energy(&self, ray: &Ray, velocity: &FourVector) -> f64 {
         self.geometry
             .inner_product(&ray.position, velocity, &ray.momentum)
