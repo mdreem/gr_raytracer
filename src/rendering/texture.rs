@@ -86,30 +86,27 @@ impl TextureMapper {
 
 impl TextureMap for TextureMapper {
     fn color_at_uv(&self, uv: UVCoordinates, redshift: f64) -> CIETristimulus {
-        let beaming_factor = redshift.powf(self.beaming_exponent);
         let cie_tristimulus = self.bilinear(&uv);
-        let cie_tristimulus_beamed = CIETristimulus {
-            x: cie_tristimulus.x * beaming_factor,
-            y: cie_tristimulus.y * beaming_factor,
-            z: cie_tristimulus.z * beaming_factor,
-            alpha: cie_tristimulus.alpha,
-        };
+        let cie_tristimulus_beamed = cie_tristimulus.apply_beaming(redshift, self.beaming_exponent);
         cie_tristimulus_beamed.normalize(self.color_normalization)
     }
 }
 
 #[derive(Clone)]
 pub struct BlackBodyMapper {
+    beaming_exponent: f64,
     temperature: f64,
     color_normalization: CIETristimulusNormalization,
 }
 
 impl BlackBodyMapper {
     pub fn new(
+        beaming_exponent: f64,
         temperature: f64,
         color_normalization: CIETristimulusNormalization,
     ) -> BlackBodyMapper {
         BlackBodyMapper {
+            beaming_exponent,
             temperature,
             color_normalization,
         }
@@ -119,13 +116,15 @@ impl BlackBodyMapper {
 impl TextureMap for BlackBodyMapper {
     fn color_at_uv(&self, _uv: UVCoordinates, redshift: f64) -> CIETristimulus {
         let c = get_cie_xyz_of_black_body_redshifted(self.temperature * redshift);
-        let r = c.normalize(self.color_normalization);
+        let c_beamed = c.apply_beaming(redshift, self.beaming_exponent);
+        let r = c_beamed.normalize(self.color_normalization);
         r
     }
 }
 
 #[derive(Clone)]
 pub struct CheckerMapper {
+    beaming_exponent: f64,
     width: f64,
     height: f64,
     c1: CIETristimulus,
@@ -136,6 +135,7 @@ pub struct CheckerMapper {
 impl CheckerMapper {
     #[allow(dead_code)] // For testing
     pub fn new(
+        beaming_exponent: f64,
         width: f64,
         height: f64,
         c1: Color,
@@ -143,6 +143,7 @@ impl CheckerMapper {
         color_normalization: CIETristimulusNormalization,
     ) -> CheckerMapper {
         CheckerMapper {
+            beaming_exponent,
             width,
             height,
             c1: srgb_to_xyz(&c1),
@@ -153,14 +154,18 @@ impl CheckerMapper {
 }
 
 impl TextureMap for CheckerMapper {
-    fn color_at_uv(&self, uv: UVCoordinates, _redshift: f64) -> CIETristimulus {
+    fn color_at_uv(&self, uv: UVCoordinates, redshift: f64) -> CIETristimulus {
         let ut = (uv.u * self.width).floor() as usize;
         let vt = (uv.v * self.height).floor() as usize;
 
         if (ut + vt) % 2 == 0 {
-            self.c1.normalize(self.color_normalization)
+            self.c1
+                .apply_beaming(redshift, self.beaming_exponent)
+                .normalize(self.color_normalization)
         } else {
-            self.c2.normalize(self.color_normalization)
+            self.c2
+                .apply_beaming(redshift, self.beaming_exponent)
+                .normalize(self.color_normalization)
         }
     }
 }
