@@ -381,13 +381,20 @@ impl Geometry for Kerr {
         FourVector::new_cartesian((1.0 - f).sqrt().recip(), 0.0, 0.0, 0.0)
     }
 
+    // See https://arxiv.org/abs/1104.5499.
     fn get_circular_orbit_velocity_at(&self, position: &Point) -> FourVector {
-        let position_spherical = position.get_as_spherical();
-        let r = position_spherical[0];
+        let r = compute_r_sqr(self.a, position[1], position[2], position[3]).sqrt();
         let r0 = self.radius;
-        let omega = -(r0 / (2.0 * r * r * r)).sqrt();
+        let a = self.a;
 
-        let ut = (1.0 - r0 / r - r * r * omega * omega).recip().sqrt();
+        let omega_mag =
+            -((2.0 * r0).sqrt() / (2.0 * r.powf(3.0 / 2.0) + 2.0_f64.sqrt() * r0.sqrt() * a));
+        let sgn_a = if a >= 0.0 { 1.0 } else { -1.0 };
+        let omega = sgn_a * omega_mag;
+
+        let ut_pre = -1.0 + r0 / r - 2.0 * a * r0 * omega / r
+            + (r * r + a * a + a * a * r0 / r) * omega * omega;
+        let ut = (-ut_pre).recip().sqrt();
         let uphi = omega * ut;
 
         let velocity_spherical = FourVector::new_spherical(ut, 0.0, 0.0, uphi);
@@ -436,6 +443,7 @@ mod tests {
     use crate::geometry::geometry::{Geometry, InnerProduct};
     use crate::geometry::kerr::Kerr;
     use crate::geometry::point::Point;
+    use crate::geometry::schwarzschild::Schwarzschild;
     use crate::geometry::spherical_coordinates_helper::cartesian_to_spherical;
     use crate::rendering::camera::Camera;
     use crate::rendering::debug::save_rays_to_file;
