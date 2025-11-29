@@ -75,6 +75,7 @@ mod tests {
         Box::new(Sphere::new(
             radius,
             Arc::new(CheckerMapper::new(
+                3.0,
                 5.0,
                 5.0,
                 Color::new(color, color, color, 255),

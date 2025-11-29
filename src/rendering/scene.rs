@@ -213,6 +213,7 @@ pub mod test_scene {
         epsilon: f64,
     ) -> Scene<'_, G> {
         let texture_mapper_celestial = Arc::new(CheckerMapper::new(
+            0.0,
             100.0,
             100.0,
             Color::new(0, 255, 0, 255),
@@ -228,6 +229,7 @@ pub mod test_scene {
             srgb_to_xyz(&Color::new(0, 100, 0, 255))
         );
         let texture_mapper_disk = Arc::new(CheckerMapper::new(
+            0.0,
             200.0,
             10.0,
             Color::new(0, 0, 255, 255),
@@ -243,6 +245,7 @@ pub mod test_scene {
             srgb_to_xyz(&Color::new(0, 0, 100, 255))
         );
         let texture_mapper_sphere = Arc::new(CheckerMapper::new(
+            0.0,
             10.0,
             10.0,
             Color::new(255, 0, 0, 255),
@@ -313,13 +316,6 @@ mod tests {
         x: 0.3575761,
         y: 0.7151522,
         z: 0.119192,
-        alpha: 1.0,
-    };
-
-    const _SPHERE_COLOR_1: CIETristimulus = CIETristimulus {
-        x: 0.052562486896837575,
-        y: 0.0271025410675224,
-        z: 0.002463867369774764,
         alpha: 1.0,
     };
 

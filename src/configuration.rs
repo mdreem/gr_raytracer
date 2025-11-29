@@ -70,6 +70,7 @@ mod tests {
     fn test_serialize() {
         let config = RenderConfig {
             celestial_texture: TextureConfig::Bitmap {
+                beaming_exponent: 3.0,
                 path: String::from("resources/celestial_sphere.png"),
                 color_normalization: NoNormalization,
             },
@@ -83,6 +84,7 @@ mod tests {
                     radius: 1.0,
                     position: (1.1, 2.2, 3.3),
                     texture: TextureConfig::Bitmap {
+                        beaming_exponent: 3.0,
                         path: String::from("resources/sphere.png"),
                         color_normalization: NoNormalization,
                     },
@@ -91,6 +93,7 @@ mod tests {
                     inner_radius: 1.0,
                     outer_radius: 3.0,
                     texture: TextureConfig::Checker {
+                        beaming_exponent: 3.0,
                         width: 0.5,
                         height: 0.5,
                         color1: (255, 0, 0),
@@ -102,6 +105,7 @@ mod tests {
                     radius: 0.5,
                     position: (4.4, 5.5, 6.6),
                     texture: TextureConfig::BlackBody {
+                        beaming_exponent: 3.0,
                         temperature: 6500.0,
                         color_normalization: NoNormalization,
                     },
@@ -120,6 +124,7 @@ mod tests {
             color_normalization = "NoNormalization"
 
             [celestial_texture.Bitmap]
+            beaming_exponent = 3.0
             path = "resources/celestial_sphere.png"
             color_normalization = "NoNormalization"
 
@@ -134,6 +139,7 @@ mod tests {
             position = [1.1, 2.2, 3.3]
 
             [objects.Sphere.texture.Bitmap]
+            beaming_exponent = 3.0
             path = "resources/sphere.png"
             color_normalization = "NoNormalization"
 
@@ -144,6 +150,7 @@ mod tests {
             outer_radius = 3.0
 
             [objects.Disc.texture.Checker]
+            beaming_exponent = 3.0
             width = 0.5
             height = 0.5
             color1 = [255, 0, 0]
@@ -155,6 +162,7 @@ mod tests {
         assert_eq!(
             config.celestial_texture,
             TextureConfig::Bitmap {
+                beaming_exponent: 3.0,
                 path: String::from("resources/celestial_sphere.png"),
                 color_normalization: NoNormalization,
             }
@@ -181,6 +189,7 @@ mod tests {
             assert_eq!(
                 texture,
                 &TextureConfig::Bitmap {
+                    beaming_exponent: 3.0,
                     path: String::from("resources/sphere.png"),
                     color_normalization: NoNormalization,
                 }

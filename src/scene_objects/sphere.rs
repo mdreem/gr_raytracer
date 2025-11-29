@@ -128,6 +128,7 @@ mod tests {
         Sphere::new(
             1.0,
             Arc::new(CheckerMapper::new(
+                3.0,
                 5.0,
                 5.0,
                 Color::new(100, 0, 0, 255),
