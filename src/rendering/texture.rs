@@ -229,6 +229,7 @@ mod tests {
 
         let dynamic_image = image::DynamicImage::ImageRgba8(image_buffer);
         let texture_mapper = TextureMapper {
+            beaming_exponent: 3.0,
             image: dynamic_image,
             color_normalization: super::CIETristimulusNormalization::NoNormalization,
         };
