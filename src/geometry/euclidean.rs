@@ -1,6 +1,6 @@
 use crate::geometry::four_vector::FourVector;
 use crate::geometry::geometry::{
-    GeodesicSolver, Geometry, HasCoordinateSystem, InnerProduct, Signature,
+    GeodesicSolver, Geometry, HasCoordinateSystem, InnerProduct, Signature, SupportQuantities,
 };
 use crate::geometry::point::CoordinateSystem::Cartesian;
 use crate::geometry::point::{CoordinateSystem, Point};
@@ -132,15 +132,6 @@ impl Geometry for EuclideanSpace {
         matrix
     }
 
-    fn get_stationary_velocity_at(&self, _position: &Point) -> FourVector {
-        FourVector::new_cartesian(1.0, 0.0, 0.0, 0.0)
-    }
-
-    fn get_circular_orbit_velocity_at(&self, _position: &Point) -> FourVector {
-        FourVector::new_cartesian(1.0, 0.0, 0.0, 0.0)
-        // TODO: implement proper circular orbit velocity in Euclidean space.
-    }
-
     fn inside_horizon(&self, _position: &Point) -> bool {
         false
     }
@@ -151,6 +142,29 @@ impl Geometry for EuclideanSpace {
 
     fn get_geodesic_solver(&self, _ray: &Ray) -> Box<dyn GeodesicSolver> {
         Box::new(EuclideanSpacedSolver {})
+    }
+}
+
+impl SupportQuantities for EuclideanSpace {
+    fn conserved_energy(&self, _position: &Point, momentum: &FourVector) -> f64 {
+        todo!()
+    }
+
+    fn conserved_angular_momentum(&self, _position: &Point) -> f64 {
+        todo!()
+    }
+
+    fn angular_velocity(&self, _position: &Point) -> f64 {
+        todo!()
+    }
+
+    fn get_stationary_velocity_at(&self, _position: &Point) -> FourVector {
+        FourVector::new_cartesian(1.0, 0.0, 0.0, 0.0)
+    }
+
+    fn get_circular_orbit_velocity_at(&self, _position: &Point) -> FourVector {
+        FourVector::new_cartesian(1.0, 0.0, 0.0, 0.0)
+        // TODO: implement proper circular orbit velocity in Euclidean space.
     }
 }
 

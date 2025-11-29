@@ -1,6 +1,6 @@
 use crate::geometry::four_vector::FourVector;
 use crate::geometry::geometry::{
-    GeodesicSolver, Geometry, HasCoordinateSystem, InnerProduct, Signature,
+    GeodesicSolver, Geometry, HasCoordinateSystem, InnerProduct, Signature, SupportQuantities,
 };
 use crate::geometry::point::CoordinateSystem::Spherical;
 use crate::geometry::point::{CoordinateSystem, Point};
@@ -174,6 +174,34 @@ impl Geometry for Schwarzschild {
         matrix
     }
 
+    fn inside_horizon(&self, position: &Point) -> bool {
+        position[1] <= self.radius + self.horizon_epsilon
+    }
+
+    fn closed_orbit(&self, _position: &Point, _step_index: usize, _max_steps: usize) -> bool {
+        false
+    }
+
+    fn get_geodesic_solver(&self, _ray: &Ray) -> Box<dyn GeodesicSolver> {
+        Box::new(SchwarzschildSolver {
+            radius: self.radius,
+        })
+    }
+}
+
+impl SupportQuantities for Schwarzschild {
+    fn conserved_energy(&self, position: &Point, momentum: &FourVector) -> f64 {
+        todo!()
+    }
+
+    fn conserved_angular_momentum(&self, position: &Point) -> f64 {
+        todo!()
+    }
+
+    fn angular_velocity(&self, position: &Point) -> f64 {
+        todo!()
+    }
+
     fn get_stationary_velocity_at(&self, position: &Point) -> FourVector {
         let a = 1.0 - self.radius / position[1];
         FourVector::new_spherical(a.sqrt().recip(), 0.0, 0.0, 0.0)
@@ -189,20 +217,6 @@ impl Geometry for Schwarzschild {
         let uphi = omega * ut;
 
         FourVector::new_spherical(ut, 0.0, 0.0, uphi)
-    }
-
-    fn inside_horizon(&self, position: &Point) -> bool {
-        position[1] <= self.radius + self.horizon_epsilon
-    }
-
-    fn closed_orbit(&self, _position: &Point, _step_index: usize, _max_steps: usize) -> bool {
-        false
-    }
-
-    fn get_geodesic_solver(&self, _ray: &Ray) -> Box<dyn GeodesicSolver> {
-        Box::new(SchwarzschildSolver {
-            radius: self.radius,
-        })
     }
 }
 

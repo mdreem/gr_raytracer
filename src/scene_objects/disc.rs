@@ -93,9 +93,12 @@ impl Hittable for Disc {
         geometry.inner_product(&position, &velocity, &momentum)
     }
 
-    fn temperature_of_emitter(&self, _geometry: &dyn Geometry, _step: &Step) -> f64 {
+    fn temperature_of_emitter(&self, _geometry: &dyn Geometry, step: &Step) -> f64 {
         // TODO: implement.
-        self.temperature
+        let position = step.x;
+        let r = position.get_as_spherical()[0];
+
+        self.temperature * 0.7 * (1.0 / r).powf(0.75)
     }
 }
 
