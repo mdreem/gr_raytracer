@@ -2,7 +2,7 @@ use crate::geometry::geometry::Geometry;
 use crate::geometry::point::Point;
 use crate::rendering::color::CIETristimulus;
 use crate::rendering::integrator::Step;
-use crate::rendering::texture::{TextureMapHandle, UVCoordinates};
+use crate::rendering::texture::{TemperatureData, TextureMapHandle, UVCoordinates};
 use crate::scene_objects::hittable::{Hittable, Intersection};
 use crate::scene_objects::objects::SceneObject;
 use nalgebra::Vector3;
@@ -11,6 +11,7 @@ pub struct Disc {
     center_disk_inner_radius: f64,
     center_disk_outer_radius: f64,
     texture_mapper: TextureMapHandle,
+    temperature: f64,
 }
 
 impl Disc {
@@ -18,11 +19,13 @@ impl Disc {
         center_disk_inner_radius: f64,
         center_disk_outer_radius: f64,
         texture_mapper: TextureMapHandle,
+        temperature: f64,
     ) -> Self {
         Self {
             center_disk_inner_radius,
             center_disk_outer_radius,
             texture_mapper,
+            temperature,
         }
     }
 }
@@ -79,8 +82,8 @@ impl Hittable for Disc {
         }
     }
 
-    fn color_at_uv(&self, uv: UVCoordinates, redshift: f64) -> CIETristimulus {
-        self.texture_mapper.color_at_uv(uv, redshift)
+    fn color_at_uv(&self, uv: UVCoordinates, temperature_data: TemperatureData) -> CIETristimulus {
+        self.texture_mapper.color_at_uv(uv, temperature_data)
     }
 
     fn energy_of_emitter(&self, geometry: &dyn Geometry, step: &Step) -> f64 {
@@ -88,6 +91,11 @@ impl Hittable for Disc {
         let velocity = geometry.get_circular_orbit_velocity_at(&position);
         let momentum = step.p;
         geometry.inner_product(&position, &velocity, &momentum)
+    }
+
+    fn temperature_of_emitter(&self, _geometry: &dyn Geometry, _step: &Step) -> f64 {
+        // TODO: implement.
+        self.temperature
     }
 }
 

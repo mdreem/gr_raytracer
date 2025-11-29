@@ -2,6 +2,7 @@ use crate::geometry::geometry::Geometry;
 use crate::rendering::color::CIETristimulus;
 use crate::rendering::integrator::Step;
 use crate::rendering::redshift::RedshiftComputer;
+use crate::rendering::texture::TemperatureData;
 use crate::scene_objects::hittable::Hittable;
 
 pub trait SceneObject: Hittable {}
@@ -50,7 +51,15 @@ impl<'a, G: Geometry> Objects<'a, G> {
                     let emitter_energy = hittable.energy_of_emitter(self.geometry, y_start);
                     let redshift = redshift_computer
                         .compute_redshift_from_energies(emitter_energy, observer_energy);
-                    resulting_color = Some(hittable.color_at_uv(intersection_data.uv, redshift));
+                    let temperature = hittable.temperature_of_emitter(self.geometry, y_start);
+
+                    resulting_color = Some(hittable.color_at_uv(
+                        intersection_data.uv,
+                        TemperatureData {
+                            redshift,
+                            temperature,
+                        },
+                    ));
                 }
             }
         }
@@ -83,6 +92,7 @@ mod tests {
                 NoNormalization,
             )),
             Point::new_cartesian(0.0, x, y, z),
+            0.0,
         ))
     }
     #[test]

@@ -8,7 +8,7 @@ use crate::rendering::integrator::{IntegrationConfiguration, Integrator, Step, S
 use crate::rendering::ray::{IntegratedRay, Ray};
 use crate::rendering::raytracer::RaytracerError;
 use crate::rendering::redshift::RedshiftComputer;
-use crate::rendering::texture::{TextureData, UVCoordinates};
+use crate::rendering::texture::{TemperatureData, TextureData, UVCoordinates};
 use crate::scene_objects::objects::Objects;
 use log::error;
 use nalgebra::{Const, OVector};
@@ -23,6 +23,7 @@ pub struct Scene<'a, G: Geometry> {
     pub camera: Camera,
     save_ray_data: bool,
     redshift_computer: RedshiftComputer<'a, G>,
+    celestial_temperature: f64,
 }
 
 pub type EquationOfMotionState = OVector<f64, Const<8>>;
@@ -49,6 +50,7 @@ impl<'a, G: Geometry> Scene<'a, G> {
         geometry: &'a G,
         camera: Camera,
         save_ray_data: bool,
+        celestial_temperature: f64,
     ) -> Scene<'a, G> {
         let integrator = Integrator::new(geometry, integration_configuration);
 
@@ -60,6 +62,7 @@ impl<'a, G: Geometry> Scene<'a, G> {
             camera,
             save_ray_data,
             redshift_computer: RedshiftComputer::new(geometry),
+            celestial_temperature,
         }
     }
 
@@ -115,7 +118,13 @@ impl<'a, G: Geometry> Scene<'a, G> {
                     let redshift = self
                         .redshift_computer
                         .compute_redshift(&last_step, observer_energy);
-                    intersections.push(self.texture_data.celestial_map.color_at_uv(uv, redshift));
+                    intersections.push(self.texture_data.celestial_map.color_at_uv(
+                        uv,
+                        TemperatureData {
+                            redshift,
+                            temperature: self.celestial_temperature,
+                        },
+                    ));
                 }
                 StopReason::CoordinateIsNan => {
                     error!(
@@ -272,11 +281,13 @@ pub mod test_scene {
             center_sphere_radius,
             texture_mapper_sphere,
             Point::new_cartesian(0.0, 0.0, 0.0, 0.0),
+            0.0,
         )));
         objects.add_object(Box::new(scene_objects::disc::Disc::new(
             center_disk_inner_radius,
             center_disk_outer_radius,
             texture_mapper_disk,
+            0.0,
         )));
 
         let scene = Scene::new(
@@ -286,6 +297,7 @@ pub mod test_scene {
             geometry,
             camera,
             false,
+            0.0,
         );
         scene
     }

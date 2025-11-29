@@ -21,8 +21,13 @@ pub struct TextureData {
     pub celestial_map: TextureMapHandle,
 }
 
+pub struct TemperatureData {
+    pub temperature: f64,
+    pub redshift: f64,
+}
+
 pub trait TextureMap: Sync {
-    fn color_at_uv(&self, uv: UVCoordinates, redshift: f64) -> CIETristimulus;
+    fn color_at_uv(&self, uv: UVCoordinates, temperature_data: TemperatureData) -> CIETristimulus;
 }
 
 #[derive(Clone)]
@@ -85,9 +90,10 @@ impl TextureMapper {
 }
 
 impl TextureMap for TextureMapper {
-    fn color_at_uv(&self, uv: UVCoordinates, redshift: f64) -> CIETristimulus {
+    fn color_at_uv(&self, uv: UVCoordinates, temperature_data: TemperatureData) -> CIETristimulus {
         let cie_tristimulus = self.bilinear(&uv);
-        let cie_tristimulus_beamed = cie_tristimulus.apply_beaming(redshift, self.beaming_exponent);
+        let cie_tristimulus_beamed =
+            cie_tristimulus.apply_beaming(temperature_data.redshift, self.beaming_exponent);
         cie_tristimulus_beamed.normalize(self.color_normalization)
     }
 }
@@ -95,28 +101,27 @@ impl TextureMap for TextureMapper {
 #[derive(Clone)]
 pub struct BlackBodyMapper {
     beaming_exponent: f64,
-    temperature: f64,
     color_normalization: CIETristimulusNormalization,
 }
 
 impl BlackBodyMapper {
     pub fn new(
         beaming_exponent: f64,
-        temperature: f64,
         color_normalization: CIETristimulusNormalization,
     ) -> BlackBodyMapper {
         BlackBodyMapper {
             beaming_exponent,
-            temperature,
             color_normalization,
         }
     }
 }
 
 impl TextureMap for BlackBodyMapper {
-    fn color_at_uv(&self, _uv: UVCoordinates, redshift: f64) -> CIETristimulus {
-        let c = get_cie_xyz_of_black_body_redshifted(self.temperature * redshift);
-        let c_beamed = c.apply_beaming(redshift, self.beaming_exponent);
+    fn color_at_uv(&self, _uv: UVCoordinates, temperature_data: TemperatureData) -> CIETristimulus {
+        let c = get_cie_xyz_of_black_body_redshifted(
+            temperature_data.temperature * temperature_data.redshift,
+        );
+        let c_beamed = c.apply_beaming(temperature_data.redshift, self.beaming_exponent);
         let r = c_beamed.normalize(self.color_normalization);
         r
     }
@@ -154,17 +159,17 @@ impl CheckerMapper {
 }
 
 impl TextureMap for CheckerMapper {
-    fn color_at_uv(&self, uv: UVCoordinates, redshift: f64) -> CIETristimulus {
+    fn color_at_uv(&self, uv: UVCoordinates, temperature_data: TemperatureData) -> CIETristimulus {
         let ut = (uv.u * self.width).floor() as usize;
         let vt = (uv.v * self.height).floor() as usize;
 
         if (ut + vt) % 2 == 0 {
             self.c1
-                .apply_beaming(redshift, self.beaming_exponent)
+                .apply_beaming(temperature_data.redshift, self.beaming_exponent)
                 .normalize(self.color_normalization)
         } else {
             self.c2
-                .apply_beaming(redshift, self.beaming_exponent)
+                .apply_beaming(temperature_data.redshift, self.beaming_exponent)
                 .normalize(self.color_normalization)
         }
     }
@@ -208,7 +213,7 @@ impl TextureMapperFactory {
 #[cfg(test)]
 mod tests {
     use crate::rendering::color::CIETristimulus;
-    use crate::rendering::texture::{TextureMap, TextureMapper};
+    use crate::rendering::texture::{TemperatureData, TextureMap, TextureMapper};
 
     fn get_red() -> CIETristimulus {
         CIETristimulus::from_rgba(&image::Rgba([255, 0, 0, 255]))
@@ -240,7 +245,13 @@ mod tests {
     fn test_texture_mapper_top_left_corner() {
         let texture_mapper = create_texture_mapper();
         let uv = super::UVCoordinates { u: 0.0, v: 0.0 };
-        let color = texture_mapper.color_at_uv(uv, 1.0);
+        let color = texture_mapper.color_at_uv(
+            uv,
+            TemperatureData {
+                redshift: 1.0,
+                temperature: 0.0,
+            },
+        );
         assert_eq!(color.x, get_red().x);
         assert_eq!(color.y, get_red().y);
         assert_eq!(color.z, get_red().z);
@@ -251,7 +262,13 @@ mod tests {
     fn test_texture_mapper_bottom_right_corner() {
         let texture_mapper = create_texture_mapper();
         let uv = super::UVCoordinates { u: 0.999, v: 0.999 };
-        let color = texture_mapper.color_at_uv(uv, 1.0);
+        let color = texture_mapper.color_at_uv(
+            uv,
+            TemperatureData {
+                redshift: 1.0,
+                temperature: 0.0,
+            },
+        );
         assert_eq!(color.x, get_red().x);
         assert_eq!(color.y, get_red().y);
         assert_eq!(color.z, get_red().z);
@@ -262,7 +279,13 @@ mod tests {
     fn test_texture_mapper_bottom_left_corner() {
         let texture_mapper = create_texture_mapper();
         let uv = super::UVCoordinates { u: 0.0, v: 0.999 };
-        let color = texture_mapper.color_at_uv(uv, 1.0);
+        let color = texture_mapper.color_at_uv(
+            uv,
+            TemperatureData {
+                redshift: 1.0,
+                temperature: 0.0,
+            },
+        );
         assert_eq!(color.x, get_blue().x);
         assert_eq!(color.y, get_blue().y);
         assert_eq!(color.z, get_blue().z);
@@ -273,7 +296,13 @@ mod tests {
     fn test_texture_mapper_top_right_corner() {
         let texture_mapper = create_texture_mapper();
         let uv = super::UVCoordinates { u: 0.999, v: 0.0 };
-        let color = texture_mapper.color_at_uv(uv, 1.0);
+        let color = texture_mapper.color_at_uv(
+            uv,
+            TemperatureData {
+                redshift: 1.0,
+                temperature: 0.0,
+            },
+        );
 
         assert_eq!(color.x, get_blue().x);
         assert_eq!(color.y, get_blue().y);
@@ -285,7 +314,13 @@ mod tests {
     fn test_texture_mapper_almost_top_left_corner() {
         let texture_mapper = create_texture_mapper();
         let uv = super::UVCoordinates { u: 0.25, v: 0.25 };
-        let color = texture_mapper.color_at_uv(uv, 1.0);
+        let color = texture_mapper.color_at_uv(
+            uv,
+            TemperatureData {
+                redshift: 1.0,
+                temperature: 0.0,
+            },
+        );
         assert_eq!(color.x, (get_red().x + get_blue().x) / 2.0);
         assert_eq!(color.y, (get_red().y + get_blue().y) / 2.0);
         assert_eq!(color.z, (get_red().z + get_blue().z) / 2.0);
