@@ -37,11 +37,19 @@ pub trait Signature {
     fn signature(&self) -> [f64; 4];
 }
 
-pub trait Geometry: InnerProduct + HasCoordinateSystem + Signature + Sync {
-    fn get_tetrad_at(&self, position: &Point) -> Tetrad;
-    fn lorentz_transformation(&self, position: &Point, velocity: &FourVector) -> Matrix4<f64>;
+pub trait SupportQuantities {
+    fn conserved_energy(&self, position: &Point, momentum: &FourVector) -> f64;
+    fn conserved_angular_momentum(&self, position: &Point) -> f64;
+    fn angular_velocity(&self, position: &Point) -> f64;
     fn get_stationary_velocity_at(&self, position: &Point) -> FourVector;
     fn get_circular_orbit_velocity_at(&self, position: &Point) -> FourVector;
+}
+
+pub trait Geometry:
+    InnerProduct + HasCoordinateSystem + Signature + SupportQuantities + Sync
+{
+    fn get_tetrad_at(&self, position: &Point) -> Tetrad;
+    fn lorentz_transformation(&self, position: &Point, velocity: &FourVector) -> Matrix4<f64>;
     fn inside_horizon(&self, position: &Point) -> bool;
     fn closed_orbit(&self, position: &Point, step_index: usize, max_steps: usize) -> bool;
     fn get_geodesic_solver(&self, ray: &Ray) -> Box<dyn GeodesicSolver>;

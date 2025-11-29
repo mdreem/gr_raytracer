@@ -1,6 +1,6 @@
 use crate::geometry::four_vector::FourVector;
 use crate::geometry::geometry::{
-    GeodesicSolver, Geometry, HasCoordinateSystem, InnerProduct, Signature,
+    GeodesicSolver, Geometry, HasCoordinateSystem, InnerProduct, Signature, SupportQuantities,
 };
 use crate::geometry::gram_schmidt::gram_schmidt;
 use crate::geometry::point::CoordinateSystem::Cartesian;
@@ -373,6 +373,46 @@ impl Geometry for Kerr {
         matrix
     }
 
+    fn inside_horizon(&self, position: &Point) -> bool {
+        if self.a > self.radius {
+            return false;
+        }
+        let (x, y, z) = (position[1], position[2], position[3]);
+        let r = compute_r_sqr(self.a, x, y, z).sqrt();
+        let rp = 0.5 * self.radius
+            + ((0.5 * self.radius) * (0.5 * self.radius) - self.a * self.a).sqrt();
+        r <= rp + self.horizon_epsilon
+    }
+
+    fn closed_orbit(&self, position: &Point, step_index: usize, max_steps: usize) -> bool {
+        let r = position.get_as_spherical()[0];
+        if step_index == max_steps - 1 && r <= self.radius {
+            return true;
+        }
+        false
+    }
+
+    fn get_geodesic_solver(&self, _ray: &Ray) -> Box<dyn GeodesicSolver> {
+        Box::new(KerrSolver {
+            radius: self.radius,
+            a: self.a,
+        })
+    }
+}
+
+impl SupportQuantities for Kerr {
+    fn conserved_energy(&self, position: &Point, momentum: &FourVector) -> f64 {
+        todo!()
+    }
+
+    fn conserved_angular_momentum(&self, position: &Point) -> f64 {
+        todo!()
+    }
+
+    fn angular_velocity(&self, position: &Point) -> f64 {
+        todo!()
+    }
+
     fn get_stationary_velocity_at(&self, position: &Point) -> FourVector {
         let (x, y, z) = (position[1], position[2], position[3]);
         let r_sqr = compute_r_sqr(self.a, x, y, z);
@@ -408,32 +448,6 @@ impl Geometry for Kerr {
             velocity_cartesian[2],
             velocity_cartesian[3],
         )
-    }
-
-    fn inside_horizon(&self, position: &Point) -> bool {
-        if self.a > self.radius {
-            return false;
-        }
-        let (x, y, z) = (position[1], position[2], position[3]);
-        let r = compute_r_sqr(self.a, x, y, z).sqrt();
-        let rp = 0.5 * self.radius
-            + ((0.5 * self.radius) * (0.5 * self.radius) - self.a * self.a).sqrt();
-        r <= rp + self.horizon_epsilon
-    }
-
-    fn closed_orbit(&self, position: &Point, step_index: usize, max_steps: usize) -> bool {
-        let r = position.get_as_spherical()[0];
-        if step_index == max_steps - 1 && r <= self.radius {
-            return true;
-        }
-        false
-    }
-
-    fn get_geodesic_solver(&self, _ray: &Ray) -> Box<dyn GeodesicSolver> {
-        Box::new(KerrSolver {
-            radius: self.radius,
-            a: self.a,
-        })
     }
 }
 
