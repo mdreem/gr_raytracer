@@ -7,6 +7,7 @@ use crate::geometry::point::CoordinateSystem::Cartesian;
 use crate::geometry::point::{CoordinateSystem, Point};
 use crate::geometry::tetrad::Tetrad;
 use crate::rendering::ray::Ray;
+use crate::rendering::raytracer::RaytracerError;
 use crate::rendering::runge_kutta::OdeFunction;
 use crate::rendering::scene::EquationOfMotionState;
 use crate::rendering::temperature::{KerrTemperatureComputer, TemperatureComputer};
@@ -456,13 +457,13 @@ impl SupportQuantities for Kerr {
         temperature: f64,
         _inner_radius: f64,
         outer_radius: f64,
-    ) -> Box<dyn TemperatureComputer> {
-        Box::new(KerrTemperatureComputer::new(
+    ) -> Result<Box<dyn TemperatureComputer>, RaytracerError> {
+        Ok(Box::new(KerrTemperatureComputer::new(
             temperature,
             outer_radius,
             self.a,
             self.radius,
-        ))
+        )?))
     }
 }
 
@@ -657,7 +658,8 @@ mod tests {
         let geometry = Kerr::new(radius, NO_ANGULAR_MOMENTUM, 1e-4);
         let camera = create_camera(position, radius);
         let scene: Scene<Kerr> =
-            scene::test_scene::create_scene_with_camera(1.0, 2.0, 7.0, &geometry, camera, 1e-5);
+            scene::test_scene::create_scene_with_camera(1.0, 2.0, 7.0, &geometry, camera, 1e-5)
+                .unwrap();
 
         let ray_a = scene.camera.get_ray_for(5, 10);
         let ray_b = scene.camera.get_ray_for(0, 5);

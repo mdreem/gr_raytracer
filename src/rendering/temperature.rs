@@ -1,8 +1,9 @@
-use log::info;
+use crate::rendering::raytracer::RaytracerError;
+use log::{error, info};
 use std::f64::consts::PI;
 
 pub trait TemperatureComputer: Sync {
-    fn compute_temperature(&self, radius: f64) -> f64;
+    fn compute_temperature(&self, radius: f64) -> Result<f64, RaytracerError>;
 }
 
 pub struct ConstantTemperatureComputer {
@@ -16,8 +17,8 @@ impl ConstantTemperatureComputer {
 }
 
 impl TemperatureComputer for ConstantTemperatureComputer {
-    fn compute_temperature(&self, _radius: f64) -> f64 {
-        self.temperature
+    fn compute_temperature(&self, _radius: f64) -> Result<f64, RaytracerError> {
+        Ok(self.temperature)
     }
 }
 
@@ -43,7 +44,12 @@ fn compute_r_isco(a: f64, radius: f64) -> f64 {
 }
 
 impl KerrTemperatureComputer {
-    pub fn new(temperature: f64, outer_radius: f64, a: f64, radius: f64) -> Self {
+    pub fn new(
+        temperature: f64,
+        outer_radius: f64,
+        a: f64,
+        radius: f64,
+    ) -> Result<Self, RaytracerError> {
         let r_isco = compute_r_isco(a, radius);
         info!(
             "Computed r_isco: {} from a: {} and radius: {}",
@@ -65,7 +71,7 @@ impl KerrTemperatureComputer {
         let dr = (outer_radius - r_isco) / num_steps as f64;
         for i in 0..num_steps {
             let r = r_isco + (i as f64 + 0.5) * dr;
-            let f = tmp_computer.compute_f(r);
+            let f = tmp_computer.compute_f(r)?;
             if max_f < f {
                 max_f = f;
                 max_r = r;
@@ -73,8 +79,8 @@ impl KerrTemperatureComputer {
         }
         info!("Max f: {} at radius: {}", max_f, max_r);
 
-        let integral = tmp_computer.compute_integral(max_r, r_isco);
-        let pre_factor = tmp_computer.computer_prefactor(max_r);
+        let integral = tmp_computer.compute_integral(max_r, r_isco)?;
+        let pre_factor = tmp_computer.computer_prefactor(max_r)?;
         let coefficient = -1.0 / (PI * r0 * r0);
 
         // target: f = sigma_sb * T^4 = intergal * pre_factor * coefficient * m_dot
@@ -86,15 +92,15 @@ impl KerrTemperatureComputer {
             m_dot, temperature
         );
 
-        Self {
+        Ok(Self {
             a,
             radius,
             r_isco,
             m_dot,
-        }
+        })
     }
 
-    fn ut_contra(&self, r: f64) -> f64 {
+    fn ut_contra(&self, r: f64) -> Result<f64, RaytracerError> {
         let a = self.a;
         let r_s = self.radius;
         let omega = self.angular_velocity(r);
@@ -106,16 +112,17 @@ impl KerrTemperatureComputer {
         let ut_pre = g_tt + 2.0 * omega * g_tphi + omega * omega * g_phiphi;
 
         if ut_pre >= 0.0 {
-            panic!(
+            error!(
                 "No timelike circular orbit at r = {} (ut_pre = {})",
                 r, ut_pre
             );
+            return Err(RaytracerError::NoCircularOrbitPossible);
         }
 
-        (-ut_pre).sqrt().recip()
+        Ok((-ut_pre).sqrt().recip())
     }
 
-    fn conserved_energy(&self, r: f64) -> f64 {
+    fn conserved_energy(&self, r: f64) -> Result<f64, RaytracerError> {
         let a = self.a;
         let r0 = self.radius;
 
@@ -123,21 +130,21 @@ impl KerrTemperatureComputer {
         let g_tphi = -(r0 * a) / r;
         let omega = self.angular_velocity(r);
 
-        let ut = self.ut_contra(r);
+        let ut = self.ut_contra(r)?;
 
-        -(g_tt + g_tphi * omega) * ut
+        Ok(-(g_tt + g_tphi * omega) * ut)
     }
 
-    fn conserved_angular_momentum(&self, r: f64) -> f64 {
+    fn conserved_angular_momentum(&self, r: f64) -> Result<f64, RaytracerError> {
         let a = self.a;
         let r0 = self.radius;
 
         let g_tphi = -(r0 * a) / r;
         let g_phiphi = r * r + a * a + (r0 * a * a) / r;
         let omega = self.angular_velocity(r);
-        let ut = self.ut_contra(r);
+        let ut = self.ut_contra(r)?;
 
-        (g_tphi + g_phiphi * omega) * ut
+        Ok((g_tphi + g_phiphi * omega) * ut)
     }
 
     fn angular_velocity(&self, r: f64) -> f64 {
@@ -149,62 +156,65 @@ impl KerrTemperatureComputer {
         sqrt_m / (r.powf(1.5) + a * sqrt_m)
     }
 
-    fn d_l_dr(&self, r: f64) -> f64 {
+    fn d_l_dr(&self, r: f64) -> Result<f64, RaytracerError> {
         let h = 10e-10;
-        (self.conserved_angular_momentum(r + h) - self.conserved_angular_momentum(r - h))
-            / (2.0 * h)
+        let d_l_dr = (self.conserved_angular_momentum(r + h)?
+            - self.conserved_angular_momentum(r - h)?)
+            / (2.0 * h);
+        Ok(d_l_dr)
     }
 
     fn d_omega_dr(&self, r: f64) -> f64 {
         let h = 10e-10;
-        (self.angular_velocity(r + h) - self.angular_velocity(r - h)) / (2.0 * h)
+        let d_omega_dr = (self.angular_velocity(r + h) - self.angular_velocity(r - h)) / (2.0 * h);
+        d_omega_dr
     }
 
-    fn compute_f(&self, r: f64) -> f64 {
+    fn compute_f(&self, r: f64) -> Result<f64, RaytracerError> {
         let r_isco = self.r_isco;
         let r0 = self.radius;
 
-        let integral = self.compute_integral(r, r_isco);
-        let pre_factor = self.computer_prefactor(r);
+        let integral = self.compute_integral(r, r_isco)?;
+        let pre_factor = self.computer_prefactor(r)?;
         let coefficient = -self.m_dot / (PI * r0 * r0);
 
-        coefficient * pre_factor * integral
+        Ok(coefficient * pre_factor * integral)
     }
 
-    fn computer_prefactor(&self, r: f64) -> f64 {
-        let e = self.conserved_energy(r);
-        let l = self.conserved_angular_momentum(r);
+    fn computer_prefactor(&self, r: f64) -> Result<f64, RaytracerError> {
+        let e = self.conserved_energy(r)?;
+        let l = self.conserved_angular_momentum(r)?;
         let omega = self.angular_velocity(r);
         let det_g = r * r;
 
         let pre_factor = self.d_omega_dr(r) / (det_g * (e - omega * l).powi(2));
-        pre_factor
+        Ok(pre_factor)
     }
 
-    fn compute_integral(&self, r: f64, r_isco: f64) -> f64 {
+    fn compute_integral(&self, r: f64, r_isco: f64) -> Result<f64, RaytracerError> {
         let num_steps = 1000;
         let dr = (r - r_isco) / num_steps as f64;
         let mut integral = 0.0;
         for i in 0..num_steps {
             let r_prime = r_isco + (i as f64 + 0.5) * dr;
-            let e_prime = self.conserved_energy(r_prime);
-            let l_prime = self.conserved_angular_momentum(r_prime);
+            let e_prime = self.conserved_energy(r_prime)?;
+            let l_prime = self.conserved_angular_momentum(r_prime)?;
             let omega_prime = self.angular_velocity(r_prime);
 
-            integral += (e_prime - omega_prime * l_prime) * self.d_l_dr(r) * dr;
+            integral += (e_prime - omega_prime * l_prime) * self.d_l_dr(r)? * dr;
         }
-        integral
+        Ok(integral)
     }
 }
 
 const BOLTZMANN_CONSTANT: f64 = 5.670374419e-8; // Boltzmann constant in W·m⁻²·K⁻⁴
 
 impl TemperatureComputer for KerrTemperatureComputer {
-    fn compute_temperature(&self, radius: f64) -> f64 {
+    fn compute_temperature(&self, radius: f64) -> Result<f64, RaytracerError> {
         let sigma_sb = BOLTZMANN_CONSTANT;
-        let f = self.compute_f(radius);
+        let f = self.compute_f(radius)?;
         let temp_fourth_power = f / sigma_sb;
         let temperature = temp_fourth_power.powf(0.25);
-        temperature
+        Ok(temperature)
     }
 }

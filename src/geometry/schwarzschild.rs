@@ -6,6 +6,7 @@ use crate::geometry::point::CoordinateSystem::Spherical;
 use crate::geometry::point::{CoordinateSystem, Point};
 use crate::geometry::tetrad::Tetrad;
 use crate::rendering::ray::Ray;
+use crate::rendering::raytracer::RaytracerError;
 use crate::rendering::runge_kutta::OdeFunction;
 use crate::rendering::scene::EquationOfMotionState;
 use crate::rendering::temperature::{KerrTemperatureComputer, TemperatureComputer};
@@ -213,13 +214,13 @@ impl SupportQuantities for Schwarzschild {
         temperature: f64,
         _inner_radius: f64,
         outer_radius: f64,
-    ) -> Box<dyn TemperatureComputer> {
-        Box::new(KerrTemperatureComputer::new(
+    ) -> Result<Box<dyn TemperatureComputer>, RaytracerError> {
+        Ok(Box::new(KerrTemperatureComputer::new(
             temperature,
             outer_radius,
             0.0,
             self.radius,
-        ))
+        )?))
     }
 }
 
@@ -547,7 +548,8 @@ mod tests {
         let geometry = Schwarzschild::new(radius, 1e-4);
         let camera = create_camera(position, radius, 0.0, 0.0, 0.0);
         let scene: Scene<Schwarzschild> =
-            scene::test_scene::create_scene_with_camera(1.0, 2.0, 7.0, &geometry, camera, 1e-5);
+            scene::test_scene::create_scene_with_camera(1.0, 2.0, 7.0, &geometry, camera, 1e-5)
+                .unwrap();
 
         let ray_a = scene.camera.get_ray_for(5, 10);
         let ray_b = scene.camera.get_ray_for(0, 5);
@@ -677,9 +679,9 @@ mod tests {
         let velocity = FourVector::new_spherical(a.sqrt().recip(), 0.0, 0.0, 0.0);
         let geometry = Schwarzschild::new(radius, 1e-4);
 
-        let scene: Box<Scene<Schwarzschild>> = Box::new(scene::test_scene::create_scene(
-            1.0, 2.0, 7.0, &geometry, position, velocity,
-        ));
+        let scene: Box<Scene<Schwarzschild>> = Box::new(
+            scene::test_scene::create_scene(1.0, 2.0, 7.0, &geometry, position, velocity).unwrap(),
+        );
 
         let momentum = FourVector::new_spherical(
             e / a,

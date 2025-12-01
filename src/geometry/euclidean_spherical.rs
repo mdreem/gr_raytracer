@@ -6,6 +6,7 @@ use crate::geometry::point::CoordinateSystem::Spherical;
 use crate::geometry::point::{CoordinateSystem, Point};
 use crate::geometry::tetrad::Tetrad;
 use crate::rendering::ray::Ray;
+use crate::rendering::raytracer::RaytracerError;
 use crate::rendering::runge_kutta::OdeFunction;
 use crate::rendering::scene::EquationOfMotionState;
 use crate::rendering::temperature::{ConstantTemperatureComputer, TemperatureComputer};
@@ -140,8 +141,8 @@ impl SupportQuantities for EuclideanSpaceSpherical {
         temperature: f64,
         _inner_radius: f64,
         _outer_radius: f64,
-    ) -> Box<dyn TemperatureComputer> {
-        Box::new(ConstantTemperatureComputer::new(temperature))
+    ) -> Result<Box<dyn TemperatureComputer>, RaytracerError> {
+        Ok(Box::new(ConstantTemperatureComputer::new(temperature)))
     }
 }
 

@@ -2,6 +2,7 @@ use crate::geometry::four_vector::FourVector;
 use crate::geometry::point::{CoordinateSystem, Point};
 use crate::geometry::tetrad::Tetrad;
 use crate::rendering::ray::Ray;
+use crate::rendering::raytracer::RaytracerError;
 use crate::rendering::runge_kutta::OdeFunction;
 use crate::rendering::scene::EquationOfMotionState;
 use crate::rendering::temperature::TemperatureComputer;
@@ -46,7 +47,7 @@ pub trait SupportQuantities {
         temperature: f64,
         inner_radius: f64,
         outer_radius: f64,
-    ) -> Box<dyn TemperatureComputer>;
+    ) -> Result<Box<dyn TemperatureComputer>, RaytracerError>;
 }
 
 pub trait Geometry:

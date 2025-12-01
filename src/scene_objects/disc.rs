@@ -2,6 +2,7 @@ use crate::geometry::geometry::Geometry;
 use crate::geometry::point::Point;
 use crate::rendering::color::CIETristimulus;
 use crate::rendering::integrator::Step;
+use crate::rendering::raytracer::RaytracerError;
 use crate::rendering::temperature::TemperatureComputer;
 use crate::rendering::texture::{TemperatureData, TextureMapHandle, UVCoordinates};
 use crate::scene_objects::hittable::{Hittable, Intersection};
@@ -94,9 +95,10 @@ impl Hittable for Disc {
         geometry.inner_product(&position, &velocity, &momentum)
     }
 
-    fn temperature_of_emitter(&self, point: &Point) -> f64 {
+    fn temperature_of_emitter(&self, point: &Point) -> Result<f64, RaytracerError> {
         let r = point.get_as_spherical()[0];
-        self.temperature_computer.compute_temperature(r)
+        let temperature = self.temperature_computer.compute_temperature(r)?;
+        Ok(temperature)
     }
 }
 

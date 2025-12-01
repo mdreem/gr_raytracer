@@ -102,7 +102,7 @@ pub fn create_scene<G: Geometry>(
                     inner_radius,
                     outer_radius,
                     texture_mapper_disc,
-                    geometry.get_temperature_computer(temperature, inner_radius, outer_radius),
+                    geometry.get_temperature_computer(temperature, inner_radius, outer_radius)?,
                 );
                 objects.add_object(Box::new(disc));
             }
