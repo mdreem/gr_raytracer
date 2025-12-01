@@ -101,7 +101,7 @@ impl<'a, G: Geometry> Scene<'a, G> {
             let step = &step_window[1];
 
             if let Some(intersection_color) =
-                self.objects.intersects(last_step, step, observer_energy)
+                self.objects.intersects(last_step, step, observer_energy)?
             {
                 intersections.push(intersection_color);
             }
@@ -174,6 +174,7 @@ pub mod test_scene {
     use crate::rendering::camera::Camera;
     use crate::rendering::color::CIETristimulusNormalization::NoNormalization;
     use crate::rendering::color::{Color, srgb_to_xyz};
+    use crate::rendering::raytracer::RaytracerError;
     use crate::rendering::scene::{IntegrationConfiguration, Scene, TextureData};
     use crate::rendering::texture::CheckerMapper;
     use crate::scene_objects;
@@ -189,7 +190,7 @@ pub mod test_scene {
         geometry: &G,
         camera_position: Point,
         camera_velocity: FourVector,
-    ) -> Scene<'_, G> {
+    ) -> Result<Scene<'_, G>, RaytracerError> {
         let camera = Camera::new(
             camera_position,
             camera_velocity,
@@ -220,7 +221,7 @@ pub mod test_scene {
         geometry: &G,
         camera: Camera,
         epsilon: f64,
-    ) -> Scene<'_, G> {
+    ) -> Result<Scene<'_, G>, RaytracerError> {
         let texture_mapper_celestial = Arc::new(CheckerMapper::new(
             0.0,
             100.0,
@@ -291,7 +292,7 @@ pub mod test_scene {
                 0.0,
                 center_disk_inner_radius,
                 center_disk_outer_radius,
-            ),
+            )?,
         )));
 
         let scene = Scene::new(
@@ -303,7 +304,7 @@ pub mod test_scene {
             false,
             0.0,
         );
-        scene
+        Ok(scene)
     }
 }
 
@@ -366,7 +367,7 @@ mod tests {
         )
         .unwrap();
         let space = EuclideanSpace::new();
-        let scene = create_scene_with_camera(2.0, 0.2, 0.3, &space, camera, 1e-12);
+        let scene = create_scene_with_camera(2.0, 0.2, 0.3, &space, camera, 1e-12).unwrap();
 
         let ray = scene.camera.get_ray_for(5, 5);
         let color = scene.color_of_ray(&ray).unwrap();
@@ -396,7 +397,7 @@ mod tests {
         )
         .unwrap();
         let space = EuclideanSpaceSpherical::new();
-        let scene = create_scene_with_camera(2.0, 0.2, 0.3, &space, camera, 1e-12);
+        let scene = create_scene_with_camera(2.0, 0.2, 0.3, &space, camera, 1e-12).unwrap();
 
         let ray = scene.camera.get_ray_for(5, 5);
         let color = scene.color_of_ray(&ray).unwrap();
@@ -435,7 +436,7 @@ mod tests {
             &geometry,
         )
         .unwrap();
-        let scene = create_scene_with_camera(2.0, 3.0, 4.0, &geometry, camera, 1e-12);
+        let scene = create_scene_with_camera(2.0, 3.0, 4.0, &geometry, camera, 1e-12).unwrap();
 
         let ray = scene.camera.get_ray_for(5, 5);
         let color = scene.color_of_ray(&ray).unwrap();
@@ -466,7 +467,8 @@ mod tests {
             &geometry,
         )
         .unwrap();
-        let scene = create_scene_with_camera(sphere_radius, 3.0, 4.0, &geometry, camera, 1e-12);
+        let scene =
+            create_scene_with_camera(sphere_radius, 3.0, 4.0, &geometry, camera, 1e-12).unwrap();
 
         let ray = scene.camera.get_ray_for(5, 5);
         let color = scene.color_of_ray(&ray).unwrap();
@@ -489,7 +491,7 @@ mod tests {
         .unwrap();
         let space = EuclideanSpace::new();
         let scene: Scene<EuclideanSpace> =
-            create_scene_with_camera(2.0, 0.2, 0.3, &space, camera, 1e-12);
+            create_scene_with_camera(2.0, 0.2, 0.3, &space, camera, 1e-12).unwrap();
 
         let ray = scene.camera.get_ray_for(0, 0);
         let color = scene.color_of_ray(&ray).unwrap();
@@ -524,7 +526,7 @@ mod tests {
         )
         .unwrap();
         let space = Schwarzschild::new(radius, 1e-4);
-        let scene = create_scene_with_camera(2.0, 3.0, 4.0, &space, camera, 1e-12);
+        let scene = create_scene_with_camera(2.0, 3.0, 4.0, &space, camera, 1e-12).unwrap();
 
         let ray = scene.camera.get_ray_for(0, 0);
         let color = scene.color_of_ray(&ray).unwrap();
@@ -554,7 +556,7 @@ mod tests {
         )
         .unwrap();
         let space = Schwarzschild::new(radius, 1e-4);
-        let scene = create_scene_with_camera(0.5, 3.0, 4.0, &space, camera, 1e-12);
+        let scene = create_scene_with_camera(0.5, 3.0, 4.0, &space, camera, 1e-12).unwrap();
 
         let ray = scene.camera.get_ray_for(5, 5);
         let color = scene.color_of_ray(&ray).unwrap();
@@ -578,7 +580,7 @@ mod tests {
         .unwrap();
         let space = EuclideanSpace::new();
         let scene: Scene<EuclideanSpace> =
-            create_scene_with_camera(1.0, 2.0, 7.0, &space, camera, 1e-12);
+            create_scene_with_camera(1.0, 2.0, 7.0, &space, camera, 1e-12).unwrap();
 
         let ray = scene.camera.get_ray_for(0, 51);
         let color = scene.color_of_ray(&ray).unwrap();

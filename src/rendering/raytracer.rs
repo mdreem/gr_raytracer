@@ -26,6 +26,7 @@ pub enum RaytracerError {
     ImageBufferCreation,
     ProgressBarTemplateError(TemplateError),
     CameraError(CameraError),
+    NoCircularOrbitPossible,
 }
 
 pub struct Raytracer<'a, G: Geometry> {

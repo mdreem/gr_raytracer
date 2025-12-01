@@ -3,6 +3,7 @@ use crate::geometry::point::{CoordinateSystem, Point};
 use crate::geometry::spherical_coordinates_helper::cartesian_to_spherical;
 use crate::rendering::color::CIETristimulus;
 use crate::rendering::integrator::Step;
+use crate::rendering::raytracer::RaytracerError;
 use crate::rendering::texture::{TemperatureData, TextureMapHandle, UVCoordinates};
 use crate::scene_objects::hittable::{Hittable, Intersection};
 use crate::scene_objects::objects::SceneObject;
@@ -118,8 +119,8 @@ impl Hittable for Sphere {
         geometry.inner_product(&position, &velocity, &momentum)
     }
 
-    fn temperature_of_emitter(&self, _point: &Point) -> f64 {
-        self.temperature
+    fn temperature_of_emitter(&self, _point: &Point) -> Result<f64, RaytracerError> {
+        Ok(self.temperature)
     }
 }
 

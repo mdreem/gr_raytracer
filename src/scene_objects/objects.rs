@@ -1,6 +1,7 @@
 use crate::geometry::geometry::Geometry;
 use crate::rendering::color::CIETristimulus;
 use crate::rendering::integrator::Step;
+use crate::rendering::raytracer::RaytracerError;
 use crate::rendering::redshift::RedshiftComputer;
 use crate::rendering::texture::TemperatureData;
 use crate::scene_objects::hittable::Hittable;
@@ -29,7 +30,7 @@ impl<'a, G: Geometry> Objects<'a, G> {
         y_start: &Step,
         y_end: &Step,
         observer_energy: f64,
-    ) -> Option<CIETristimulus> {
+    ) -> Result<Option<CIETristimulus>, RaytracerError> {
         let redshift_computer = RedshiftComputer::new(self.geometry);
         let mut resulting_color = None;
         let mut shortest_distance = f64::MAX;
@@ -52,7 +53,7 @@ impl<'a, G: Geometry> Objects<'a, G> {
                     let redshift = redshift_computer
                         .compute_redshift_from_energies(emitter_energy, observer_energy);
                     let temperature =
-                        hittable.temperature_of_emitter(&intersection_data.intersection_point);
+                        hittable.temperature_of_emitter(&intersection_data.intersection_point)?;
 
                     resulting_color = Some(hittable.color_at_uv(
                         intersection_data.uv,
@@ -64,7 +65,7 @@ impl<'a, G: Geometry> Objects<'a, G> {
                 }
             }
         }
-        resulting_color
+        Ok(resulting_color)
     }
 }
 
@@ -120,7 +121,7 @@ mod tests {
             p: FourVector::new_cartesian(1.0, 0.0, 0.0, 0.0),
         };
 
-        let result = objects.intersects(&step_start, &step_end, 1.0);
+        let result = objects.intersects(&step_start, &step_end, 1.0).unwrap();
         assert!(result.is_some());
     }
 
@@ -147,7 +148,9 @@ mod tests {
         objects_setup_1.add_object(farther_sphere);
         objects_setup_1.add_object(closer_sphere);
 
-        let result_1 = objects_setup_1.intersects(&step_start, &step_end, 1.0);
+        let result_1 = objects_setup_1
+            .intersects(&step_start, &step_end, 1.0)
+            .unwrap();
         assert!(result_1.is_some());
         assert_abs_diff_eq!(result_1.unwrap().x, 0.121, epsilon = 1e-2);
 
@@ -157,7 +160,9 @@ mod tests {
         objects_setup_2.add_object(closer_sphere);
         objects_setup_2.add_object(farther_sphere);
 
-        let result_2 = objects_setup_2.intersects(&step_start, &step_end, 1.0);
+        let result_2 = objects_setup_2
+            .intersects(&step_start, &step_end, 1.0)
+            .unwrap();
         assert!(result_2.is_some());
         assert_abs_diff_eq!(result_2.unwrap().x, 0.121, epsilon = 1e-2);
     }
