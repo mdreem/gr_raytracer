@@ -435,7 +435,7 @@ mod tests {
             &geometry,
         )
         .unwrap();
-        let scene = create_scene_with_camera(2.0, 0.2, 0.3, &geometry, camera, 1e-12);
+        let scene = create_scene_with_camera(2.0, 3.0, 4.0, &geometry, camera, 1e-12);
 
         let ray = scene.camera.get_ray_for(5, 5);
         let color = scene.color_of_ray(&ray).unwrap();
@@ -466,7 +466,7 @@ mod tests {
             &geometry,
         )
         .unwrap();
-        let scene = create_scene_with_camera(sphere_radius, 0.2, 0.3, &geometry, camera, 1e-12);
+        let scene = create_scene_with_camera(sphere_radius, 3.0, 4.0, &geometry, camera, 1e-12);
 
         let ray = scene.camera.get_ray_for(5, 5);
         let color = scene.color_of_ray(&ray).unwrap();
@@ -524,7 +524,7 @@ mod tests {
         )
         .unwrap();
         let space = Schwarzschild::new(radius, 1e-4);
-        let scene = create_scene_with_camera(2.0, 0.2, 0.3, &space, camera, 1e-12);
+        let scene = create_scene_with_camera(2.0, 3.0, 4.0, &space, camera, 1e-12);
 
         let ray = scene.camera.get_ray_for(0, 0);
         let color = scene.color_of_ray(&ray).unwrap();
@@ -554,7 +554,7 @@ mod tests {
         )
         .unwrap();
         let space = Schwarzschild::new(radius, 1e-4);
-        let scene = create_scene_with_camera(0.5, 0.2, 0.3, &space, camera, 1e-12);
+        let scene = create_scene_with_camera(0.5, 3.0, 4.0, &space, camera, 1e-12);
 
         let ray = scene.camera.get_ray_for(5, 5);
         let color = scene.color_of_ray(&ray).unwrap();
