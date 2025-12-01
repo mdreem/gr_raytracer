@@ -9,6 +9,7 @@ use crate::geometry::tetrad::Tetrad;
 use crate::rendering::ray::Ray;
 use crate::rendering::runge_kutta::OdeFunction;
 use crate::rendering::scene::EquationOfMotionState;
+use crate::rendering::temperature::{KerrTemperatureComputer, TemperatureComputer};
 use log::{debug, trace};
 use nalgebra::{Const, Matrix4, OVector, Vector3, Vector4};
 
@@ -122,6 +123,27 @@ impl Kerr {
         ];
 
         Matrix4::from_row_slice(&data)
+    }
+
+    fn ut_contra(&self, position: &Point) -> f64 {
+        let r = compute_r_sqr(self.a, position[1], position[2], position[3]).sqrt();
+        let a = self.a;
+        let r0 = self.radius;
+        let omega = self.angular_velocity(r);
+
+        let ut_pre = -1.0 + r0 / r - 2.0 * a * r0 * omega / r
+            + (r * r + a * a + a * a * r0 / r) * omega * omega;
+        (-ut_pre).recip().sqrt()
+    }
+
+    fn angular_velocity(&self, r: f64) -> f64 {
+        let a = self.a;
+        let r0 = self.radius;
+
+        let omega_mag =
+            -((2.0 * r0).sqrt() / (2.0 * r.powf(3.0 / 2.0) + 2.0_f64.sqrt() * r0.sqrt() * a));
+        let sgn_a = if a >= 0.0 { 1.0 } else { -1.0 };
+        sgn_a * omega_mag
     }
 }
 
@@ -401,18 +423,6 @@ impl Geometry for Kerr {
 }
 
 impl SupportQuantities for Kerr {
-    fn conserved_energy(&self, position: &Point, momentum: &FourVector) -> f64 {
-        todo!()
-    }
-
-    fn conserved_angular_momentum(&self, position: &Point) -> f64 {
-        todo!()
-    }
-
-    fn angular_velocity(&self, position: &Point) -> f64 {
-        todo!()
-    }
-
     fn get_stationary_velocity_at(&self, position: &Point) -> FourVector {
         let (x, y, z) = (position[1], position[2], position[3]);
         let r_sqr = compute_r_sqr(self.a, x, y, z);
@@ -424,17 +434,8 @@ impl SupportQuantities for Kerr {
     // See https://arxiv.org/abs/1104.5499.
     fn get_circular_orbit_velocity_at(&self, position: &Point) -> FourVector {
         let r = compute_r_sqr(self.a, position[1], position[2], position[3]).sqrt();
-        let r0 = self.radius;
-        let a = self.a;
-
-        let omega_mag =
-            -((2.0 * r0).sqrt() / (2.0 * r.powf(3.0 / 2.0) + 2.0_f64.sqrt() * r0.sqrt() * a));
-        let sgn_a = if a >= 0.0 { 1.0 } else { -1.0 };
-        let omega = sgn_a * omega_mag;
-
-        let ut_pre = -1.0 + r0 / r - 2.0 * a * r0 * omega / r
-            + (r * r + a * a + a * a * r0 / r) * omega * omega;
-        let ut = (-ut_pre).recip().sqrt();
+        let omega = self.angular_velocity(r);
+        let ut = self.ut_contra(&position);
         let uphi = omega * ut;
 
         let velocity_spherical = FourVector::new_spherical(ut, 0.0, 0.0, uphi);
@@ -449,6 +450,20 @@ impl SupportQuantities for Kerr {
             velocity_cartesian[3],
         )
     }
+
+    fn get_temperature_computer(
+        &self,
+        temperature: f64,
+        _inner_radius: f64,
+        outer_radius: f64,
+    ) -> Box<dyn TemperatureComputer> {
+        Box::new(KerrTemperatureComputer::new(
+            temperature,
+            outer_radius,
+            self.a,
+            self.radius,
+        ))
+    }
 }
 
 #[cfg(test)]
@@ -457,7 +472,6 @@ mod tests {
     use crate::geometry::geometry::{Geometry, InnerProduct};
     use crate::geometry::kerr::Kerr;
     use crate::geometry::point::Point;
-    use crate::geometry::schwarzschild::Schwarzschild;
     use crate::geometry::spherical_coordinates_helper::cartesian_to_spherical;
     use crate::rendering::camera::Camera;
     use crate::rendering::debug::save_rays_to_file;
