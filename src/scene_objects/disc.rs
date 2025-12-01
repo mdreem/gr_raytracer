@@ -2,6 +2,7 @@ use crate::geometry::geometry::Geometry;
 use crate::geometry::point::Point;
 use crate::rendering::color::CIETristimulus;
 use crate::rendering::integrator::Step;
+use crate::rendering::temperature::TemperatureComputer;
 use crate::rendering::texture::{TemperatureData, TextureMapHandle, UVCoordinates};
 use crate::scene_objects::hittable::{Hittable, Intersection};
 use crate::scene_objects::objects::SceneObject;
@@ -11,7 +12,7 @@ pub struct Disc {
     center_disk_inner_radius: f64,
     center_disk_outer_radius: f64,
     texture_mapper: TextureMapHandle,
-    temperature: f64,
+    temperature_computer: Box<dyn TemperatureComputer>,
 }
 
 impl Disc {
@@ -19,13 +20,13 @@ impl Disc {
         center_disk_inner_radius: f64,
         center_disk_outer_radius: f64,
         texture_mapper: TextureMapHandle,
-        temperature: f64,
+        temperature_computer: Box<dyn TemperatureComputer>,
     ) -> Self {
         Self {
             center_disk_inner_radius,
             center_disk_outer_radius,
             texture_mapper,
-            temperature,
+            temperature_computer,
         }
     }
 }
@@ -93,12 +94,9 @@ impl Hittable for Disc {
         geometry.inner_product(&position, &velocity, &momentum)
     }
 
-    fn temperature_of_emitter(&self, _geometry: &dyn Geometry, step: &Step) -> f64 {
-        // TODO: implement.
-        let position = step.x;
-        let r = position.get_as_spherical()[0];
-
-        self.temperature * 0.7 * (1.0 / r).powf(0.75)
+    fn temperature_of_emitter(&self, point: &Point) -> f64 {
+        let r = point.get_as_spherical()[0];
+        self.temperature_computer.compute_temperature(r)
     }
 }
 

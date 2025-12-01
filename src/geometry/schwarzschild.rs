@@ -8,6 +8,7 @@ use crate::geometry::tetrad::Tetrad;
 use crate::rendering::ray::Ray;
 use crate::rendering::runge_kutta::OdeFunction;
 use crate::rendering::scene::EquationOfMotionState;
+use crate::rendering::temperature::{KerrTemperatureComputer, TemperatureComputer};
 use log::debug;
 use nalgebra::{Const, Matrix4, OVector};
 
@@ -190,18 +191,6 @@ impl Geometry for Schwarzschild {
 }
 
 impl SupportQuantities for Schwarzschild {
-    fn conserved_energy(&self, position: &Point, momentum: &FourVector) -> f64 {
-        todo!()
-    }
-
-    fn conserved_angular_momentum(&self, position: &Point) -> f64 {
-        todo!()
-    }
-
-    fn angular_velocity(&self, position: &Point) -> f64 {
-        todo!()
-    }
-
     fn get_stationary_velocity_at(&self, position: &Point) -> FourVector {
         let a = 1.0 - self.radius / position[1];
         FourVector::new_spherical(a.sqrt().recip(), 0.0, 0.0, 0.0)
@@ -217,6 +206,20 @@ impl SupportQuantities for Schwarzschild {
         let uphi = omega * ut;
 
         FourVector::new_spherical(ut, 0.0, 0.0, uphi)
+    }
+
+    fn get_temperature_computer(
+        &self,
+        temperature: f64,
+        _inner_radius: f64,
+        outer_radius: f64,
+    ) -> Box<dyn TemperatureComputer> {
+        Box::new(KerrTemperatureComputer::new(
+            temperature,
+            outer_radius,
+            0.0,
+            self.radius,
+        ))
     }
 }
 

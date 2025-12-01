@@ -4,6 +4,7 @@ use crate::geometry::tetrad::Tetrad;
 use crate::rendering::ray::Ray;
 use crate::rendering::runge_kutta::OdeFunction;
 use crate::rendering::scene::EquationOfMotionState;
+use crate::rendering::temperature::TemperatureComputer;
 use nalgebra::{Const, Matrix4};
 
 pub trait GeodesicSolver: OdeFunction<Const<8>> + HasCoordinateSystem {
@@ -38,11 +39,14 @@ pub trait Signature {
 }
 
 pub trait SupportQuantities {
-    fn conserved_energy(&self, position: &Point, momentum: &FourVector) -> f64;
-    fn conserved_angular_momentum(&self, position: &Point) -> f64;
-    fn angular_velocity(&self, position: &Point) -> f64;
     fn get_stationary_velocity_at(&self, position: &Point) -> FourVector;
     fn get_circular_orbit_velocity_at(&self, position: &Point) -> FourVector;
+    fn get_temperature_computer(
+        &self,
+        temperature: f64,
+        inner_radius: f64,
+        outer_radius: f64,
+    ) -> Box<dyn TemperatureComputer>;
 }
 
 pub trait Geometry:

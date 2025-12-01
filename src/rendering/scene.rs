@@ -287,7 +287,11 @@ pub mod test_scene {
             center_disk_inner_radius,
             center_disk_outer_radius,
             texture_mapper_disk,
-            0.0,
+            geometry.get_temperature_computer(
+                0.0,
+                center_disk_inner_radius,
+                center_disk_outer_radius,
+            ),
         )));
 
         let scene = Scene::new(

@@ -1,0 +1,200 @@
+use log::info;
+use std::f64::consts::PI;
+
+pub trait TemperatureComputer: Sync {
+    fn compute_temperature(&self, radius: f64) -> f64;
+}
+
+pub struct ConstantTemperatureComputer {
+    temperature: f64,
+}
+
+impl ConstantTemperatureComputer {
+    pub fn new(temperature: f64) -> Self {
+        Self { temperature }
+    }
+}
+
+impl TemperatureComputer for ConstantTemperatureComputer {
+    fn compute_temperature(&self, _radius: f64) -> f64 {
+        self.temperature
+    }
+}
+
+pub struct KerrTemperatureComputer {
+    a: f64,
+    radius: f64,
+    r_isco: f64,
+    m_dot: f64,
+}
+
+fn compute_r_isco(a: f64, radius: f64) -> f64 {
+    let a_s = 2.0 * a / radius;
+
+    let z1 = 1.0
+        + (1.0 - a_s * a_s).powf(1.0 / 3.0)
+            * ((1.0 + a_s).powf(1.0 / 3.0) + (1.0 - a_s).powf(1.0 / 3.0));
+    let z2 = (3.0 * a_s * a_s + z1 * z1).sqrt();
+
+    // prograde ISCO radius
+    let r_isco = (3.0 + z2 - ((3.0 - z1) * (3.0 + z1 + 2.0 * z2)).sqrt()) * radius / 2.0;
+
+    r_isco
+}
+
+impl KerrTemperatureComputer {
+    pub fn new(temperature: f64, outer_radius: f64, a: f64, radius: f64) -> Self {
+        let r_isco = compute_r_isco(a, radius);
+        info!(
+            "Computed r_isco: {} from a: {} and radius: {}",
+            r_isco, a, radius
+        );
+        let r0 = radius;
+
+        let tmp_computer = Self {
+            a,
+            radius,
+            r_isco,
+            m_dot: 1.0,
+        };
+
+        let mut max_f = 0.0;
+        let mut max_r = 0.0;
+
+        let num_steps = 1000;
+        let dr = (outer_radius - r_isco) / num_steps as f64;
+        for i in 0..num_steps {
+            let r = r_isco + (i as f64 + 0.5) * dr;
+            let f = tmp_computer.compute_f(r);
+            if max_f < f {
+                max_f = f;
+                max_r = r;
+            }
+        }
+        info!("Max f: {} at radius: {}", max_f, max_r);
+
+        let integral = tmp_computer.compute_integral(max_r, r_isco);
+        let pre_factor = tmp_computer.computer_prefactor(max_r);
+        let coefficient = -1.0 / (PI * r0 * r0);
+
+        // target: f = sigma_sb * T^4 = intergal * pre_factor * coefficient * m_dot
+        let sigma_sb = BOLTZMANN_CONSTANT;
+        let f = sigma_sb * temperature.powf(4.0);
+        let m_dot = f / (coefficient * pre_factor * integral);
+        info!(
+            "Computed m_dot: {} for target temperature: {}",
+            m_dot, temperature
+        );
+
+        Self {
+            a,
+            radius,
+            r_isco,
+            m_dot,
+        }
+    }
+
+    fn ut_contra(&self, r: f64) -> f64 {
+        let a = self.a;
+        let r0 = self.radius;
+        let omega = self.angular_velocity(r);
+
+        let ut_pre = -1.0 + r0 / r - 2.0 * a * r0 * omega / r
+            + (r * r + a * a + a * a * r0 / r) * omega * omega;
+        (-ut_pre).recip().sqrt()
+    }
+
+    fn conserved_energy(&self, r: f64) -> f64 {
+        let a = self.a;
+        let r0 = self.radius;
+
+        let g_tt = -1.0 + r0 / r;
+        let g_tphi = -(r0 * a) / r;
+        let omega = self.angular_velocity(r);
+
+        let ut = self.ut_contra(r);
+
+        -(g_tt + g_tphi * omega) * ut
+    }
+
+    fn conserved_angular_momentum(&self, r: f64) -> f64 {
+        let a = self.a;
+        let r0 = self.radius;
+
+        let g_tphi = -(r0 * a) / r;
+        let g_phiphi = r * r + a * a + (r0 * a * a) / r;
+        let omega = self.angular_velocity(r);
+        let ut = self.ut_contra(r);
+
+        (g_tphi + g_phiphi * omega) * ut
+    }
+
+    fn angular_velocity(&self, r: f64) -> f64 {
+        let a = self.a;
+        let r0 = self.radius;
+
+        let omega_mag =
+            -((2.0 * r0).sqrt() / (2.0 * r.powf(3.0 / 2.0) + 2.0_f64.sqrt() * r0.sqrt() * a));
+        let sgn_a = if a >= 0.0 { 1.0 } else { -1.0 };
+        sgn_a * omega_mag
+    }
+
+    fn d_l_dr(&self, r: f64) -> f64 {
+        let h = 10e-10;
+        (self.conserved_angular_momentum(r + h) - self.conserved_angular_momentum(r - h))
+            / (2.0 * h)
+    }
+
+    fn d_omega_dr(&self, r: f64) -> f64 {
+        let h = 10e-10;
+        (self.angular_velocity(r + h) - self.angular_velocity(r - h)) / (2.0 * h)
+    }
+
+    fn compute_f(&self, r: f64) -> f64 {
+        let r_isco = self.r_isco;
+        let r0 = self.radius;
+
+        let integral = self.compute_integral(r, r_isco);
+        let pre_factor = self.computer_prefactor(r);
+        let coefficient = -self.m_dot / (PI * r0 * r0);
+
+        coefficient * pre_factor * integral
+    }
+
+    fn computer_prefactor(&self, r: f64) -> f64 {
+        let e = self.conserved_energy(r);
+        let l = self.conserved_angular_momentum(r);
+        let omega = self.angular_velocity(r);
+        let det_g = r * r;
+
+        let pre_factor = self.d_omega_dr(r) / (det_g * (e - omega * l).powi(2));
+        pre_factor
+    }
+
+    fn compute_integral(&self, r: f64, r_isco: f64) -> f64 {
+        let num_steps = 1000;
+        let dr = (r - r_isco) / num_steps as f64;
+        let mut integral = 0.0;
+        for i in 0..num_steps {
+            let r_prime = r_isco + (i as f64 + 0.5) * dr;
+            let e_prime = self.conserved_energy(r_prime);
+            let l_prime = self.conserved_angular_momentum(r_prime);
+            let omega_prime = self.angular_velocity(r_prime);
+
+            integral += (e_prime - omega_prime * l_prime) * self.d_l_dr(r) * dr;
+        }
+        integral
+    }
+}
+
+const BOLTZMANN_CONSTANT: f64 = 5.670374419e-8; // Boltzmann constant in W·m⁻²·K⁻⁴
+
+impl TemperatureComputer for KerrTemperatureComputer {
+    fn compute_temperature(&self, radius: f64) -> f64 {
+        let sigma_sb = BOLTZMANN_CONSTANT;
+        let f = self.compute_f(radius);
+        let temp_fourth_power = f / sigma_sb;
+        let temperature = temp_fourth_power.powf(0.25);
+        temperature
+    }
+}

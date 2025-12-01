@@ -118,7 +118,7 @@ impl Hittable for Sphere {
         geometry.inner_product(&position, &velocity, &momentum)
     }
 
-    fn temperature_of_emitter(&self, _geometry: &dyn Geometry, _step: &Step) -> f64 {
+    fn temperature_of_emitter(&self, _point: &Point) -> f64 {
         self.temperature
     }
 }

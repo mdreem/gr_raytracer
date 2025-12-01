@@ -8,6 +8,7 @@ use crate::geometry::tetrad::Tetrad;
 use crate::rendering::ray::Ray;
 use crate::rendering::runge_kutta::OdeFunction;
 use crate::rendering::scene::EquationOfMotionState;
+use crate::rendering::temperature::{ConstantTemperatureComputer, TemperatureComputer};
 use nalgebra::{Const, Matrix4, OVector};
 
 pub struct EuclideanSpaceSphericalSolver {}
@@ -125,18 +126,6 @@ impl Geometry for EuclideanSpaceSpherical {
 }
 
 impl SupportQuantities for EuclideanSpaceSpherical {
-    fn conserved_energy(&self, _position: &Point, momentum: &FourVector) -> f64 {
-        todo!()
-    }
-
-    fn conserved_angular_momentum(&self, _position: &Point) -> f64 {
-        todo!()
-    }
-
-    fn angular_velocity(&self, _position: &Point) -> f64 {
-        todo!()
-    }
-
     fn get_stationary_velocity_at(&self, _position: &Point) -> FourVector {
         FourVector::new_spherical(1.0, 0.0, 0.0, 0.0)
     }
@@ -144,6 +133,15 @@ impl SupportQuantities for EuclideanSpaceSpherical {
     fn get_circular_orbit_velocity_at(&self, _position: &Point) -> FourVector {
         FourVector::new_cartesian(1.0, 0.0, 0.0, 0.0)
         // TODO: implement proper circular orbit velocity in Euclidean space.
+    }
+
+    fn get_temperature_computer(
+        &self,
+        temperature: f64,
+        _inner_radius: f64,
+        _outer_radius: f64,
+    ) -> Box<dyn TemperatureComputer> {
+        Box::new(ConstantTemperatureComputer::new(temperature))
     }
 }
 
