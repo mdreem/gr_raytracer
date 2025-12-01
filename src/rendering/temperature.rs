@@ -61,7 +61,7 @@ impl KerrTemperatureComputer {
         let mut max_f = 0.0;
         let mut max_r = 0.0;
 
-        let num_steps = 1000;
+        let num_steps = 10;
         let dr = (outer_radius - r_isco) / num_steps as f64;
         for i in 0..num_steps {
             let r = r_isco + (i as f64 + 0.5) * dr;
@@ -96,12 +96,23 @@ impl KerrTemperatureComputer {
 
     fn ut_contra(&self, r: f64) -> f64 {
         let a = self.a;
-        let r0 = self.radius;
+        let r_s = self.radius;
         let omega = self.angular_velocity(r);
 
-        let ut_pre = -1.0 + r0 / r - 2.0 * a * r0 * omega / r
-            + (r * r + a * a + a * a * r0 / r) * omega * omega;
-        (-ut_pre).recip().sqrt()
+        let g_tt = -(1.0 - r_s / r);
+        let g_tphi = -a * r_s / r;
+        let g_phiphi = r * r + a * a + a * a * r_s / r;
+
+        let ut_pre = g_tt + 2.0 * omega * g_tphi + omega * omega * g_phiphi;
+
+        if ut_pre >= 0.0 {
+            panic!(
+                "No timelike circular orbit at r = {} (ut_pre = {})",
+                r, ut_pre
+            );
+        }
+
+        (-ut_pre).sqrt().recip()
     }
 
     fn conserved_energy(&self, r: f64) -> f64 {
@@ -131,12 +142,11 @@ impl KerrTemperatureComputer {
 
     fn angular_velocity(&self, r: f64) -> f64 {
         let a = self.a;
-        let r0 = self.radius;
+        let r_s = self.radius; // Schwarzschild radius
+        let m = 0.5 * r_s; // M = r_s / 2
+        let sqrt_m = m.sqrt();
 
-        let omega_mag =
-            -((2.0 * r0).sqrt() / (2.0 * r.powf(3.0 / 2.0) + 2.0_f64.sqrt() * r0.sqrt() * a));
-        let sgn_a = if a >= 0.0 { 1.0 } else { -1.0 };
-        sgn_a * omega_mag
+        sqrt_m / (r.powf(1.5) + a * sqrt_m)
     }
 
     fn d_l_dr(&self, r: f64) -> f64 {
