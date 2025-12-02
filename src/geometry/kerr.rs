@@ -11,7 +11,7 @@ use crate::rendering::raytracer::RaytracerError;
 use crate::rendering::runge_kutta::OdeFunction;
 use crate::rendering::scene::EquationOfMotionState;
 use crate::rendering::temperature::{KerrTemperatureComputer, TemperatureComputer};
-use log::{debug, trace};
+use log::{debug, error, trace};
 use nalgebra::{Const, Matrix4, OVector, Vector3, Vector4};
 
 #[derive(Clone, Debug)]
@@ -127,24 +127,36 @@ impl Kerr {
     }
 
     fn ut_contra(&self, position: &Point) -> f64 {
-        let r = compute_r_sqr(self.a, position[1], position[2], position[3]).sqrt();
+        let r = position.get_as_spherical()[0];
         let a = self.a;
-        let r0 = self.radius;
+        let r_s = self.radius;
         let omega = self.angular_velocity(r);
 
-        let ut_pre = -1.0 + r0 / r - 2.0 * a * r0 * omega / r
-            + (r * r + a * a + a * a * r0 / r) * omega * omega;
-        (-ut_pre).recip().sqrt()
+        let g_tt = -(1.0 - r_s / r);
+        let g_tphi = -a * r_s / r;
+        let g_phiphi = r * r + a * a + a * a * r_s / r;
+
+        let ut_pre = g_tt + 2.0 * omega * g_tphi + omega * omega * g_phiphi;
+
+        if ut_pre >= 0.0 {
+            error!(
+                "No timelike circular orbit at r = {} (ut_pre = {})",
+                r, ut_pre
+            );
+            // TODO: Improve error handling here.
+            panic!("No timelike circular orbit possible");
+        }
+
+        (-ut_pre).sqrt().recip()
     }
 
     fn angular_velocity(&self, r: f64) -> f64 {
         let a = self.a;
-        let r0 = self.radius;
+        let r_s = self.radius;
+        let m = 0.5 * r_s;
+        let sqrt_m = m.sqrt();
 
-        let omega_mag =
-            -((2.0 * r0).sqrt() / (2.0 * r.powf(3.0 / 2.0) + 2.0_f64.sqrt() * r0.sqrt() * a));
-        let sgn_a = if a >= 0.0 { 1.0 } else { -1.0 };
-        sgn_a * omega_mag
+        sqrt_m / (r.powf(1.5) + a * sqrt_m)
     }
 }
 
