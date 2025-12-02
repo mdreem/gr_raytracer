@@ -201,7 +201,7 @@ impl KerrTemperatureComputer {
             let l_prime = self.conserved_angular_momentum(r_prime)?;
             let omega_prime = self.angular_velocity(r_prime);
 
-            integral += (e_prime - omega_prime * l_prime) * self.d_l_dr(r)? * dr;
+            integral += (e_prime - omega_prime * l_prime) * self.d_l_dr(r_prime)? * dr;
         }
         Ok(integral)
     }
