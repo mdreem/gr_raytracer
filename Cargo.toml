@@ -11,7 +11,7 @@ clap = { version = "4.5.53", features = ["derive"] }
 toml = "0.9.8"
 serde = { version = "1.0.228", features = ["derive"] }
 indicatif = "0.18.3"
-log = "0.4.20"
+log = "0.4.29"
 env_logger = "0.11.8"
 
 [dev-dependencies]
