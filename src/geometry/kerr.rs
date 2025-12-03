@@ -150,6 +150,7 @@ impl Kerr {
         (-ut_pre).sqrt().recip()
     }
 
+    // https://arxiv.org/abs/1104.5499 equation (36)
     fn angular_velocity(&self, r: f64) -> f64 {
         let a = self.a;
         let r_s = self.radius;

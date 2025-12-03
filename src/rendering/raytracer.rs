@@ -27,6 +27,7 @@ pub enum RaytracerError {
     ProgressBarTemplateError(TemplateError),
     CameraError(CameraError),
     NoCircularOrbitPossible,
+    BelowRISCO,
 }
 
 pub struct Raytracer<'a, G: Geometry> {

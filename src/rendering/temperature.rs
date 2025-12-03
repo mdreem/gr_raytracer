@@ -50,15 +50,16 @@ impl KerrTemperatureComputer {
         a: f64,
         radius: f64,
     ) -> Result<Self, RaytracerError> {
-        let r_isco = compute_r_isco(a, radius);
+        let a_abs = a.abs(); // Ensure a co-rotating disc. TODO: generalize later.
+        let r_isco = compute_r_isco(a_abs, radius);
         info!(
             "Computed r_isco: {} from a: {} and radius: {}",
-            r_isco, a, radius
+            r_isco, a_abs, radius
         );
         let r0 = radius;
 
         let tmp_computer = Self {
-            a,
+            a: a_abs,
             radius,
             r_isco,
             m_dot: 1.0,
@@ -84,7 +85,7 @@ impl KerrTemperatureComputer {
         let coefficient = -1.0 / (PI * r0 * r0);
 
         // target: f = sigma_sb * T^4 = intergal * pre_factor * coefficient * m_dot
-        let sigma_sb = BOLTZMANN_CONSTANT;
+        let sigma_sb = SIGMA_SB;
         let f = sigma_sb * temperature.powf(4.0);
         let m_dot = f / (coefficient * pre_factor * integral);
         info!(
@@ -93,7 +94,7 @@ impl KerrTemperatureComputer {
         );
 
         Ok(Self {
-            a,
+            a: a_abs,
             radius,
             r_isco,
             m_dot,
@@ -147,25 +148,31 @@ impl KerrTemperatureComputer {
         Ok((g_tphi + g_phiphi * omega) * ut)
     }
 
+    // https://arxiv.org/abs/1104.5499 equation (36)
     fn angular_velocity(&self, r: f64) -> f64 {
         let a = self.a;
-        let r_s = self.radius; // Schwarzschild radius
-        let m = 0.5 * r_s; // M = r_s / 2
+        let r_s = self.radius;
+        let m = 0.5 * r_s;
         let sqrt_m = m.sqrt();
 
         sqrt_m / (r.powf(1.5) + a * sqrt_m)
     }
 
     fn d_l_dr(&self, r: f64) -> Result<f64, RaytracerError> {
-        let h = 10e-10;
-        let d_l_dr = (self.conserved_angular_momentum(r + h)?
-            - self.conserved_angular_momentum(r - h)?)
-            / (2.0 * h);
-        Ok(d_l_dr)
+        let h = 1e-6 * r.max(1.0);
+
+        if r - h < self.r_isco {
+            // forward difference near ISCO to avoid going below ISCO
+            Ok((self.conserved_angular_momentum(r + h)? - self.conserved_angular_momentum(r)?) / h)
+        } else {
+            Ok((self.conserved_angular_momentum(r + h)?
+                - self.conserved_angular_momentum(r - h)?)
+                / (2.0 * h))
+        }
     }
 
     fn d_omega_dr(&self, r: f64) -> f64 {
-        let h = 10e-10;
+        let h = 1e-10;
         let d_omega_dr = (self.angular_velocity(r + h) - self.angular_velocity(r - h)) / (2.0 * h);
         d_omega_dr
     }
@@ -185,9 +192,9 @@ impl KerrTemperatureComputer {
         let e = self.conserved_energy(r)?;
         let l = self.conserved_angular_momentum(r)?;
         let omega = self.angular_velocity(r);
-        let det_g = r * r;
+        let root_of_det_minus_g = r * r;
 
-        let pre_factor = self.d_omega_dr(r) / (det_g * (e - omega * l).powi(2));
+        let pre_factor = self.d_omega_dr(r) / (root_of_det_minus_g * (e - omega * l).powi(2));
         Ok(pre_factor)
     }
 
@@ -207,11 +214,15 @@ impl KerrTemperatureComputer {
     }
 }
 
-const BOLTZMANN_CONSTANT: f64 = 5.670374419e-8; // Boltzmann constant in W·m⁻²·K⁻⁴
+const SIGMA_SB: f64 = 1.0; // Set to 1.0 as this will get calibrated later on anyway.
 
 impl TemperatureComputer for KerrTemperatureComputer {
     fn compute_temperature(&self, radius: f64) -> Result<f64, RaytracerError> {
-        let sigma_sb = BOLTZMANN_CONSTANT;
+        if radius < self.r_isco {
+            return Err(RaytracerError::BelowRISCO);
+        }
+
+        let sigma_sb = SIGMA_SB;
         let f = self.compute_f(radius)?;
         let temp_fourth_power = f / sigma_sb;
         let temperature = temp_fourth_power.powf(0.25);
