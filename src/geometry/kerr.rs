@@ -126,7 +126,7 @@ impl Kerr {
         Matrix4::from_row_slice(&data)
     }
 
-    fn ut_contra(&self, position: &Point) -> f64 {
+    fn ut_contra(&self, position: &Point) -> Result<f64, RaytracerError> {
         let r = position.get_as_spherical()[0];
         let a = self.a;
         let r_s = self.radius;
@@ -143,11 +143,10 @@ impl Kerr {
                 "No timelike circular orbit at r = {} (ut_pre = {})",
                 r, ut_pre
             );
-            // TODO: Improve error handling here.
-            panic!("No timelike circular orbit possible");
+            return Err(RaytracerError::NoCircularOrbitPossible);
         }
 
-        (-ut_pre).sqrt().recip()
+        Ok((-ut_pre).sqrt().recip())
     }
 
     // https://arxiv.org/abs/1104.5499 equation (36)
@@ -312,6 +311,7 @@ impl HasCoordinateSystem for Kerr {
 
 impl InnerProduct for Kerr {
     fn inner_product(&self, position: &Point, v: &FourVector, w: &FourVector) -> f64 {
+        assert_eq!(v.coordinate_system, w.coordinate_system);
         let metric = metric(self.radius, self.a, position[1], position[2], position[3]);
         (v.vector.transpose() * metric * w.vector).x
     }
@@ -446,10 +446,13 @@ impl SupportQuantities for Kerr {
     }
 
     // See https://arxiv.org/abs/1104.5499.
-    fn get_circular_orbit_velocity_at(&self, position: &Point) -> FourVector {
+    fn get_circular_orbit_velocity_at(
+        &self,
+        position: &Point,
+    ) -> Result<FourVector, RaytracerError> {
         let r = compute_r_sqr(self.a, position[1], position[2], position[3]).sqrt();
         let omega = self.angular_velocity(r);
-        let ut = self.ut_contra(&position);
+        let ut = self.ut_contra(&position)?;
         let uphi = omega * ut;
 
         let velocity_spherical = FourVector::new_spherical(ut, 0.0, 0.0, uphi);
@@ -457,12 +460,12 @@ impl SupportQuantities for Kerr {
         let jacobian = self.jacobian_spherical_to_cartesian(position);
         let velocity_cartesian = jacobian * velocity_spherical.vector;
 
-        FourVector::new_cartesian(
+        Ok(FourVector::new_cartesian(
             velocity_cartesian[0],
             velocity_cartesian[1],
             velocity_cartesian[2],
             velocity_cartesian[3],
-        )
+        ))
     }
 
     fn get_temperature_computer(
@@ -710,7 +713,7 @@ mod tests {
         let geometry = Kerr::new(radius, NO_ANGULAR_MOMENTUM, 1e-4);
 
         let position = Point::new_cartesian(0.0, 0.0, 3.0, 0.0);
-        let velocity = geometry.get_circular_orbit_velocity_at(&position);
+        let velocity = geometry.get_circular_orbit_velocity_at(&position).unwrap();
 
         assert_abs_diff_eq!(velocity[0], 1.414213562373095, epsilon = 1e-8);
         assert_abs_diff_eq!(velocity[1], -0.5773502691896257, epsilon = 1e-8);

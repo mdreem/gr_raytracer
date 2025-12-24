@@ -49,7 +49,7 @@ impl<'a, G: Geometry> Objects<'a, G> {
                 let distance = (intersection_point - y_start_cartesian).norm();
                 if distance < shortest_distance {
                     shortest_distance = distance;
-                    let emitter_energy = hittable.energy_of_emitter(self.geometry, y_start);
+                    let emitter_energy = hittable.energy_of_emitter(self.geometry, y_start)?;
                     let redshift = redshift_computer
                         .compute_redshift_from_energies(emitter_energy, observer_energy);
                     let temperature =

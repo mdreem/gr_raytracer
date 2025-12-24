@@ -1,4 +1,5 @@
 color_normalization = "NoNormalization"
+celestial_temperature = 0.0
 
 [celestial_texture.Bitmap]
 beaming_exponent = 3.0
@@ -12,6 +13,7 @@ color_normalization = "NoNormalization"
 [objects.Disc]
 inner_radius = 3.0
 outer_radius = 5.0
+temperature = 1.0
 
 [objects.Disc.texture.Bitmap]
 beaming_exponent = 3.0

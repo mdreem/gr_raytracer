@@ -21,6 +21,8 @@ pub struct TextureData {
     pub celestial_map: TextureMapHandle,
 }
 
+/// Data about the temperature and redshift at a point. Used e.g. for texture mapping with black
+/// body radiation.
 pub struct TemperatureData {
     pub temperature: f64,
     pub redshift: f64,

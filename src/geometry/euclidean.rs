@@ -152,8 +152,11 @@ impl SupportQuantities for EuclideanSpace {
         FourVector::new_cartesian(1.0, 0.0, 0.0, 0.0)
     }
 
-    fn get_circular_orbit_velocity_at(&self, _position: &Point) -> FourVector {
-        FourVector::new_cartesian(1.0, 0.0, 0.0, 0.0)
+    fn get_circular_orbit_velocity_at(
+        &self,
+        _position: &Point,
+    ) -> Result<FourVector, RaytracerError> {
+        Ok(FourVector::new_cartesian(1.0, 0.0, 0.0, 0.0))
         // TODO: implement proper circular orbit velocity in Euclidean space.
     }
 
