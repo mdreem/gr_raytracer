@@ -28,6 +28,8 @@ pub enum RaytracerError {
     CameraError(CameraError),
     NoCircularOrbitPossible,
     BelowRISCO,
+    NumberBelowZero,
+    DenominatorCloseToZero,
 }
 
 pub struct Raytracer<'a, G: Geometry> {

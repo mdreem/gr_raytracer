@@ -39,9 +39,15 @@ pub trait Signature {
     fn signature(&self) -> [f64; 4];
 }
 
+/// Support quantities that can be derived from the geometry.
+/// This includes things like computing various velocities at a given position or ways to
+/// compute temperatures.
 pub trait SupportQuantities {
     fn get_stationary_velocity_at(&self, position: &Point) -> FourVector;
-    fn get_circular_orbit_velocity_at(&self, position: &Point) -> FourVector;
+    fn get_circular_orbit_velocity_at(
+        &self,
+        position: &Point,
+    ) -> Result<FourVector, RaytracerError>;
     fn get_temperature_computer(
         &self,
         temperature: f64,

@@ -108,6 +108,7 @@ impl CIETristimulus {
         }
     }
 
+    /// Applies relativistic beaming effect based on redshift and beaming exponent.
     pub fn apply_beaming(&self, redshift: f64, beaming_exponent: f64) -> CIETristimulus {
         let beaming_factor = redshift.powf(beaming_exponent);
         CIETristimulus {

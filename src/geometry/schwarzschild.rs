@@ -198,7 +198,10 @@ impl SupportQuantities for Schwarzschild {
     }
 
     // This is based on assume stable circular orbits in the equatorial plane.
-    fn get_circular_orbit_velocity_at(&self, position: &Point) -> FourVector {
+    fn get_circular_orbit_velocity_at(
+        &self,
+        position: &Point,
+    ) -> Result<FourVector, RaytracerError> {
         let r = position[1];
         let r0 = self.radius;
         let omega = (r0 / (2.0 * r * r * r)).sqrt();
@@ -206,7 +209,7 @@ impl SupportQuantities for Schwarzschild {
         let ut = (1.0 - r0 / r - r * r * omega * omega).recip().sqrt();
         let uphi = omega * ut;
 
-        FourVector::new_spherical(ut, 0.0, 0.0, uphi)
+        Ok(FourVector::new_spherical(ut, 0.0, 0.0, uphi))
     }
 
     fn get_temperature_computer(

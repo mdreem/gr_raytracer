@@ -112,11 +112,15 @@ impl Hittable for Sphere {
         self.texture_mapper.color_at_uv(uv, temperature_data)
     }
 
-    fn energy_of_emitter(&self, geometry: &dyn Geometry, step: &Step) -> f64 {
+    fn energy_of_emitter(
+        &self,
+        geometry: &dyn Geometry,
+        step: &Step,
+    ) -> Result<f64, RaytracerError> {
         let position = step.x;
         let velocity = geometry.get_stationary_velocity_at(&position);
         let momentum = step.p;
-        geometry.inner_product(&position, &velocity, &momentum)
+        Ok(geometry.inner_product(&position, &velocity, &momentum))
     }
 
     fn temperature_of_emitter(&self, _point: &Point) -> Result<f64, RaytracerError> {
