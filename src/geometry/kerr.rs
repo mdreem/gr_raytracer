@@ -106,17 +106,17 @@ impl Kerr {
             0.0,
             0.0,
             0.0,
-            // row 1: x(r,θ,φ)
+            // row 1: x(r,theta,phi)
             0.0,
             st * cp,
             r * ct * cp,
             -r * st * sp,
-            // row 2: y(r,θ,φ)
+            // row 2: y(r,theta,phi)
             0.0,
             st * sp,
             r * ct * sp,
             r * st * cp,
-            // row 3: z(r,θ,φ)
+            // row 3: z(r,theta,phi)
             0.0,
             ct,
             -r * st,
@@ -483,7 +483,7 @@ impl SupportQuantities for Kerr {
 #[cfg(test)]
 mod tests {
     use crate::geometry::four_vector::FourVector;
-    use crate::geometry::geometry::{Geometry, InnerProduct};
+    use crate::geometry::geometry::{Geometry, InnerProduct, SupportQuantities};
     use crate::geometry::kerr::Kerr;
     use crate::geometry::point::Point;
     use crate::geometry::spherical_coordinates_helper::cartesian_to_spherical;
@@ -702,5 +702,19 @@ mod tests {
             assert_abs_diff_eq!(step_a.x[2], -step_b.x[3], epsilon = 1e-5);
             assert_abs_diff_eq!(step_a.x[3], step_b.x[2], epsilon = 1e-5);
         }
+    }
+
+    #[test]
+    fn test_circular_orbit_velocity() {
+        let radius = 1.0;
+        let geometry = Kerr::new(radius, NO_ANGULAR_MOMENTUM, 1e-4);
+
+        let position = Point::new_cartesian(0.0, 0.0, 3.0, 0.0);
+        let velocity = geometry.get_circular_orbit_velocity_at(&position);
+
+        assert_abs_diff_eq!(velocity[0], 1.414213562373095, epsilon = 1e-8);
+        assert_abs_diff_eq!(velocity[1], -0.5773502691896257, epsilon = 1e-8);
+        assert_abs_diff_eq!(velocity[2], 0.0, epsilon = 1e-8);
+        assert_abs_diff_eq!(velocity[3], 0.0, epsilon = 1e-8);
     }
 }
