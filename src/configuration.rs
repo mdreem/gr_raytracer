@@ -60,6 +60,12 @@ pub enum ObjectsConfig {
         texture: TextureConfig,
         temperature: f64,
     },
+    VolumetricDisc {
+        inner_radius: f64,
+        outer_radius: f64,
+        texture: TextureConfig,
+        temperature: f64,
+    },
 }
 
 #[cfg(test)]

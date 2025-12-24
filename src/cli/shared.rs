@@ -106,6 +106,25 @@ pub fn create_scene<G: Geometry>(
                 );
                 objects.add_object(Box::new(disc));
             }
+            configuration::ObjectsConfig::VolumetricDisc {
+                inner_radius,
+                outer_radius,
+                texture,
+                temperature,
+            } => {
+                debug!(
+                    "Adding volumetric disc with inner radius: {}, outer radius: {}",
+                    inner_radius, outer_radius
+                );
+                let texture_mapper_disc = get_texture_mapper(&mut texture_mapper_factory, texture)?;
+                let disc = scene_objects::volumetric_disc::VolumetricDisc::new(
+                    inner_radius,
+                    outer_radius,
+                    texture_mapper_disc,
+                    geometry.get_temperature_computer(temperature, inner_radius, outer_radius)?,
+                );
+                objects.add_object(Box::new(disc));
+            }
         }
     }
 
