@@ -70,6 +70,7 @@ pub fn create_scene<G: Geometry>(
                 radius,
                 position,
                 texture,
+                temperature,
             } => {
                 debug!(
                     "Adding sphere with radius: {} at ({},{},{})",
@@ -82,6 +83,7 @@ pub fn create_scene<G: Geometry>(
                     radius,
                     texture_mapper_sphere,
                     Point::new_cartesian(0.0, position.0, position.1, position.2),
+                    temperature,
                 );
                 objects.add_object(Box::new(sphere));
             }
@@ -89,14 +91,19 @@ pub fn create_scene<G: Geometry>(
                 inner_radius,
                 outer_radius,
                 texture,
+                temperature,
             } => {
                 debug!(
                     "Adding disc with inner radius: {}, outer radius: {}",
                     inner_radius, outer_radius
                 );
                 let texture_mapper_disc = get_texture_mapper(&mut texture_mapper_factory, texture)?;
-                let disc =
-                    scene_objects::disc::Disc::new(inner_radius, outer_radius, texture_mapper_disc);
+                let disc = scene_objects::disc::Disc::new(
+                    inner_radius,
+                    outer_radius,
+                    texture_mapper_disc,
+                    geometry.get_temperature_computer(temperature, inner_radius, outer_radius)?,
+                );
                 objects.add_object(Box::new(disc));
             }
         }
@@ -109,6 +116,7 @@ pub fn create_scene<G: Geometry>(
         geometry,
         camera,
         false,
+        config.celestial_temperature,
     );
     Ok(scene)
 }
@@ -119,16 +127,23 @@ fn get_texture_mapper(
 ) -> Result<TextureMapHandle, RaytracerError> {
     let texture_mapper_sphere = match texture {
         TextureConfig::Bitmap {
+            beaming_exponent,
             path,
             color_normalization,
-        } => texture_mapper_factory.get_texture_mapper(path, color_normalization)?,
+        } => texture_mapper_factory.get_texture_mapper(
+            beaming_exponent,
+            path,
+            color_normalization,
+        )?,
         TextureConfig::Checker {
+            beaming_exponent,
             width,
             height,
             color1,
             color2,
             color_normalization,
         } => Arc::new(CheckerMapper::new(
+            beaming_exponent,
             width,
             height,
             Color::new(color1.0, color1.1, color1.2, 255),
@@ -136,9 +151,9 @@ fn get_texture_mapper(
             color_normalization,
         )),
         TextureConfig::BlackBody {
-            temperature,
+            beaming_exponent,
             color_normalization,
-        } => Arc::new(BlackBodyMapper::new(temperature, color_normalization)),
+        } => Arc::new(BlackBodyMapper::new(beaming_exponent, color_normalization)),
     };
     Ok(texture_mapper_sphere)
 }

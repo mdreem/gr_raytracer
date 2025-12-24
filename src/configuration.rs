@@ -7,6 +7,7 @@ pub struct RenderConfig {
     pub color_normalization: CIETristimulusNormalization,
     pub objects: Vec<ObjectsConfig>,
     pub celestial_texture: TextureConfig,
+    pub celestial_temperature: f64,
 }
 
 #[derive(Deserialize, Serialize, Debug, PartialEq, Clone)]
@@ -27,10 +28,12 @@ pub enum GeometryType {
 #[derive(Deserialize, Serialize, Debug, PartialEq, Clone)]
 pub enum TextureConfig {
     Bitmap {
+        beaming_exponent: f64,
         path: String,
         color_normalization: CIETristimulusNormalization,
     },
     Checker {
+        beaming_exponent: f64,
         width: f64,
         height: f64,
         color1: (u8, u8, u8),
@@ -38,7 +41,7 @@ pub enum TextureConfig {
         color_normalization: CIETristimulusNormalization,
     },
     BlackBody {
-        temperature: f64,
+        beaming_exponent: f64,
         color_normalization: CIETristimulusNormalization,
     },
 }
@@ -49,11 +52,13 @@ pub enum ObjectsConfig {
         radius: f64,
         position: (f64, f64, f64),
         texture: TextureConfig,
+        temperature: f64,
     },
     Disc {
         inner_radius: f64,
         outer_radius: f64,
         texture: TextureConfig,
+        temperature: f64,
     },
 }
 
@@ -67,10 +72,12 @@ mod tests {
     fn test_serialize() {
         let config = RenderConfig {
             celestial_texture: TextureConfig::Bitmap {
+                beaming_exponent: 3.0,
                 path: String::from("resources/celestial_sphere.png"),
                 color_normalization: NoNormalization,
             },
             color_normalization: NoNormalization,
+            celestial_temperature: 1500.0,
             geometry_type: GeometryType::Schwarzschild {
                 radius: 2.0,
                 horizon_epsilon: 1e-4,
@@ -80,28 +87,33 @@ mod tests {
                     radius: 1.0,
                     position: (1.1, 2.2, 3.3),
                     texture: TextureConfig::Bitmap {
+                        beaming_exponent: 3.0,
                         path: String::from("resources/sphere.png"),
                         color_normalization: NoNormalization,
                     },
+                    temperature: 4500.0,
                 },
                 ObjectsConfig::Disc {
                     inner_radius: 1.0,
                     outer_radius: 3.0,
                     texture: TextureConfig::Checker {
+                        beaming_exponent: 3.0,
                         width: 0.5,
                         height: 0.5,
                         color1: (255, 0, 0),
                         color2: (0, 0, 255),
                         color_normalization: NoNormalization,
                     },
+                    temperature: 5500.0,
                 },
                 ObjectsConfig::Sphere {
                     radius: 0.5,
                     position: (4.4, 5.5, 6.6),
                     texture: TextureConfig::BlackBody {
-                        temperature: 6500.0,
+                        beaming_exponent: 3.0,
                         color_normalization: NoNormalization,
                     },
+                    temperature: 6500.0,
                 },
             ],
         };
@@ -115,8 +127,10 @@ mod tests {
     fn test_deserialize() {
         let toml_str = r#"
             color_normalization = "NoNormalization"
+            celestial_temperature = 1500.0
 
             [celestial_texture.Bitmap]
+            beaming_exponent = 3.0
             path = "resources/celestial_sphere.png"
             color_normalization = "NoNormalization"
 
@@ -129,8 +143,10 @@ mod tests {
             [objects.Sphere]
             radius = 1.0
             position = [1.1, 2.2, 3.3]
+            temperature = 5500.0
 
             [objects.Sphere.texture.Bitmap]
+            beaming_exponent = 3.0
             path = "resources/sphere.png"
             color_normalization = "NoNormalization"
 
@@ -139,8 +155,10 @@ mod tests {
             [objects.Disc]
             inner_radius = 1.0
             outer_radius = 3.0
+            temperature = 6500.0
 
             [objects.Disc.texture.Checker]
+            beaming_exponent = 3.0
             width = 0.5
             height = 0.5
             color1 = [255, 0, 0]
@@ -152,10 +170,12 @@ mod tests {
         assert_eq!(
             config.celestial_texture,
             TextureConfig::Bitmap {
+                beaming_exponent: 3.0,
                 path: String::from("resources/celestial_sphere.png"),
                 color_normalization: NoNormalization,
             }
         );
+        assert_eq!(config.celestial_temperature, 1500.0);
 
         assert_eq!(
             config.geometry_type,
@@ -169,6 +189,7 @@ mod tests {
             radius,
             position,
             texture,
+            temperature,
         } = &config.objects[0]
         {
             assert_eq!(*radius, 1.0);
@@ -178,10 +199,12 @@ mod tests {
             assert_eq!(
                 texture,
                 &TextureConfig::Bitmap {
+                    beaming_exponent: 3.0,
                     path: String::from("resources/sphere.png"),
                     color_normalization: NoNormalization,
                 }
             );
+            assert_eq!(*temperature, 5500.0);
         } else {
             panic!("Expected first object to be a Sphere");
         }
@@ -190,10 +213,12 @@ mod tests {
             inner_radius,
             outer_radius,
             texture: _,
+            temperature,
         } = &config.objects[1]
         {
             assert_eq!(*inner_radius, 1.0);
             assert_eq!(*outer_radius, 3.0);
+            assert_eq!(*temperature, 6500.0);
         } else {
             panic!("Expected second object to be a Disc");
         }

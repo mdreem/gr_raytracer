@@ -1,13 +1,15 @@
 use crate::geometry::four_vector::FourVector;
 use crate::geometry::geometry::{
-    GeodesicSolver, Geometry, HasCoordinateSystem, InnerProduct, Signature,
+    GeodesicSolver, Geometry, HasCoordinateSystem, InnerProduct, Signature, SupportQuantities,
 };
 use crate::geometry::point::CoordinateSystem::Cartesian;
 use crate::geometry::point::{CoordinateSystem, Point};
 use crate::geometry::tetrad::Tetrad;
 use crate::rendering::ray::Ray;
+use crate::rendering::raytracer::RaytracerError;
 use crate::rendering::runge_kutta::OdeFunction;
 use crate::rendering::scene::EquationOfMotionState;
+use crate::rendering::temperature::{ConstantTemperatureComputer, TemperatureComputer};
 use log::trace;
 use nalgebra::{Const, Matrix4, OVector};
 
@@ -132,10 +134,6 @@ impl Geometry for EuclideanSpace {
         matrix
     }
 
-    fn get_stationary_velocity_at(&self, _position: &Point) -> FourVector {
-        FourVector::new_cartesian(1.0, 0.0, 0.0, 0.0)
-    }
-
     fn inside_horizon(&self, _position: &Point) -> bool {
         false
     }
@@ -146,6 +144,29 @@ impl Geometry for EuclideanSpace {
 
     fn get_geodesic_solver(&self, _ray: &Ray) -> Box<dyn GeodesicSolver> {
         Box::new(EuclideanSpacedSolver {})
+    }
+}
+
+impl SupportQuantities for EuclideanSpace {
+    fn get_stationary_velocity_at(&self, _position: &Point) -> FourVector {
+        FourVector::new_cartesian(1.0, 0.0, 0.0, 0.0)
+    }
+
+    fn get_circular_orbit_velocity_at(
+        &self,
+        _position: &Point,
+    ) -> Result<FourVector, RaytracerError> {
+        Ok(FourVector::new_cartesian(1.0, 0.0, 0.0, 0.0))
+        // TODO: implement proper circular orbit velocity in Euclidean space.
+    }
+
+    fn get_temperature_computer(
+        &self,
+        temperature: f64,
+        _inner_radius: f64,
+        _outer_radius: f64,
+    ) -> Result<Box<dyn TemperatureComputer>, RaytracerError> {
+        Ok(Box::new(ConstantTemperatureComputer::new(temperature)))
     }
 }
 

@@ -2,8 +2,10 @@ use crate::geometry::four_vector::FourVector;
 use crate::geometry::point::{CoordinateSystem, Point};
 use crate::geometry::tetrad::Tetrad;
 use crate::rendering::ray::Ray;
+use crate::rendering::raytracer::RaytracerError;
 use crate::rendering::runge_kutta::OdeFunction;
 use crate::rendering::scene::EquationOfMotionState;
+use crate::rendering::temperature::TemperatureComputer;
 use nalgebra::{Const, Matrix4};
 
 pub trait GeodesicSolver: OdeFunction<Const<8>> + HasCoordinateSystem {
@@ -37,10 +39,28 @@ pub trait Signature {
     fn signature(&self) -> [f64; 4];
 }
 
-pub trait Geometry: InnerProduct + HasCoordinateSystem + Signature + Clone + Sync {
+/// Support quantities that can be derived from the geometry.
+/// This includes things like computing various velocities at a given position or ways to
+/// compute temperatures.
+pub trait SupportQuantities {
+    fn get_stationary_velocity_at(&self, position: &Point) -> FourVector;
+    fn get_circular_orbit_velocity_at(
+        &self,
+        position: &Point,
+    ) -> Result<FourVector, RaytracerError>;
+    fn get_temperature_computer(
+        &self,
+        temperature: f64,
+        inner_radius: f64,
+        outer_radius: f64,
+    ) -> Result<Box<dyn TemperatureComputer>, RaytracerError>;
+}
+
+pub trait Geometry:
+    InnerProduct + HasCoordinateSystem + Signature + SupportQuantities + Sync
+{
     fn get_tetrad_at(&self, position: &Point) -> Tetrad;
     fn lorentz_transformation(&self, position: &Point, velocity: &FourVector) -> Matrix4<f64>;
-    fn get_stationary_velocity_at(&self, position: &Point) -> FourVector;
     fn inside_horizon(&self, position: &Point) -> bool;
     fn closed_orbit(&self, position: &Point, step_index: usize, max_steps: usize) -> bool;
     fn get_geodesic_solver(&self, ray: &Ray) -> Box<dyn GeodesicSolver>;

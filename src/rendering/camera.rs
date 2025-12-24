@@ -90,7 +90,7 @@ impl Camera {
     ) -> Result<Camera, CameraError> {
         let original_tetrad = geometry.get_tetrad_at(&position);
 
-        let tetrad_validator = TetradValidator::new(geometry.clone());
+        let tetrad_validator = TetradValidator::new(geometry);
         tetrad_validator.validate(&original_tetrad)?;
 
         let (a_prime, b_prime) = rotate(original_tetrad.x, original_tetrad.y, phi);
