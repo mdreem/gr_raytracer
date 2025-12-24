@@ -29,7 +29,8 @@ pub struct TemperatureData {
 }
 
 pub trait TextureMap: Sync {
-    fn color_at_uv(&self, uv: UVCoordinates, temperature_data: TemperatureData) -> CIETristimulus;
+    fn color_at_uv(&self, uv: &UVCoordinates, temperature_data: &TemperatureData)
+    -> CIETristimulus;
 }
 
 #[derive(Clone)]
@@ -92,7 +93,11 @@ impl TextureMapper {
 }
 
 impl TextureMap for TextureMapper {
-    fn color_at_uv(&self, uv: UVCoordinates, temperature_data: TemperatureData) -> CIETristimulus {
+    fn color_at_uv(
+        &self,
+        uv: &UVCoordinates,
+        temperature_data: &TemperatureData,
+    ) -> CIETristimulus {
         let cie_tristimulus = self.bilinear(&uv);
         let cie_tristimulus_beamed =
             cie_tristimulus.apply_beaming(temperature_data.redshift, self.beaming_exponent);
@@ -119,7 +124,11 @@ impl BlackBodyMapper {
 }
 
 impl TextureMap for BlackBodyMapper {
-    fn color_at_uv(&self, _uv: UVCoordinates, temperature_data: TemperatureData) -> CIETristimulus {
+    fn color_at_uv(
+        &self,
+        uv_: &UVCoordinates,
+        temperature_data: &TemperatureData,
+    ) -> CIETristimulus {
         let c = get_cie_xyz_of_black_body_redshifted(
             temperature_data.temperature * temperature_data.redshift,
         );
@@ -161,7 +170,11 @@ impl CheckerMapper {
 }
 
 impl TextureMap for CheckerMapper {
-    fn color_at_uv(&self, uv: UVCoordinates, temperature_data: TemperatureData) -> CIETristimulus {
+    fn color_at_uv(
+        &self,
+        uv: &UVCoordinates,
+        temperature_data: &TemperatureData,
+    ) -> CIETristimulus {
         let ut = (uv.u * self.width).floor() as usize;
         let vt = (uv.v * self.height).floor() as usize;
 
@@ -248,8 +261,8 @@ mod tests {
         let texture_mapper = create_texture_mapper();
         let uv = super::UVCoordinates { u: 0.0, v: 0.0 };
         let color = texture_mapper.color_at_uv(
-            uv,
-            TemperatureData {
+            &uv,
+            &TemperatureData {
                 redshift: 1.0,
                 temperature: 0.0,
             },
@@ -265,8 +278,8 @@ mod tests {
         let texture_mapper = create_texture_mapper();
         let uv = super::UVCoordinates { u: 0.999, v: 0.999 };
         let color = texture_mapper.color_at_uv(
-            uv,
-            TemperatureData {
+            &uv,
+            &TemperatureData {
                 redshift: 1.0,
                 temperature: 0.0,
             },
@@ -282,8 +295,8 @@ mod tests {
         let texture_mapper = create_texture_mapper();
         let uv = super::UVCoordinates { u: 0.0, v: 0.999 };
         let color = texture_mapper.color_at_uv(
-            uv,
-            TemperatureData {
+            &uv,
+            &TemperatureData {
                 redshift: 1.0,
                 temperature: 0.0,
             },
@@ -299,8 +312,8 @@ mod tests {
         let texture_mapper = create_texture_mapper();
         let uv = super::UVCoordinates { u: 0.999, v: 0.0 };
         let color = texture_mapper.color_at_uv(
-            uv,
-            TemperatureData {
+            &uv,
+            &TemperatureData {
                 redshift: 1.0,
                 temperature: 0.0,
             },
@@ -317,8 +330,8 @@ mod tests {
         let texture_mapper = create_texture_mapper();
         let uv = super::UVCoordinates { u: 0.25, v: 0.25 };
         let color = texture_mapper.color_at_uv(
-            uv,
-            TemperatureData {
+            &uv,
+            &TemperatureData {
                 redshift: 1.0,
                 temperature: 0.0,
             },

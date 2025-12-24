@@ -119,8 +119,8 @@ impl<'a, G: Geometry> Scene<'a, G> {
                         .redshift_computer
                         .compute_redshift(&last_step, observer_energy);
                     intersections.push(self.texture_data.celestial_map.color_at_uv(
-                        uv,
-                        TemperatureData {
+                        &uv,
+                        &TemperatureData {
                             redshift,
                             temperature: self.celestial_temperature,
                         },
