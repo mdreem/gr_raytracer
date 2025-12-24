@@ -5,7 +5,7 @@ use crate::rendering::integrator::Step;
 use crate::rendering::raytracer::RaytracerError;
 use crate::rendering::temperature::TemperatureComputer;
 use crate::rendering::texture::{TemperatureData, TextureMapHandle, UVCoordinates};
-use crate::scene_objects::hittable::{Hittable, Intersection};
+use crate::scene_objects::hittable::{ColorComputationData, Hittable, Intersection};
 use crate::scene_objects::objects::SceneObject;
 
 pub struct VolumetricDisc {
@@ -73,10 +73,13 @@ impl Hittable for VolumetricDisc {
         })
     }
 
-    fn color_at_uv(&self, uv: UVCoordinates, temperature_data: TemperatureData) -> CIETristimulus {
-        CIETristimulus::new(100.0, 0.0, 0.0, 1.0)
-
-        //self.texture_mapper.color_at_uv(uv, temperature_data)
+    fn color_at_uv(&self, color_computation_data: &ColorComputationData) -> CIETristimulus {
+        let disc_thickness = (color_computation_data.intersection_point[3].abs() / 0.5).exp();
+        if color_computation_data.intersection_point[3].abs() > 0.5 {
+            CIETristimulus::new(0.0, 0.0, 0.0, 0.0)
+        } else {
+            CIETristimulus::new(100.0, 0.0, disc_thickness, 1.0)
+        }
     }
 
     fn energy_of_emitter(

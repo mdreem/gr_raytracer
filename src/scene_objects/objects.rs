@@ -4,7 +4,7 @@ use crate::rendering::integrator::Step;
 use crate::rendering::raytracer::RaytracerError;
 use crate::rendering::redshift::RedshiftComputer;
 use crate::rendering::texture::TemperatureData;
-use crate::scene_objects::hittable::Hittable;
+use crate::scene_objects::hittable::{ColorComputationData, Hittable};
 
 pub trait SceneObject: Hittable {}
 
@@ -55,13 +55,15 @@ impl<'a, G: Geometry> Objects<'a, G> {
                     let temperature =
                         hittable.temperature_of_emitter(&intersection_data.intersection_point)?;
 
-                    resulting_color = Some(hittable.color_at_uv(
-                        intersection_data.uv,
-                        TemperatureData {
+                    let color_computation_data = ColorComputationData {
+                        uv: intersection_data.uv,
+                        temperature_data: TemperatureData {
                             redshift,
                             temperature,
                         },
-                    ));
+                        intersection_point: intersection_data.intersection_point,
+                    };
+                    resulting_color = Some(hittable.color_at_uv(&color_computation_data));
                 }
             }
         }
