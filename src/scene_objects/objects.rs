@@ -1,7 +1,9 @@
 use crate::geometry::geometry::Geometry;
 use crate::rendering::color::CIETristimulus;
 use crate::rendering::integrator::Step;
+use crate::rendering::raytracer::RaytracerError;
 use crate::rendering::redshift::RedshiftComputer;
+use crate::rendering::texture::TemperatureData;
 use crate::scene_objects::hittable::Hittable;
 
 pub trait SceneObject: Hittable {}
@@ -28,7 +30,7 @@ impl<'a, G: Geometry> Objects<'a, G> {
         y_start: &Step,
         y_end: &Step,
         observer_energy: f64,
-    ) -> Option<CIETristimulus> {
+    ) -> Result<Option<CIETristimulus>, RaytracerError> {
         let redshift_computer = RedshiftComputer::new(self.geometry);
         let mut resulting_color = None;
         let mut shortest_distance = f64::MAX;
@@ -47,12 +49,23 @@ impl<'a, G: Geometry> Objects<'a, G> {
                 let distance = (intersection_point - y_start_cartesian).norm();
                 if distance < shortest_distance {
                     shortest_distance = distance;
-                    let redshift = redshift_computer.compute_redshift(y_start, observer_energy);
-                    resulting_color = Some(hittable.color_at_uv(intersection_data.uv, redshift));
+                    let emitter_energy = hittable.energy_of_emitter(self.geometry, y_start)?;
+                    let redshift = redshift_computer
+                        .compute_redshift_from_energies(emitter_energy, observer_energy);
+                    let temperature =
+                        hittable.temperature_of_emitter(&intersection_data.intersection_point)?;
+
+                    resulting_color = Some(hittable.color_at_uv(
+                        intersection_data.uv,
+                        TemperatureData {
+                            redshift,
+                            temperature,
+                        },
+                    ));
                 }
             }
         }
-        resulting_color
+        Ok(resulting_color)
     }
 }
 
@@ -73,6 +86,7 @@ mod tests {
         Box::new(Sphere::new(
             radius,
             Arc::new(CheckerMapper::new(
+                3.0,
                 5.0,
                 5.0,
                 Color::new(color, color, color, 255),
@@ -80,6 +94,7 @@ mod tests {
                 NoNormalization,
             )),
             Point::new_cartesian(0.0, x, y, z),
+            0.0,
         ))
     }
     #[test]
@@ -106,7 +121,7 @@ mod tests {
             p: FourVector::new_cartesian(1.0, 0.0, 0.0, 0.0),
         };
 
-        let result = objects.intersects(&step_start, &step_end, 1.0);
+        let result = objects.intersects(&step_start, &step_end, 1.0).unwrap();
         assert!(result.is_some());
     }
 
@@ -133,7 +148,9 @@ mod tests {
         objects_setup_1.add_object(farther_sphere);
         objects_setup_1.add_object(closer_sphere);
 
-        let result_1 = objects_setup_1.intersects(&step_start, &step_end, 1.0);
+        let result_1 = objects_setup_1
+            .intersects(&step_start, &step_end, 1.0)
+            .unwrap();
         assert!(result_1.is_some());
         assert_abs_diff_eq!(result_1.unwrap().x, 0.121, epsilon = 1e-2);
 
@@ -143,7 +160,9 @@ mod tests {
         objects_setup_2.add_object(closer_sphere);
         objects_setup_2.add_object(farther_sphere);
 
-        let result_2 = objects_setup_2.intersects(&step_start, &step_end, 1.0);
+        let result_2 = objects_setup_2
+            .intersects(&step_start, &step_end, 1.0)
+            .unwrap();
         assert!(result_2.is_some());
         assert_abs_diff_eq!(result_2.unwrap().x, 0.121, epsilon = 1e-2);
     }

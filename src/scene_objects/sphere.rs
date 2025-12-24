@@ -1,7 +1,10 @@
+use crate::geometry::geometry::Geometry;
 use crate::geometry::point::{CoordinateSystem, Point};
 use crate::geometry::spherical_coordinates_helper::cartesian_to_spherical;
 use crate::rendering::color::CIETristimulus;
-use crate::rendering::texture::{TextureMapHandle, UVCoordinates};
+use crate::rendering::integrator::Step;
+use crate::rendering::raytracer::RaytracerError;
+use crate::rendering::texture::{TemperatureData, TextureMapHandle, UVCoordinates};
 use crate::scene_objects::hittable::{Hittable, Intersection};
 use crate::scene_objects::objects::SceneObject;
 use nalgebra::Vector3;
@@ -11,14 +14,21 @@ pub struct Sphere {
     radius: f64,
     texture_mapper: TextureMapHandle,
     position: Point,
+    temperature: f64,
 }
 
 impl Sphere {
-    pub fn new(radius: f64, texture_mapper: TextureMapHandle, position: Point) -> Self {
+    pub fn new(
+        radius: f64,
+        texture_mapper: TextureMapHandle,
+        position: Point,
+        temperature: f64,
+    ) -> Self {
         Self {
             radius,
             texture_mapper,
             position,
+            temperature,
         }
     }
 }
@@ -98,8 +108,23 @@ impl Hittable for Sphere {
         None
     }
 
-    fn color_at_uv(&self, uv: UVCoordinates, redshift: f64) -> CIETristimulus {
-        self.texture_mapper.color_at_uv(uv, redshift)
+    fn color_at_uv(&self, uv: UVCoordinates, temperature_data: TemperatureData) -> CIETristimulus {
+        self.texture_mapper.color_at_uv(uv, temperature_data)
+    }
+
+    fn energy_of_emitter(
+        &self,
+        geometry: &dyn Geometry,
+        step: &Step,
+    ) -> Result<f64, RaytracerError> {
+        let position = step.x;
+        let velocity = geometry.get_stationary_velocity_at(&position);
+        let momentum = step.p;
+        Ok(geometry.inner_product(&position, &velocity, &momentum))
+    }
+
+    fn temperature_of_emitter(&self, _point: &Point) -> Result<f64, RaytracerError> {
+        Ok(self.temperature)
     }
 }
 
@@ -119,6 +144,7 @@ mod tests {
         Sphere::new(
             1.0,
             Arc::new(CheckerMapper::new(
+                3.0,
                 5.0,
                 5.0,
                 Color::new(100, 0, 0, 255),
@@ -126,6 +152,7 @@ mod tests {
                 NoNormalization,
             )),
             Point::new_cartesian(0.0, x, y, z),
+            0.0,
         )
     }
 

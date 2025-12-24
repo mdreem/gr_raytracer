@@ -1,6 +1,8 @@
 color_normalization = "NoNormalization"
+celestial_temperature = 0.0
 
 [celestial_texture.Bitmap]
+beaming_exponent = 3.0
 path = "resources/celestial.png"
 color_normalization = "NoNormalization"
 
@@ -13,8 +15,10 @@ horizon_epsilon = 1e-4
 [objects.Disc]
 inner_radius = 3.0
 outer_radius = 5.0
+temperature = 2000.0
 
 [objects.Disc.texture.Bitmap]
+beaming_exponent = 3.0
 path = "resources/disk.png"
 color_normalization = "NoNormalization"
 
@@ -23,7 +27,9 @@ color_normalization = "NoNormalization"
 [objects.Sphere]
 radius = 2.0
 position = [0.0, 0.0, 20.0]
+temperature = 2000.0
 
 [objects.Sphere.texture.Bitmap]
+beaming_exponent = 3.0
 path = "resources/sphere.png"
 color_normalization = "NoNormalization"

@@ -1,13 +1,15 @@
 use crate::geometry::four_vector::FourVector;
 use crate::geometry::geometry::{
-    GeodesicSolver, Geometry, HasCoordinateSystem, InnerProduct, Signature,
+    GeodesicSolver, Geometry, HasCoordinateSystem, InnerProduct, Signature, SupportQuantities,
 };
 use crate::geometry::point::CoordinateSystem::Spherical;
 use crate::geometry::point::{CoordinateSystem, Point};
 use crate::geometry::tetrad::Tetrad;
 use crate::rendering::ray::Ray;
+use crate::rendering::raytracer::RaytracerError;
 use crate::rendering::runge_kutta::OdeFunction;
 use crate::rendering::scene::EquationOfMotionState;
+use crate::rendering::temperature::{KerrTemperatureComputer, TemperatureComputer};
 use log::debug;
 use nalgebra::{Const, Matrix4, OVector};
 
@@ -174,11 +176,6 @@ impl Geometry for Schwarzschild {
         matrix
     }
 
-    fn get_stationary_velocity_at(&self, position: &Point) -> FourVector {
-        let a = 1.0 - self.radius / position[1];
-        FourVector::new_spherical(a.sqrt().recip(), 0.0, 0.0, 0.0)
-    }
-
     fn inside_horizon(&self, position: &Point) -> bool {
         position[1] <= self.radius + self.horizon_epsilon
     }
@@ -191,6 +188,42 @@ impl Geometry for Schwarzschild {
         Box::new(SchwarzschildSolver {
             radius: self.radius,
         })
+    }
+}
+
+impl SupportQuantities for Schwarzschild {
+    fn get_stationary_velocity_at(&self, position: &Point) -> FourVector {
+        let a = 1.0 - self.radius / position[1];
+        FourVector::new_spherical(a.sqrt().recip(), 0.0, 0.0, 0.0)
+    }
+
+    // This is based on assume stable circular orbits in the equatorial plane.
+    fn get_circular_orbit_velocity_at(
+        &self,
+        position: &Point,
+    ) -> Result<FourVector, RaytracerError> {
+        let r = position[1];
+        let r0 = self.radius;
+        let omega = (r0 / (2.0 * r * r * r)).sqrt();
+
+        let ut = (1.0 - r0 / r - r * r * omega * omega).recip().sqrt();
+        let uphi = omega * ut;
+
+        Ok(FourVector::new_spherical(ut, 0.0, 0.0, uphi))
+    }
+
+    fn get_temperature_computer(
+        &self,
+        temperature: f64,
+        _inner_radius: f64,
+        outer_radius: f64,
+    ) -> Result<Box<dyn TemperatureComputer>, RaytracerError> {
+        Ok(Box::new(KerrTemperatureComputer::new(
+            temperature,
+            outer_radius,
+            0.0,
+            self.radius,
+        )?))
     }
 }
 
@@ -518,7 +551,8 @@ mod tests {
         let geometry = Schwarzschild::new(radius, 1e-4);
         let camera = create_camera(position, radius, 0.0, 0.0, 0.0);
         let scene: Scene<Schwarzschild> =
-            scene::test_scene::create_scene_with_camera(1.0, 2.0, 7.0, &geometry, camera, 1e-5);
+            scene::test_scene::create_scene_with_camera(1.0, 2.0, 7.0, &geometry, camera, 1e-5)
+                .unwrap();
 
         let ray_a = scene.camera.get_ray_for(5, 10);
         let ray_b = scene.camera.get_ray_for(0, 5);
@@ -648,9 +682,9 @@ mod tests {
         let velocity = FourVector::new_spherical(a.sqrt().recip(), 0.0, 0.0, 0.0);
         let geometry = Schwarzschild::new(radius, 1e-4);
 
-        let scene: Box<Scene<Schwarzschild>> = Box::new(scene::test_scene::create_scene(
-            1.0, 2.0, 7.0, &geometry, position, velocity,
-        ));
+        let scene: Box<Scene<Schwarzschild>> = Box::new(
+            scene::test_scene::create_scene(1.0, 2.0, 7.0, &geometry, position, velocity).unwrap(),
+        );
 
         let momentum = FourVector::new_spherical(
             e / a,

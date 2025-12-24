@@ -44,16 +44,16 @@ impl Display for Tetrad {
     }
 }
 
-pub struct TetradValidator<G: Geometry> {
-    geometry: G,
+pub struct TetradValidator<'a, G: Geometry> {
+    geometry: &'a G,
 }
 
 fn is_approx_equal(a: f64, b: f64, tol: f64) -> bool {
     (a - b).abs() < tol
 }
 
-impl<G: Geometry> TetradValidator<G> {
-    pub fn new(geometry: G) -> TetradValidator<G> {
+impl<'a, G: Geometry> TetradValidator<'a, G> {
+    pub fn new(geometry: &'a G) -> TetradValidator<'a, G> {
         TetradValidator { geometry }
     }
 

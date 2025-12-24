@@ -1,15 +1,17 @@
 use crate::geometry::four_vector::FourVector;
 use crate::geometry::geometry::{
-    GeodesicSolver, Geometry, HasCoordinateSystem, InnerProduct, Signature,
+    GeodesicSolver, Geometry, HasCoordinateSystem, InnerProduct, Signature, SupportQuantities,
 };
 use crate::geometry::gram_schmidt::gram_schmidt;
 use crate::geometry::point::CoordinateSystem::Cartesian;
 use crate::geometry::point::{CoordinateSystem, Point};
 use crate::geometry::tetrad::Tetrad;
 use crate::rendering::ray::Ray;
+use crate::rendering::raytracer::RaytracerError;
 use crate::rendering::runge_kutta::OdeFunction;
 use crate::rendering::scene::EquationOfMotionState;
-use log::{debug, trace};
+use crate::rendering::temperature::{KerrTemperatureComputer, TemperatureComputer};
+use log::{debug, error, trace};
 use nalgebra::{Const, Matrix4, OVector, Vector3, Vector4};
 
 #[derive(Clone, Debug)]
@@ -86,6 +88,75 @@ impl Kerr {
             a,
             horizon_epsilon,
         }
+    }
+
+    fn jacobian_spherical_to_cartesian(&self, position: &Point) -> Matrix4<f64> {
+        let spherical = position.get_as_spherical();
+
+        let r = spherical[0];
+        let theta = spherical[1];
+        let phi = spherical[2];
+
+        let (st, ct) = (theta.sin(), theta.cos());
+        let (sp, cp) = (phi.sin(), phi.cos());
+
+        let data = vec![
+            // row 0: t = t
+            1.0,
+            0.0,
+            0.0,
+            0.0,
+            // row 1: x(r,theta,phi)
+            0.0,
+            st * cp,
+            r * ct * cp,
+            -r * st * sp,
+            // row 2: y(r,theta,phi)
+            0.0,
+            st * sp,
+            r * ct * sp,
+            r * st * cp,
+            // row 3: z(r,theta,phi)
+            0.0,
+            ct,
+            -r * st,
+            0.0,
+        ];
+
+        Matrix4::from_row_slice(&data)
+    }
+
+    fn ut_contra(&self, position: &Point) -> Result<f64, RaytracerError> {
+        let r = position.get_as_spherical()[0];
+        let a = self.a;
+        let r_s = self.radius;
+        let omega = self.angular_velocity(r);
+
+        let g_tt = -(1.0 - r_s / r);
+        let g_tphi = -a * r_s / r;
+        let g_phiphi = r * r + a * a + a * a * r_s / r;
+
+        let ut_pre = g_tt + 2.0 * omega * g_tphi + omega * omega * g_phiphi;
+
+        if ut_pre >= 0.0 {
+            error!(
+                "No timelike circular orbit at r = {} (ut_pre = {})",
+                r, ut_pre
+            );
+            return Err(RaytracerError::NoCircularOrbitPossible);
+        }
+
+        Ok((-ut_pre).sqrt().recip())
+    }
+
+    // https://arxiv.org/abs/1104.5499 equation (36)
+    fn angular_velocity(&self, r: f64) -> f64 {
+        let a = self.a;
+        let r_s = self.radius;
+        let m = 0.5 * r_s;
+        let sqrt_m = m.sqrt();
+
+        sqrt_m / (r.powf(1.5) + a * sqrt_m)
     }
 }
 
@@ -240,6 +311,7 @@ impl HasCoordinateSystem for Kerr {
 
 impl InnerProduct for Kerr {
     fn inner_product(&self, position: &Point, v: &FourVector, w: &FourVector) -> f64 {
+        assert_eq!(v.coordinate_system, w.coordinate_system);
         let metric = metric(self.radius, self.a, position[1], position[2], position[3]);
         (v.vector.transpose() * metric * w.vector).x
     }
@@ -337,14 +409,6 @@ impl Geometry for Kerr {
         matrix
     }
 
-    fn get_stationary_velocity_at(&self, position: &Point) -> FourVector {
-        let (x, y, z) = (position[1], position[2], position[3]);
-        let r_sqr = compute_r_sqr(self.a, x, y, z);
-        let r = r_sqr.sqrt();
-        let f = (r * r * r * self.radius) / (r * r * r * r + self.a * self.a * z * z);
-        FourVector::new_cartesian((1.0 - f).sqrt().recip(), 0.0, 0.0, 0.0)
-    }
-
     fn inside_horizon(&self, position: &Point) -> bool {
         if self.a > self.radius {
             return false;
@@ -372,10 +436,57 @@ impl Geometry for Kerr {
     }
 }
 
+impl SupportQuantities for Kerr {
+    fn get_stationary_velocity_at(&self, position: &Point) -> FourVector {
+        let (x, y, z) = (position[1], position[2], position[3]);
+        let r_sqr = compute_r_sqr(self.a, x, y, z);
+        let r = r_sqr.sqrt();
+        let f = (r * r * r * self.radius) / (r * r * r * r + self.a * self.a * z * z);
+        FourVector::new_cartesian((1.0 - f).sqrt().recip(), 0.0, 0.0, 0.0)
+    }
+
+    // See https://arxiv.org/abs/1104.5499.
+    fn get_circular_orbit_velocity_at(
+        &self,
+        position: &Point,
+    ) -> Result<FourVector, RaytracerError> {
+        let r = compute_r_sqr(self.a, position[1], position[2], position[3]).sqrt();
+        let omega = self.angular_velocity(r);
+        let ut = self.ut_contra(&position)?;
+        let uphi = omega * ut;
+
+        let velocity_spherical = FourVector::new_spherical(ut, 0.0, 0.0, uphi);
+
+        let jacobian = self.jacobian_spherical_to_cartesian(position);
+        let velocity_cartesian = jacobian * velocity_spherical.vector;
+
+        Ok(FourVector::new_cartesian(
+            velocity_cartesian[0],
+            velocity_cartesian[1],
+            velocity_cartesian[2],
+            velocity_cartesian[3],
+        ))
+    }
+
+    fn get_temperature_computer(
+        &self,
+        temperature: f64,
+        _inner_radius: f64,
+        outer_radius: f64,
+    ) -> Result<Box<dyn TemperatureComputer>, RaytracerError> {
+        Ok(Box::new(KerrTemperatureComputer::new(
+            temperature,
+            outer_radius,
+            self.a,
+            self.radius,
+        )?))
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use crate::geometry::four_vector::FourVector;
-    use crate::geometry::geometry::{Geometry, InnerProduct};
+    use crate::geometry::geometry::{Geometry, InnerProduct, SupportQuantities};
     use crate::geometry::kerr::Kerr;
     use crate::geometry::point::Point;
     use crate::geometry::spherical_coordinates_helper::cartesian_to_spherical;
@@ -563,7 +674,8 @@ mod tests {
         let geometry = Kerr::new(radius, NO_ANGULAR_MOMENTUM, 1e-4);
         let camera = create_camera(position, radius);
         let scene: Scene<Kerr> =
-            scene::test_scene::create_scene_with_camera(1.0, 2.0, 7.0, &geometry, camera, 1e-5);
+            scene::test_scene::create_scene_with_camera(1.0, 2.0, 7.0, &geometry, camera, 1e-5)
+                .unwrap();
 
         let ray_a = scene.camera.get_ray_for(5, 10);
         let ray_b = scene.camera.get_ray_for(0, 5);
@@ -593,5 +705,19 @@ mod tests {
             assert_abs_diff_eq!(step_a.x[2], -step_b.x[3], epsilon = 1e-5);
             assert_abs_diff_eq!(step_a.x[3], step_b.x[2], epsilon = 1e-5);
         }
+    }
+
+    #[test]
+    fn test_circular_orbit_velocity() {
+        let radius = 1.0;
+        let geometry = Kerr::new(radius, NO_ANGULAR_MOMENTUM, 1e-4);
+
+        let position = Point::new_cartesian(0.0, 0.0, 3.0, 0.0);
+        let velocity = geometry.get_circular_orbit_velocity_at(&position).unwrap();
+
+        assert_abs_diff_eq!(velocity[0], 1.414213562373095, epsilon = 1e-8);
+        assert_abs_diff_eq!(velocity[1], -0.5773502691896257, epsilon = 1e-8);
+        assert_abs_diff_eq!(velocity[2], 0.0, epsilon = 1e-8);
+        assert_abs_diff_eq!(velocity[3], 0.0, epsilon = 1e-8);
     }
 }
