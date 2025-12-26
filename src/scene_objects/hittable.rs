@@ -1,3 +1,4 @@
+use crate::geometry::four_vector::FourVector;
 use crate::geometry::geometry::Geometry;
 use crate::geometry::point::Point;
 use crate::rendering::color::CIETristimulus;
@@ -8,12 +9,14 @@ use crate::rendering::texture::{TemperatureData, UVCoordinates};
 pub struct Intersection {
     pub uv: UVCoordinates,
     pub intersection_point: Point,
+    pub direction: FourVector,
 }
 
 pub struct ColorComputationData {
     pub uv: UVCoordinates,
     pub temperature_data: TemperatureData,
     pub intersection_point: Point,
+    pub direction: FourVector,
 }
 
 pub trait Hittable: Sync {

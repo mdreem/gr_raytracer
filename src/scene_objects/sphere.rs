@@ -1,3 +1,4 @@
+use crate::geometry::four_vector::FourVector;
 use crate::geometry::geometry::Geometry;
 use crate::geometry::point::{CoordinateSystem, Point};
 use crate::geometry::spherical_coordinates_helper::cartesian_to_spherical;
@@ -102,6 +103,7 @@ impl Hittable for Sphere {
             return Some(Intersection {
                 uv: UVCoordinates { u: 1.0 - u, v },
                 intersection_point: point_on_sphere,
+                direction: FourVector::new_cartesian(0.0, direction[0], direction[1], direction[2]),
             });
         }
 

@@ -62,6 +62,7 @@ impl<'a, G: Geometry> Objects<'a, G> {
                             temperature,
                         },
                         intersection_point: intersection_data.intersection_point,
+                        direction: intersection_data.direction,
                     };
                     resulting_color = Some(hittable.color_at_uv(&color_computation_data));
                 }
