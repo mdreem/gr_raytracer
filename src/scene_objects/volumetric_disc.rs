@@ -1,7 +1,7 @@
 use crate::geometry::four_vector::FourVector;
 use crate::geometry::geometry::Geometry;
 use crate::geometry::point::Point;
-use crate::rendering::color::CIETristimulus;
+use crate::rendering::color::{CIETristimulus, Color, srgb_to_xyz};
 use crate::rendering::integrator::Step;
 use crate::rendering::raytracer::RaytracerError;
 use crate::rendering::temperature::TemperatureComputer;
@@ -13,7 +13,7 @@ use nalgebra::{Vector3, inf};
 use noise::{NoiseFn, Perlin};
 
 const NUM_OCTAVES: usize = 8;
-const MAX_STEPS: usize = 1000;
+const MAX_STEPS: usize = 10000;
 
 pub struct VolumetricDisc {
     center_disk_inner_radius: f64,
@@ -38,11 +38,11 @@ impl VolumetricDisc {
     }
 
     fn raymarch_constant_step(&self, ro: &Vector3<f64>, rd: &Vector3<f64>) -> CIETristimulus {
-        let sigma_a = 0.5; // absorption coefficient
-        let sigma_s = 0.8; // scattering coefficient
+        let sigma_a = 0.01; // absorption coefficient
+        let sigma_s = 2.1; // scattering coefficient
 
         let background_color = CIETristimulus::new(0.0, 0.0, 0.0, 0.0);
-        let light_color = CIETristimulus::new(1.0, 1.0, 1.0, 1.0);
+        let light_color = srgb_to_xyz(&Color::new(255, 100, 0, 255)); // orange light
         let mut result = CIETristimulus::new(0.0, 0.0, 0.0, 0.0);
 
         let mut transparency = 1.0;
@@ -51,7 +51,6 @@ impl VolumetricDisc {
         let d_s = max_distance / (MAX_STEPS as f64);
 
         // TODO count number of times we went through the middle.
-
         let mut hit_ring = false;
         let mut exited_ring = false;
 
@@ -97,8 +96,6 @@ impl VolumetricDisc {
             let n = n * 0.5 + 0.5;
 
             let mut density = n;
-            let disc_thickness = (-p[2].abs() / 0.1).exp(); // TODO: make the denominator a parameter.
-            density *= disc_thickness;
 
             let sample_attenuation = (-d_s * density * (sigma_a + sigma_s)).exp();
             transparency *= sample_attenuation;
@@ -152,6 +149,8 @@ impl Hittable for VolumetricDisc {
         let y_end_spatial = y_end.get_spatial_vector_cartesian();
         let direction = y_end_spatial - y_start_spatial;
 
+        let disc_thickness_parameter = 0.3;
+
         let n_start = y_start_spatial.norm_squared().sqrt();
         let n_end = y_end_spatial.norm_squared().sqrt();
 
@@ -161,6 +160,12 @@ impl Hittable for VolumetricDisc {
         }
         // If both points are outside outer radius, no intersection.
         if n_start > self.center_disk_outer_radius && n_end > self.center_disk_outer_radius {
+            return None;
+        }
+
+        if y_start_spatial[2].abs() > disc_thickness_parameter
+            && y_end_spatial[2].abs() > disc_thickness_parameter
+        {
             return None;
         }
 
@@ -178,7 +183,17 @@ impl Hittable for VolumetricDisc {
         {
             (self.center_disk_inner_radius - n_start) / (n_end - n_start)
         } else {
-            return None;
+            if (y_start_spatial[2].abs() > disc_thickness_parameter
+                && y_end_spatial[2].abs() < disc_thickness_parameter)
+                || (y_start_spatial[2].abs() < disc_thickness_parameter
+                    && y_end_spatial[2].abs() > disc_thickness_parameter)
+            {
+                // crossed thickness boundary
+                (disc_thickness_parameter - y_start_spatial[2].abs())
+                    / (y_end_spatial[2].abs() - y_start_spatial[2].abs())
+            } else {
+                return None;
+            }
         };
 
         let intersection_point = y_start_spatial + t * direction;
@@ -235,3 +250,22 @@ impl Hittable for VolumetricDisc {
 }
 
 impl SceneObject for VolumetricDisc {}
+
+mod tests {
+    #[test]
+    fn test_fbm() {
+        for x in 0..10 {
+            for y in 0..10 {
+                for z in 0..10 {
+                    let p = nalgebra::Vector3::new(x as f64 * 0.1, y as f64 * 0.1, z as f64 * 0.1);
+                    let value = super::fbm(p, 0.5);
+                    println!("fbm value at {:?} is {}", p, value);
+                }
+            }
+        }
+        let p = nalgebra::Vector3::new(1.0, 2.0, 13.0);
+        let value = super::fbm(p, 0.5);
+        println!("fbm value at {:?} is {}", p, value);
+        assert!(false);
+    }
+}
