@@ -109,17 +109,76 @@ impl TextureMap for TextureMapper {
 pub struct BlackBodyMapper {
     beaming_exponent: f64,
     color_normalization: CIETristimulusNormalization,
+    /// Precomputed blackbody colors indexed by log10(temperature).
+    color_profile: Vec<(f64, CIETristimulus)>,
 }
+
+const NUM_COLOR_LUT_STEPS: usize = 1000;
+const MIN_TEMPERATURE: f64 = 10.0;
+const MAX_TEMPERATURE: f64 = 10_000_000.0;
 
 impl BlackBodyMapper {
     pub fn new(
         beaming_exponent: f64,
         color_normalization: CIETristimulusNormalization,
     ) -> BlackBodyMapper {
+        let mut color_profile = Vec::with_capacity(NUM_COLOR_LUT_STEPS);
+        let min_log = MIN_TEMPERATURE.log10();
+        let max_log = MAX_TEMPERATURE.log10();
+        let step = (max_log - min_log) / (NUM_COLOR_LUT_STEPS - 1) as f64;
+
+        for i in 0..NUM_COLOR_LUT_STEPS {
+            let log_t = min_log + (i as f64) * step;
+            let t = 10.0_f64.powf(log_t);
+            let color = get_cie_xyz_of_black_body_redshifted(t);
+            color_profile.push((log_t, color));
+        }
+
         BlackBodyMapper {
             beaming_exponent,
             color_normalization,
+            color_profile,
         }
+    }
+
+    fn sample_blackbody(&self, temperature: f64) -> CIETristimulus {
+        let (first_log_t, first_color) = *self
+            .color_profile
+            .first()
+            .expect("Color profile should not be empty");
+        let (last_log_t, last_color) = *self
+            .color_profile
+            .last()
+            .expect("Color profile should not be empty");
+
+        let log_t = temperature.max(10.0).log10();
+
+        if log_t <= first_log_t {
+            return first_color;
+        }
+        if log_t >= last_log_t {
+            return last_color;
+        }
+
+        let idx = match self
+            .color_profile
+            .binary_search_by(|(lt, _)| lt.partial_cmp(&log_t).unwrap())
+        {
+            Ok(i) => i,
+            Err(i) => i - 1,
+        };
+
+        let (lt0, c0) = self.color_profile[idx];
+        let (lt1, c1) = self.color_profile[idx + 1];
+
+        let t = (log_t - lt0) / (lt1 - lt0);
+
+        CIETristimulus::new(
+            c0.x + t * (c1.x - c0.x),
+            c0.y + t * (c1.y - c0.y),
+            c0.z + t * (c1.z - c0.z),
+            1.0,
+        )
     }
 }
 
@@ -129,12 +188,10 @@ impl TextureMap for BlackBodyMapper {
         _uv: &UVCoordinates,
         temperature_data: &TemperatureData,
     ) -> CIETristimulus {
-        let c = get_cie_xyz_of_black_body_redshifted(
-            temperature_data.temperature * temperature_data.redshift,
-        );
+        let effective_temp = temperature_data.temperature * temperature_data.redshift;
+        let c = self.sample_blackbody(effective_temp);
         let c_beamed = c.apply_beaming(temperature_data.redshift, self.beaming_exponent);
-        let r = c_beamed.normalize(self.color_normalization);
-        r
+        c_beamed.normalize(self.color_normalization)
     }
 }
 
