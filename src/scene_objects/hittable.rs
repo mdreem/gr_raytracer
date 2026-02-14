@@ -10,6 +10,7 @@ pub struct Intersection {
     pub uv: UVCoordinates,
     pub intersection_point: Point,
     pub direction: FourVector,
+    pub t: f64,
 }
 
 pub struct ColorComputationData {

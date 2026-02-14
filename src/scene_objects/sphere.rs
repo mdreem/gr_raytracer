@@ -103,6 +103,7 @@ impl Hittable for Sphere {
             return Some(Intersection {
                 uv: UVCoordinates { u: 1.0 - u, v },
                 intersection_point: point_on_sphere,
+                t,
                 direction: FourVector::new_cartesian(0.0, direction[0], direction[1], direction[2]),
             });
         }
