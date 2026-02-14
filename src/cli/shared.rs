@@ -15,6 +15,7 @@ use crate::rendering::texture::{
 use crate::scene_objects::objects::Objects;
 use crate::{configuration, scene_objects};
 use log::debug;
+use nalgebra::Vector3;
 use std::f64::consts::PI;
 use std::sync::Arc;
 
@@ -122,6 +123,7 @@ pub fn create_scene<G: Geometry>(
                     outer_radius,
                     texture_mapper_disc,
                     geometry.get_temperature_computer(temperature, inner_radius, outer_radius)?,
+                    Vector3::new(0.0, 0.0, 1.0),
                 );
                 objects.add_object(Box::new(disc));
             }

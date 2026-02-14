@@ -79,6 +79,7 @@ impl Hittable for Disc {
                     intersection_point[1],
                     intersection_point[2],
                 ),
+                t,
                 direction: FourVector::new_cartesian(0.0, direction[0], direction[1], direction[2]),
             })
         } else {
