@@ -10,7 +10,7 @@ use crate::rendering::raytracer::RaytracerError;
 use crate::rendering::redshift::RedshiftComputer;
 use crate::rendering::texture::{TemperatureData, TextureData, UVCoordinates};
 use crate::scene_objects::objects::Objects;
-use log::{error, info, trace};
+use log::{error, trace};
 use nalgebra::{Const, OVector};
 use std::f64::consts::PI;
 use std::fs::File;
