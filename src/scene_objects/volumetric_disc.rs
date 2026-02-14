@@ -74,21 +74,36 @@ impl VolumetricDisc {
         let h = p.dot(&self.axis).abs();
         let r = p.cross(&self.axis).norm();
 
-        if r <= self.center_disk_inner_radius
-            || r >= self.center_disk_outer_radius
-            || h > self.thickness
-        {
+        if r <= self.center_disk_inner_radius || r >= self.center_disk_outer_radius {
             return 0.0;
         }
 
-        let mut thickness = 1.0;
+        // Smooth vertical falloff (Gaussian) using thickness as sigma
+        let vertical_falloff = (-(h / self.thickness).powi(2)).exp();
+        if vertical_falloff < 0.001 {
+            return 0.0;
+        }
 
-        thickness *= (-1.0 / (self.center_disk_outer_radius - r).powi(4).max(0.00001)).exp();
-        thickness *= (-1.0 / (r - self.center_disk_inner_radius).powi(4).max(0.00001)).exp();
+        // Radial base density (inverse power law)
+        let radial_base = (self.center_disk_inner_radius / r).powf(1.5);
 
-        let n = self.fbm(*p, 0.5);
-        let n = 10.55 * (n + 0.90);
-        n * thickness
+        // Smooth radial boundaries
+        let mut boundary_falloff = 1.0;
+        boundary_falloff *= (-1.0 / (self.center_disk_outer_radius - r).powi(2).max(0.0001)).exp();
+        boundary_falloff *= (-1.0 / (r - self.center_disk_inner_radius).powi(2).max(0.0001)).exp();
+
+        // Cylindrical Noise Mapping
+        let x_local = p.dot(&self.e1);
+        let y_local = p.dot(&self.e2);
+        let phi = y_local.atan2(x_local);
+
+        // Map to noise space: (r, phi, h)
+        let noise_p = Vector3::new(r * 2.0, phi * 8.0, h * 5.0);
+        let n = self.fbm(noise_p, 0.5);
+
+        let n = (n + 0.6).max(0.0) * 15.0;
+
+        n * radial_base * vertical_falloff * boundary_falloff
     }
 
     fn get_uv(&self, p: &Vector3<f64>) -> UVCoordinates {
@@ -308,8 +323,11 @@ impl VolumetricDisc {
         let mut hits = Vec::new();
         let dir = to - from;
 
+        // Use 3.0 * thickness to capture the Gaussian tail
+        let capture_height = self.thickness * 3.0;
+
         // Check Outer Tube
-        match self.intersects_clipped_cylinder(from, to, outer_radius, axis, self.thickness) {
+        match self.intersects_clipped_cylinder(from, to, outer_radius, axis, capture_height) {
             OneIntersection(t) => hits.push(t),
             TwoIntersections(t1, t2) => {
                 hits.push(t1);
@@ -318,7 +336,7 @@ impl VolumetricDisc {
             _ => {}
         }
         // Check Inner Tube
-        match self.intersects_clipped_cylinder(from, to, inner_radius, axis, self.thickness) {
+        match self.intersects_clipped_cylinder(from, to, inner_radius, axis, capture_height) {
             OneIntersection(t) => hits.push(t),
             TwoIntersections(t1, t2) => {
                 hits.push(t1);
@@ -327,7 +345,7 @@ impl VolumetricDisc {
             _ => {}
         }
         // Check Caps
-        for pos in [self.thickness, -self.thickness] {
+        for pos in [capture_height, -capture_height] {
             if let Some(t) = self.intersects_cap(from, to, outer_radius, axis, pos) {
                 let p = from + t * dir;
                 let r_sq = p.cross(axis).norm_squared();
