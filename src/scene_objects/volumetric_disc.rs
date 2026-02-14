@@ -1,7 +1,7 @@
 use crate::geometry::four_vector::FourVector;
 use crate::geometry::geometry::Geometry;
 use crate::geometry::point::Point;
-use crate::rendering::color::{CIETristimulus, Color, srgb_to_xyz};
+use crate::rendering::color::CIETristimulus;
 use crate::rendering::integrator::Step;
 use crate::rendering::raytracer::RaytracerError;
 use crate::rendering::temperature::TemperatureComputer;
@@ -23,6 +23,8 @@ pub struct VolumetricDisc {
     texture_mapper: TextureMapHandle,
     temperature_computer: Box<dyn TemperatureComputer>,
     axis: Vector3<f64>,
+    e1: Vector3<f64>,
+    e2: Vector3<f64>,
     perlin: Perlin,
     num_octaves: usize,
     max_steps: usize,
@@ -42,12 +44,24 @@ impl VolumetricDisc {
         step_size: f64,
         thickness: f64,
     ) -> Self {
+        let axis = axis.normalize();
+        let e1 = if axis.x.abs() > 0.9 {
+            Vector3::new(0.0, 1.0, 0.0)
+        } else {
+            Vector3::new(1.0, 0.0, 0.0)
+        }
+        .cross(&axis)
+        .normalize();
+        let e2 = axis.cross(&e1).normalize();
+
         Self {
             center_disk_inner_radius,
             center_disk_outer_radius,
             texture_mapper,
             temperature_computer,
-            axis: axis.normalize(),
+            axis,
+            e1,
+            e2,
             perlin: Perlin::new(1),
             num_octaves,
             max_steps,
@@ -77,6 +91,20 @@ impl VolumetricDisc {
         n * thickness
     }
 
+    fn get_uv(&self, p: &Vector3<f64>) -> UVCoordinates {
+        let x = p.dot(&self.e1);
+        let y = p.dot(&self.e2);
+        let rr = (x * x + y * y).sqrt();
+
+        let phi = y.atan2(x);
+        let r = (rr - self.center_disk_inner_radius)
+            / (self.center_disk_outer_radius - self.center_disk_inner_radius);
+
+        let u = 0.5 + 0.5 * r * phi.cos();
+        let v = 0.5 + 0.5 * r * phi.sin();
+        UVCoordinates { u, v }
+    }
+
     fn does_exit(&self, p: &Vector3<f64>, rd: &Vector3<f64>, t: f64) -> bool {
         let point_from = Point::new_cartesian(0.0, p[0], p[1], p[2]);
         let point_to =
@@ -96,13 +124,16 @@ impl VolumetricDisc {
     }
 
     // https://www.scratchapixel.com/lessons/3d-basic-rendering/volume-rendering-for-developers/ray-marching-get-it-right.html
-    fn raymarch_constant_step(&self, ro: &Vector3<f64>, rd: &Vector3<f64>) -> CIETristimulus {
+    fn raymarch_constant_step(
+        &self,
+        ro: &Vector3<f64>,
+        rd: &Vector3<f64>,
+        redshift: f64,
+    ) -> Result<CIETristimulus, RaytracerError> {
         let sigma_a = 0.9; // absorption coefficient
         let sigma_s = 0.9; // scattering coefficient
 
-        let light_color = srgb_to_xyz(&Color::new(255, 100, 0, 255)); // orange light
-
-        let mut result = 0.0;
+        let mut accum_color = CIETristimulus::new(0.0, 0.0, 0.0, 0.0);
         let mut transparency = 1.0;
 
         let d_s = self.step_size;
@@ -116,12 +147,32 @@ impl VolumetricDisc {
             step_count += 1;
             let density = self.compute_density(&p);
 
-            let sample_attenuation = (-d_s * density * (sigma_a + sigma_s)).exp();
-            transparency *= sample_attenuation;
+            if density > 0.0 {
+                let r_dist = p.cross(&self.axis).norm();
+                let temperature = self.temperature_computer.compute_temperature(r_dist)?;
+                let uv = self.get_uv(&p);
+                let light_color = self.texture_mapper.color_at_uv(
+                    &uv,
+                    &crate::rendering::texture::TemperatureData {
+                        temperature,
+                        redshift,
+                    },
+                );
 
-            let travel_density = d_s; // Ignore the light ray here for now.
-            let light_attenuation = (-density * travel_density * (sigma_a + sigma_s)).exp();
-            result += transparency * light_attenuation * sigma_s * density * d_s;
+                let sample_attenuation = (-d_s * density * (sigma_a + sigma_s)).exp();
+                transparency *= sample_attenuation;
+
+                let travel_density = d_s; // Ignore the light ray here for now.
+                let light_attenuation = (-density * travel_density * (sigma_a + sigma_s)).exp();
+
+                // Stefan-Boltzmann law: emission intensity scales with T^4.
+                // Use a reference temperature of 1000K for normalization.
+                let intensity_factor = (temperature / 1000.0).powi(4);
+                let step_contribution =
+                    transparency * light_attenuation * sigma_s * density * d_s * intensity_factor;
+
+                accum_color = accum_color + light_color.mul_all_parts(step_contribution);
+            }
 
             // Check if ray will exist the disc in the next step.
             if self.does_exit(&p, &rd, d_s) {
@@ -135,9 +186,8 @@ impl VolumetricDisc {
             ro + rd * d_o,
             step_count
         );
-        let res = light_color.mul_all_parts(result);
-        trace!("  resulting color: {:?}", res);
-        res
+        trace!("  resulting color: {:?}", accum_color);
+        Ok(accum_color)
     }
 
     fn fbm(&self, x: Vector3<f64>, h: f64) -> f64 {
@@ -366,8 +416,10 @@ impl Hittable for VolumetricDisc {
             intersection_point.norm()
         );
 
+        let uv = self.get_uv(&intersection_point);
+
         Some(Intersection {
-            uv: UVCoordinates { u: 0.0, v: 0.0 },
+            uv,
             intersection_point: Point::new_cartesian(
                 0.0,
                 intersection_point[0],
@@ -391,7 +443,8 @@ impl Hittable for VolumetricDisc {
         )
         .normalize();
 
-        self.raymarch_constant_step(&ro, &rd)
+        self.raymarch_constant_step(&ro, &rd, color_computation_data.temperature_data.redshift)
+            .unwrap_or(CIETristimulus::new(0.0, 0.0, 0.0, 0.0))
     }
 
     fn energy_of_emitter(
@@ -431,6 +484,7 @@ mod tests {
     #[test]
     fn test_fbm() {
         use crate::rendering::color::CIETristimulusNormalization;
+        use crate::rendering::color::Color;
         use crate::rendering::texture::CheckerMapper;
         use std::sync::Arc;
 
