@@ -112,6 +112,10 @@ pub fn create_scene<G: Geometry>(
                 outer_radius,
                 texture,
                 temperature,
+                num_octaves,
+                max_steps,
+                step_size,
+                thickness,
             } => {
                 debug!(
                     "Adding volumetric disc with inner radius: {}, outer radius: {}",
@@ -124,6 +128,10 @@ pub fn create_scene<G: Geometry>(
                     texture_mapper_disc,
                     geometry.get_temperature_computer(temperature, inner_radius, outer_radius)?,
                     Vector3::new(0.0, 0.0, 1.0),
+                    num_octaves,
+                    max_steps,
+                    step_size,
+                    thickness,
                 );
                 objects.add_object(Box::new(disc));
             }

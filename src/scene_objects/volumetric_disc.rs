@@ -15,20 +15,19 @@ use log::trace;
 use nalgebra::Vector3;
 use noise::{NoiseFn, Perlin};
 
-const NUM_OCTAVES: usize = 8;
-const MAX_STEPS: usize = 10000;
-const STEP_SIZE: f64 = 0.01;
-const DISC_THICKNESS: f64 = 0.02;
 const MIN_INTERSECTION_T: f64 = 1e-9;
 
 pub struct VolumetricDisc {
     center_disk_inner_radius: f64,
     center_disk_outer_radius: f64,
-    #[allow(dead_code)]
     texture_mapper: TextureMapHandle,
     temperature_computer: Box<dyn TemperatureComputer>,
     axis: Vector3<f64>,
     perlin: Perlin,
+    num_octaves: usize,
+    max_steps: usize,
+    step_size: f64,
+    thickness: f64,
 }
 
 impl VolumetricDisc {
@@ -38,6 +37,10 @@ impl VolumetricDisc {
         texture_mapper: TextureMapHandle,
         temperature_computer: Box<dyn TemperatureComputer>,
         axis: Vector3<f64>,
+        num_octaves: usize,
+        max_steps: usize,
+        step_size: f64,
+        thickness: f64,
     ) -> Self {
         Self {
             center_disk_inner_radius,
@@ -46,6 +49,10 @@ impl VolumetricDisc {
             temperature_computer,
             axis: axis.normalize(),
             perlin: Perlin::new(1),
+            num_octaves,
+            max_steps,
+            step_size,
+            thickness,
         }
     }
 
@@ -55,7 +62,7 @@ impl VolumetricDisc {
 
         if r <= self.center_disk_inner_radius
             || r >= self.center_disk_outer_radius
-            || h > DISC_THICKNESS
+            || h > self.thickness
         {
             return 0.0;
         }
@@ -98,11 +105,11 @@ impl VolumetricDisc {
         let mut result = 0.0;
         let mut transparency = 1.0;
 
-        let d_s = STEP_SIZE;
+        let d_s = self.step_size;
         let mut step_count = 0;
         let mut d_o = 0.0;
 
-        for i in 0..MAX_STEPS {
+        for i in 0..self.max_steps {
             let p = ro + rd * d_o;
             d_o += d_s;
 
@@ -139,7 +146,7 @@ impl VolumetricDisc {
         let mut amplitude = 1.0;
         let mut t = 0.0;
 
-        for _ in 0..NUM_OCTAVES {
+        for _ in 0..self.num_octaves {
             t += amplitude * self.noise(x * frequency);
             frequency *= 2.0;
             amplitude *= g;
@@ -150,155 +157,154 @@ impl VolumetricDisc {
     fn noise(&self, p: Vector3<f64>) -> f64 {
         self.perlin.get([p[0], p[1], p[2]])
     }
+
+    fn intersects_clipped_cylinder(
+        &self,
+        from: &Vector3<f64>,
+        to: &Vector3<f64>,
+        radius: f64,
+        axis: &Vector3<f64>,
+        half_height: f64,
+    ) -> CylinderIntersection {
+        let d = (to - from).normalize();
+        let segment_length = (to - from).norm();
+
+        if segment_length < 1e-12 {
+            return NoIntersection;
+        }
+
+        let v = from.cross(axis);
+        let w = d.cross(axis);
+
+        let a = w.dot(&w);
+        let b = 2.0 * v.dot(&w);
+        let c = v.dot(&v) - radius * radius;
+
+        if a < 1e-10 {
+            if v.norm_squared() > radius * radius {
+                return NoIntersection;
+            }
+            return Parallel;
+        }
+
+        let discriminant = b * b - 4.0 * a * c;
+        if discriminant < 0.0 {
+            return NoIntersection;
+        }
+
+        let sqrt_disc = discriminant.sqrt();
+        let t1_dist = (-b - sqrt_disc) / (2.0 * a);
+        let t2_dist = (-b + sqrt_disc) / (2.0 * a);
+
+        let mut hits = Vec::new();
+        for dist in [t1_dist, t2_dist] {
+            let t = dist / segment_length;
+            if (0.0..=1.0).contains(&t) {
+                let p = from + t * (to - from);
+                if p.dot(axis).abs() <= half_height {
+                    hits.push(t);
+                }
+            }
+        }
+
+        if hits.is_empty() {
+            return NoIntersection;
+        }
+        if hits.len() == 1 {
+            return OneIntersection(hits[0]);
+        }
+        TwoIntersections(hits[0].min(hits[1]), hits[0].max(hits[1]))
+    }
+
+    fn intersects_cap(
+        &self,
+        from: &Vector3<f64>,
+        to: &Vector3<f64>,
+        radius: f64,
+        axis: &Vector3<f64>,
+        pos: f64,
+    ) -> Option<f64> {
+        let n = (to - from).normalize();
+        let segment_vector = to - from;
+
+        let denom = n.dot(axis);
+        if denom.abs() < 1e-10 {
+            return None;
+        }
+
+        let t = (pos - from.dot(axis)) / segment_vector.dot(axis);
+
+        if !(0.0..=1.0).contains(&t) {
+            return None;
+        }
+
+        let p = from + t * segment_vector;
+        let radial_dist_sq = p.cross(axis).norm_squared();
+        if radial_dist_sq > radius * radius {
+            return None;
+        }
+
+        Some(t)
+    }
+
+    fn intersects_cylinder(
+        &self,
+        from: &Vector3<f64>,
+        to: &Vector3<f64>,
+        inner_radius: f64,
+        outer_radius: f64,
+        axis: &Vector3<f64>,
+    ) -> CylinderIntersection {
+        let mut hits = Vec::new();
+        let dir = to - from;
+
+        // Check Outer Tube
+        match self.intersects_clipped_cylinder(from, to, outer_radius, axis, self.thickness) {
+            OneIntersection(t) => hits.push(t),
+            TwoIntersections(t1, t2) => {
+                hits.push(t1);
+                hits.push(t2);
+            }
+            _ => {}
+        }
+        // Check Inner Tube
+        match self.intersects_clipped_cylinder(from, to, inner_radius, axis, self.thickness) {
+            OneIntersection(t) => hits.push(t),
+            TwoIntersections(t1, t2) => {
+                hits.push(t1);
+                hits.push(t2);
+            }
+            _ => {}
+        }
+        // Check Caps
+        for pos in [self.thickness, -self.thickness] {
+            if let Some(t) = self.intersects_cap(from, to, outer_radius, axis, pos) {
+                let p = from + t * dir;
+                let r_sq = p.cross(axis).norm_squared();
+                if r_sq >= inner_radius * inner_radius {
+                    hits.push(t);
+                }
+            }
+        }
+
+        hits.sort_by(|a, b| a.partial_cmp(b).unwrap());
+
+        if hits.is_empty() {
+            NoIntersection
+        } else if hits.len() == 1 {
+            OneIntersection(hits[0])
+        } else {
+            TwoIntersections(hits[0], hits[1])
+        }
+    }
 }
 
 #[derive(Debug)]
-enum CylinderIntersection {
+pub enum CylinderIntersection {
     NoIntersection,
     Parallel,
     OneIntersection(f64),
     TwoIntersections(f64, f64),
-}
-
-fn intersects_clipped_cylinder(
-    from: &Vector3<f64>,
-    to: &Vector3<f64>,
-    radius: f64,
-    axis: &Vector3<f64>,
-    half_height: f64,
-) -> CylinderIntersection {
-    let d = (to - from).normalize();
-    let segment_length = (to - from).norm();
-
-    if segment_length < 1e-12 {
-        return NoIntersection;
-    }
-
-    // Ray: P(t) = F + tD. Distance to axis A through origin: ||(F + tD) x A||^2 = R^2
-    // Let V = F x A, W = D x A
-    // ||V||^2 + 2t(V.W) + t^2||W||^2 = R^2
-    let v = from.cross(axis);
-    let w = d.cross(axis);
-
-    let a = w.dot(&w);
-    let b = 2.0 * v.dot(&w);
-    let c = v.dot(&v) - radius * radius;
-
-    if a < 1e-10 {
-        // Ray parallel to axis
-        if v.norm_squared() > radius * radius {
-            return NoIntersection;
-        }
-        return Parallel;
-    }
-
-    let discriminant = b * b - 4.0 * a * c;
-    if discriminant < 0.0 {
-        return NoIntersection;
-    }
-
-    let sqrt_disc = discriminant.sqrt();
-    let t1_dist = (-b - sqrt_disc) / (2.0 * a);
-    let t2_dist = (-b + sqrt_disc) / (2.0 * a);
-
-    let mut hits = Vec::new();
-    for dist in [t1_dist, t2_dist] {
-        let t = dist / segment_length;
-        if (0.0..=1.0).contains(&t) {
-            let p = from + t * (to - from);
-            if p.dot(axis).abs() <= half_height {
-                hits.push(t);
-            }
-        }
-    }
-
-    if hits.is_empty() {
-        return NoIntersection;
-    }
-    if hits.len() == 1 {
-        return OneIntersection(hits[0]);
-    }
-    TwoIntersections(hits[0].min(hits[1]), hits[0].max(hits[1]))
-}
-
-fn intersects_cap(
-    from: &Vector3<f64>,
-    to: &Vector3<f64>,
-    radius: f64,
-    axis: &Vector3<f64>,
-    pos: f64,
-) -> Option<f64> {
-    let n = (to - from).normalize();
-    let segment_vector = to - from;
-
-    let denom = n.dot(axis);
-    if denom.abs() < 1e-10 {
-        return None;
-    }
-
-    let t = (pos - from.dot(axis)) / segment_vector.dot(axis);
-
-    if !(0.0..=1.0).contains(&t) {
-        return None;
-    }
-
-    let p = from + t * segment_vector;
-    let radial_dist_sq = p.cross(axis).norm_squared();
-    if radial_dist_sq > radius * radius {
-        return None;
-    }
-
-    Some(t)
-}
-
-fn intersects_cylinder(
-    from: &Vector3<f64>,
-    to: &Vector3<f64>,
-    inner_radius: f64,
-    outer_radius: f64,
-    axis: &Vector3<f64>,
-) -> CylinderIntersection {
-    let mut hits = Vec::new();
-    let dir = to - from;
-
-    // 1. Check Outer Tube
-    match intersects_clipped_cylinder(from, to, outer_radius, axis, DISC_THICKNESS) {
-        OneIntersection(t) => hits.push(t),
-        TwoIntersections(t1, t2) => {
-            hits.push(t1);
-            hits.push(t2);
-        }
-        _ => {}
-    }
-    // 2. Check Inner Tube
-    match intersects_clipped_cylinder(from, to, inner_radius, axis, DISC_THICKNESS) {
-        OneIntersection(t) => hits.push(t),
-        TwoIntersections(t1, t2) => {
-            hits.push(t1);
-            hits.push(t2);
-        }
-        _ => {}
-    }
-    // 3. Check Caps
-    for pos in [DISC_THICKNESS, -DISC_THICKNESS] {
-        if let Some(t) = intersects_cap(from, to, outer_radius, axis, pos) {
-            let p = from + t * dir;
-            let r_sq = p.cross(axis).norm_squared();
-            if r_sq >= inner_radius * inner_radius {
-                hits.push(t);
-            }
-        }
-    }
-
-    hits.sort_by(|a, b| a.partial_cmp(b).unwrap());
-
-    if hits.is_empty() {
-        NoIntersection
-    } else if hits.len() == 1 {
-        OneIntersection(hits[0])
-    } else {
-        TwoIntersections(hits[0], hits[1])
-    }
 }
 
 impl Hittable for VolumetricDisc {
@@ -308,7 +314,7 @@ impl Hittable for VolumetricDisc {
 
         let direction = y_end_spatial - y_start_spatial;
 
-        let cylinder_intersection = intersects_cylinder(
+        let cylinder_intersection = self.intersects_cylinder(
             &y_start_spatial,
             &y_end_spatial,
             self.center_disk_inner_radius,
@@ -342,7 +348,7 @@ impl Hittable for VolumetricDisc {
                 } else if t2 > MIN_INTERSECTION_T {
                     t2
                 } else {
-                    None?
+                    return None;
                 }
             }
         };
@@ -377,6 +383,7 @@ impl Hittable for VolumetricDisc {
         let ro = color_computation_data
             .intersection_point
             .get_spatial_vector_cartesian();
+
         let rd = Vector3::<f64>::new(
             color_computation_data.direction[1],
             color_computation_data.direction[2],
@@ -423,19 +430,27 @@ mod tests {
 
     #[test]
     fn test_fbm() {
+        use crate::rendering::color::CIETristimulusNormalization;
+        use crate::rendering::texture::CheckerMapper;
+        use std::sync::Arc;
+
         let disc = VolumetricDisc::new(
             4.05,
             11.0,
-            TextureMapHandle::new_checker(
+            Arc::new(CheckerMapper::new(
                 3.0,
                 5.0,
                 5.0,
                 Color::new(255, 0, 0, 255),
                 Color::new(0, 0, 255, 255),
-                crate::rendering::color::CIETristimulusNormalization::NoNormalization,
-            ),
+                CIETristimulusNormalization::NoNormalization,
+            )),
             Box::new(DummyTemperatureComputer {}),
             Vector3::new(0.0, 0.0, 1.0),
+            8,
+            10000,
+            0.01,
+            0.02,
         );
 
         for x in 0..10 {

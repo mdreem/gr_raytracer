@@ -65,6 +65,10 @@ pub enum ObjectsConfig {
         outer_radius: f64,
         texture: TextureConfig,
         temperature: f64,
+        num_octaves: usize,
+        max_steps: usize,
+        step_size: f64,
+        thickness: f64,
     },
 }
 
