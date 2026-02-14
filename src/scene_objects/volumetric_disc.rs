@@ -11,18 +11,20 @@ use crate::scene_objects::objects::SceneObject;
 use crate::scene_objects::volumetric_disc::CylinderIntersection::{
     NoIntersection, OneIntersection, Parallel, TwoIntersections,
 };
-use log::{info, trace};
-use nalgebra::{DimMul, Vector3, inf};
+use log::trace;
+use nalgebra::Vector3;
 use noise::{NoiseFn, Perlin};
 
 const NUM_OCTAVES: usize = 8;
 const MAX_STEPS: usize = 10000;
 const STEP_SIZE: f64 = 0.01;
 const DISC_THICKNESS: f64 = 0.02;
+const MIN_INTERSECTION_T: f64 = 1e-9;
 
 pub struct VolumetricDisc {
     center_disk_inner_radius: f64,
     center_disk_outer_radius: f64,
+    #[allow(dead_code)]
     texture_mapper: TextureMapHandle,
     temperature_computer: Box<dyn TemperatureComputer>,
     axis: Vector3<f64>,
@@ -73,11 +75,11 @@ impl VolumetricDisc {
         let point_to =
             Point::new_cartesian(0.0, p[0] + rd[0] * t, p[1] + rd[1] * t, p[2] + rd[2] * t);
         if let Some(intersection) = self.intersects(&point_from, &point_to) {
-            let exit = intersection.t > 1e-9;
+            let exit = intersection.t > MIN_INTERSECTION_T;
             if exit {
                 trace!(
-                    "  does_exit found intersection at t={} ( > 1e-9), breaking.",
-                    intersection.t
+                    "  does_exit found intersection at t={} ( > {}), breaking.",
+                    intersection.t, MIN_INTERSECTION_T
                 );
             }
             exit
@@ -98,11 +100,11 @@ impl VolumetricDisc {
 
         let d_s = STEP_SIZE;
         let mut step_count = 0;
-        let mut dO = 0.0;
+        let mut d_o = 0.0;
 
         for i in 0..MAX_STEPS {
-            let p = ro + rd * dO;
-            dO += d_s;
+            let p = ro + rd * d_o;
+            d_o += d_s;
 
             step_count += 1;
             let density = self.compute_density(&p);
@@ -123,7 +125,7 @@ impl VolumetricDisc {
         trace!(
             "  Computed from {:?} to {:?} with step_count={}",
             ro,
-            ro + rd * dO,
+            ro + rd * d_o,
             step_count
         );
         let res = light_color.mul_all_parts(result);
@@ -325,14 +327,24 @@ impl Hittable for VolumetricDisc {
         }
 
         let t = match cylinder_intersection {
-            NoIntersection => {
-                return None;
+            NoIntersection => return None,
+            Parallel => return None,
+            OneIntersection(t) => {
+                if t > MIN_INTERSECTION_T {
+                    t
+                } else {
+                    return None;
+                }
             }
-            Parallel => {
-                return None;
+            TwoIntersections(t1, t2) => {
+                if t1 > MIN_INTERSECTION_T {
+                    t1
+                } else if t2 > MIN_INTERSECTION_T {
+                    t2
+                } else {
+                    None?
+                }
             }
-            OneIntersection(t) => t,
-            TwoIntersections(t1, _t2) => t1, // Always take the first hit
         };
 
         let intersection_point = y_start_spatial + t * direction;
@@ -395,11 +407,9 @@ impl Hittable for VolumetricDisc {
 
 impl SceneObject for VolumetricDisc {}
 
+#[cfg(test)]
 mod tests {
-    use crate::rendering::temperature::TemperatureComputer;
-    use crate::rendering::texture::TextureMapHandle;
-    use crate::scene_objects::volumetric_disc::VolumetricDisc;
-    use nalgebra::Vector3;
+    use super::*;
 
     struct DummyTemperatureComputer;
     impl TemperatureComputer for DummyTemperatureComputer {
@@ -420,11 +430,11 @@ mod tests {
                 3.0,
                 5.0,
                 5.0,
-                crate::rendering::color::Color::new(255, 0, 0, 255),
-                crate::rendering::color::Color::new(0, 0, 255, 255),
+                Color::new(255, 0, 0, 255),
+                Color::new(0, 0, 255, 255),
                 crate::rendering::color::CIETristimulusNormalization::NoNormalization,
             ),
-            Box::new(DummyTemperatureComputer),
+            Box::new(DummyTemperatureComputer {}),
             Vector3::new(0.0, 0.0, 1.0),
         );
 
@@ -440,6 +450,5 @@ mod tests {
         let p = nalgebra::Vector3::new(1.0, 2.0, 13.0);
         let value = disc.fbm(p, 0.5);
         println!("fbm value at {:?} is {}", p, value);
-        // assert!(false);
     }
 }

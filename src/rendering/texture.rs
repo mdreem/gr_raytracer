@@ -126,7 +126,7 @@ impl BlackBodyMapper {
 impl TextureMap for BlackBodyMapper {
     fn color_at_uv(
         &self,
-        uv_: &UVCoordinates,
+        _uv: &UVCoordinates,
         temperature_data: &TemperatureData,
     ) -> CIETristimulus {
         let c = get_cie_xyz_of_black_body_redshifted(
