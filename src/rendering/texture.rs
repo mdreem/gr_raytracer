@@ -3,6 +3,7 @@ use crate::rendering::color::{CIETristimulus, CIETristimulusNormalization, Color
 use crate::rendering::raytracer::RaytracerError;
 use crate::rendering::texture::TextureError::DecodeError;
 use image::{DynamicImage, GenericImageView, ImageReader};
+use log::{error, warn};
 use std::sync::Arc;
 
 #[derive(Debug)]
@@ -142,16 +143,23 @@ impl BlackBodyMapper {
     }
 
     fn sample_blackbody(&self, temperature: f64) -> CIETristimulus {
-        let (first_log_t, first_color) = *self
-            .color_profile
-            .first()
-            .expect("Color profile should not be empty");
-        let (last_log_t, last_color) = *self
-            .color_profile
-            .last()
-            .expect("Color profile should not be empty");
+        let Some((first_log_t, first_color)) = self.color_profile.first().copied() else {
+            error!("BlackBodyMapper color_profile is empty; falling back to black.");
+            return CIETristimulus::new(0.0, 0.0, 0.0, 1.0);
+        };
+        let Some((last_log_t, last_color)) = self.color_profile.last().copied() else {
+            error!("BlackBodyMapper color_profile is empty; falling back to black.");
+            return CIETristimulus::new(0.0, 0.0, 0.0, 1.0);
+        };
 
         let log_t = temperature.max(10.0).log10();
+        if !log_t.is_finite() {
+            warn!(
+                "BlackBodyMapper received non-finite temperature {}, clamping to LUT minimum.",
+                temperature
+            );
+            return first_color;
+        }
 
         if log_t <= first_log_t {
             return first_color;
@@ -162,9 +170,10 @@ impl BlackBodyMapper {
 
         let idx = match self
             .color_profile
-            .binary_search_by(|(lt, _)| lt.partial_cmp(&log_t).unwrap())
+            .binary_search_by(|(lt, _)| lt.total_cmp(&log_t))
         {
             Ok(i) => i,
+            Err(0) => 0,
             Err(i) => i - 1,
         };
 
