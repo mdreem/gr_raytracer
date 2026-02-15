@@ -1,0 +1,32 @@
+color_normalization = "NoNormalization"
+celestial_temperature = 0.0
+
+[celestial_texture.Bitmap]
+beaming_exponent = 3.0
+path = "resources/celestial.png"
+color_normalization = "NoNormalization"
+
+[geometry_type.Schwarzschild]
+radius = 1.0
+horizon_epsilon = 1e-4
+
+[[objects]]
+
+[objects.VolumetricDisc]
+inner_radius = 4.05
+outer_radius = 11.0
+temperature = 1400.0
+num_octaves = 8
+max_steps = 50000
+step_size = 0.002
+thickness = 0.1
+density_multiplier = 500.0
+brightness_reference_temperature = 650.0
+absorption = 1.3
+scattering = 0.5
+noise_scale = [60.0, 2.0, 30.0]
+noise_offset = -0.1
+
+[objects.VolumetricDisc.texture.BlackBody]
+beaming_exponent = 7.0
+color_normalization = "EqualLuminance"
