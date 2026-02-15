@@ -112,7 +112,9 @@ pub fn create_scene<G: Geometry>(
                 outer_radius,
                 texture,
                 temperature,
+                axis,
                 num_octaves,
+                perlin_seed,
                 max_steps,
                 step_size,
                 thickness,
@@ -128,13 +130,17 @@ pub fn create_scene<G: Geometry>(
                     inner_radius, outer_radius
                 );
                 let texture_mapper_disc = get_texture_mapper(&mut texture_mapper_factory, texture)?;
+                let axis = axis
+                    .map(|(x, y, z)| Vector3::new(x, y, z))
+                    .unwrap_or(Vector3::new(0.0, 0.0, 1.0));
                 let disc = scene_objects::volumetric_disc::VolumetricDisc::new(
                     inner_radius,
                     outer_radius,
                     texture_mapper_disc,
                     geometry.get_temperature_computer(temperature, inner_radius, outer_radius)?,
-                    Vector3::new(0.0, 0.0, 1.0),
+                    axis,
                     num_octaves,
+                    perlin_seed.unwrap_or(1),
                     max_steps,
                     step_size,
                     thickness,

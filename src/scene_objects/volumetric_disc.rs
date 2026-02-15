@@ -46,6 +46,7 @@ impl VolumetricDisc {
         temperature_computer: Box<dyn TemperatureComputer>,
         axis: Vector3<f64>,
         num_octaves: usize,
+        perlin_seed: u32,
         max_steps: usize,
         step_size: f64,
         thickness: f64,
@@ -56,7 +57,11 @@ impl VolumetricDisc {
         noise_scale: Vector3<f64>,
         noise_offset: f64,
     ) -> Self {
-        let axis = axis.normalize();
+        let axis = if axis.norm_squared() <= f64::EPSILON {
+            Vector3::new(0.0, 0.0, 1.0)
+        } else {
+            axis.normalize()
+        };
         let e1 = if axis.x.abs() > 0.9 {
             Vector3::new(0.0, 1.0, 0.0)
         } else {
@@ -74,7 +79,7 @@ impl VolumetricDisc {
             axis,
             e1,
             e2,
-            perlin: Perlin::new(1),
+            perlin: Perlin::new(perlin_seed),
             num_octaves,
             max_steps,
             step_size,
