@@ -270,9 +270,10 @@ impl TemperatureComputer for KerrTemperatureComputer {
 
         let idx = match self
             .radial_temperature_profile
-            .binary_search_by(|(r, _)| r.partial_cmp(&radius).unwrap())
+            .binary_search_by(|(r, _)| r.total_cmp(&radius))
         {
             Ok(i) => i,
+            Err(0) => 0,
             Err(i) => i - 1,
         };
 
