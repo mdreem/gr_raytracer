@@ -525,3 +525,93 @@ impl Hittable for VolumetricDisc {
 }
 
 impl SceneObject for VolumetricDisc {}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::rendering::color::CIETristimulusNormalization::NoNormalization;
+    use crate::rendering::color::Color;
+    use crate::rendering::texture::CheckerMapper;
+    use std::sync::Arc;
+
+    struct DummyTemperatureComputer;
+
+    impl TemperatureComputer for DummyTemperatureComputer {
+        fn compute_temperature(&self, _r: f64) -> Result<f64, RaytracerError> {
+            Ok(1000.0)
+        }
+    }
+
+    fn create_disc() -> VolumetricDisc {
+        VolumetricDisc::new(
+            1.0,
+            3.0,
+            Arc::new(CheckerMapper::new(
+                3.0,
+                5.0,
+                5.0,
+                Color::new(255, 0, 0, 255),
+                Color::new(0, 0, 255, 255),
+                NoNormalization,
+            )),
+            Box::new(DummyTemperatureComputer),
+            Vector3::new(0.0, 0.0, 1.0),
+            4,
+            42,
+            500,
+            0.01,
+            0.5,
+            10.0,
+            1000.0,
+            0.2,
+            0.2,
+            Vector3::new(1.0, 1.0, 1.0),
+            1.0,
+        )
+    }
+
+    #[test]
+    fn test_volumetric_disc_intersection_exists() {
+        let disc = create_disc();
+        let y_start = Point::new_cartesian(0.0, 0.5, 0.0, 0.0);
+        let y_end = Point::new_cartesian(0.0, 1.5, 0.0, 0.0);
+
+        assert!(disc.intersects(&y_start, &y_end).is_some());
+    }
+
+    #[test]
+    fn test_volumetric_disc_intersection_miss_above_caps() {
+        let disc = create_disc();
+        let y_start = Point::new_cartesian(0.0, 1.5, 0.0, 2.0);
+        let y_end = Point::new_cartesian(0.0, 2.5, 0.0, 2.0);
+
+        assert!(disc.intersects(&y_start, &y_end).is_none());
+    }
+
+    #[test]
+    fn test_volumetric_disc_density_inside_and_outside() {
+        let disc = create_disc();
+
+        let inside = Vector3::new(2.0, 0.0, 0.0);
+        let outside_radial = Vector3::new(0.2, 0.0, 0.0);
+        let outside_vertical = Vector3::new(2.0, 0.0, 2.0);
+
+        assert!(disc.compute_density(&inside) > 0.0);
+        assert_eq!(disc.compute_density(&outside_radial), 0.0);
+        assert_eq!(disc.compute_density(&outside_vertical), 0.0);
+    }
+
+    #[test]
+    fn test_volumetric_disc_raymarch_produces_opacity() {
+        let disc = create_disc();
+        let ro = Vector3::new(2.0, 0.0, 0.0);
+        let rd = Vector3::new(1.0, 0.0, 0.0);
+
+        let color = disc
+            .raymarch_constant_step(&ro, &rd, 1.0)
+            .expect("raymarch should succeed");
+
+        assert!(color.alpha > 0.0);
+        assert!(color.alpha <= 1.0);
+    }
+}
