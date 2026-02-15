@@ -246,6 +246,11 @@ const SIGMA_SB: f64 = 1.0; // Set to 1.0 as this will get calibrated later on an
 
 impl TemperatureComputer for KerrTemperatureComputer {
     fn compute_temperature(&self, radius: f64) -> Result<f64, RaytracerError> {
+        if !radius.is_finite() {
+            error!("Radius {} is not finite", radius);
+            return Err(RaytracerError::NonFiniteRadius);
+        }
+
         if radius < self.r_isco {
             error!("Radius {} is below r_isco {}", radius, self.r_isco);
             return Err(RaytracerError::BelowRISCO);
