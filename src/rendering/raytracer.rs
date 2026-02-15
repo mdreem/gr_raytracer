@@ -26,6 +26,7 @@ pub enum RaytracerError {
     ImageBufferCreation,
     ProgressBarTemplateError(TemplateError),
     CameraError(CameraError),
+    InvalidConfiguration(String),
     NoCircularOrbitPossible,
     BelowRISCO,
     NonFiniteRadius,

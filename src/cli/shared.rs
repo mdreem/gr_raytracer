@@ -125,6 +125,25 @@ pub fn create_scene<G: Geometry>(
                 noise_scale,
                 noise_offset,
             } => {
+                if outer_radius <= inner_radius {
+                    return Err(RaytracerError::InvalidConfiguration(format!(
+                        "VolumetricDisc requires outer_radius > inner_radius (got outer_radius={}, inner_radius={}).",
+                        outer_radius, inner_radius
+                    )));
+                }
+                if thickness <= 0.0 {
+                    return Err(RaytracerError::InvalidConfiguration(format!(
+                        "VolumetricDisc requires thickness > 0 (got thickness={}).",
+                        thickness
+                    )));
+                }
+                if brightness_reference_temperature <= 0.0 {
+                    return Err(RaytracerError::InvalidConfiguration(format!(
+                        "VolumetricDisc requires brightness_reference_temperature > 0 (got brightness_reference_temperature={}).",
+                        brightness_reference_temperature
+                    )));
+                }
+
                 debug!(
                     "Adding volumetric disc with inner radius: {}, outer radius: {}",
                     inner_radius, outer_radius
