@@ -30,6 +30,12 @@ pub struct VolumetricDisc {
     max_steps: usize,
     step_size: f64,
     thickness: f64,
+    density_multiplier: f64,
+    brightness_reference_temperature: f64,
+    absorption: f64,
+    scattering: f64,
+    noise_scale: Vector3<f64>,
+    noise_offset: f64,
 }
 
 impl VolumetricDisc {
@@ -43,6 +49,12 @@ impl VolumetricDisc {
         max_steps: usize,
         step_size: f64,
         thickness: f64,
+        density_multiplier: f64,
+        brightness_reference_temperature: f64,
+        absorption: f64,
+        scattering: f64,
+        noise_scale: Vector3<f64>,
+        noise_offset: f64,
     ) -> Self {
         let axis = axis.normalize();
         let e1 = if axis.x.abs() > 0.9 {
@@ -67,6 +79,12 @@ impl VolumetricDisc {
             max_steps,
             step_size,
             thickness,
+            density_multiplier,
+            brightness_reference_temperature,
+            absorption,
+            scattering,
+            noise_scale,
+            noise_offset,
         }
     }
 
@@ -92,16 +110,23 @@ impl VolumetricDisc {
         boundary_falloff *= (-1.0 / (self.center_disk_outer_radius - r).powi(2).max(0.0001)).exp();
         boundary_falloff *= (-1.0 / (r - self.center_disk_inner_radius).powi(2).max(0.0001)).exp();
 
-        // Cylindrical Noise Mapping
+        // Periodic Cylindrical Noise Mapping (removes the phi-seam)
         let x_local = p.dot(&self.e1);
         let y_local = p.dot(&self.e2);
         let phi = y_local.atan2(x_local);
 
-        // Map to noise space: (r, phi, h)
-        let noise_p = Vector3::new(r * 2.0, phi * 8.0, h * 5.0);
-        let n = self.fbm(noise_p, 0.5);
+        // Map phi to a circle in noise space to ensure continuity
+        let noise_phi_x = phi.cos() * self.noise_scale.y;
+        let noise_phi_y = phi.sin() * self.noise_scale.y;
 
-        let n = (n + 0.6).max(0.0) * 15.0;
+        // Use a 3D noise sample where phi-components are coordinates
+        let noise_p = Vector3::new(r * self.noise_scale.x, noise_phi_x, noise_phi_y);
+        let mut n = self.fbm(noise_p, 0.5);
+
+        // Add vertical variation separately
+        n += self.noise(Vector3::new(r * 0.5, h * self.noise_scale.z, phi.cos())) * 0.5;
+
+        let n = (n + self.noise_offset).max(0.0) * self.density_multiplier;
 
         n * radial_base * vertical_falloff * boundary_falloff
     }
@@ -145,8 +170,8 @@ impl VolumetricDisc {
         rd: &Vector3<f64>,
         redshift: f64,
     ) -> Result<CIETristimulus, RaytracerError> {
-        let sigma_a = 0.9; // absorption coefficient
-        let sigma_s = 0.9; // scattering coefficient
+        let sigma_a = self.absorption;
+        let sigma_s = self.scattering;
 
         let mut accum_color = CIETristimulus::new(0.0, 0.0, 0.0, 0.0);
         let mut transparency = 1.0;
@@ -181,20 +206,29 @@ impl VolumetricDisc {
                 let light_attenuation = (-density * travel_density * (sigma_a + sigma_s)).exp();
 
                 // Stefan-Boltzmann law: emission intensity scales with T^4.
-                // Use a reference temperature of 1000K for normalization.
-                let intensity_factor = (temperature / 1000.0).powi(4);
-                let step_contribution =
-                    transparency * light_attenuation * sigma_s * density * d_s * intensity_factor;
+                // Use a reference temperature for normalization to boost brightness.
+                let intensity_factor =
+                    (temperature / self.brightness_reference_temperature).powi(4);
 
-                accum_color = accum_color + light_color.mul_all_parts(step_contribution);
+                let emission_weight = transparency * light_attenuation * sigma_s * density * d_s;
+                let step_emission = light_color.mul_all_parts(emission_weight * intensity_factor);
+
+                accum_color.x += step_emission.x;
+                accum_color.y += step_emission.y;
+                accum_color.z += step_emission.z;
             }
 
-            // Check if ray will exist the disc in the next step.
+            // Check if ray will exit the disc in the next step.
             if self.does_exit(&p, &rd, d_s) {
                 trace!("  Ray exited disc at step {}, position {:?}", i, p,);
                 break;
             }
         }
+
+        // Final Alpha is strictly the physical opacity (1.0 - transparency)
+        // Above the transparency is not updated, but computed separately.
+        accum_color.alpha = 1.0 - transparency;
+
         trace!(
             "  Computed from {:?} to {:?} with step_count={}",
             ro,
@@ -523,6 +557,12 @@ mod tests {
             10000,
             0.01,
             0.02,
+            40.0,
+            350.0,
+            0.1,
+            0.1,
+            Vector3::new(2.0, 8.0, 5.0),
+            0.6,
         );
 
         for x in 0..10 {

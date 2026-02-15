@@ -116,6 +116,12 @@ pub fn create_scene<G: Geometry>(
                 max_steps,
                 step_size,
                 thickness,
+                density_multiplier,
+                brightness_reference_temperature,
+                absorption,
+                scattering,
+                noise_scale,
+                noise_offset,
             } => {
                 debug!(
                     "Adding volumetric disc with inner radius: {}, outer radius: {}",
@@ -132,6 +138,12 @@ pub fn create_scene<G: Geometry>(
                     max_steps,
                     step_size,
                     thickness,
+                    density_multiplier,
+                    brightness_reference_temperature,
+                    absorption,
+                    scattering,
+                    Vector3::new(noise_scale.0, noise_scale.1, noise_scale.2),
+                    noise_offset,
                 );
                 objects.add_object(Box::new(disc));
             }

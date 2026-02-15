@@ -69,6 +69,12 @@ pub enum ObjectsConfig {
         max_steps: usize,
         step_size: f64,
         thickness: f64,
+        density_multiplier: f64,
+        brightness_reference_temperature: f64,
+        absorption: f64,
+        scattering: f64,
+        noise_scale: (f64, f64, f64),
+        noise_offset: f64,
     },
 }
 
