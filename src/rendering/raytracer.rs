@@ -28,6 +28,7 @@ pub enum RaytracerError {
     CameraError(CameraError),
     NoCircularOrbitPossible,
     BelowRISCO,
+    NonFiniteRadius,
     NumberBelowZero,
     DenominatorCloseToZero,
 }
