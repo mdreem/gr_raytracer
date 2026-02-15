@@ -230,8 +230,9 @@ impl VolumetricDisc {
             }
         }
 
-        // Final Alpha is strictly the physical opacity (1.0 - transparency)
-        // Above the transparency is not updated, but computed separately.
+        // Final alpha is strictly the physical opacity (1.0 - transparency)
+        // Above the transparency is not updated in the color itself,
+        // but computed separately.
         accum_color.alpha = 1.0 - transparency;
 
         trace!(
