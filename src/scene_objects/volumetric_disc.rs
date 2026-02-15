@@ -168,12 +168,48 @@ impl VolumetricDisc {
         }
     }
 
+    fn precompute_exit_distance(&self, ro: &Vector3<f64>, rd: &Vector3<f64>) -> Option<f64> {
+        let max_distance = self.step_size * self.max_steps as f64;
+        let to = ro + rd * max_distance;
+        let intersection = self.intersects_cylinder(
+            ro,
+            &to,
+            self.center_disk_inner_radius,
+            self.center_disk_outer_radius,
+            &self.axis,
+        );
+
+        match intersection {
+            NoIntersection | Parallel => None,
+            OneIntersection(t) => (t > MIN_INTERSECTION_T).then_some(t * max_distance),
+            TwoIntersections(t1, t2) => {
+                if t1 > MIN_INTERSECTION_T {
+                    Some(t1 * max_distance)
+                } else if t2 > MIN_INTERSECTION_T {
+                    Some(t2 * max_distance)
+                } else {
+                    None
+                }
+            }
+        }
+    }
+
     // https://www.scratchapixel.com/lessons/3d-basic-rendering/volume-rendering-for-developers/ray-marching-get-it-right.html
     fn raymarch_constant_step(
         &self,
         ro: &Vector3<f64>,
         rd: &Vector3<f64>,
         redshift: f64,
+    ) -> Result<CIETristimulus, RaytracerError> {
+        self.raymarch_constant_step_internal(ro, rd, redshift, true)
+    }
+
+    fn raymarch_constant_step_internal(
+        &self,
+        ro: &Vector3<f64>,
+        rd: &Vector3<f64>,
+        redshift: f64,
+        use_cached_exit: bool,
     ) -> Result<CIETristimulus, RaytracerError> {
         let sigma_a = self.absorption;
         let sigma_s = self.scattering;
@@ -186,6 +222,11 @@ impl VolumetricDisc {
         let d_s = self.step_size;
         let mut step_count = 0;
         let mut d_o = 0.0;
+        let cached_exit_distance = if use_cached_exit {
+            self.precompute_exit_distance(ro, rd)
+        } else {
+            None
+        };
 
         for i in 0..self.max_steps {
             let p = ro + rd * d_o;
@@ -230,8 +271,13 @@ impl VolumetricDisc {
                 accum_color.z += step_emission.z;
             }
 
-            // Check if ray will exit the disc in the next step.
-            if self.does_exit(&p, &rd, d_s) {
+            // Use precomputed exit distance when available (fast path), fallback to legacy check.
+            let exited = if let Some(exit_distance) = cached_exit_distance {
+                d_o >= exit_distance
+            } else {
+                self.does_exit(&p, &rd, d_s)
+            };
+            if exited {
                 trace!("  Ray exited disc at step {}, position {:?}", i, p,);
                 break;
             }
@@ -639,5 +685,43 @@ mod tests {
 
         assert!(color.alpha > 0.0);
         assert!(color.alpha <= 1.0);
+    }
+
+    #[test]
+    fn test_volumetric_disc_raymarch_cached_exit_matches_legacy() {
+        let disc = VolumetricDisc::new(
+            1.0,
+            3.0,
+            Arc::new(FixedTextureMap {
+                color: CIETristimulus::new(2.0, 1.0, 0.5, 0.7),
+            }),
+            Box::new(DummyTemperatureComputer),
+            Vector3::new(0.0, 0.0, 1.0),
+            4,
+            42,
+            500,
+            0.01,
+            0.5,
+            10.0,
+            1000.0,
+            0.2,
+            0.2,
+            Vector3::new(1.0, 1.0, 1.0),
+            1.0,
+        );
+        let ro = Vector3::new(2.0, 0.0, 0.0);
+        let rd = Vector3::new(1.0, 0.0, 0.0);
+
+        let cached = disc
+            .raymarch_constant_step_internal(&ro, &rd, 1.0, true)
+            .expect("raymarch should succeed");
+        let legacy = disc
+            .raymarch_constant_step_internal(&ro, &rd, 1.0, false)
+            .expect("raymarch should succeed");
+
+        assert_abs_diff_eq!(cached.x, legacy.x, epsilon = 1e-10);
+        assert_abs_diff_eq!(cached.y, legacy.y, epsilon = 1e-10);
+        assert_abs_diff_eq!(cached.z, legacy.z, epsilon = 1e-10);
+        assert_abs_diff_eq!(cached.alpha, legacy.alpha, epsilon = 1e-10);
     }
 }
