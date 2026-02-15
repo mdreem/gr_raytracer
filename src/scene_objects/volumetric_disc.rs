@@ -180,6 +180,8 @@ impl VolumetricDisc {
 
         let mut accum_color = CIETristimulus::new(0.0, 0.0, 0.0, 0.0);
         let mut transparency = 1.0;
+        let mut alpha_weighted_sum = 0.0;
+        let mut alpha_weight_total = 0.0;
 
         let d_s = self.step_size;
         let mut step_count = 0;
@@ -216,7 +218,12 @@ impl VolumetricDisc {
                     (temperature / self.brightness_reference_temperature).powi(4);
 
                 let emission_weight = transparency * light_attenuation * sigma_s * density * d_s;
-                let step_emission = light_color.mul_all_parts(emission_weight * intensity_factor);
+                let step_emission = light_color.mul_color_part(emission_weight * intensity_factor);
+
+                // Keep texture alpha influence separate from per-step emission accumulation.
+                let alpha_sample_weight = density * d_s;
+                alpha_weighted_sum += light_color.alpha.clamp(0.0, 1.0) * alpha_sample_weight;
+                alpha_weight_total += alpha_sample_weight;
 
                 accum_color.x += step_emission.x;
                 accum_color.y += step_emission.y;
@@ -230,10 +237,14 @@ impl VolumetricDisc {
             }
         }
 
-        // Final alpha is strictly the physical opacity (1.0 - transparency)
-        // Above the transparency is not updated in the color itself,
-        // but computed separately.
-        accum_color.alpha = 1.0 - transparency;
+        // Final alpha combines physical opacity with texture alpha, applied once at the end.
+        let physical_opacity = 1.0 - transparency;
+        let texture_alpha = if alpha_weight_total > 0.0 {
+            alpha_weighted_sum / alpha_weight_total
+        } else {
+            1.0
+        };
+        accum_color.alpha = physical_opacity * texture_alpha;
 
         trace!(
             "  Computed from {:?} to {:?} with step_count={}",
@@ -531,7 +542,8 @@ mod tests {
     use super::*;
     use crate::rendering::color::CIETristimulusNormalization::NoNormalization;
     use crate::rendering::color::Color;
-    use crate::rendering::texture::CheckerMapper;
+    use crate::rendering::texture::{CheckerMapper, TemperatureData, TextureMap};
+    use approx::assert_abs_diff_eq;
     use std::sync::Arc;
 
     struct DummyTemperatureComputer;
@@ -539,6 +551,20 @@ mod tests {
     impl TemperatureComputer for DummyTemperatureComputer {
         fn compute_temperature(&self, _r: f64) -> Result<f64, RaytracerError> {
             Ok(1000.0)
+        }
+    }
+
+    struct FixedTextureMap {
+        color: CIETristimulus,
+    }
+
+    impl TextureMap for FixedTextureMap {
+        fn color_at_uv(
+            &self,
+            _uv: &UVCoordinates,
+            _temperature_data: &TemperatureData,
+        ) -> CIETristimulus {
+            self.color
         }
     }
 
