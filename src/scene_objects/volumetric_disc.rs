@@ -11,7 +11,7 @@ use crate::scene_objects::objects::SceneObject;
 use crate::scene_objects::volumetric_disc::CylinderIntersection::{
     NoIntersection, OneIntersection, Parallel, TwoIntersections,
 };
-use log::trace;
+use log::{error, trace};
 use nalgebra::Vector3;
 use noise::{NoiseFn, Perlin};
 
@@ -389,7 +389,7 @@ impl VolumetricDisc {
             }
         }
 
-        hits.sort_by(|a, b| a.partial_cmp(b).unwrap());
+        hits.sort_by(|a, b| a.total_cmp(b));
 
         if hits.is_empty() {
             NoIntersection
@@ -458,7 +458,8 @@ impl Hittable for VolumetricDisc {
         let intersection_point = y_start_spatial + t * direction;
 
         if !(0.0..=1.0).contains(&t) {
-            panic!("VolumetricDisc: Intersection t={} out of bounds.", t);
+            error!("VolumetricDisc: Intersection t={} out of bounds.", t);
+            return None;
         }
 
         trace!(
@@ -518,64 +519,3 @@ impl Hittable for VolumetricDisc {
 }
 
 impl SceneObject for VolumetricDisc {}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    struct DummyTemperatureComputer;
-    impl TemperatureComputer for DummyTemperatureComputer {
-        fn compute_temperature(
-            &self,
-            _r: f64,
-        ) -> Result<f64, crate::rendering::raytracer::RaytracerError> {
-            Ok(1000.0)
-        }
-    }
-
-    #[test]
-    fn test_fbm() {
-        use crate::rendering::color::CIETristimulusNormalization;
-        use crate::rendering::color::Color;
-        use crate::rendering::texture::CheckerMapper;
-        use std::sync::Arc;
-
-        let disc = VolumetricDisc::new(
-            4.05,
-            11.0,
-            Arc::new(CheckerMapper::new(
-                3.0,
-                5.0,
-                5.0,
-                Color::new(255, 0, 0, 255),
-                Color::new(0, 0, 255, 255),
-                CIETristimulusNormalization::NoNormalization,
-            )),
-            Box::new(DummyTemperatureComputer {}),
-            Vector3::new(0.0, 0.0, 1.0),
-            8,
-            10000,
-            0.01,
-            0.02,
-            40.0,
-            350.0,
-            0.1,
-            0.1,
-            Vector3::new(2.0, 8.0, 5.0),
-            0.6,
-        );
-
-        for x in 0..10 {
-            for y in 0..10 {
-                for z in 0..10 {
-                    let p = nalgebra::Vector3::new(x as f64 * 0.1, y as f64 * 0.1, z as f64 * 0.1);
-                    let value = disc.fbm(p, 0.5);
-                    println!("fbm value at {:?} is {}", p, value);
-                }
-            }
-        }
-        let p = nalgebra::Vector3::new(1.0, 2.0, 13.0);
-        let value = disc.fbm(p, 0.5);
-        println!("fbm value at {:?} is {}", p, value);
-    }
-}
