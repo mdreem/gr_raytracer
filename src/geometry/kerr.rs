@@ -116,12 +116,25 @@ impl Kerr {
         }
     }
 
+    fn convert_cartesian_to_spherical(&self, position: &Point) -> Point {
+        let x = position[1];
+        let y = position[2];
+        let z = position[3];
+
+        let r_sqr = compute_r_sqr(self.a, x, y, z);
+        let r = r_sqr.sqrt();
+        let theta = (z / r).acos();
+        let phi = (r * y - self.a * x).atan2(r * x + self.a * y);
+
+        Point::new_spherical(position[0], r, theta, phi)
+    }
+
     fn jacobian_spherical_to_cartesian(&self, position: &Point) -> Matrix4<f64> {
-        let spherical = position.get_as_spherical();
+        let spherical = self.convert_cartesian_to_spherical(position);
 
         let r = self.get_radial_coordinate(position);
-        let theta = spherical[1];
-        let phi = spherical[2];
+        let theta = spherical[2];
+        let phi = spherical[3];
 
         let (st, ct) = (theta.sin(), theta.cos());
         let (sp, cp) = (phi.sin(), phi.cos());
@@ -135,13 +148,13 @@ impl Kerr {
             // row 1: x(r,theta,phi)
             0.0,
             st * cp,
-            r * ct * cp,
-            -r * st * sp,
+            (r * cp - self.a * sp) * ct,
+            (-r * sp - self.a * cp) * st,
             // row 2: y(r,theta,phi)
             0.0,
             st * sp,
-            r * ct * sp,
-            r * st * cp,
+            (r * sp + self.a * cp) * ct,
+            (r * cp - self.a * sp) * st,
             // row 3: z(r,theta,phi)
             0.0,
             ct,
@@ -765,5 +778,14 @@ mod tests {
         assert_abs_diff_eq!(velocity[1], -0.5773502691896257, epsilon = 1e-8);
         assert_abs_diff_eq!(velocity[2], 0.0, epsilon = 1e-8);
         assert_abs_diff_eq!(velocity[3], 0.0, epsilon = 1e-8);
+    }
+
+    #[test]
+    fn test_circular_orbit_velocity_rejects_off_equatorial_position() {
+        let geometry = Kerr::new(1.0, 0.2, 1e-4);
+        let position = Point::new_cartesian(0.0, 3.0, 0.0, 1.0);
+        let velocity = geometry.get_circular_orbit_velocity_at(&position);
+
+        assert!(velocity.is_err());
     }
 }
