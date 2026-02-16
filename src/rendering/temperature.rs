@@ -33,6 +33,7 @@ pub struct KerrTemperatureComputer {
     r_isco: f64,
     /// Mass accretion rate in internal units.
     m_dot: f64,
+    radial_temperature_profile: Vec<(f64, f64)>,
 }
 
 fn compute_r_isco(a: f64, radius: f64) -> f64 {
@@ -49,6 +50,7 @@ fn compute_r_isco(a: f64, radius: f64) -> f64 {
     r_isco
 }
 
+const NUM_LUT_STEPS: usize = 1000;
 const NUM_INTEGRATION_STEPS: i32 = 1000;
 const NUM_STEPS_FIND_MAXIMUM: i32 = 10;
 
@@ -61,23 +63,34 @@ impl KerrTemperatureComputer {
     ) -> Result<Self, RaytracerError> {
         let a_abs = a.abs(); // Ensure a co-rotating disc. TODO: generalize later.
         let r_isco = compute_r_isco(a_abs, radius);
+        let effective_outer_radius = if outer_radius <= r_isco {
+            let adjusted = r_isco + 1e-6_f64.max(r_isco.abs() * 1e-9);
+            info!(
+                "outer_radius ({}) <= r_isco ({}); clamping to {} for stable LUT construction.",
+                outer_radius, r_isco, adjusted
+            );
+            adjusted
+        } else {
+            outer_radius
+        };
         info!(
             "Computed r_isco: {} from a: {} and radius: {}",
             r_isco, a_abs, radius
         );
         let r0 = radius;
 
-        let tmp_computer = Self {
+        let mut tmp_computer = Self {
             a: a_abs,
             radius,
             r_isco,
             m_dot: 1.0,
+            radial_temperature_profile: Vec::new(),
         };
 
         let mut max_f = 0.0;
         let mut max_r = 0.0;
 
-        let dr = (outer_radius - r_isco) / NUM_STEPS_FIND_MAXIMUM as f64;
+        let dr = (effective_outer_radius - r_isco) / NUM_STEPS_FIND_MAXIMUM as f64;
         for i in 0..NUM_STEPS_FIND_MAXIMUM {
             let r = r_isco + (i as f64 + 0.5) * dr;
             let f = tmp_computer.compute_f(r)?;
@@ -101,12 +114,20 @@ impl KerrTemperatureComputer {
             m_dot, temperature
         );
 
-        Ok(Self {
-            a: a_abs,
-            radius,
-            r_isco,
-            m_dot,
-        })
+        tmp_computer.m_dot = m_dot;
+
+        // Build radial temperature profile
+        let mut profile = Vec::with_capacity(NUM_LUT_STEPS);
+        let radial_profile_step = (effective_outer_radius - r_isco) / (NUM_LUT_STEPS - 1) as f64;
+        for i in 0..NUM_LUT_STEPS {
+            let r = r_isco + (i as f64) * radial_profile_step;
+            let f_val = tmp_computer.compute_f(r)?;
+            let temp = (f_val / sigma_sb).max(0.0).powf(0.25);
+            profile.push((r, temp));
+        }
+        tmp_computer.radial_temperature_profile = profile;
+
+        Ok(tmp_computer)
     }
 
     // TODO: Deduplicate against Kerr geometry methods.
@@ -235,19 +256,49 @@ const SIGMA_SB: f64 = 1.0; // Set to 1.0 as this will get calibrated later on an
 
 impl TemperatureComputer for KerrTemperatureComputer {
     fn compute_temperature(&self, radius: f64) -> Result<f64, RaytracerError> {
+        if !radius.is_finite() {
+            error!("Radius {} is not finite", radius);
+            return Err(RaytracerError::NonFiniteRadius);
+        }
+
         if radius < self.r_isco {
             error!("Radius {} is below r_isco {}", radius, self.r_isco);
             return Err(RaytracerError::BelowRISCO);
         }
 
-        let sigma_sb = SIGMA_SB;
-        let f = self.compute_f(radius)?;
-        if f < 0.0 {
-            error!("Computed negative flux f: {} at radius: {}", f, radius);
-            return Err(RaytracerError::NumberBelowZero);
+        // Use radial temperature profile for fast lookup with linear interpolation.
+        let (first_r, first_t) = *self
+            .radial_temperature_profile
+            .first()
+            .ok_or(RaytracerError::BelowRISCO)?;
+        let (last_r, last_t) = *self
+            .radial_temperature_profile
+            .last()
+            .ok_or(RaytracerError::BelowRISCO)?;
+
+        if radius <= first_r {
+            return Ok(first_t);
         }
-        let temp_fourth_power = f / sigma_sb;
-        let temperature = temp_fourth_power.powf(0.25);
+        if radius >= last_r {
+            return Ok(last_t);
+        }
+
+        let idx = match self
+            .radial_temperature_profile
+            .binary_search_by(|(r, _)| r.total_cmp(&radius))
+        {
+            Ok(i) => i,
+            Err(0) => 0,
+            Err(i) => i - 1,
+        };
+
+        let (r0, t0) = self.radial_temperature_profile[idx];
+        let (r1, t1) = self.radial_temperature_profile[idx + 1];
+
+        // Linear interpolation
+        let t = (radius - r0) / (r1 - r0);
+        let temperature = t0 + t * (t1 - t0);
+
         Ok(temperature)
     }
 }

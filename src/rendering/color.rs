@@ -118,6 +118,33 @@ impl CIETristimulus {
             alpha: self.alpha,
         }
     }
+
+    pub fn mul_color_part(&self, factor: f64) -> CIETristimulus {
+        CIETristimulus {
+            x: self.x * factor,
+            y: self.y * factor,
+            z: self.z * factor,
+            alpha: self.alpha,
+        }
+    }
+
+    pub fn mul_alpha_part(&self, factor: f64) -> CIETristimulus {
+        CIETristimulus {
+            x: self.x,
+            y: self.y,
+            z: self.z,
+            alpha: self.alpha * factor,
+        }
+    }
+
+    pub fn mul_all_parts(&self, factor: f64) -> CIETristimulus {
+        CIETristimulus {
+            x: self.x * factor,
+            y: self.y * factor,
+            z: self.z * factor,
+            alpha: self.alpha * factor,
+        }
+    }
 }
 
 impl Mul<CIETristimulus> for f64 {

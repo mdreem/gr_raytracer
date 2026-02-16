@@ -15,6 +15,7 @@ use crate::rendering::texture::{
 use crate::scene_objects::objects::Objects;
 use crate::{configuration, scene_objects};
 use log::debug;
+use nalgebra::Vector3;
 use std::f64::consts::PI;
 use std::sync::Arc;
 
@@ -103,6 +104,94 @@ pub fn create_scene<G: Geometry>(
                     outer_radius,
                     texture_mapper_disc,
                     geometry.get_temperature_computer(temperature, inner_radius, outer_radius)?,
+                );
+                objects.add_object(Box::new(disc));
+            }
+            configuration::ObjectsConfig::VolumetricDisc {
+                inner_radius,
+                outer_radius,
+                texture,
+                temperature,
+                axis,
+                num_octaves,
+                perlin_seed,
+                max_steps,
+                step_size,
+                thickness,
+                density_multiplier,
+                brightness_reference_temperature,
+                absorption,
+                scattering,
+                noise_scale,
+                noise_offset,
+            } => {
+                if outer_radius <= inner_radius {
+                    return Err(RaytracerError::InvalidConfiguration(format!(
+                        "VolumetricDisc requires outer_radius > inner_radius (got outer_radius={}, inner_radius={}).",
+                        outer_radius, inner_radius
+                    )));
+                }
+                if thickness <= 0.0 {
+                    return Err(RaytracerError::InvalidConfiguration(format!(
+                        "VolumetricDisc requires thickness > 0 (got thickness={}).",
+                        thickness
+                    )));
+                }
+                if max_steps == 0 {
+                    return Err(RaytracerError::InvalidConfiguration(
+                        "VolumetricDisc requires max_steps > 0 (got max_steps=0).".to_string(),
+                    ));
+                }
+                if step_size <= 0.0 {
+                    return Err(RaytracerError::InvalidConfiguration(format!(
+                        "VolumetricDisc requires step_size > 0 (got step_size={}).",
+                        step_size
+                    )));
+                }
+                if brightness_reference_temperature <= 0.0 {
+                    return Err(RaytracerError::InvalidConfiguration(format!(
+                        "VolumetricDisc requires brightness_reference_temperature > 0 (got brightness_reference_temperature={}).",
+                        brightness_reference_temperature
+                    )));
+                }
+                if absorption < 0.0 {
+                    return Err(RaytracerError::InvalidConfiguration(format!(
+                        "VolumetricDisc requires absorption >= 0 (got absorption={}).",
+                        absorption
+                    )));
+                }
+                if scattering < 0.0 {
+                    return Err(RaytracerError::InvalidConfiguration(format!(
+                        "VolumetricDisc requires scattering >= 0 (got scattering={}).",
+                        scattering
+                    )));
+                }
+
+                debug!(
+                    "Adding volumetric disc with inner radius: {}, outer radius: {}",
+                    inner_radius, outer_radius
+                );
+                let texture_mapper_disc = get_texture_mapper(&mut texture_mapper_factory, texture)?;
+                let axis = axis
+                    .map(|(x, y, z)| Vector3::new(x, y, z))
+                    .unwrap_or(Vector3::new(0.0, 0.0, 1.0));
+                let disc = scene_objects::volumetric_disc::VolumetricDisc::new(
+                    inner_radius,
+                    outer_radius,
+                    texture_mapper_disc,
+                    geometry.get_temperature_computer(temperature, inner_radius, outer_radius)?,
+                    axis,
+                    num_octaves,
+                    perlin_seed.unwrap_or(1),
+                    max_steps,
+                    step_size,
+                    thickness,
+                    density_multiplier,
+                    brightness_reference_temperature,
+                    absorption,
+                    scattering,
+                    Vector3::new(noise_scale.0, noise_scale.1, noise_scale.2),
+                    noise_offset,
                 );
                 objects.add_object(Box::new(disc));
             }
