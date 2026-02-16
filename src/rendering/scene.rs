@@ -10,7 +10,7 @@ use crate::rendering::raytracer::RaytracerError;
 use crate::rendering::redshift::RedshiftComputer;
 use crate::rendering::texture::{TemperatureData, TextureData, UVCoordinates};
 use crate::scene_objects::objects::Objects;
-use log::error;
+use log::{error, trace};
 use nalgebra::{Const, OVector};
 use std::f64::consts::PI;
 use std::fs::File;
@@ -74,6 +74,7 @@ impl<'a, G: Geometry> Scene<'a, G> {
     }
 
     pub fn color_of_ray(&self, ray: &Ray) -> Result<CIETristimulus, RaytracerError> {
+        trace!("Tracing ray at ({}|{})", ray.row, ray.col);
         let m_s = self
             .geometry
             .inner_product(&ray.position, &ray.momentum, &ray.momentum);
@@ -119,8 +120,8 @@ impl<'a, G: Geometry> Scene<'a, G> {
                         .redshift_computer
                         .compute_redshift(&last_step, observer_energy);
                     intersections.push(self.texture_data.celestial_map.color_at_uv(
-                        uv,
-                        TemperatureData {
+                        &uv,
+                        &TemperatureData {
                             redshift,
                             temperature: self.celestial_temperature,
                         },

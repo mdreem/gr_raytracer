@@ -1,11 +1,12 @@
+use crate::geometry::four_vector::FourVector;
 use crate::geometry::geometry::Geometry;
 use crate::geometry::point::{CoordinateSystem, Point};
 use crate::geometry::spherical_coordinates_helper::cartesian_to_spherical;
 use crate::rendering::color::CIETristimulus;
 use crate::rendering::integrator::Step;
 use crate::rendering::raytracer::RaytracerError;
-use crate::rendering::texture::{TemperatureData, TextureMapHandle, UVCoordinates};
-use crate::scene_objects::hittable::{Hittable, Intersection};
+use crate::rendering::texture::{TextureMapHandle, UVCoordinates};
+use crate::scene_objects::hittable::{ColorComputationData, Hittable, Intersection};
 use crate::scene_objects::objects::SceneObject;
 use nalgebra::Vector3;
 use std::f64::consts::PI;
@@ -102,14 +103,19 @@ impl Hittable for Sphere {
             return Some(Intersection {
                 uv: UVCoordinates { u: 1.0 - u, v },
                 intersection_point: point_on_sphere,
+                t,
+                direction: FourVector::new_cartesian(0.0, direction[0], direction[1], direction[2]),
             });
         }
 
         None
     }
 
-    fn color_at_uv(&self, uv: UVCoordinates, temperature_data: TemperatureData) -> CIETristimulus {
-        self.texture_mapper.color_at_uv(uv, temperature_data)
+    fn color_at_uv(&self, color_computation_data: &ColorComputationData) -> CIETristimulus {
+        self.texture_mapper.color_at_uv(
+            &color_computation_data.uv,
+            &color_computation_data.temperature_data,
+        )
     }
 
     fn energy_of_emitter(

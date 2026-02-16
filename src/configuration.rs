@@ -60,6 +60,24 @@ pub enum ObjectsConfig {
         texture: TextureConfig,
         temperature: f64,
     },
+    VolumetricDisc {
+        inner_radius: f64,
+        outer_radius: f64,
+        texture: TextureConfig,
+        temperature: f64,
+        axis: Option<(f64, f64, f64)>,
+        num_octaves: usize,
+        perlin_seed: Option<u32>,
+        max_steps: usize,
+        step_size: f64,
+        thickness: f64,
+        density_multiplier: f64,
+        brightness_reference_temperature: f64,
+        absorption: f64,
+        scattering: f64,
+        noise_scale: (f64, f64, f64),
+        noise_offset: f64,
+    },
 }
 
 #[cfg(test)]

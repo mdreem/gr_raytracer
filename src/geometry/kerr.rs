@@ -31,7 +31,7 @@ fn compute_r_sqr(a: f64, x: f64, y: f64, z: f64) -> f64 {
     0.5 * (rho_sqr - a * a + ((rho_sqr - a * a) * (rho_sqr - a * a) + 4.0 * a * a * z * z).sqrt())
 }
 
-fn k_vector(a: f64, x: f64, y: f64, z: f64) -> Vector4<f64> {
+fn k_covector(a: f64, x: f64, y: f64, z: f64) -> Vector4<f64> {
     let r_sqr = compute_r_sqr(a, x, y, z);
     let r = r_sqr.sqrt();
 
@@ -49,7 +49,7 @@ fn metric(radius: f64, a: f64, x: f64, y: f64, z: f64) -> Matrix4<f64> {
     let r = r_sqr.sqrt();
     let f = (r * r * r * radius) / (r * r * r * r + a * a * z * z);
 
-    let k = k_vector(a, x, y, z);
+    let k = k_covector(a, x, y, z);
     let k_0 = k[0];
     let k_x = k[1];
     let k_y = k[2];
@@ -77,6 +77,32 @@ fn metric(radius: f64, a: f64, x: f64, y: f64, z: f64) -> Matrix4<f64> {
     metric[(3, 3)] = k_z * k_z * f + 1.0;
 
     trace!("metric: {:?}", metric);
+
+    metric
+}
+
+// For Kerr-Schild form g_{mu nu} = eta_{mu nu} + f k_mu k_nu, the inverse is
+// g^{mu nu} = eta^{mu nu} - f k^mu k^nu.
+fn metric_contravariant(radius: f64, a: f64, x: f64, y: f64, z: f64) -> Matrix4<f64> {
+    let r_sqr = compute_r_sqr(a, x, y, z);
+    let r = r_sqr.sqrt();
+    let f = (r * r * r * radius) / (r * r * r * r + a * a * z * z);
+
+    let k_cov = k_covector(a, x, y, z);
+    // Raise with eta^{mu nu} = diag(-1, 1, 1, 1).
+    let k_contravariant = [-k_cov[0], k_cov[1], k_cov[2], k_cov[3]];
+
+    let mut metric = Matrix4::zeros();
+    metric[(0, 0)] = -1.0;
+    metric[(1, 1)] = 1.0;
+    metric[(2, 2)] = 1.0;
+    metric[(3, 3)] = 1.0;
+
+    for i in 0..4 {
+        for j in 0..4 {
+            metric[(i, j)] -= f * k_contravariant[i] * k_contravariant[j];
+        }
+    }
 
     metric
 }
@@ -235,11 +261,7 @@ impl GeodesicSolver for KerrSolver {
 
         let p = OVector::<f64, Const<4>>::from_column_slice(&[p_t, p_x, p_y, p_z]);
 
-        let covariant_metric = metric(self.radius, self.a, x, y, z);
-        trace!("covariant_metric = {:?}", covariant_metric);
-        let contravariant_metric = covariant_metric
-            .try_inverse()
-            .expect("Metric should be invertible");
+        let contravariant_metric = metric_contravariant(self.radius, self.a, x, y, z);
         trace!("contravariant_metric = {:?}", contravariant_metric);
 
         debug_assert!(!p_t.is_nan());
@@ -287,10 +309,7 @@ impl GeodesicSolver for KerrSolver {
     }
 
     fn momentum_from_state(&self, y: &EquationOfMotionState) -> FourVector {
-        let covariant_metric = metric(self.radius, self.a, y[1], y[2], y[3]);
-        let contravariant_metric = covariant_metric
-            .try_inverse()
-            .expect("Metric should be invertible");
+        let contravariant_metric = metric_contravariant(self.radius, self.a, y[1], y[2], y[3]);
         let covariant = Vector4::new(y[4], y[5], y[6], y[7]);
         let contravariant = contravariant_metric * covariant;
 
@@ -333,7 +352,7 @@ impl Geometry for Kerr {
         let r = r_sqr.sqrt();
         let f = (r * r * r * self.radius) / (r * r * r * r + self.a * self.a * z * z);
 
-        let k = k_vector(self.a, x, y, z);
+        let k = k_covector(self.a, x, y, z);
         let k_x = k[1];
         let k_y = k[2];
         let k_z = k[3];
@@ -485,6 +504,7 @@ impl SupportQuantities for Kerr {
 
 #[cfg(test)]
 mod tests {
+    use super::{metric, metric_contravariant};
     use crate::geometry::four_vector::FourVector;
     use crate::geometry::geometry::{Geometry, InnerProduct, SupportQuantities};
     use crate::geometry::kerr::Kerr;
@@ -496,6 +516,25 @@ mod tests {
     use crate::rendering::scene::Scene;
     use approx::assert_abs_diff_eq;
     use std::f64::consts::PI;
+
+    #[test]
+    fn test_metric_contravariant_matches_inverse() {
+        let radius = 1.0;
+        let a = 0.5;
+        let points = [(3.0, -4.0, 1.5), (-7.5, 2.0, 0.3), (10.0, 1.0, -2.5)];
+
+        for (x, y, z) in points {
+            let g_cov = metric(radius, a, x, y, z);
+            let g_inv = g_cov.try_inverse().expect("Metric should be invertible");
+            let g_contra = metric_contravariant(radius, a, x, y, z);
+
+            for i in 0..4 {
+                for j in 0..4 {
+                    assert_abs_diff_eq!(g_contra[(i, j)], g_inv[(i, j)], epsilon = 1e-10);
+                }
+            }
+        }
+    }
 
     #[test]
     fn test_tetrad_orthonormal() {
