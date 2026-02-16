@@ -152,7 +152,7 @@ impl BlackBodyMapper {
             return CIETristimulus::new(0.0, 0.0, 0.0, 1.0);
         };
 
-        let log_t = temperature.max(10.0).log10();
+        let log_t = temperature.max(MIN_TEMPERATURE).log10();
         if !log_t.is_finite() {
             warn!(
                 "BlackBodyMapper received non-finite temperature {}, clamping to LUT minimum.",

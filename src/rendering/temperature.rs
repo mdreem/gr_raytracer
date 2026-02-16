@@ -63,6 +63,16 @@ impl KerrTemperatureComputer {
     ) -> Result<Self, RaytracerError> {
         let a_abs = a.abs(); // Ensure a co-rotating disc. TODO: generalize later.
         let r_isco = compute_r_isco(a_abs, radius);
+        let effective_outer_radius = if outer_radius <= r_isco {
+            let adjusted = r_isco + 1e-6_f64.max(r_isco.abs() * 1e-9);
+            info!(
+                "outer_radius ({}) <= r_isco ({}); clamping to {} for stable LUT construction.",
+                outer_radius, r_isco, adjusted
+            );
+            adjusted
+        } else {
+            outer_radius
+        };
         info!(
             "Computed r_isco: {} from a: {} and radius: {}",
             r_isco, a_abs, radius
@@ -80,7 +90,7 @@ impl KerrTemperatureComputer {
         let mut max_f = 0.0;
         let mut max_r = 0.0;
 
-        let dr = (outer_radius - r_isco) / NUM_STEPS_FIND_MAXIMUM as f64;
+        let dr = (effective_outer_radius - r_isco) / NUM_STEPS_FIND_MAXIMUM as f64;
         for i in 0..NUM_STEPS_FIND_MAXIMUM {
             let r = r_isco + (i as f64 + 0.5) * dr;
             let f = tmp_computer.compute_f(r)?;
@@ -108,7 +118,7 @@ impl KerrTemperatureComputer {
 
         // Build radial temperature profile
         let mut profile = Vec::with_capacity(NUM_LUT_STEPS);
-        let radial_profile_step = (outer_radius - r_isco) / (NUM_LUT_STEPS - 1) as f64;
+        let radial_profile_step = (effective_outer_radius - r_isco) / (NUM_LUT_STEPS - 1) as f64;
         for i in 0..NUM_LUT_STEPS {
             let r = r_isco + (i as f64) * radial_profile_step;
             let f_val = tmp_computer.compute_f(r)?;

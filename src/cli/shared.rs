@@ -137,10 +137,33 @@ pub fn create_scene<G: Geometry>(
                         thickness
                     )));
                 }
+                if max_steps == 0 {
+                    return Err(RaytracerError::InvalidConfiguration(
+                        "VolumetricDisc requires max_steps > 0 (got max_steps=0).".to_string(),
+                    ));
+                }
+                if step_size <= 0.0 {
+                    return Err(RaytracerError::InvalidConfiguration(format!(
+                        "VolumetricDisc requires step_size > 0 (got step_size={}).",
+                        step_size
+                    )));
+                }
                 if brightness_reference_temperature <= 0.0 {
                     return Err(RaytracerError::InvalidConfiguration(format!(
                         "VolumetricDisc requires brightness_reference_temperature > 0 (got brightness_reference_temperature={}).",
                         brightness_reference_temperature
+                    )));
+                }
+                if absorption < 0.0 {
+                    return Err(RaytracerError::InvalidConfiguration(format!(
+                        "VolumetricDisc requires absorption >= 0 (got absorption={}).",
+                        absorption
+                    )));
+                }
+                if scattering < 0.0 {
+                    return Err(RaytracerError::InvalidConfiguration(format!(
+                        "VolumetricDisc requires scattering >= 0 (got scattering={}).",
+                        scattering
                     )));
                 }
 
