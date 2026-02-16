@@ -18,6 +18,7 @@ pub struct Camera {
     pub position: Point,
     pub velocity: FourVector,
     tetrad: Tetrad,
+    spatial_signature: f64,
 }
 
 pub fn lorentz_transform_tetrad<G: Geometry>(
@@ -104,6 +105,13 @@ impl Camera {
         debug!("lorentz transformed tetrad: {}", tetrad);
         tetrad_validator.validate(&tetrad)?;
 
+        let signature = geometry.signature();
+        debug_assert!(
+            (signature[1] - signature[2]).abs() < 1e-12
+                && (signature[2] - signature[3]).abs() < 1e-12,
+            "Camera projection expects equal spatial signature components"
+        );
+
         Ok(Self {
             position,
             velocity,
@@ -111,6 +119,7 @@ impl Camera {
             rows,
             columns,
             tetrad,
+            spatial_signature: signature[3],
         })
     }
 
@@ -139,9 +148,11 @@ impl Camera {
             * (shifted_row as f64 - (self.rows as f64 + 1.0) / 2.0);
 
         let w = self.tetrad.z + i_prime * self.tetrad.x + j_prime * self.tetrad.y;
-        let w_squared = -1.0 - i_prime * i_prime - j_prime * j_prime;
+        // Keep the paper-style notation w_squared = w·w. Its sign depends on the
+        // metric signature, so normalize with spatial_signature to keep the same formula.
+        let w_squared = self.spatial_signature * (1.0 + i_prime * i_prime + j_prime * j_prime);
 
-        -self.tetrad.z + 2.0 * w / (-w_squared)
+        -self.tetrad.z + 2.0 * w / (self.spatial_signature * w_squared)
     }
 
     pub fn get_ray_for(&self, row: i64, column: i64) -> Ray {

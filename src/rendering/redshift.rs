@@ -14,13 +14,11 @@ impl<'a, G: Geometry> RedshiftComputer<'a, G> {
 
     pub fn compute_redshift(&self, step: &Step, observer_energy: f64) -> f64 {
         let emitter_energy = self.energy_of_stationary_emitter(step);
-        // TODO: Figure out if we need to take the absolute value here.
-        (observer_energy / emitter_energy).abs()
+        self.compute_redshift_from_energies(emitter_energy, observer_energy)
     }
 
     pub fn compute_redshift_from_energies(&self, emitter_energy: f64, observer_energy: f64) -> f64 {
-        // TODO: Figure out if we need to take the absolute value here.
-        (observer_energy / emitter_energy).abs()
+        self.to_physical_energy(observer_energy) / self.to_physical_energy(emitter_energy)
     }
 
     pub fn get_observer_energy(&self, ray: &Ray, velocity: &FourVector) -> f64 {
@@ -33,5 +31,9 @@ impl<'a, G: Geometry> RedshiftComputer<'a, G> {
         let velocity = self.geometry.get_stationary_velocity_at(&position);
         let momentum = step.p;
         self.geometry.inner_product(&position, &velocity, &momentum)
+    }
+
+    fn to_physical_energy(&self, inner_product_energy: f64) -> f64 {
+        self.geometry.signature()[0] * inner_product_energy
     }
 }
