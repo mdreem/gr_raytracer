@@ -129,7 +129,11 @@ impl Hittable for Sphere {
         Ok(geometry.inner_product(&position, &velocity, &momentum))
     }
 
-    fn temperature_of_emitter(&self, _point: &Point) -> Result<f64, RaytracerError> {
+    fn temperature_of_emitter(
+        &self,
+        _point: &Point,
+        _geometry: &dyn Geometry,
+    ) -> Result<f64, RaytracerError> {
         Ok(self.temperature)
     }
 }

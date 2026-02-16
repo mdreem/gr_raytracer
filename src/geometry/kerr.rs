@@ -119,7 +119,7 @@ impl Kerr {
     fn jacobian_spherical_to_cartesian(&self, position: &Point) -> Matrix4<f64> {
         let spherical = position.get_as_spherical();
 
-        let r = spherical[0];
+        let r = self.get_radial_coordinate(position);
         let theta = spherical[1];
         let phi = spherical[2];
 
@@ -153,7 +153,7 @@ impl Kerr {
     }
 
     fn ut_contra(&self, position: &Point) -> Result<f64, RaytracerError> {
-        let r = position.get_as_spherical()[0];
+        let r = self.get_radial_coordinate(position);
         let a = self.a;
         let r_s = self.radius;
         let omega = self.angular_velocity(r);
@@ -429,7 +429,7 @@ impl Geometry for Kerr {
     }
 
     fn inside_horizon(&self, position: &Point) -> bool {
-        if self.a > self.radius {
+        if self.a > self.radius / 2.0 {
             return false;
         }
         let (x, y, z) = (position[1], position[2], position[3]);
@@ -440,7 +440,7 @@ impl Geometry for Kerr {
     }
 
     fn closed_orbit(&self, position: &Point, step_index: usize, max_steps: usize) -> bool {
-        let r = position.get_as_spherical()[0];
+        let r = self.get_radial_coordinate(position);
         if step_index == max_steps - 1 && r <= self.radius {
             return true;
         }
@@ -452,6 +452,11 @@ impl Geometry for Kerr {
             radius: self.radius,
             a: self.a,
         })
+    }
+
+    fn get_radial_coordinate(&self, position: &Point) -> f64 {
+        let rho_sqr = compute_r_sqr(self.a, position[1], position[2], position[3]);
+        rho_sqr.sqrt()
     }
 }
 
@@ -465,6 +470,8 @@ impl SupportQuantities for Kerr {
     }
 
     // See https://arxiv.org/abs/1104.5499.
+    // This is only valid for circular orbits in the equatorial plane, but should be a good
+    // approximation for near-circular orbits not too close to the black hole.
     fn get_circular_orbit_velocity_at(
         &self,
         position: &Point,
