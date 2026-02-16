@@ -130,6 +130,12 @@ impl KerrTemperatureComputer {
         Ok(tmp_computer)
     }
 
+    /// Computes the contravariant time component of the four-velocity for a circular orbit.
+    ///
+    /// Constraints:
+    /// - Assumes a Boyer-Lindquist coordinate system.
+    /// - Assumes a circular orbit in the equatorial plane (theta = PI/2).
+    /// - For off-equatorial positions, this is a physical approximation.
     // TODO: Deduplicate against Kerr geometry methods.
     fn ut_contra(&self, r: f64) -> Result<f64, RaytracerError> {
         let a = self.a;

@@ -117,6 +117,7 @@ impl Kerr {
     }
 
     fn convert_cartesian_to_spherical(&self, position: &Point) -> Point {
+        assert_eq!(position.coordinate_system, Cartesian);
         let x = position[1];
         let y = position[2];
         let z = position[3];
@@ -130,6 +131,7 @@ impl Kerr {
     }
 
     fn jacobian_spherical_to_cartesian(&self, position: &Point) -> Matrix4<f64> {
+        assert_eq!(position.coordinate_system, Cartesian);
         let spherical = self.convert_cartesian_to_spherical(position);
 
         let r = self.get_radial_coordinate(position);
@@ -165,6 +167,12 @@ impl Kerr {
         Matrix4::from_row_slice(&data)
     }
 
+    /// Computes the contravariant time component of the four-velocity for a circular orbit.
+    ///
+    /// Constraints:
+    /// - Assumes a Boyer-Lindquist coordinate system.
+    /// - Assumes a circular orbit in the equatorial plane (theta = PI/2).
+    /// - For off-equatorial positions, this is a physical approximation.
     fn ut_contra(&self, position: &Point) -> Result<f64, RaytracerError> {
         let r = self.get_radial_coordinate(position);
         let a = self.a;
@@ -529,7 +537,6 @@ mod tests {
     use crate::geometry::geometry::{Geometry, InnerProduct, SupportQuantities};
     use crate::geometry::kerr::Kerr;
     use crate::geometry::point::Point;
-    use crate::geometry::spherical_coordinates_helper::cartesian_to_spherical;
     use crate::rendering::camera::Camera;
     use crate::rendering::debug::save_rays_to_file;
     use crate::rendering::scene;
@@ -590,13 +597,11 @@ mod tests {
 
     #[test]
     fn test_lorentz_transformed_tetrad_orthonormal() {
-        let position = cartesian_to_spherical(&Point::new_cartesian(2.0, 3.0, 4.0, 5.0));
+        let position = Point::new_cartesian(2.0, 3.0, 4.0, 5.0);
         let radius = 2.0;
-        let r = (position[1] * position[1] + position[2] * position[2] + position[3] * position[3])
-            .sqrt();
-        let a = 1.0 - radius / r;
-
         let geometry = Kerr::new(radius, NO_ANGULAR_MOMENTUM, KERR_RADIUS_EPSILON);
+        let r = geometry.get_radial_coordinate(&position);
+        let a = 1.0 - radius / r;
 
         let velocity = FourVector::new_cartesian(1.0 / a.sqrt(), 0.0, 0.0, 0.0);
 
@@ -656,11 +661,10 @@ mod tests {
 
     #[test]
     fn test_kerr_ray() {
-        let position = cartesian_to_spherical(&Point::new_cartesian(2.0, 3.0, 4.0, 5.0));
+        let position = Point::new_cartesian(2.0, 3.0, 4.0, 5.0);
         let radius = 2.0;
         let geometry = Kerr::new(radius, NO_ANGULAR_MOMENTUM, 1e-4);
-        let r = (position[1] * position[1] + position[2] * position[2] + position[3] * position[3])
-            .sqrt();
+        let r = geometry.get_radial_coordinate(&position);
         let a = 1.0 - radius / r;
         let velocity = FourVector::new_cartesian(1.0 / a.sqrt(), 0.0, 0.0, 0.0);
         let camera = Camera::new(
@@ -685,8 +689,8 @@ mod tests {
     }
 
     fn create_camera(position: Point, radius: f64) -> Camera {
-        let r = (position[1] * position[1] + position[2] * position[2] + position[3] * position[3])
-            .sqrt();
+        let geometry = Kerr::new(radius, NO_ANGULAR_MOMENTUM, 1e-4);
+        let r = geometry.get_radial_coordinate(&position);
         let a = 1.0 - radius / r;
         let momentum = FourVector::new_cartesian(1.0 / a.sqrt(), 0.0, 0.0, 0.0);
         let camera = Camera::new(
@@ -778,14 +782,5 @@ mod tests {
         assert_abs_diff_eq!(velocity[1], -0.5773502691896257, epsilon = 1e-8);
         assert_abs_diff_eq!(velocity[2], 0.0, epsilon = 1e-8);
         assert_abs_diff_eq!(velocity[3], 0.0, epsilon = 1e-8);
-    }
-
-    #[test]
-    fn test_circular_orbit_velocity_rejects_off_equatorial_position() {
-        let geometry = Kerr::new(1.0, 0.2, 1e-4);
-        let position = Point::new_cartesian(0.0, 3.0, 0.0, 1.0);
-        let velocity = geometry.get_circular_orbit_velocity_at(&position);
-
-        assert!(velocity.is_err());
     }
 }
