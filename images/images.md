@@ -10,6 +10,8 @@
 
 ![render_kerr_checker_texture.png](render_kerr_checker_texture.png)
 
+![render_kerr_checker_texture_volumetric.png](render_kerr_checker_texture_volumetric.png)
+
 ![kerr_animation_stars_and_disk.gif](kerr_animation_stars_and_disk.gif)
 
 ![kerr_blackbody_disk_1.png](kerr_blackbody_disk_1.png)
@@ -19,3 +21,7 @@
 ![kerr_blackbody_disk_a_0_5__1.png](kerr_blackbody_disk_a_0_5__1.png)
 
 ![kerr_blackbody_disk_a_0_5__2.png](kerr_blackbody_disk_a_0_5__2.png)
+
+![render_schwarzschild_volumetric.png](render_schwarzschild_volumetric.png)
+
+![render_kerr_stars_volumetric.png](render_kerr_stars_volumetric.png)
