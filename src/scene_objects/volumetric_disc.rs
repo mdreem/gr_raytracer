@@ -328,12 +328,13 @@ impl VolumetricDisc {
         axis: &Vector3<f64>,
         half_height: f64,
     ) -> CylinderIntersection {
-        let d = (to - from).normalize();
-        let segment_length = (to - from).norm();
+        let segment_vector = to - from;
+        let segment_length = segment_vector.norm();
 
         if segment_length < 1e-12 {
             return NoIntersection;
         }
+        let d = segment_vector / segment_length;
 
         let v = from.cross(axis);
         let w = d.cross(axis);
@@ -386,8 +387,12 @@ impl VolumetricDisc {
         axis: &Vector3<f64>,
         pos: f64,
     ) -> Option<f64> {
-        let n = (to - from).normalize();
         let segment_vector = to - from;
+        let segment_length = segment_vector.norm();
+        if segment_length < 1e-12 {
+            return None;
+        }
+        let n = segment_vector / segment_length;
 
         let denom = n.dot(axis);
         if denom.abs() < 1e-10 {
