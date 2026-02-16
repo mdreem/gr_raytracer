@@ -145,6 +145,10 @@ impl Geometry for EuclideanSpace {
     fn get_geodesic_solver(&self, _ray: &Ray) -> Box<dyn GeodesicSolver> {
         Box::new(EuclideanSpacedSolver {})
     }
+
+    fn get_radial_coordinate(&self, position: &Point) -> f64 {
+        position.get_as_spherical()[0]
+    }
 }
 
 impl SupportQuantities for EuclideanSpace {

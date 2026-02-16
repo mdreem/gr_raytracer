@@ -64,4 +64,5 @@ pub trait Geometry:
     fn inside_horizon(&self, position: &Point) -> bool;
     fn closed_orbit(&self, position: &Point, step_index: usize, max_steps: usize) -> bool;
     fn get_geodesic_solver(&self, ray: &Ray) -> Box<dyn GeodesicSolver>;
+    fn get_radial_coordinate(&self, position: &Point) -> f64;
 }
