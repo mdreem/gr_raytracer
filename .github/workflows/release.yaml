@@ -1,9 +1,14 @@
 on:
   release:
-    types: [created]
+    types: [published]
 
 jobs:
   release:
+    permissions:
+      contents: write
+    concurrency:
+      group: release-${{ github.ref }}
+      cancel-in-progress: false
     strategy:
       matrix:
         include:
@@ -16,9 +21,9 @@ jobs:
     runs-on: ${{ matrix.os }}
     name: release ${{ matrix.target }}
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v6 # TODO: pin to a full commit SHA.
       - name: Compile and release
-        uses: taiki-e/upload-rust-binary-action@v1
+        uses: taiki-e/upload-rust-binary-action@v1 # TODO: pin to a full commit SHA.
         with:
           include: "README.md,LICENSE,scene-definitions,resources"
           target: ${{ matrix.target }}
