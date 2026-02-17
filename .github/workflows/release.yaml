@@ -1,9 +1,16 @@
+name: Release
+
 on:
   release:
-    types: [created]
+    types: [published]
 
 jobs:
   release:
+    permissions:
+      contents: write
+    concurrency:
+      group: release-${{ github.ref }}-${{ matrix.target }}
+      cancel-in-progress: false
     strategy:
       matrix:
         include:
@@ -16,11 +23,53 @@ jobs:
     runs-on: ${{ matrix.os }}
     name: release ${{ matrix.target }}
     steps:
-      - uses: actions/checkout@v6
-      - name: Compile and release
-        uses: taiki-e/upload-rust-binary-action@v1
+      - uses: actions/checkout@v6 # TODO: pin to a full commit SHA.
+
+      - name: Build binary
+        run: cargo build --release --target ${{ matrix.target }}
+
+      - name: Create release bundle (Unix)
+        if: runner.os != 'Windows'
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          VERSION="${GITHUB_REF_NAME}"
+          TARGET="${{ matrix.target }}"
+          BUNDLE_DIR="gr_raytracer-${VERSION}-${TARGET}"
+          BUNDLE_ARCHIVE="${BUNDLE_DIR}.tar.gz"
+
+          mkdir -p "${BUNDLE_DIR}"
+          cp "target/${TARGET}/release/gr_raytracer" "${BUNDLE_DIR}/"
+          cp README.md LICENSE "${BUNDLE_DIR}/"
+          cp -R scene-definitions "${BUNDLE_DIR}/"
+          cp -R resources "${BUNDLE_DIR}/"
+
+          tar -czf "${BUNDLE_ARCHIVE}" "${BUNDLE_DIR}"
+          echo "BUNDLE_ARCHIVE=${BUNDLE_ARCHIVE}" >> "${GITHUB_ENV}"
+
+      - name: Create release bundle (Windows)
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          $Version = $env:GITHUB_REF_NAME
+          $Target = "${{ matrix.target }}"
+          $BundleDir = "gr_raytracer-$Version-$Target"
+          $BundleArchive = "$BundleDir.zip"
+
+          New-Item -ItemType Directory -Path $BundleDir -Force | Out-Null
+          Copy-Item "target/$Target/release/gr_raytracer.exe" "$BundleDir/"
+          Copy-Item "README.md" "$BundleDir/"
+          Copy-Item "LICENSE" "$BundleDir/"
+          Copy-Item "scene-definitions" "$BundleDir/scene-definitions" -Recurse
+          Copy-Item "resources" "$BundleDir/resources" -Recurse
+
+          Compress-Archive -Path $BundleDir -DestinationPath $BundleArchive -Force
+          "BUNDLE_ARCHIVE=$BundleArchive" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
+
+      - name: Upload release bundle
+        uses: softprops/action-gh-release@v2 # TODO: pin to a full commit SHA.
         with:
-          include: "README.md,LICENSE,schwarzschild.toml,euclidean-spherical.toml,euclidean.toml,resources/celestial.png,resources/disk.png,resources/sphere.png"
-          target: ${{ matrix.target }}
-          token: ${{ secrets.GITHUB_TOKEN }}
-          bin: 'gr_raytracer'
+          files: ${{ env.BUNDLE_ARCHIVE }}
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
