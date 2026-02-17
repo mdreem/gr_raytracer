@@ -116,12 +116,33 @@ impl Kerr {
         }
     }
 
-    fn jacobian_spherical_to_cartesian(&self, position: &Point) -> Matrix4<f64> {
-        let spherical = position.get_as_spherical();
+    fn convert_cartesian_to_spherical(&self, position: &Point) -> Point {
+        assert_eq!(position.coordinate_system, Cartesian);
+        let x = position[1];
+        let y = position[2];
+        let z = position[3];
 
-        let r = spherical[0];
-        let theta = spherical[1];
-        let phi = spherical[2];
+        let r_sqr = compute_r_sqr(self.a, x, y, z);
+        let r = r_sqr.sqrt();
+        let theta = if r == 0.0 {
+            // At the origin, the polar angle is undefined; choose a conventional value.
+            0.0
+        } else {
+            let cos_theta = (z / r).max(-1.0).min(1.0);
+            cos_theta.acos()
+        };
+        let phi = (r * y - self.a * x).atan2(r * x + self.a * y);
+
+        Point::new_spherical(position[0], r, theta, phi)
+    }
+
+    fn jacobian_spherical_to_cartesian(&self, position: &Point) -> Matrix4<f64> {
+        assert_eq!(position.coordinate_system, Cartesian);
+        let spherical = self.convert_cartesian_to_spherical(position);
+
+        let r = self.get_radial_coordinate(position);
+        let theta = spherical[2];
+        let phi = spherical[3];
 
         let (st, ct) = (theta.sin(), theta.cos());
         let (sp, cp) = (phi.sin(), phi.cos());
@@ -135,13 +156,13 @@ impl Kerr {
             // row 1: x(r,theta,phi)
             0.0,
             st * cp,
-            r * ct * cp,
-            -r * st * sp,
+            (r * cp - self.a * sp) * ct,
+            (-r * sp - self.a * cp) * st,
             // row 2: y(r,theta,phi)
             0.0,
             st * sp,
-            r * ct * sp,
-            r * st * cp,
+            (r * sp + self.a * cp) * ct,
+            (r * cp - self.a * sp) * st,
             // row 3: z(r,theta,phi)
             0.0,
             ct,
@@ -152,8 +173,14 @@ impl Kerr {
         Matrix4::from_row_slice(&data)
     }
 
+    /// Computes the contravariant time component of the four-velocity for a circular orbit.
+    ///
+    /// Constraints:
+    /// - Assumes a Boyer-Lindquist coordinate system.
+    /// - Assumes a circular orbit in the equatorial plane (theta = PI/2).
+    /// - For off-equatorial positions, this is a physical approximation.
     fn ut_contra(&self, position: &Point) -> Result<f64, RaytracerError> {
-        let r = position.get_as_spherical()[0];
+        let r = self.get_radial_coordinate(position);
         let a = self.a;
         let r_s = self.radius;
         let omega = self.angular_velocity(r);
@@ -429,7 +456,7 @@ impl Geometry for Kerr {
     }
 
     fn inside_horizon(&self, position: &Point) -> bool {
-        if self.a > self.radius {
+        if self.a > self.radius / 2.0 {
             return false;
         }
         let (x, y, z) = (position[1], position[2], position[3]);
@@ -440,7 +467,7 @@ impl Geometry for Kerr {
     }
 
     fn closed_orbit(&self, position: &Point, step_index: usize, max_steps: usize) -> bool {
-        let r = position.get_as_spherical()[0];
+        let r = self.get_radial_coordinate(position);
         if step_index == max_steps - 1 && r <= self.radius {
             return true;
         }
@@ -452,6 +479,11 @@ impl Geometry for Kerr {
             radius: self.radius,
             a: self.a,
         })
+    }
+
+    fn get_radial_coordinate(&self, position: &Point) -> f64 {
+        let rho_sqr = compute_r_sqr(self.a, position[1], position[2], position[3]);
+        rho_sqr.sqrt()
     }
 }
 
@@ -465,6 +497,8 @@ impl SupportQuantities for Kerr {
     }
 
     // See https://arxiv.org/abs/1104.5499.
+    // This is only valid for circular orbits in the equatorial plane, but should be a good
+    // approximation for near-circular orbits not too close to the black hole.
     fn get_circular_orbit_velocity_at(
         &self,
         position: &Point,
@@ -509,7 +543,6 @@ mod tests {
     use crate::geometry::geometry::{Geometry, InnerProduct, SupportQuantities};
     use crate::geometry::kerr::Kerr;
     use crate::geometry::point::Point;
-    use crate::geometry::spherical_coordinates_helper::cartesian_to_spherical;
     use crate::rendering::camera::Camera;
     use crate::rendering::debug::save_rays_to_file;
     use crate::rendering::scene;
@@ -570,13 +603,11 @@ mod tests {
 
     #[test]
     fn test_lorentz_transformed_tetrad_orthonormal() {
-        let position = cartesian_to_spherical(&Point::new_cartesian(2.0, 3.0, 4.0, 5.0));
+        let position = Point::new_cartesian(2.0, 3.0, 4.0, 5.0);
         let radius = 2.0;
-        let r = (position[1] * position[1] + position[2] * position[2] + position[3] * position[3])
-            .sqrt();
-        let a = 1.0 - radius / r;
-
         let geometry = Kerr::new(radius, NO_ANGULAR_MOMENTUM, KERR_RADIUS_EPSILON);
+        let r = geometry.get_radial_coordinate(&position);
+        let a = 1.0 - radius / r;
 
         let velocity = FourVector::new_cartesian(1.0 / a.sqrt(), 0.0, 0.0, 0.0);
 
@@ -636,11 +667,10 @@ mod tests {
 
     #[test]
     fn test_kerr_ray() {
-        let position = cartesian_to_spherical(&Point::new_cartesian(2.0, 3.0, 4.0, 5.0));
+        let position = Point::new_cartesian(2.0, 3.0, 4.0, 5.0);
         let radius = 2.0;
         let geometry = Kerr::new(radius, NO_ANGULAR_MOMENTUM, 1e-4);
-        let r = (position[1] * position[1] + position[2] * position[2] + position[3] * position[3])
-            .sqrt();
+        let r = geometry.get_radial_coordinate(&position);
         let a = 1.0 - radius / r;
         let velocity = FourVector::new_cartesian(1.0 / a.sqrt(), 0.0, 0.0, 0.0);
         let camera = Camera::new(
@@ -665,8 +695,8 @@ mod tests {
     }
 
     fn create_camera(position: Point, radius: f64) -> Camera {
-        let r = (position[1] * position[1] + position[2] * position[2] + position[3] * position[3])
-            .sqrt();
+        let geometry = Kerr::new(radius, NO_ANGULAR_MOMENTUM, 1e-4);
+        let r = geometry.get_radial_coordinate(&position);
         let a = 1.0 - radius / r;
         let momentum = FourVector::new_cartesian(1.0 / a.sqrt(), 0.0, 0.0, 0.0);
         let camera = Camera::new(
