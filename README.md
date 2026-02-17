@@ -15,6 +15,12 @@ There are various predefined geometries, defined via TOML-files:
 - `scene-definitions/euclidean-spherical.toml`
 - `scene-definitions/euclidean.toml`
 - `scene-definitions/schwarzschild.toml`
+- `scene-definitions/kerr.toml`
+- `scene-definitions/schwarzschild-volumetric-streaky.toml`
+- `scene-definitions/schwarzschild-volumetric-stony.toml`
+- `scene-definitions/schwarzschild-volumetric-dense.toml`
+- `scene-definitions/kerr-volumetric-streaky.toml`
+- `scene-definitions/kerr-volumetric-stony.toml`
 
 These can be used to render an image of the described setup via
 
