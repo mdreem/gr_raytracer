@@ -22,10 +22,37 @@ jobs:
     name: release ${{ matrix.target }}
     steps:
       - uses: actions/checkout@v6 # TODO: pin to a full commit SHA.
-      - name: Compile and release
-        uses: taiki-e/upload-rust-binary-action@v1 # TODO: pin to a full commit SHA.
+
+      - name: Build binary
+        run: cargo build --release --target ${{ matrix.target }}
+
+      - name: Create release bundle
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          VERSION="${GITHUB_REF_NAME}"
+          TARGET="${{ matrix.target }}"
+          BIN_NAME="gr_raytracer"
+          if [[ "${TARGET}" == *"windows"* ]]; then
+            BIN_NAME="gr_raytracer.exe"
+          fi
+
+          BUNDLE_DIR="gr_raytracer-${VERSION}-${TARGET}"
+          BUNDLE_ARCHIVE="${BUNDLE_DIR}.tar.gz"
+
+          mkdir -p "${BUNDLE_DIR}"
+          cp "target/${TARGET}/release/${BIN_NAME}" "${BUNDLE_DIR}/"
+          cp README.md LICENSE "${BUNDLE_DIR}/"
+          cp -R scene-definitions "${BUNDLE_DIR}/"
+          cp -R resources "${BUNDLE_DIR}/"
+
+          tar -czf "${BUNDLE_ARCHIVE}" "${BUNDLE_DIR}"
+          echo "BUNDLE_ARCHIVE=${BUNDLE_ARCHIVE}" >> "${GITHUB_ENV}"
+
+      - name: Upload release bundle
+        uses: softprops/action-gh-release@v2 # TODO: pin to a full commit SHA.
         with:
-          include: "README.md,LICENSE,scene-definitions,resources"
-          target: ${{ matrix.target }}
-          token: ${{ secrets.GITHUB_TOKEN }}
-          bin: 'gr_raytracer'
+          files: ${{ env.BUNDLE_ARCHIVE }}
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
