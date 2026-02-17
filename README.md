@@ -12,14 +12,14 @@ from [BlackHoleViz_v2](https://github.com/HollowaySean/BlackHoleViz_v2).
 
 There are various predefined geometries, defined via TOML-files:
 
-- `euclidean-spherical.toml`
-- `euclidean.toml`
-- `schwarzschild.toml`
+- `scene-definitions/euclidean-spherical.toml`
+- `scene-definitions/euclidean.toml`
+- `scene-definitions/schwarzschild.toml`
 
 These can be used to render an image of the described setup via
 
 ```ah
-cargo run --release -- --width=1500 --height=1500 --camera-position=10.0,0.0,0.8  --config-file schwarzschild.toml render --filename=render.png
+cargo run --release -- --width=1500 --height=1500 --camera-position=10.0,0.0,0.8  --config-file scene-definitions/schwarzschild.toml render --filename=render.png
 ```
 
 where `--width` and `--height` define the resolution, the camera position can be adapted via `--camera-position`.
@@ -74,7 +74,7 @@ The background is: https://commons.wikimedia.org/wiki/File:Messier_object_025.jp
 The parameters are
 
 ```sh
-gr_raytracer --width=500 --height=500 --max-steps=1000000 --camera-position=-10,0,-0.5 --theta=1.52 --psi=-1.57 --phi=0 --config-file kerr.toml render
+gr_raytracer --width=500 --height=500 --max-steps=1000000 --camera-position=-10,0,-0.5 --theta=1.52 --psi=-1.57 --phi=0 --config-file scene-definitions/kerr.toml render
 ```
 
 Note the large number of max-steps required to get a good image, due to the complex light paths around a Kerr black
@@ -91,7 +91,7 @@ Example of a Kerr black hole with a radius r_s = 1.0 and a = 0.5.
 Create a trajectory near the horizon like this:
 
 ```sh
-gr_raytracer --width=501 --height=501 --max-steps=1000000 --camera-position=-5,0,0.5 --theta=1.57 --psi=1.57 --phi=0 --config-file kerr.toml render-ray --col=195 --row=250
+gr_raytracer --width=501 --height=501 --max-steps=1000000 --camera-position=-5,0,0.5 --theta=1.57 --psi=1.57 --phi=0 --config-file scene-definitions/kerr.toml render-ray --col=195 --row=250
 ```
 
 Example of a trajectory of Kerr black hole with a radius r_s = 1.0 and a = 0.5 near the horizon.
