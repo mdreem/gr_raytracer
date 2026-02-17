@@ -1,5 +1,7 @@
 # General Relativity Raytracer
 
+![alt_text](kerr_black_hole_with_stars.png "Kerr Black hole with stars in the background")
+
 This is a raytracer for general relativity, which can be used to visualize the effects of gravity on light paths. It is
 based on the principles of general relativity and uses numerical methods to solve the geodesic equations.
 
@@ -10,17 +12,8 @@ from [BlackHoleViz_v2](https://github.com/HollowaySean/BlackHoleViz_v2).
 
 # How to render an image
 
-There are various predefined geometries, defined via TOML-files:
+There are various predefined geometries, defined via TOML-files in the directory [scene-definitions](/scene-definitions).
 
-- `scene-definitions/euclidean-spherical.toml`
-- `scene-definitions/euclidean.toml`
-- `scene-definitions/schwarzschild.toml`
-- `scene-definitions/kerr.toml`
-- `scene-definitions/schwarzschild-volumetric-streaky.toml`
-- `scene-definitions/schwarzschild-volumetric-stony.toml`
-- `scene-definitions/schwarzschild-volumetric-dense.toml`
-- `scene-definitions/kerr-volumetric-streaky.toml`
-- `scene-definitions/kerr-volumetric-stony.toml`
 
 These can be used to render an image of the described setup via
 
@@ -115,3 +108,9 @@ Example of a Kerr black hole with a radius r_s = 1.0 and a = 0.51.
 This animations shows a Kerr black hole with r_s = 1.0 and increasing spin parameter a from 0.0 to 0.5.
 
 ![alt text](./images/kerr_animation.gif "Kerr black hole with a radius r_s = 1.0 and a = 0.0 to 0.5")
+
+# Sources
+
+- [Seeing relativity -- I. Ray tracing in a Schwarzschild metric to explore the maximal analytic extension of the metric and making a proper rendering of the stars](https://arxiv.org/abs/1511.06025)
+- [BlackHoleViz_v2](https://github.com/HollowaySean/BlackHoleViz_v2).
+- https://commons.wikimedia.org/wiki/File:Messier_object_025.jpg
