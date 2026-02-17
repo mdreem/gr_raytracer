@@ -124,7 +124,13 @@ impl Kerr {
 
         let r_sqr = compute_r_sqr(self.a, x, y, z);
         let r = r_sqr.sqrt();
-        let theta = (z / r).acos();
+        let theta = if r == 0.0 {
+            // At the origin, the polar angle is undefined; choose a conventional value.
+            0.0
+        } else {
+            let cos_theta = (z / r).max(-1.0).min(1.0);
+            cos_theta.acos()
+        };
         let phi = (r * y - self.a * x).atan2(r * x + self.a * y);
 
         Point::new_spherical(position[0], r, theta, phi)
