@@ -28,5 +28,9 @@ pub trait Hittable: Sync {
         geometry: &dyn Geometry,
         step: &Step,
     ) -> Result<f64, RaytracerError>;
-    fn temperature_of_emitter(&self, point: &Point) -> Result<f64, RaytracerError>;
+    fn temperature_of_emitter(
+        &self,
+        point: &Point,
+        geometry: &dyn Geometry,
+    ) -> Result<f64, RaytracerError>;
 }

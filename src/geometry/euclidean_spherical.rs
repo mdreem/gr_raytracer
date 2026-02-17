@@ -124,6 +124,13 @@ impl Geometry for EuclideanSpaceSpherical {
     fn get_geodesic_solver(&self, _ray: &Ray) -> Box<dyn GeodesicSolver> {
         Box::new(EuclideanSpaceSphericalSolver {})
     }
+
+    fn get_radial_coordinate(&self, position: &Point) -> f64 {
+        match position.coordinate_system {
+            CoordinateSystem::Cartesian => position.get_as_spherical()[0],
+            CoordinateSystem::Spherical => position[1],
+        }
+    }
 }
 
 impl SupportQuantities for EuclideanSpaceSpherical {

@@ -14,7 +14,7 @@ horizon_epsilon = 1e-4
 [[objects]]
 
 [objects.VolumetricDisc]
-inner_radius = 4.05
+inner_radius = 0.795
 outer_radius = 16.0
 temperature = 5000.0
 num_octaves = 8

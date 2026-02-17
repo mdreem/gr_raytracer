@@ -52,8 +52,10 @@ impl<'a, G: Geometry> Objects<'a, G> {
                     let emitter_energy = hittable.energy_of_emitter(self.geometry, y_start)?;
                     let redshift = redshift_computer
                         .compute_redshift_from_energies(emitter_energy, observer_energy);
-                    let temperature =
-                        hittable.temperature_of_emitter(&intersection_data.intersection_point)?;
+                    let temperature = hittable.temperature_of_emitter(
+                        &intersection_data.intersection_point,
+                        self.geometry,
+                    )?;
 
                     let color_computation_data = ColorComputationData {
                         uv: intersection_data.uv,

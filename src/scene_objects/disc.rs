@@ -105,8 +105,12 @@ impl Hittable for Disc {
         Ok(geometry.inner_product(&position, &velocity, &momentum))
     }
 
-    fn temperature_of_emitter(&self, point: &Point) -> Result<f64, RaytracerError> {
-        let r = point.get_as_spherical()[0];
+    fn temperature_of_emitter(
+        &self,
+        point: &Point,
+        geometry: &dyn Geometry,
+    ) -> Result<f64, RaytracerError> {
+        let r = geometry.get_radial_coordinate(point);
         let temperature = self.temperature_computer.compute_temperature(r)?;
         Ok(temperature)
     }

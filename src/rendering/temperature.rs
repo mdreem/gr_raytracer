@@ -130,6 +130,12 @@ impl KerrTemperatureComputer {
         Ok(tmp_computer)
     }
 
+    /// Computes the contravariant time component of the four-velocity for a circular orbit.
+    ///
+    /// Constraints:
+    /// - Assumes a Boyer-Lindquist coordinate system.
+    /// - Assumes a circular orbit in the equatorial plane (theta = PI/2).
+    /// - For off-equatorial positions, this is a physical approximation.
     // TODO: Deduplicate against Kerr geometry methods.
     fn ut_contra(&self, r: f64) -> Result<f64, RaytracerError> {
         let a = self.a;
@@ -262,7 +268,20 @@ impl TemperatureComputer for KerrTemperatureComputer {
         }
 
         if radius < self.r_isco {
-            error!("Radius {} is below r_isco {}", radius, self.r_isco);
+            let min_cartesian_inner_radius = (self.r_isco * self.r_isco + self.a * self.a).sqrt();
+            error!(
+                concat!(
+                    "Radius {} is below r_isco {}. In Kerr, this is the ",
+                    "Boyer-Lindquist-type radial coordinate used for temperature, ",
+                    "while Disc intersection uses cartesian distance. ",
+                    "For Disc config, use inner_radius >= {} ",
+                    "(sqrt(r_isco^2 + a^2), a={})."
+                ),
+                radius,
+                self.r_isco,
+                min_cartesian_inner_radius,
+                self.a
+            );
             return Err(RaytracerError::BelowRISCO);
         }
 

@@ -41,7 +41,7 @@ impl OdeFunction<Const<8>> for SchwarzschildSolver {
 
 impl HasCoordinateSystem for SchwarzschildSolver {
     fn coordinate_system(&self) -> CoordinateSystem {
-        Spherical
+        CoordinateSystem::Spherical
     }
 }
 
@@ -188,6 +188,13 @@ impl Geometry for Schwarzschild {
         Box::new(SchwarzschildSolver {
             radius: self.radius,
         })
+    }
+
+    fn get_radial_coordinate(&self, position: &Point) -> f64 {
+        match position.coordinate_system {
+            CoordinateSystem::Cartesian => position.get_as_spherical()[0],
+            CoordinateSystem::Spherical => position[1],
+        }
     }
 }
 
