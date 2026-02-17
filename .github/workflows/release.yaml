@@ -7,7 +7,7 @@ jobs:
     permissions:
       contents: write
     concurrency:
-      group: release-${{ github.ref }}
+      group: release-${{ github.ref }}-${{ matrix.target }}
       cancel-in-progress: false
     strategy:
       matrix:
