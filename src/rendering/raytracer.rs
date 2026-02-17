@@ -35,7 +35,7 @@ pub enum RaytracerError {
 }
 
 pub struct Raytracer<'a, G: Geometry> {
-    scene: Scene<'a, G>,
+    pub scene: Scene<'a, G>,
     color_normalization: CIETristimulusNormalization,
 }
 
@@ -155,17 +155,6 @@ impl<'a, G: Geometry> Raytracer<'a, G> {
 
         info!("saved image to {}", filename);
         Ok(())
-    }
-
-    // TODO: maybe change image width and height types to align through the codebase
-    pub fn render(&self, filename: String) -> Result<(), RaytracerError> {
-        self.render_section(
-            0,
-            0,
-            self.scene.camera.rows as u32,
-            self.scene.camera.columns as u32,
-            filename,
-        )
     }
 
     pub fn integrate_ray_at_point(

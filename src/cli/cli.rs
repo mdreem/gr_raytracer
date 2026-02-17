@@ -40,6 +40,14 @@ pub enum Action {
     Render {
         #[arg(long, default_value = "render.png")]
         filename: String,
+        #[arg(long)]
+        from_row: Option<u32>,
+        #[arg(long)]
+        from_col: Option<u32>,
+        #[arg(long)]
+        to_row: Option<u32>,
+        #[arg(long)]
+        to_col: Option<u32>,
     },
     RenderRay {
         #[arg(short, long)]
