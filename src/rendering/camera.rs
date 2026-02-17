@@ -133,8 +133,8 @@ impl Camera {
     /// This ensures k·k = 0 (null geodesic) in the observer's tetrad frame.
     ///
     /// Coordinate convention:
-    /// - e_x: vertical (up) in image
-    /// - e_y: horizontal (right) in image
+    /// - e_x: horizontal (right) in image
+    /// - e_y: vertical (up) in image
     /// - e_z: camera forward direction
     ///
     /// row, column range from 1..R, 1..C in https://arxiv.org/abs/1511.06025, but here we work
@@ -142,9 +142,12 @@ impl Camera {
     fn get_direction_for(&self, row: i64, column: i64) -> FourVector {
         let shifted_column = (column + 1) as f64; // Convert to 1-based index.
         let shifted_row = (row + 1) as f64; // Convert to 1-based index.
-        let i_prime = (2.0 * f64::tan(self.alpha / 2.0) / (self.columns as f64))
+        let tan_half_alpha = f64::tan(self.alpha / 2.0);
+        // To ensure square pixels, we use the same angular scale for both directions.
+        // alpha is treated as the vertical field of view (FOV).
+        let i_prime = (2.0 * tan_half_alpha / (self.rows as f64))
             * (shifted_column - (self.columns as f64 + 1.0) / 2.0);
-        let j_prime = (2.0 * f64::tan(self.alpha / 2.0) / (self.rows as f64))
+        let j_prime = (2.0 * tan_half_alpha / (self.rows as f64))
             * (shifted_row as f64 - (self.rows as f64 + 1.0) / 2.0);
 
         let w = self.tetrad.z + i_prime * self.tetrad.x + j_prime * self.tetrad.y;
