@@ -14,13 +14,25 @@ pub fn render_euclidean_spherical(
     config: RenderConfig,
     camera_position: Point,
     filename: String,
+    from_row: Option<u32>,
+    from_col: Option<u32>,
+    to_row: Option<u32>,
+    to_col: Option<u32>,
 ) -> Result<(), raytracer::RaytracerError> {
     let camera_position = cartesian_to_spherical(&camera_position);
     let momentum = FourVector::new_spherical(1.0, 0.0, 0.0, 0.0);
     let geometry = EuclideanSpaceSpherical::new();
     let scene = create_scene(&geometry, camera_position, momentum, opts, config.clone())?;
 
-    render(scene, filename, config.color_normalization)
+    render(
+        scene,
+        filename,
+        config.color_normalization,
+        from_row,
+        from_col,
+        to_row,
+        to_col,
+    )
 }
 
 pub fn render_euclidean_spherical_ray(
