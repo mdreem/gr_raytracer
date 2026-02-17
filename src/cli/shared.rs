@@ -23,9 +23,19 @@ pub fn render<G: Geometry>(
     scene: Scene<G>,
     filename: String,
     color_normalization: CIETristimulusNormalization,
+    from_row: Option<u32>,
+    from_col: Option<u32>,
+    to_row: Option<u32>,
+    to_col: Option<u32>,
 ) -> Result<(), RaytracerError> {
     let raytracer = raytracer::Raytracer::new(scene, color_normalization);
-    raytracer.render(filename)
+    raytracer.render_section(
+        from_row.unwrap_or(0),
+        from_col.unwrap_or(0),
+        to_row.unwrap_or(raytracer.scene.camera.rows as u32),
+        to_col.unwrap_or(raytracer.scene.camera.columns as u32),
+        filename,
+    )
 }
 
 pub fn create_scene<G: Geometry>(
