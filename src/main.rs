@@ -32,7 +32,13 @@ fn run() -> Result<(), RaytracerError> {
 
     let start = Instant::now();
     match args.action {
-        Action::Render { filename } => {
+        Action::Render {
+            filename,
+            from_row,
+            from_col,
+            to_row,
+            to_col,
+        } => {
             let config_file = fs::read_to_string(args.config_file)
                 .map_err(RaytracerError::ConfigurationFileError)?;
 
@@ -57,6 +63,10 @@ fn run() -> Result<(), RaytracerError> {
                         config,
                         Point::new_from_vector(position, CoordinateSystem::Cartesian),
                         filename,
+                        from_row,
+                        from_col,
+                        to_row,
+                        to_col,
                     )?;
                 }
                 GeometryType::EuclideanSpherical => {
@@ -66,6 +76,10 @@ fn run() -> Result<(), RaytracerError> {
                         config,
                         Point::new_from_vector(position, CoordinateSystem::Cartesian),
                         filename,
+                        from_row,
+                        from_col,
+                        to_row,
+                        to_col,
                     )?;
                 }
                 GeometryType::Schwarzschild {
@@ -80,6 +94,10 @@ fn run() -> Result<(), RaytracerError> {
                         config,
                         Point::new_from_vector(position, CoordinateSystem::Cartesian),
                         filename,
+                        from_row,
+                        from_col,
+                        to_row,
+                        to_col,
                     )?;
                 }
                 GeometryType::Kerr {
@@ -96,6 +114,10 @@ fn run() -> Result<(), RaytracerError> {
                         config,
                         Point::new_from_vector(position, CoordinateSystem::Cartesian),
                         filename,
+                        from_row,
+                        from_col,
+                        to_row,
+                        to_col,
                     )?;
                 }
             }

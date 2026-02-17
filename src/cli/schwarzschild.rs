@@ -43,12 +43,24 @@ pub fn render_schwarzschild(
     config: RenderConfig,
     camera_position: Point,
     filename: String,
+    from_row: Option<u32>,
+    from_col: Option<u32>,
+    to_row: Option<u32>,
+    to_col: Option<u32>,
 ) -> Result<(), RaytracerError> {
     let geometry = Schwarzschild::new(radius, horizon_epsilon);
 
     let scene = create_schwarzschild_scene(&geometry, radius, opts, &config, camera_position)?;
 
-    render(scene, filename, config.color_normalization)
+    render(
+        scene,
+        filename,
+        config.color_normalization,
+        from_row,
+        from_col,
+        to_row,
+        to_col,
+    )
 }
 
 pub fn render_schwarzschild_ray(
