@@ -1,5 +1,11 @@
 # General Relativity Raytracer (Rust)
 
+[![CI](https://github.com/mdreem/gr_raytracer/actions/workflows/ci.yaml/badge.svg)](https://github.com/mdreem/gr_raytracer/actions/workflows/ci.yaml)
+[![Release](https://github.com/mdreem/gr_raytracer/actions/workflows/release.yaml/badge.svg)](https://github.com/mdreem/gr_raytracer/actions/workflows/release.yaml)
+[![Latest Release](https://img.shields.io/github/v/release/mdreem/gr_raytracer)](https://github.com/mdreem/gr_raytracer/releases)
+[![License](https://img.shields.io/github/license/mdreem/gr_raytracer)](https://github.com/mdreem/gr_raytracer/blob/main/LICENSE)
+[![Downloads](https://img.shields.io/github/downloads/mdreem/gr_raytracer/total)](https://github.com/mdreem/gr_raytracer/releases)
+
 <p align="center">
   <img src="kerr_black_hole_with_stars.png" alt="Kerr black hole raytraced in Rust with stars in the background" title="Kerr black hole with stars in the background">
 </p>
@@ -7,9 +13,6 @@
 A Rust ray tracer for **general relativity** and **black hole visualization**.  
 It solves geodesic equations numerically and renders gravitational lensing, redshift, beaming, accretion disks, and
 photon trajectories in Schwarzschild and Kerr spacetimes.
-
-If you are searching for a **Rust black hole renderer**, **gravitational lensing simulation**, or **general relativity
-ray tracing project**, this repository is built for that use case.
 
 Inspired
 by [Seeing relativity -- I. Ray tracing in a Schwarzschild metric to explore the maximal analytic extension of the metric and making a proper rendering of the stars](https://arxiv.org/abs/1511.06025)
