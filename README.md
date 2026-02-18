@@ -10,10 +10,24 @@ paper [Seeing relativity -- I. Ray tracing in a Schwarzschild metric to explore 
 and takes various formulas from it. Additional inspiration came
 from [BlackHoleViz_v2](https://github.com/HollowaySean/BlackHoleViz_v2).
 
+## Feature Snapshot
+
+- Multi-geometry raytracing: Euclidean, EuclideanSpherical, Schwarzschild, Kerr.
+- Geodesic integration with RKF45.
+- Relativistic effects in shading: gravitational/Doppler redshift and beaming.
+- Physically motivated emission: black-body spectrum integration in CIE XYZ.
+- Various scene primitives: Sphere, Disc, and Perlin-noise-based VolumetricDisc.
+    - Note that the volumetric disc is not physically motivated, but rather a visual effect to create a more volumetric
+      appearance of the accretion disk.
+- Flexible materials/textures: Bitmap, Checker, and BlackBody mappers.
+- High-fidelity outputs: standard image export plus HDR (`.hdr`) support.
+- Debug/inspection tooling: per-pixel ray export and arbitrary ray-at-position export.
+- Config-driven scenes via TOML with pluggable geometry, textures, and objects.
+
 ## How to render an image
 
-There are various predefined geometries, defined via TOML-files in the directory [scene-definitions](/scene-definitions).
-
+There are various predefined geometries, defined via TOML-files in the
+directory [scene-definitions](/scene-definitions).
 
 These can be used to render an image of the described setup via
 
@@ -113,4 +127,7 @@ This animations shows a Kerr black hole with r_s = 1.0 and increasing spin param
 
 - [Seeing relativity -- I. Ray tracing in a Schwarzschild metric to explore the maximal analytic extension of the metric and making a proper rendering of the stars](https://arxiv.org/abs/1511.06025)
 - [BlackHoleViz_v2](https://github.com/HollowaySean/BlackHoleViz_v2).
+- Novikov, I. D., & Thorne, K. S. (1973). *Astrophysics of black holes*. In C. DeWitt & B. S. DeWitt (Eds.), *Black
+  Holes (Les Astres Occlus)*, p.
+  343. [Chapter bibliographic entry](https://cir.nii.ac.jp/crid/1370025430666224928), [Book record](https://lccn.loc.gov/73169355).
 - https://commons.wikimedia.org/wiki/File:Messier_object_025.jpg
