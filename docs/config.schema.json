@@ -1,0 +1,549 @@
+{
+  "$defs": {
+    "CIETristimulusNormalization": {
+      "description": "Strategy used to normalize CIE XYZ tristimulus values before image output.",
+      "oneOf": [
+        {
+          "const": "NoNormalization",
+          "description": "Keep raw XYZ values unchanged.",
+          "type": "string"
+        },
+        {
+          "const": "Chromaticity",
+          "description": "Normalize XYZ values so X + Y + Z = 1 (chromaticity coordinates).",
+          "type": "string"
+        },
+        {
+          "const": "EqualLuminance",
+          "description": "Normalize XYZ values so Y = 1 (relative luminance normalization).",
+          "type": "string"
+        }
+      ]
+    },
+    "GeometryType": {
+      "description": "Available spacetime geometry models.",
+      "oneOf": [
+        {
+          "const": "Euclidean",
+          "description": "Flat Euclidean geometry in Cartesian coordinates.",
+          "type": "string"
+        },
+        {
+          "const": "EuclideanSpherical",
+          "description": "Flat Euclidean geometry in spherical coordinates.",
+          "type": "string"
+        },
+        {
+          "additionalProperties": false,
+          "description": "Schwarzschild black hole geometry.",
+          "properties": {
+            "Schwarzschild": {
+              "properties": {
+                "horizon_epsilon": {
+                  "description": "Small offset used to avoid singular behavior at the horizon.",
+                  "format": "double",
+                  "type": "number"
+                },
+                "radius": {
+                  "description": "Schwarzschild radius.",
+                  "format": "double",
+                  "type": "number"
+                }
+              },
+              "required": [
+                "radius",
+                "horizon_epsilon"
+              ],
+              "type": "object"
+            }
+          },
+          "required": [
+            "Schwarzschild"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "description": "Kerr rotating black hole geometry.",
+          "properties": {
+            "Kerr": {
+              "properties": {
+                "a": {
+                  "description": "Kerr spin parameter.",
+                  "format": "double",
+                  "type": "number"
+                },
+                "horizon_epsilon": {
+                  "description": "Small offset used to avoid singular behavior at the horizon.",
+                  "format": "double",
+                  "type": "number"
+                },
+                "radius": {
+                  "description": "Characteristic radius term.",
+                  "format": "double",
+                  "type": "number"
+                }
+              },
+              "required": [
+                "radius",
+                "a",
+                "horizon_epsilon"
+              ],
+              "type": "object"
+            }
+          },
+          "required": [
+            "Kerr"
+          ],
+          "type": "object"
+        }
+      ]
+    },
+    "ObjectsConfig": {
+      "description": "Scene object definitions.",
+      "oneOf": [
+        {
+          "additionalProperties": false,
+          "description": "Spherical emitter or textured sphere.",
+          "properties": {
+            "Sphere": {
+              "properties": {
+                "position": {
+                  "description": "Center position in Cartesian coordinates (x, y, z).",
+                  "maxItems": 3,
+                  "minItems": 3,
+                  "prefixItems": [
+                    {
+                      "format": "double",
+                      "type": "number"
+                    },
+                    {
+                      "format": "double",
+                      "type": "number"
+                    },
+                    {
+                      "format": "double",
+                      "type": "number"
+                    }
+                  ],
+                  "type": "array"
+                },
+                "radius": {
+                  "description": "Sphere radius.",
+                  "format": "double",
+                  "type": "number"
+                },
+                "temperature": {
+                  "description": "Emitter temperature in Kelvin.",
+                  "format": "double",
+                  "type": "number"
+                },
+                "texture": {
+                  "$ref": "#/$defs/TextureConfig",
+                  "description": "Surface texture configuration."
+                }
+              },
+              "required": [
+                "radius",
+                "position",
+                "texture",
+                "temperature"
+              ],
+              "type": "object"
+            }
+          },
+          "required": [
+            "Sphere"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "description": "Thin disc emitter with inner and outer radius.",
+          "properties": {
+            "Disc": {
+              "properties": {
+                "inner_radius": {
+                  "description": "Inner radius of the disc.",
+                  "format": "double",
+                  "type": "number"
+                },
+                "outer_radius": {
+                  "description": "Outer radius of the disc.",
+                  "format": "double",
+                  "type": "number"
+                },
+                "temperature": {
+                  "description": "Emitter temperature in Kelvin.",
+                  "format": "double",
+                  "type": "number"
+                },
+                "texture": {
+                  "$ref": "#/$defs/TextureConfig",
+                  "description": "Surface texture configuration."
+                }
+              },
+              "required": [
+                "inner_radius",
+                "outer_radius",
+                "texture",
+                "temperature"
+              ],
+              "type": "object"
+            }
+          },
+          "required": [
+            "Disc"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "description": "Participating-media disc with absorption/scattering.",
+          "properties": {
+            "VolumetricDisc": {
+              "properties": {
+                "absorption": {
+                  "description": "Absorption coefficient.",
+                  "format": "double",
+                  "type": "number"
+                },
+                "axis": {
+                  "description": "Optional rotation axis for the disc volume (x, y, z).",
+                  "maxItems": 3,
+                  "minItems": 3,
+                  "prefixItems": [
+                    {
+                      "format": "double",
+                      "type": "number"
+                    },
+                    {
+                      "format": "double",
+                      "type": "number"
+                    },
+                    {
+                      "format": "double",
+                      "type": "number"
+                    }
+                  ],
+                  "type": [
+                    "array",
+                    "null"
+                  ]
+                },
+                "brightness_reference_temperature": {
+                  "description": "Reference temperature used for brightness scaling.",
+                  "format": "double",
+                  "type": "number"
+                },
+                "density_multiplier": {
+                  "description": "Global multiplier applied to local density values.",
+                  "format": "double",
+                  "type": "number"
+                },
+                "inner_radius": {
+                  "description": "Inner radius of the disc volume.",
+                  "format": "double",
+                  "type": "number"
+                },
+                "max_steps": {
+                  "description": "Maximum integration steps through the participating media.",
+                  "format": "uint",
+                  "minimum": 0,
+                  "type": "integer"
+                },
+                "noise_offset": {
+                  "description": "Scalar offset added to the sampled noise domain.",
+                  "format": "double",
+                  "type": "number"
+                },
+                "noise_scale": {
+                  "description": "Noise scaling factors (x, y, z).",
+                  "maxItems": 3,
+                  "minItems": 3,
+                  "prefixItems": [
+                    {
+                      "format": "double",
+                      "type": "number"
+                    },
+                    {
+                      "format": "double",
+                      "type": "number"
+                    },
+                    {
+                      "format": "double",
+                      "type": "number"
+                    }
+                  ],
+                  "type": "array"
+                },
+                "num_octaves": {
+                  "description": "Number of octaves used for procedural density noise.",
+                  "format": "uint",
+                  "minimum": 0,
+                  "type": "integer"
+                },
+                "outer_radius": {
+                  "description": "Outer radius of the disc volume.",
+                  "format": "double",
+                  "type": "number"
+                },
+                "perlin_seed": {
+                  "description": "Optional explicit seed for noise generation.",
+                  "format": "uint32",
+                  "minimum": 0,
+                  "type": [
+                    "integer",
+                    "null"
+                  ]
+                },
+                "scattering": {
+                  "description": "Scattering coefficient.",
+                  "format": "double",
+                  "type": "number"
+                },
+                "step_size": {
+                  "description": "Integration step size through the media volume.",
+                  "format": "double",
+                  "type": "number"
+                },
+                "temperature": {
+                  "description": "Base emitter temperature in Kelvin.",
+                  "format": "double",
+                  "type": "number"
+                },
+                "texture": {
+                  "$ref": "#/$defs/TextureConfig",
+                  "description": "Texture sampled within the volume."
+                },
+                "thickness": {
+                  "description": "Vertical thickness of the media disc.",
+                  "format": "double",
+                  "type": "number"
+                }
+              },
+              "required": [
+                "inner_radius",
+                "outer_radius",
+                "texture",
+                "temperature",
+                "num_octaves",
+                "max_steps",
+                "step_size",
+                "thickness",
+                "density_multiplier",
+                "brightness_reference_temperature",
+                "absorption",
+                "scattering",
+                "noise_scale",
+                "noise_offset"
+              ],
+              "type": "object"
+            }
+          },
+          "required": [
+            "VolumetricDisc"
+          ],
+          "type": "object"
+        }
+      ]
+    },
+    "TextureConfig": {
+      "description": "Texture definitions used by objects and background.",
+      "oneOf": [
+        {
+          "additionalProperties": false,
+          "description": "Sample colors from a bitmap image.",
+          "properties": {
+            "Bitmap": {
+              "properties": {
+                "beaming_exponent": {
+                  "description": "Exponent used for relativistic beaming intensity scaling.",
+                  "format": "double",
+                  "type": "number"
+                },
+                "color_normalization": {
+                  "$ref": "#/$defs/CIETristimulusNormalization",
+                  "description": "Normalization applied to sampled texture colors."
+                },
+                "path": {
+                  "description": "Filesystem path to the image file.",
+                  "type": "string"
+                }
+              },
+              "required": [
+                "beaming_exponent",
+                "path",
+                "color_normalization"
+              ],
+              "type": "object"
+            }
+          },
+          "required": [
+            "Bitmap"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "description": "Procedural checkerboard texture.",
+          "properties": {
+            "Checker": {
+              "properties": {
+                "beaming_exponent": {
+                  "description": "Exponent used for relativistic beaming intensity scaling.",
+                  "format": "double",
+                  "type": "number"
+                },
+                "color1": {
+                  "description": "RGB tuple for first checker color.",
+                  "maxItems": 3,
+                  "minItems": 3,
+                  "prefixItems": [
+                    {
+                      "format": "uint8",
+                      "maximum": 255,
+                      "minimum": 0,
+                      "type": "integer"
+                    },
+                    {
+                      "format": "uint8",
+                      "maximum": 255,
+                      "minimum": 0,
+                      "type": "integer"
+                    },
+                    {
+                      "format": "uint8",
+                      "maximum": 255,
+                      "minimum": 0,
+                      "type": "integer"
+                    }
+                  ],
+                  "type": "array"
+                },
+                "color2": {
+                  "description": "RGB tuple for second checker color.",
+                  "maxItems": 3,
+                  "minItems": 3,
+                  "prefixItems": [
+                    {
+                      "format": "uint8",
+                      "maximum": 255,
+                      "minimum": 0,
+                      "type": "integer"
+                    },
+                    {
+                      "format": "uint8",
+                      "maximum": 255,
+                      "minimum": 0,
+                      "type": "integer"
+                    },
+                    {
+                      "format": "uint8",
+                      "maximum": 255,
+                      "minimum": 0,
+                      "type": "integer"
+                    }
+                  ],
+                  "type": "array"
+                },
+                "color_normalization": {
+                  "$ref": "#/$defs/CIETristimulusNormalization",
+                  "description": "Normalization applied to generated texture colors."
+                },
+                "height": {
+                  "description": "Height of each checker cell in UV space.",
+                  "format": "double",
+                  "type": "number"
+                },
+                "width": {
+                  "description": "Width of each checker cell in UV space.",
+                  "format": "double",
+                  "type": "number"
+                }
+              },
+              "required": [
+                "beaming_exponent",
+                "width",
+                "height",
+                "color1",
+                "color2",
+                "color_normalization"
+              ],
+              "type": "object"
+            }
+          },
+          "required": [
+            "Checker"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "description": "Color from black-body spectrum at emitter temperature.",
+          "properties": {
+            "BlackBody": {
+              "properties": {
+                "beaming_exponent": {
+                  "description": "Exponent used for relativistic beaming intensity scaling.",
+                  "format": "double",
+                  "type": "number"
+                },
+                "color_normalization": {
+                  "$ref": "#/$defs/CIETristimulusNormalization",
+                  "description": "Normalization applied to generated black-body colors."
+                }
+              },
+              "required": [
+                "beaming_exponent",
+                "color_normalization"
+              ],
+              "type": "object"
+            }
+          },
+          "required": [
+            "BlackBody"
+          ],
+          "type": "object"
+        }
+      ]
+    }
+  },
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "description": "Top-level scene configuration loaded from TOML.",
+  "properties": {
+    "celestial_temperature": {
+      "description": "Background emitter temperature in Kelvin.",
+      "format": "double",
+      "type": "number"
+    },
+    "celestial_texture": {
+      "$ref": "#/$defs/TextureConfig",
+      "description": "Texture mapped onto the celestial sphere/background."
+    },
+    "color_normalization": {
+      "$ref": "#/$defs/CIETristimulusNormalization",
+      "description": "Normalization applied to final rendered color values."
+    },
+    "geometry_type": {
+      "$ref": "#/$defs/GeometryType",
+      "description": "Geometry model used for ray integration."
+    },
+    "objects": {
+      "description": "Scene objects rendered in front of the celestial background.",
+      "items": {
+        "$ref": "#/$defs/ObjectsConfig"
+      },
+      "type": "array"
+    }
+  },
+  "required": [
+    "geometry_type",
+    "color_normalization",
+    "objects",
+    "celestial_texture",
+    "celestial_temperature"
+  ],
+  "title": "RenderConfig",
+  "type": "object"
+}

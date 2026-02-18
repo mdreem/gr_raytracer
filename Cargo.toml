@@ -3,6 +3,10 @@ name = "gr_raytracer"
 version = "0.1.0"
 edition = "2024"
 
+[[bin]]
+name = "generate_config_docs"
+path = "tools/generate_config_docs.rs"
+
 [dependencies]
 nalgebra = "0.34.1"
 image = "0.25.9"
@@ -10,6 +14,8 @@ rayon = "1.10.0"
 clap = { version = "4.5.58", features = ["derive"] }
 toml = "1.0.1"
 serde = { version = "1.0.228", features = ["derive"] }
+schemars = { version = "1.0.4", features = ["derive"] }
+serde_json = "1.0.145"
 indicatif = "0.18.4"
 log = "0.4.29"
 env_logger = "0.11.9"
