@@ -12,6 +12,8 @@ paper [Seeing relativity -- I. Ray tracing in a Schwarzschild metric to explore 
 and takes various formulas from it. Additional inspiration came
 from [BlackHoleViz_v2](https://github.com/HollowaySean/BlackHoleViz_v2).
 
+See [Image Gallery](/images/images.md) for a gallery of renders created with this raytracer.
+
 ## Feature Snapshot
 
 - Multi-geometry raytracing: Euclidean, EuclideanSpherical, Schwarzschild, Kerr.
