@@ -1,147 +1,171 @@
-# General Relativity Raytracer
+# General Relativity Raytracer (Rust)
 
 <p align="center">
-  <img src="kerr_black_hole_with_stars.png" alt="alt_text" title="Kerr Black hole with stars in the background">
+  <img src="kerr_black_hole_with_stars.png" alt="Kerr black hole raytraced in Rust with stars in the background" title="Kerr black hole with stars in the background">
 </p>
 
-This is a raytracer for general relativity, which can be used to visualize the effects of gravity on light paths. It is
-based on the principles of general relativity and uses numerical methods to solve the geodesic equations.
+A Rust ray tracer for **general relativity** and **black hole visualization**.  
+It solves geodesic equations numerically and renders gravitational lensing, redshift, beaming, accretion disks, and
+photon trajectories in Schwarzschild and Kerr spacetimes.
 
-It is inspired by the
-paper [Seeing relativity -- I. Ray tracing in a Schwarzschild metric to explore the maximal analytic extension of the metric and making a proper rendering of the stars](https://arxiv.org/abs/1511.06025)
-and takes various formulas from it. Additional inspiration came
-from [BlackHoleViz_v2](https://github.com/HollowaySean/BlackHoleViz_v2).
+If you are searching for a **Rust black hole renderer**, **gravitational lensing simulation**, or **general relativity
+ray tracing project**, this repository is built for that use case.
 
-See [Image Gallery](/images/images.md) for a gallery of renders created with this raytracer.
+Inspired
+by [Seeing relativity -- I. Ray tracing in a Schwarzschild metric to explore the maximal analytic extension of the metric and making a proper rendering of the stars](https://arxiv.org/abs/1511.06025)
+and [BlackHoleViz_v2](https://github.com/HollowaySean/BlackHoleViz_v2).
 
-## Feature Snapshot
+See the [Image Gallery](./images/images.md) for more rendered outputs.
 
-- Multi-geometry raytracing: Euclidean, EuclideanSpherical, Schwarzschild, Kerr.
+## Table of Contents
+
+- [Features](#features)
+- [Quick Start](#quick-start)
+- [How Rendering Works](#how-rendering-works)
+- [Scripts](#scripts)
+- [Examples](#examples)
+- [References](#references)
+- [License](#license)
+
+## Features
+
+- Multi-geometry ray tracing: `Euclidean`, `EuclideanSpherical`, `Schwarzschild`, and `Kerr`.
 - Geodesic integration with RKF45.
-- Relativistic effects in shading: gravitational/Doppler redshift and beaming.
+- Relativistic shading effects: gravitational and Doppler redshift plus relativistic beaming.
 - Physically motivated emission: black-body spectrum integration in CIE XYZ.
-- Various scene primitives: Sphere, Disc, and Perlin-noise-based VolumetricDisc.
-    - Note that the volumetric disc is not physically motivated, but rather a visual effect to create a more volumetric
-      appearance of the accretion disk.
-- Flexible materials/textures: Bitmap, Checker, and BlackBody mappers.
-- High-fidelity outputs: standard image export plus HDR (`.hdr`) support.
-- Debug/inspection tooling: per-pixel ray export and arbitrary ray-at-position export.
-- Config-driven scenes via TOML with pluggable geometry, textures, and objects.
+- Scene primitives: `Sphere`, `Disc`, and Perlin-noise-based `VolumetricDisc`.
+- Flexible materials and textures: bitmap, checker, and black-body mappers.
+- Image output formats: standard image export plus HDR (`.hdr`).
+- Debug and analysis tools: per-pixel ray export and arbitrary ray-at-position export.
+- Config-driven scenes through TOML definitions.
 
-## How to render an image
+Note: `VolumetricDisc` is primarily a visual effect for accretion-disk appearance rather than a strict physical
+model.
 
-There are various predefined geometries, defined via TOML-files in the
-directory [scene-definitions](/scene-definitions).
+## Quick Start
 
-These can be used to render an image of the described setup via
+### Requirements
 
-```ah
-cargo run --release -- --width=1500 --height=1500 --camera-position=10.0,0.0,0.8  --config-file scene-definitions/schwarzschild.toml render --filename=render.png
+- Rust toolchain (`cargo`)
+
+### Build
+
+```sh
+cargo build --release
 ```
 
-where `--width` and `--height` define the resolution, the camera position can be adapted via `--camera-position`.
-Call the command `render` to render a full image which will be saved to a file given by `--filename`.
+### Render a First Image
+
+```sh
+cargo run --release -- --width=1500 --height=1500 --camera-position=10.0,0.0,0.8 --config-file scene-definitions/schwarzschild.toml render --filename=render.png
+```
+
+- `--width` and `--height`: output resolution.
+- `--camera-position`: camera location.
+- `render`: full image render command.
+- `--filename`: output image path.
+
+## How Rendering Works
+
+Predefined scenes live in [`scene-definitions`](./scene-definitions) as TOML files.  
+You can swap geometry, textures, and objects by choosing or editing a scene file.
 
 ## Scripts
 
-There are various scripts. Some of them create importable CSV files, others create images and animations based
-on [Manim](https://github.com/3b1b/manim).
+This repository includes helper scripts for ray export and animation (Manim-based).
 
-### Create rays to be plotted.
+### Create rays
 
-- `scripts/create_rays_positions.sh`: Creates rays in a Schwarzschild metric based on a given position and direction and
-  saves them to a CSV file in the directory `rays/`.
-- `scripts/create_rays_from_camera.sh`: Creates rays in a Schwarzschild metric using the camera given its position and
-  a selected pixel. The data will be saved to a CSV file in the directory `rays/`.
+- `scripts/create_rays_positions.sh`: Generates rays in Schwarzschild spacetime from a position and direction, then
+  writes CSV files to `rays/`.
+- `scripts/create_rays_from_camera.sh`: Generates Schwarzschild rays starting from a camera and selected pixel, then
+  writes CSV files to `rays/`.
 
-### Plot rays.
+### Plot/animate rays
 
-Running `python -m manim scripts/animate-rays/main.py AnimateRays` will create an animation of the rays saved in
-CSV files in the directory `rays/`.
+```sh
+python -m manim scripts/animate-rays/main.py AnimateRays
+```
+
+This command renders an animation from CSV ray data in `rays/`.
 
 ## Examples
 
-### Plot of a Schwarzschild black hole with a accretion disk
+### Schwarzschild black hole with accretion disk
 
-Plot of the Schwarzschild solution with a accretion disk using a checkerboard texture to visualize the relations.
+Checkerboard texturing helps visualize lensing and warped geometry.
+
 <p align="center">
-  <img src="./images/render_schwarzschild_checker_texture.png" alt="alt text" title="Black Hole with accretion disk">
+  <img src="./images/render_schwarzschild_checker_texture.png" alt="Schwarzschild black hole with checkerboard accretion disk showing lensing distortions" title="Schwarzschild black hole with accretion disk">
 </p>
 
-### Video of rays in a Schwarzschild metric
+### Rays in a Schwarzschild metric (video)
 
 https://github.com/user-attachments/assets/c1ce889b-6186-4ce5-b613-fecae3af03ef
 
-### Video of flying over a Schwarzschild black hole
+### Flyover of a Schwarzschild black hole (video)
 
 https://github.com/user-attachments/assets/914d3134-53db-4084-8a5f-1728d8460594
 
-The background is: https://commons.wikimedia.org/wiki/File:Messier_object_025.jpg
+Background image source: https://commons.wikimedia.org/wiki/File:Messier_object_025.jpg
 
-### Video of lensing due to a Schwarzschild black hole
+### Lensing with background object (video)
 
-This shows a Schwarzschild black hole with a spherical object behind it and its lensing effects when moving around.
+A Schwarzschild black hole with a spherical object behind it, showing lensing while the camera moves.
 
 https://github.com/user-attachments/assets/6907c6a2-970a-4d19-be60-5e0f6f340709
 
-The background is: https://commons.wikimedia.org/wiki/File:Messier_object_025.jpg
-
-## Examples
+Background image source: https://commons.wikimedia.org/wiki/File:Messier_object_025.jpg
 
 ### Kerr black hole with accretion disk
 
-The parameters are
+Example render command:
 
 ```sh
 gr_raytracer --width=500 --height=500 --max-steps=1000000 --camera-position=-10,0,-0.5 --theta=1.52 --psi=-1.57 --phi=0 --config-file scene-definitions/kerr.toml render
 ```
 
-Note the large number of max-steps required to get a good image, due to the complex light paths around a Kerr black
-hole.
+Kerr scenes often require a high `--max-steps` value because of complex geodesic behavior near the black hole.
 
-#### Example 1
-
-Example of a Kerr black hole with a radius r_s = 1.0 and a = 0.5.
+#### Example 1: `r_s = 1.0`, `a = 0.5`
 
 <p align="center">
-  <img src="./images/render_kerr_checker_texture.png" alt="alt text" title="Kerr black hole with a radius r_s = 1.0 and a = 0.5">
+  <img src="./images/render_kerr_checker_texture.png" alt="Kerr black hole render with spin parameter a equals 0.5" title="Kerr black hole with r_s = 1.0 and a = 0.5">
 </p>
 
-##### Trajectories
-
-Create a trajectory near the horizon like this:
+##### Near-horizon trajectory
 
 ```sh
 gr_raytracer --width=501 --height=501 --max-steps=1000000 --camera-position=-5,0,0.5 --theta=1.57 --psi=1.57 --phi=0 --config-file scene-definitions/kerr.toml render-ray --col=195 --row=250
 ```
 
-Example of a trajectory of Kerr black hole with a radius r_s = 1.0 and a = 0.5 near the horizon.
-
 <p align="center">
-  <img src="./images/kerr_trajectory_near_horizon.png" alt="alt text" title="Trajectory of Kerr black hole with a radius r_s = 1.0 and a = 0.5 near the horizon">
+  <img src="./images/kerr_trajectory_near_horizon.png" alt="Photon trajectory near the horizon of a Kerr black hole" title="Trajectory near horizon for Kerr black hole with r_s = 1.0 and a = 0.5">
 </p>
 
-#### Example 2
-
-Example of a Kerr black hole with a radius r_s = 1.0 and a = 0.51.
+#### Example 2: `r_s = 1.0`, `a = 0.51`
 
 <p align="center">
-  <img src="./images/render_kerr_large_a_checker_texture.png" alt="alt text" title="Kerr black hole with a radius r_s = 1.0 and a = 0.51">
+  <img src="./images/render_kerr_large_a_checker_texture.png" alt="Kerr black hole render with higher spin parameter a equals 0.51" title="Kerr black hole with r_s = 1.0 and a = 0.51">
 </p>
 
-### Animation of increasing spin parameter a of Kerr black hole
+### Kerr spin animation
 
-This animations shows a Kerr black hole with r_s = 1.0 and increasing spin parameter a from 0.0 to 0.5.
+Animation of a Kerr black hole with `r_s = 1.0` and spin parameter `a` increasing from `0.0` to `0.5`.
 
 <p align="center">
-  <img src="./images/kerr_animation.gif" alt="alt text" title="Kerr black hole with a radius r_s = 1.0 and a = 0.0 to 0.5">
+  <img src="./images/kerr_animation.gif" alt="Animation of Kerr black hole as spin parameter increases from 0 to 0.5" title="Kerr black hole animation with increasing spin">
 </p>
 
-## Sources
+## References
 
 - [Seeing relativity -- I. Ray tracing in a Schwarzschild metric to explore the maximal analytic extension of the metric and making a proper rendering of the stars](https://arxiv.org/abs/1511.06025)
-- [BlackHoleViz_v2](https://github.com/HollowaySean/BlackHoleViz_v2).
+- [BlackHoleViz_v2](https://github.com/HollowaySean/BlackHoleViz_v2)
 - Novikov, I. D., & Thorne, K. S. (1973). *Astrophysics of black holes*. In C. DeWitt & B. S. DeWitt (Eds.), *Black
   Holes (Les Astres Occlus)*, p.
-  343. [Chapter bibliographic entry](https://cir.nii.ac.jp/crid/1370025430666224928), [Book record](https://lccn.loc.gov/73169355).
+    343. [Chapter bibliographic entry](https://cir.nii.ac.jp/crid/1370025430666224928), [Book record](https://lccn.loc.gov/73169355)
 - https://commons.wikimedia.org/wiki/File:Messier_object_025.jpg
+
+## License
+
+This project is licensed under the terms in [`LICENSE`](./LICENSE).
