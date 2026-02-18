@@ -1,6 +1,8 @@
 # General Relativity Raytracer
 
-![alt_text](kerr_black_hole_with_stars.png "Kerr Black hole with stars in the background")
+<p align="center">
+  <img src="kerr_black_hole_with_stars.png" alt="alt_text" title="Kerr Black hole with stars in the background">
+</p>
 
 This is a raytracer for general relativity, which can be used to visualize the effects of gravity on light paths. It is
 based on the principles of general relativity and uses numerical methods to solve the geodesic equations.
@@ -60,7 +62,9 @@ CSV files in the directory `rays/`.
 ### Plot of a Schwarzschild black hole with a accretion disk
 
 Plot of the Schwarzschild solution with a accretion disk using a checkerboard texture to visualize the relations.
-![alt text](./images/render_schwarzschild_checker_texture.png "Black Hole with accretion disk")
+<p align="center">
+  <img src="./images/render_schwarzschild_checker_texture.png" alt="alt text" title="Black Hole with accretion disk">
+</p>
 
 ### Video of rays in a Schwarzschild metric
 
@@ -97,7 +101,9 @@ hole.
 
 Example of a Kerr black hole with a radius r_s = 1.0 and a = 0.5.
 
-![alt text](./images/render_kerr_checker_texture.png "Kerr black hole with a radius r_s = 1.0 and a = 0.5")
+<p align="center">
+  <img src="./images/render_kerr_checker_texture.png" alt="alt text" title="Kerr black hole with a radius r_s = 1.0 and a = 0.5">
+</p>
 
 ##### Trajectories
 
@@ -109,19 +115,25 @@ gr_raytracer --width=501 --height=501 --max-steps=1000000 --camera-position=-5,0
 
 Example of a trajectory of Kerr black hole with a radius r_s = 1.0 and a = 0.5 near the horizon.
 
-![alt text](./images/kerr_trajectory_near_horizon.png "Trajectory of Kerr black hole with a radius r_s = 1.0 and a = 0.5 near the horizon")
+<p align="center">
+  <img src="./images/kerr_trajectory_near_horizon.png" alt="alt text" title="Trajectory of Kerr black hole with a radius r_s = 1.0 and a = 0.5 near the horizon">
+</p>
 
 #### Example 2
 
 Example of a Kerr black hole with a radius r_s = 1.0 and a = 0.51.
 
-![alt text](./images/render_kerr_large_a_checker_texture.png "Kerr black hole with a radius r_s = 1.0 and a = 0.51")
+<p align="center">
+  <img src="./images/render_kerr_large_a_checker_texture.png" alt="alt text" title="Kerr black hole with a radius r_s = 1.0 and a = 0.51">
+</p>
 
 ### Animation of increasing spin parameter a of Kerr black hole
 
 This animations shows a Kerr black hole with r_s = 1.0 and increasing spin parameter a from 0.0 to 0.5.
 
-![alt text](./images/kerr_animation.gif "Kerr black hole with a radius r_s = 1.0 and a = 0.0 to 0.5")
+<p align="center">
+  <img src="./images/kerr_animation.gif" alt="alt text" title="Kerr black hole with a radius r_s = 1.0 and a = 0.0 to 0.5">
+</p>
 
 ## Sources
 
