@@ -1,0 +1,35 @@
+color_normalization = "NoNormalization"
+celestial_temperature = 100.0
+
+[celestial_texture.Bitmap]
+beaming_exponent = 3.0
+path = "resources/Messier_object_025.jpg"
+color_normalization = "NoNormalization"
+
+[geometry_type.Kerr]
+radius = 1.0
+a=0.5
+horizon_epsilon = 1e-4
+
+[[objects]]
+
+[objects.Disc]
+temperature = 4000.0
+inner_radius = 2.12
+outer_radius = 11.0
+
+[objects.Disc.texture.BlackBody]
+beaming_exponent = 3.0
+color_normalization = "EqualLuminance"
+
+#[[objects]]
+#
+#[objects.Sphere]
+#radius = 2.0
+#position = [0.0, 0.0, 20.0]
+#
+#[objects.Sphere.texture.BlackBody]
+#beaming_exponent = 3.0
+#temperature = 2500.0
+#color_normalization = "Chromaticity"
+

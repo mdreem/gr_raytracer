@@ -1,0 +1,11 @@
+kerr_images/kerr_a_0.25_annotated.png
+kerr_images/kerr_a_0.275_annotated.png
+kerr_images/kerr_a_0.3_annotated.png
+kerr_images/kerr_a_0.325_annotated.png
+kerr_images/kerr_a_0.35_annotated.png
+kerr_images/kerr_a_0.375_annotated.png
+kerr_images/kerr_a_0.4_annotated.png
+kerr_images/kerr_a_0.425_annotated.png
+kerr_images/kerr_a_0.45_annotated.png
+kerr_images/kerr_a_0.475_annotated.png
+kerr_images/kerr_a_0.5_annotated.png

@@ -73,6 +73,21 @@ cargo run --release -- --width=1500 --height=1500 --camera-position=10.0,0.0,0.8
 Predefined scenes live in [`scene-definitions`](./scene-definitions) as TOML files.  
 You can swap geometry, textures, and objects by choosing or editing a scene file.
 
+### Generate TOML Schema Docs
+
+The TOML schema is defined in Rust in [`src/configuration.rs`](./src/configuration.rs).  
+The generator binary source is in [`tools/generate_config_docs.rs`](./tools/generate_config_docs.rs).  
+Generate fresh schema docs from those Rust definitions with:
+
+```sh
+cargo run --bin generate_config_docs
+```
+
+This writes:
+
+- `docs/config.schema.json`
+- `docs/config-schema.md`
+
 ## Scripts
 
 This repository includes helper scripts for ray export and animation (Manim-based).

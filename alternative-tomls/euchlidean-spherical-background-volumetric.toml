@@ -1,0 +1,47 @@
+color_normalization = "NoNormalization"
+celestial_temperature = 0.0
+
+[celestial_texture.Bitmap]
+beaming_exponent = 3.0
+#path = "resources/white.png"
+path = "resources/black.png"
+color_normalization = "NoNormalization"
+
+[geometry_type.EuclideanSpherical]
+
+[[objects]]
+
+[objects.VolumetricDisc]
+inner_radius = 4.05
+outer_radius = 11.0
+temperature = 1000.0
+num_octaves = 8
+max_steps = 50000
+step_size = 0.002
+thickness = 0.1
+density_multiplier = 40.0
+brightness_reference_temperature = 350.0
+noise_scale = [2.0, 8.0, 5.0]
+noise_offset = 0.6
+#
+#[objects.Disc.texture.Bitmap]
+#beaming_exponent = 3.0
+#path = "resources/orange.png"
+#color_normalization = "NoNormalization"
+
+[objects.VolumetricDisc.texture.BlackBody]
+beaming_exponent = 3.0
+color_normalization = "EqualLuminance"
+#color_normalization = "Chromaticity"
+
+#[[objects]]
+#
+#[objects.Sphere]
+#temperature = 2000.0
+#radius = 2.0
+#position = [-22.5, 0.0, 1.0]
+#
+#[objects.Sphere.texture.Bitmap]
+#beaming_exponent = 3.0
+#path = "resources/orange.png"
+#color_normalization = "NoNormalization"

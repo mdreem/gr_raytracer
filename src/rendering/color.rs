@@ -1,5 +1,6 @@
 use image::Rgba;
 use nalgebra::{Matrix3, Vector3};
+use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 use std::ops::{Add, Mul};
 
@@ -11,10 +12,14 @@ pub struct Color {
     pub alpha: u8,
 }
 
-#[derive(Deserialize, Serialize, Clone, Copy, PartialEq, Debug)]
+/// Strategy used to normalize CIE XYZ tristimulus values before image output.
+#[derive(Deserialize, Serialize, JsonSchema, Clone, Copy, PartialEq, Debug)]
 pub enum CIETristimulusNormalization {
+    /// Keep raw XYZ values unchanged.
     NoNormalization,
+    /// Normalize XYZ values so X + Y + Z = 1 (chromaticity coordinates).
     Chromaticity,
+    /// Normalize XYZ values so Y = 1 (relative luminance normalization).
     EqualLuminance,
 }
 

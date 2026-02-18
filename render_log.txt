@@ -1,0 +1,86 @@
+    Finished `release` profile [optimized] target(s) in 0.36s
+     Running `target/release/gr_raytracer --width=150 --height=150 --max-steps=10000 --camera-position=-20,0,-1.5 --theta=1.52 --psi=-1.57 --phi=0 --config-file alternative-tomls/kerr-background-volumetric.toml render`
+[2026-02-14T23:43:47Z INFO  gr_raytracer] Rendering Kerr geometry with radius: 1
+[2026-02-14T23:43:47Z INFO  gr_raytracer::cli::kerr] Momentum at position Point { coordinate_system: Cartesian, vector: [[0.0, -20.0, 0.0, -1.5]] }: FourVector { coordinate_system: Cartesian, vector: [[1.0259080085804126, 0.0, 0.0, 0.0]] } with m_s=-0.9999999999999998
+[2026-02-14T23:43:47Z DEBUG gr_raytracer::geometry::kerr] alpha = 0.975960622446282, beta = [[-0.04735835404023431, 0.0009447012098552836, -0.003553289915655467]]
+[2026-02-14T23:43:47Z DEBUG gr_raytracer::geometry::kerr] [FourVector { coordinate_system: Cartesian, vector: [[1.0246315035676978, 0.04852486150673664, -0.0009679706210762425, 0.0036408127888899995]] }, FourVector { coordinate_system: Cartesian, vector: [[6.43836661569178e-19, 0.9760995270168605, -6.082332731335892e-22, 2.2877383168830422e-21]] }, FourVector { coordinate_system: Cartesian, vector: [[4.683648976377653e-20, 0.0009421262413546547, 0.9999906033092111, 1.6642362676232766e-22]] }, FourVector { coordinate_system: Cartesian, vector: [[-4.466377882260876e-19, -0.0035431004515130366, 7.067752566610539e-5, 0.9998670896966749]] }]
+[2026-02-14T23:43:47Z DEBUG gr_raytracer::geometry::tetrad] position: Point { coordinate_system: Cartesian, vector: [[0.0, -20.0, 0.0, -1.5]] }
+[2026-02-14T23:43:47Z DEBUG gr_raytracer::geometry::tetrad] tetrad: Tetrad
+      position: Point { coordinate_system: Cartesian, vector: [[0.0, -20.0, 0.0, -1.5]] }
+      t: FourVector { coordinate_system: Cartesian, vector: [[1.0246315035676978, 0.04852486150673664, -0.0009679706210762425, 0.0036408127888899995]] }
+      x: FourVector { coordinate_system: Cartesian, vector: [[6.43836661569178e-19, 0.9760995270168605, -6.082332731335892e-22, 2.2877383168830422e-21]] }
+      y: FourVector { coordinate_system: Cartesian, vector: [[4.683648976377653e-20, 0.0009421262413546547, 0.9999906033092111, 1.6642362676232766e-22]] }
+      z: FourVector { coordinate_system: Cartesian, vector: [[-4.466377882260876e-19, -0.0035431004515130366, 7.067752566610539e-5, 0.9998670896966749]] }
+    
+[2026-02-14T23:43:47Z DEBUG gr_raytracer::geometry::tetrad] inner product checks for tetrad:
+[2026-02-14T23:43:47Z DEBUG gr_raytracer::geometry::tetrad]   inner product t.t: -1.00000
+[2026-02-14T23:43:47Z DEBUG gr_raytracer::geometry::tetrad]   inner product x.x: 1.00000
+[2026-02-14T23:43:47Z DEBUG gr_raytracer::geometry::tetrad]   inner product y.y: 1.00000
+[2026-02-14T23:43:47Z DEBUG gr_raytracer::geometry::tetrad]   inner product z.z: 1.00000
+[2026-02-14T23:43:47Z DEBUG gr_raytracer::geometry::tetrad] 
+[2026-02-14T23:43:47Z DEBUG gr_raytracer::geometry::tetrad]   inner product t.x: -0.00000
+[2026-02-14T23:43:47Z DEBUG gr_raytracer::geometry::tetrad]   inner product t.y: -0.00000
+[2026-02-14T23:43:47Z DEBUG gr_raytracer::geometry::tetrad]   inner product t.z: 0.00000
+[2026-02-14T23:43:47Z DEBUG gr_raytracer::geometry::tetrad] 
+[2026-02-14T23:43:47Z DEBUG gr_raytracer::geometry::tetrad]   inner product x.y: 0.00000
+[2026-02-14T23:43:47Z DEBUG gr_raytracer::geometry::tetrad]   inner product x.z: 0.00000
+[2026-02-14T23:43:47Z DEBUG gr_raytracer::geometry::tetrad] 
+[2026-02-14T23:43:47Z DEBUG gr_raytracer::geometry::tetrad]   inner product y.z: -0.00000
+[2026-02-14T23:43:47Z DEBUG gr_raytracer::geometry::tetrad] 
+[2026-02-14T23:43:47Z DEBUG gr_raytracer::geometry::tetrad]   is_orthonormal: true
+[2026-02-14T23:43:47Z DEBUG gr_raytracer::rendering::camera] rotated tetrad: Tetrad
+      position: Point { coordinate_system: Cartesian, vector: [[0.0, -20.0, 0.0, -1.5]] }
+      t: FourVector { coordinate_system: Cartesian, vector: [[1.0246315035676978, 0.04852486150673664, -0.0009679706210762425, 0.0036408127888899995]] }
+      x: FourVector { coordinate_system: Cartesian, vector: [[-4.6455231776879113e-20, -0.0008998414075181804, -0.9999903424538304, -0.0007951938604217439]] }
+      y: FourVector { coordinate_system: Cartesian, vector: [[4.787893100075074e-19, 0.053100214494377705, 0.0007257328884442498, -0.9985770884903075]] }
+      z: FourVector { coordinate_system: Cartesian, vector: [[6.203284013234599e-19, 0.9746606000610137, 3.5886149620763233e-6, 0.05076773648138549]] }
+    
+[2026-02-14T23:43:47Z DEBUG gr_raytracer::geometry::kerr] Lorentz transformation at position Point { coordinate_system: Cartesian, vector: [[0.0, -20.0, 0.0, -1.5]] } with velocity FourVector { coordinate_system: Cartesian, vector: [[1.0259080085804126, 0.0, 0.0, 0.0]] }
+[2026-02-14T23:43:47Z DEBUG gr_raytracer::geometry::kerr] metric: [[-0.9501302818965991, -0.04972010180606185, 0.0009918131928827083, -0.0037304914820888626], [-0.04972010180606185, 1.049570934379045, -0.000988837611242896, 0.0037192994733101564], [0.0009918131928827083, -0.000988837611242896, 1.0000197252650904, -7.419233171121501e-5], [-0.0037304914820888626, 0.0037192994733101564, -7.419233171121501e-5, 1.0002790584592653]]
+[2026-02-14T23:43:47Z DEBUG gr_raytracer::geometry::kerr] alpha = 0.975960622446282, beta = [[-0.04735835404023431, 0.0009447012098552836, -0.003553289915655467]]
+[2026-02-14T23:43:47Z DEBUG gr_raytracer::geometry::kerr] [FourVector { coordinate_system: Cartesian, vector: [[1.0246315035676978, 0.04852486150673664, -0.0009679706210762425, 0.0036408127888899995]] }, FourVector { coordinate_system: Cartesian, vector: [[6.43836661569178e-19, 0.9760995270168605, -6.082332731335892e-22, 2.2877383168830422e-21]] }, FourVector { coordinate_system: Cartesian, vector: [[4.683648976377653e-20, 0.0009421262413546547, 0.9999906033092111, 1.6642362676232766e-22]] }, FourVector { coordinate_system: Cartesian, vector: [[-4.466377882260876e-19, -0.0035431004515130366, 7.067752566610539e-5, 0.9998670896966749]] }]
+[2026-02-14T23:43:47Z DEBUG gr_raytracer::geometry::kerr] gamma: 1.0012458186267652
+[2026-02-14T23:43:47Z DEBUG gr_raytracer::geometry::kerr] scalar prod tetrad_t: -1.0000000000000002
+[2026-02-14T23:43:47Z DEBUG gr_raytracer::geometry::kerr] scalar prod velocity: -0.9999999999999998
+[2026-02-14T23:43:47Z DEBUG gr_raytracer::geometry::kerr] uv = [[2.0505395121481103, 0.04852486150673664, -0.0009679706210762425, 0.0036408127888899995]]
+[2026-02-14T23:43:47Z DEBUG gr_raytracer::geometry::kerr] uv_lower = [[-1.950706887838768, -0.05100825063027229, 0.0010175090975940795, -0.0038271410874159764]]
+[2026-02-14T23:43:47Z DEBUG gr_raytracer::geometry::kerr] lorentz transformation = [[1.0037359057474293, -0.047299427532379146, 0.0009435257479037127, -0.0035488686689637288], [-0.052264660537653856, 0.9987631862740214, 2.4671875680158863e-5, -9.279794091514209e-5], [0.001042571876561633, 2.4671875680158852e-5, 0.99999950784711, 1.8511269834279923e-6], [-0.0039214093267647444, -9.279794091514209e-5, 1.8511269834279931e-6, 0.9999930373849698]]
+[2026-02-14T23:43:47Z DEBUG gr_raytracer::rendering::camera] lorentz transformation: [[1.0037359057474293, -0.047299427532379146, 0.0009435257479037127, -0.0035488686689637288], [-0.052264660537653856, 0.9987631862740214, 2.4671875680158863e-5, -9.279794091514209e-5], [0.001042571876561633, 2.4671875680158852e-5, 0.99999950784711, 1.8511269834279923e-6], [-0.0039214093267647444, -9.279794091514209e-5, 1.8511269834279931e-6, 0.9999930373849698]]
+[2026-02-14T23:43:47Z DEBUG gr_raytracer::rendering::camera] lorentz transformed tetrad: Tetrad
+      position: Point { coordinate_system: Cartesian, vector: [[0.0, -20.0, 0.0, -1.5]] }
+      t: FourVector { coordinate_system: Cartesian, vector: [[1.025908008580413, -4.965201257686302e-19, 1.673105137786507e-19, 0.0]] }
+      x: FourVector { coordinate_system: Cartesian, vector: [[-0.0009924136215530936, -0.0009233263163716628, -0.9999898739784736, -0.0007969559294693352]] }
+      y: FourVector { coordinate_system: Cartesian, vector: [[0.001141321451973606, 0.05312722322308719, 0.000725194120169769, -0.9985750620296059]] }
+      z: FourVector { coordinate_system: Cartesian, vector: [[-0.0511393827355627, 0.9734504153998151, 2.7729295877871725e-5, 0.050676936515046615]] }
+    
+[2026-02-14T23:43:47Z DEBUG gr_raytracer::geometry::tetrad] position: Point { coordinate_system: Cartesian, vector: [[0.0, -20.0, 0.0, -1.5]] }
+[2026-02-14T23:43:47Z DEBUG gr_raytracer::geometry::tetrad] tetrad: Tetrad
+      position: Point { coordinate_system: Cartesian, vector: [[0.0, -20.0, 0.0, -1.5]] }
+      t: FourVector { coordinate_system: Cartesian, vector: [[1.025908008580413, -4.965201257686302e-19, 1.673105137786507e-19, 0.0]] }
+      x: FourVector { coordinate_system: Cartesian, vector: [[-0.0009924136215530936, -0.0009233263163716628, -0.9999898739784736, -0.0007969559294693352]] }
+      y: FourVector { coordinate_system: Cartesian, vector: [[0.001141321451973606, 0.05312722322308719, 0.000725194120169769, -0.9985750620296059]] }
+      z: FourVector { coordinate_system: Cartesian, vector: [[-0.0511393827355627, 0.9734504153998151, 2.7729295877871725e-5, 0.050676936515046615]] }
+    
+[2026-02-14T23:43:47Z DEBUG gr_raytracer::geometry::tetrad] inner product checks for tetrad:
+[2026-02-14T23:43:47Z DEBUG gr_raytracer::geometry::tetrad]   inner product t.t: -1.00000
+[2026-02-14T23:43:47Z DEBUG gr_raytracer::geometry::tetrad]   inner product x.x: 1.00000
+[2026-02-14T23:43:47Z DEBUG gr_raytracer::geometry::tetrad]   inner product y.y: 1.00000
+[2026-02-14T23:43:47Z DEBUG gr_raytracer::geometry::tetrad]   inner product z.z: 1.00000
+[2026-02-14T23:43:47Z DEBUG gr_raytracer::geometry::tetrad] 
+[2026-02-14T23:43:47Z DEBUG gr_raytracer::geometry::tetrad]   inner product t.x: -0.00000
+[2026-02-14T23:43:47Z DEBUG gr_raytracer::geometry::tetrad]   inner product t.y: 0.00000
+[2026-02-14T23:43:47Z DEBUG gr_raytracer::geometry::tetrad]   inner product t.z: -0.00000
+[2026-02-14T23:43:47Z DEBUG gr_raytracer::geometry::tetrad] 
+[2026-02-14T23:43:47Z DEBUG gr_raytracer::geometry::tetrad]   inner product x.y: 0.00000
+[2026-02-14T23:43:47Z DEBUG gr_raytracer::geometry::tetrad]   inner product x.z: 0.00000
+[2026-02-14T23:43:47Z DEBUG gr_raytracer::geometry::tetrad] 
+[2026-02-14T23:43:47Z DEBUG gr_raytracer::geometry::tetrad]   inner product y.z: -0.00000
+[2026-02-14T23:43:47Z DEBUG gr_raytracer::geometry::tetrad] 
+[2026-02-14T23:43:47Z DEBUG gr_raytracer::geometry::tetrad]   is_orthonormal: true
+[2026-02-14T23:43:47Z DEBUG gr_raytracer::cli::shared] Adding volumetric disc with inner radius: 4.05, outer radius: 11
+[2026-02-14T23:43:47Z INFO  gr_raytracer::rendering::temperature] Computed r_isco: 1.4533219272320979 from a: 0.4 and radius: 1
+[2026-02-14T23:43:47Z INFO  gr_raytracer::rendering::temperature] Max f: 0.0011288595194128552 at radius: 1.930655830870493
+[2026-02-14T23:43:47Z INFO  gr_raytracer::rendering::temperature] Computed m_dot: 885849818159944.4 for target temperature: 1000
+[2026-02-14T23:43:47Z INFO  gr_raytracer::rendering::raytracer] Creating non-HDR image
+[2026-02-14T23:44:02Z INFO  gr_raytracer::rendering::raytracer] saved image to render.png
+[2026-02-14T23:44:02Z INFO  gr_raytracer] Elapsed time: 14.53s
