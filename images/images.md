@@ -10,8 +10,8 @@
 
 ### Volumetric Rendering
 <div align="center">
-  <img src="render_schwarzschild_volumetric.png" alt="Schwarzschild black hole visualization with volumetric light scattering effects">
-  <p>Schwarzschild black hole visualization with volumetric light scattering effects</p>
+  <img src="render_schwarzschild_volumetric.png" alt="Schwarzschild black hole visualization with volumetric light disc effects">
+  <p>Schwarzschild black hole visualization with volumetric disc (background image: <a href="https://commons.wikimedia.org/wiki/File:NGC6355_-_HST_-_Potw2301a.jpg">NGC 6355</a>)</p>
 </div>
 
 ## Kerr Black Hole
@@ -30,22 +30,22 @@
 ### Blackbody Radiation
 <div align="center">
   <img src="kerr_blackbody_disk_1.png" alt="Kerr black hole with an accretion disk rendered using blackbody radiation spectrum (view 1)">
-  <p>Kerr black hole with an accretion disk rendered using blackbody radiation spectrum (view 1)</p>
+  <p>Kerr black hole with an accretion disk rendered using blackbody radiation spectrum (view 1) (background image: <a href="https://commons.wikimedia.org/wiki/File:Messier_object_025.jpg">M25</a>)</p>
 </div>
 
 <div align="center">
   <img src="kerr_blackbody_disk_2.png" alt="Kerr black hole with an accretion disk rendered using blackbody radiation spectrum (view 2)">
-  <p>Kerr black hole with an accretion disk rendered using blackbody radiation spectrum (view 2)</p>
+  <p>Kerr black hole with an accretion disk rendered using blackbody radiation spectrum (view 2) (background image: <a href="https://commons.wikimedia.org/wiki/File:Messier_object_025.jpg">M25</a>)</p>
 </div>
 
 <div align="center">
   <img src="kerr_blackbody_disk_a_0_5__1.png" alt="Kerr black hole with spin parameter a=0.5 and a blackbody accretion disk (view 1)">
-  <p>Kerr black hole with spin parameter a=0.5 and a blackbody accretion disk (view 1)</p>
+  <p>Kerr black hole with spin parameter a=0.5 and a blackbody accretion disk (view 1) (background image: <a href="https://commons.wikimedia.org/wiki/File:Messier_object_025.jpg">M25</a>)</p>
 </div>
 
 <div align="center">
   <img src="kerr_blackbody_disk_a_0_5__2.png" alt="Kerr black hole with spin parameter a=0.5 and a blackbody accretion disk (view 2)">
-  <p>Kerr black hole with spin parameter a=0.5 and a blackbody accretion disk (view 2)</p>
+  <p>Kerr black hole with spin parameter a=0.5 and a blackbody accretion disk (view 2) (background image: <a href="https://commons.wikimedia.org/wiki/File:Messier_object_025.jpg">M25</a>)</p>
 </div>
 
 ### Volumetric Rendering
@@ -55,8 +55,8 @@
 </div>
 
 <div align="center">
-  <img src="render_kerr_stars_volumetric.png" alt="Kerr black hole visualization with background stars and volumetric scattering">
-  <p>Kerr black hole visualization with background stars and volumetric scattering</p>
+  <img src="render_kerr_stars_volumetric.png" alt="Kerr black hole visualization with background stars and volumetric disc">
+  <p>Kerr black hole visualization with background stars and volumetric disc (background image: <a href="https://commons.wikimedia.org/wiki/File:NGC6355_-_HST_-_Potw2301a.jpg">NGC 6355</a>)</p>
 </div>
 
 ### Animations
@@ -67,7 +67,7 @@
 
 <div align="center">
   <img src="kerr_animation_stars_and_disk.gif" alt="Animation of a Kerr black hole with background stars and a rotating accretion disk">
-  <p>Animation of a Kerr black hole with background stars and a rotating accretion disk</p>
+  <p>Animation of a Kerr black hole with background stars and a rotating accretion disk (background image: <a href="https://commons.wikimedia.org/wiki/File:Messier_object_025.jpg">M25</a>)</p>
 </div>
 
 ### Trajectories
