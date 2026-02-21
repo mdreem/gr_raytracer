@@ -1,7 +1,7 @@
 use crate::rendering::color::CIETristimulusNormalization;
 use serde::{Deserialize, Serialize};
 
-#[derive(Deserialize, Serialize, Clone)]
+#[derive(Deserialize, Serialize, Default, Clone)]
 pub struct RenderConfig {
     pub geometry_type: GeometryType,
     pub color_normalization: CIETristimulusNormalization,
@@ -10,8 +10,9 @@ pub struct RenderConfig {
     pub celestial_temperature: f64,
 }
 
-#[derive(Deserialize, Serialize, Debug, PartialEq, Clone)]
+#[derive(Deserialize, Serialize, Default, Debug, PartialEq, Clone)]
 pub enum GeometryType {
+    #[default]
     Euclidean,
     EuclideanSpherical,
     Schwarzschild {
@@ -23,6 +24,30 @@ pub enum GeometryType {
         a: f64,
         horizon_epsilon: f64,
     },
+}
+
+use crate::geometry::euclidean::EuclideanSpace;
+use crate::geometry::euclidean_spherical::EuclideanSpaceSpherical;
+use crate::geometry::geometry::RenderableGeometry;
+use crate::geometry::kerr::Kerr;
+use crate::geometry::schwarzschild::Schwarzschild;
+
+impl GeometryType {
+    pub fn get_renderable_geometry(&self) -> Box<dyn RenderableGeometry> {
+        match self {
+            GeometryType::Euclidean => Box::new(EuclideanSpace::new()),
+            GeometryType::EuclideanSpherical => Box::new(EuclideanSpaceSpherical::new()),
+            GeometryType::Schwarzschild {
+                radius,
+                horizon_epsilon,
+            } => Box::new(Schwarzschild::new(*radius, *horizon_epsilon)),
+            GeometryType::Kerr {
+                radius,
+                a,
+                horizon_epsilon,
+            } => Box::new(Kerr::new(*radius, *a, *horizon_epsilon)),
+        }
+    }
 }
 
 #[derive(Deserialize, Serialize, Debug, PartialEq, Clone)]
@@ -44,6 +69,15 @@ pub enum TextureConfig {
         beaming_exponent: f64,
         color_normalization: CIETristimulusNormalization,
     },
+}
+
+impl Default for TextureConfig {
+    fn default() -> Self {
+        TextureConfig::BlackBody {
+            beaming_exponent: 3.0,
+            color_normalization: CIETristimulusNormalization::default(),
+        }
+    }
 }
 
 #[derive(Deserialize, Serialize, Debug, Clone)]
@@ -78,6 +112,17 @@ pub enum ObjectsConfig {
         noise_scale: (f64, f64, f64),
         noise_offset: f64,
     },
+}
+
+impl Default for ObjectsConfig {
+    fn default() -> Self {
+        ObjectsConfig::Sphere {
+            radius: 1.0,
+            position: (0.0, 0.0, 0.0),
+            texture: TextureConfig::default(),
+            temperature: 0.0,
+        }
+    }
 }
 
 #[cfg(test)]

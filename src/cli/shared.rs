@@ -17,6 +17,7 @@ use crate::{configuration, scene_objects};
 use log::debug;
 use nalgebra::Vector3;
 use std::f64::consts::PI;
+use std::io::Write;
 use std::sync::Arc;
 
 pub fn render<G: Geometry>(
@@ -36,6 +37,29 @@ pub fn render<G: Geometry>(
         to_col.unwrap_or(raytracer.scene.camera.columns as u32),
         filename,
     )
+}
+
+pub fn integrate_and_save_ray<G: Geometry>(
+    geometry: &G,
+    position: Point,
+    momentum: FourVector,
+    opts: GlobalOpts,
+    write: &mut dyn Write,
+) -> Result<(), RaytracerError> {
+    let ray = crate::rendering::ray::Ray::new(0, 0, position, momentum);
+
+    let integration_configuration = IntegrationConfiguration::new(
+        opts.max_steps,
+        opts.max_radius,
+        opts.step_size,
+        opts.epsilon,
+    );
+    let integrator = crate::rendering::integrator::Integrator::new(geometry, integration_configuration);
+
+    let (integrated_ray, stop_reason) = integrator.integrate(&ray)?;
+    log::info!("Stop reason: {:?}", stop_reason);
+    integrated_ray.save(write)?;
+    Ok(())
 }
 
 pub fn create_scene<G: Geometry>(

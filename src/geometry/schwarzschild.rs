@@ -15,8 +15,8 @@ use nalgebra::{Const, Matrix4, OVector};
 
 #[derive(Clone, Debug)]
 pub struct Schwarzschild {
-    radius: f64,
-    horizon_epsilon: f64,
+    pub radius: f64,
+    pub horizon_epsilon: f64,
 }
 
 struct SchwarzschildSolver {
