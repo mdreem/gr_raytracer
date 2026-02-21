@@ -399,11 +399,11 @@ impl Geometry for Kerr {
         let e_2 = FourVector::new_cartesian(0.0, 0.0, 1.0, 0.0);
         let e_3 = FourVector::new_cartesian(0.0, 0.0, 0.0, 1.0);
 
-        let basis = gram_schmidt(self, position, &vec![e_t, e_1, e_2, e_3]);
+        let basis = gram_schmidt(self, position, &[e_t, e_1, e_2, e_3]);
 
         debug!("{:?}", basis);
 
-        Tetrad::new(position.clone(), basis[0], basis[1], basis[2], basis[3])
+        Tetrad::new(*position, basis[0], basis[1], basis[2], basis[3])
     }
 
     fn lorentz_transformation(&self, position: &Point, velocity: &FourVector) -> Matrix4<f64> {
@@ -492,18 +492,18 @@ impl Geometry for Kerr {
         momentum: &FourVector,
     ) -> crate::geometry::geometry::ConstantsOfMotion {
         let mut constants = crate::geometry::geometry::ConstantsOfMotion::default();
-        
+
         let (x, y, z) = (position[1], position[2], position[3]);
 
         // covariant momentum p_mu = g_{mu nu} p^nu
         let covariant_metric = metric(self.radius, self.a, x, y, z);
         let p_cov = covariant_metric * momentum.vector;
-        
+
         // E = - p_mu dt^mu = - p_t
         let e = -p_cov[0];
         constants.push("E", e);
-        
-        // L_z is associated with rotation around z axis 
+
+        // L_z is associated with rotation around z axis
         // d/dphi in Cartesian coords: x d/dy - y d/dx
         // L_z = p_mu (dphi)^mu = p_x (-y) + p_y (x)
         let l_z = -y * p_cov[1] + x * p_cov[2];
@@ -531,7 +531,7 @@ impl SupportQuantities for Kerr {
     ) -> Result<FourVector, RaytracerError> {
         let r = compute_r_sqr(self.a, position[1], position[2], position[3]).sqrt();
         let omega = self.angular_velocity(r);
-        let ut = self.ut_contra(&position)?;
+        let ut = self.ut_contra(position)?;
         let uphi = omega * ut;
 
         let velocity_spherical = FourVector::new_spherical(ut, 0.0, 0.0, uphi);

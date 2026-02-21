@@ -68,7 +68,7 @@ fn rkf45_step<D: Dim>(
 where
     DefaultAllocator: Allocator<D>,
 {
-    let k1 = h * f.apply(t + A1 * h, &y);
+    let k1 = h * f.apply(t + A1 * h, y);
     let k2 = h * f.apply(t + A2 * h, &(y + B_2_1 * k1.clone()));
     let k3 = h * f.apply(t + A3 * h, &(y + B_3_1 * k1.clone() + B_3_2 * k2.clone()));
     let k4 = h * f.apply(

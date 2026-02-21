@@ -84,5 +84,6 @@ pub trait Geometry:
     fn get_radial_coordinate(&self, position: &Point) -> f64;
     /// Return the invariants along a geodesic, e.g. E and L_z.
     #[allow(dead_code)]
-    fn get_constants_of_motion(&self, position: &Point, momentum: &FourVector) -> ConstantsOfMotion;
+    fn get_constants_of_motion(&self, position: &Point, momentum: &FourVector)
+    -> ConstantsOfMotion;
 }
