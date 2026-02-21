@@ -5,8 +5,9 @@ use crate::geometry::tetrad::{Tetrad, TetradValidator};
 use crate::rendering::ray::Ray;
 use log::{debug, trace};
 
-#[derive(Debug, PartialEq)]
+#[derive(Debug, PartialEq, thiserror::Error)]
 pub enum CameraError {
+    #[error("Tetrad is not orthonormal")]
     TetradNotOrthonormal,
 }
 
