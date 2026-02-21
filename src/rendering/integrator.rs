@@ -80,18 +80,13 @@ impl<G: Geometry> Integrator<'_, G> {
         ray: &Ray,
     ) -> Result<(IntegratedRay, Option<StopReason>), RaytracerError> {
         let mut t = 0.0;
-        let geodesic_solver = self.geometry.get_geodesic_solver(&ray);
-        let mut y = geodesic_solver.create_initial_state(&ray);
+        let geodesic_solver = self.geometry.get_geodesic_solver(ray);
+        let mut y = geodesic_solver.create_initial_state(ray);
 
         let mut result: Vec<Step> = Vec::with_capacity(self.integration_configuration.max_steps);
         let x = Point::new(y[0], y[1], y[2], y[3], self.geometry.coordinate_system());
         let p = geodesic_solver.momentum_from_state(&y);
-        result.push(Step {
-            x: x.clone(),
-            p: p.clone(),
-            t,
-            step: 0,
-        });
+        result.push(Step { x, p, t, step: 0 });
 
         #[cfg(debug_assertions)]
         let initial_constants = self.geometry.get_constants_of_motion(&x, &p);
@@ -116,8 +111,8 @@ impl<G: Geometry> Integrator<'_, G> {
             let x = Point::new(y[0], y[1], y[2], y[3], self.geometry.coordinate_system());
             let p = geodesic_solver.momentum_from_state(&y);
             result.push(Step {
-                x: x.clone(),
-                p: p.clone(),
+                x,
+                p,
                 t,
                 step: i,
             });
@@ -189,7 +184,10 @@ impl<G: Geometry> Integrator<'_, G> {
         {
             let tolerance = 1e-4;
             if max_k_dot_k_drift > tolerance {
-                log::warn!("Large invariant drift detected! k.k drift: {:.3e}", max_k_dot_k_drift);
+                log::warn!(
+                    "Large invariant drift detected! k.k drift: {:.3e}",
+                    max_k_dot_k_drift
+                );
             }
             for (idx, (name, _)) in initial_constants.as_slice().iter().enumerate() {
                 if max_constant_drifts[idx] > tolerance {
