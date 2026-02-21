@@ -54,9 +54,9 @@ impl HasCoordinateSystem for EuclideanSpace {
 impl InnerProduct for EuclideanSpace {
     fn inner_product(&self, _position: &Point, v: &FourVector, w: &FourVector) -> f64 {
         1.0 * v.vector[0] * w.vector[0]
-            + (-1.0) * v.vector[1] * w.vector[1]
-            + (-1.0) * v.vector[2] * w.vector[2]
-            + (-1.0) * v.vector[3] * w.vector[3]
+            + -v.vector[1] * w.vector[1]
+            + -v.vector[2] * w.vector[2]
+            + -v.vector[3] * w.vector[3]
     }
 }
 
@@ -98,7 +98,7 @@ impl Geometry for EuclideanSpace {
         );
         let e_phi = FourVector::new_cartesian(0.0, -phi.sin(), phi.cos(), 0.0);
 
-        Tetrad::new(position.clone(), e_t, e_phi, -e_theta, -e_r)
+        Tetrad::new(*position, e_t, e_phi, -e_theta, -e_r)
     }
 
     fn lorentz_transformation(&self, position: &Point, t_velocity: &FourVector) -> Matrix4<f64> {

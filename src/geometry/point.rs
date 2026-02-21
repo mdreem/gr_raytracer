@@ -107,7 +107,7 @@ impl Point {
 
     pub fn to_cartesian(self) -> Point {
         match self.coordinate_system {
-            Cartesian => self.clone(),
+            Cartesian => self,
             Spherical => spherical_to_cartesian(&self),
         }
     }

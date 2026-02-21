@@ -57,11 +57,12 @@ pub trait SupportQuantities {
 }
 
 #[derive(Debug, Clone, Default)]
+#[allow(dead_code)]
 pub struct ConstantsOfMotion {
     constants: Option<[(&'static str, f64); 4]>,
     count: usize,
 }
-
+#[allow(dead_code)]
 impl ConstantsOfMotion {
     pub fn push(&mut self, name: &'static str, value: f64) {
         if self.count < 4 {
@@ -91,5 +92,6 @@ pub trait Geometry:
     fn get_geodesic_solver(&self, ray: &Ray) -> Box<dyn GeodesicSolver>;
     fn get_radial_coordinate(&self, position: &Point) -> f64;
     /// Return the invariants along a geodesic, e.g. E and L_z.
+    #[allow(dead_code)]
     fn get_constants_of_motion(&self, position: &Point, momentum: &FourVector) -> ConstantsOfMotion;
 }

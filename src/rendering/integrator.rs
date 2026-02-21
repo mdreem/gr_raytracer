@@ -80,15 +80,15 @@ impl<G: Geometry> Integrator<'_, G> {
         ray: &Ray,
     ) -> Result<(IntegratedRay, Option<StopReason>), RaytracerError> {
         let mut t = 0.0;
-        let geodesic_solver = self.geometry.get_geodesic_solver(&ray);
-        let mut y = geodesic_solver.create_initial_state(&ray);
+        let geodesic_solver = self.geometry.get_geodesic_solver(ray);
+        let mut y = geodesic_solver.create_initial_state(ray);
 
         let mut result: Vec<Step> = Vec::with_capacity(self.integration_configuration.max_steps);
         let x = Point::new(y[0], y[1], y[2], y[3], self.geometry.coordinate_system());
         let p = geodesic_solver.momentum_from_state(&y);
         result.push(Step {
-            x: x.clone(),
-            p: p.clone(),
+            x: x,
+            p: p,
             t,
             step: 0,
         });
@@ -116,8 +116,8 @@ impl<G: Geometry> Integrator<'_, G> {
             let x = Point::new(y[0], y[1], y[2], y[3], self.geometry.coordinate_system());
             let p = geodesic_solver.momentum_from_state(&y);
             result.push(Step {
-                x: x.clone(),
-                p: p.clone(),
+                x: x,
+                p: p,
                 t,
                 step: i,
             });

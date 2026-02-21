@@ -117,10 +117,10 @@ impl<'a, G: Geometry> Scene<'a, G> {
                     intersections.push(CIETristimulus::new(0.0, 0.0, 0.0, 1.0));
                 }
                 CelestialSphereReached => {
-                    let uv = self.get_uv_coordinates(&last_step);
+                    let uv = self.get_uv_coordinates(last_step);
                     let redshift = self
                         .redshift_computer
-                        .compute_redshift(&last_step, observer_energy);
+                        .compute_redshift(last_step, observer_energy);
                     intersections.push(self.texture_data.celestial_map.color_at_uv(
                         &uv,
                         &TemperatureData {
@@ -151,7 +151,7 @@ impl<'a, G: Geometry> Scene<'a, G> {
         let mut result = CIETristimulus::new(0.0, 0.0, 0.0, 1.0);
 
         for color in intersections.iter().rev() {
-            result = result.blend(&color)
+            result = result.blend(color)
         }
 
         Ok(result)

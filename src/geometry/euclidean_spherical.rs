@@ -55,10 +55,10 @@ impl GeodesicSolver for EuclideanSpaceSphericalSolver {
         let a_phi = -(2.0 / r) * v_phi * v_r - 2.0 * theta.cos() / theta.sin() * v_theta * v_phi;
 
         // y'
-        let y_new = EquationOfMotionState::from_column_slice(&[
+        
+        EquationOfMotionState::from_column_slice(&[
             v_t, v_r, v_theta, v_phi, a_t, a_r, a_theta, a_phi,
-        ]);
-        y_new
+        ])
     }
 }
 

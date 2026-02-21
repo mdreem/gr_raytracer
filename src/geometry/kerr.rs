@@ -399,11 +399,11 @@ impl Geometry for Kerr {
         let e_2 = FourVector::new_cartesian(0.0, 0.0, 1.0, 0.0);
         let e_3 = FourVector::new_cartesian(0.0, 0.0, 0.0, 1.0);
 
-        let basis = gram_schmidt(self, position, &vec![e_t, e_1, e_2, e_3]);
+        let basis = gram_schmidt(self, position, &[e_t, e_1, e_2, e_3]);
 
         debug!("{:?}", basis);
 
-        Tetrad::new(position.clone(), basis[0], basis[1], basis[2], basis[3])
+        Tetrad::new(*position, basis[0], basis[1], basis[2], basis[3])
     }
 
     fn lorentz_transformation(&self, position: &Point, velocity: &FourVector) -> Matrix4<f64> {
@@ -531,7 +531,7 @@ impl SupportQuantities for Kerr {
     ) -> Result<FourVector, RaytracerError> {
         let r = compute_r_sqr(self.a, position[1], position[2], position[3]).sqrt();
         let omega = self.angular_velocity(r);
-        let ut = self.ut_contra(&position)?;
+        let ut = self.ut_contra(position)?;
         let uphi = omega * ut;
 
         let velocity_spherical = FourVector::new_spherical(ut, 0.0, 0.0, uphi);
