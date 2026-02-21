@@ -565,7 +565,10 @@ impl Hittable for VolumetricDisc {
         .normalize();
 
         self.raymarch_constant_step(&ro, &rd, color_computation_data.temperature_data.redshift)
-            .unwrap_or(CIETristimulus::new(0.0, 0.0, 0.0, 0.0))
+            .unwrap_or_else(|e| {
+                log::warn!("Raymarching failed: {}", e);
+                CIETristimulus::new(0.0, 0.0, 0.0, 0.0)
+            })
     }
 
     fn energy_of_emitter(

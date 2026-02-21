@@ -24,7 +24,10 @@ use std::time::Instant;
 
 fn main() {
     env_logger::Builder::from_env(env_logger::Env::default().default_filter_or("info")).init();
-    run().expect("Error running raytracer");
+    if let Err(e) = run() {
+        eprintln!("Fatal error: {}", e);
+        std::process::exit(1);
+    }
 }
 
 fn run() -> Result<(), RaytracerError> {

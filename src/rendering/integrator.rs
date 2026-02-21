@@ -66,9 +66,11 @@ impl IntegrationConfiguration {
     }
 }
 
-#[derive(Debug)]
+#[derive(Debug, thiserror::Error)]
 pub enum IntegrationError {
+    #[error("Max steps reached")]
     MaxStepsReached,
+    #[error("No steps produced")]
     NoStepsProduced,
 }
 

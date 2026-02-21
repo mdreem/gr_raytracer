@@ -6,11 +6,14 @@ use image::{DynamicImage, GenericImageView, ImageReader};
 use log::{error, warn};
 use std::sync::Arc;
 
-#[derive(Debug)]
+#[derive(Debug, thiserror::Error)]
 pub enum TextureError {
+    #[error("Texture file error: {0}")]
     TextureFileError(String),
-    IoError(std::io::Error),
-    DecodeError(image::ImageError),
+    #[error("I/O error: {0}")]
+    IoError(#[from] std::io::Error),
+    #[error("Image decode error: {0}")]
+    DecodeError(#[from] image::ImageError),
 }
 
 pub struct UVCoordinates {

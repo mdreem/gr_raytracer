@@ -15,22 +15,37 @@ use rayon::prelude::ParallelSliceMut;
 use std::io;
 use std::sync::atomic::{AtomicUsize, Ordering};
 
-#[derive(Debug)]
+#[derive(Debug, thiserror::Error)]
 pub enum RaytracerError {
-    IntegrationError(IntegrationError),
-    IoError(io::Error),
+    #[error("Integration error: {0}")]
+    IntegrationError(#[from] IntegrationError),
+    #[error("I/O error: {0}")]
+    IoError(#[from] io::Error),
+    #[error("Configuration file error: {0}")]
     ConfigurationFileError(io::Error),
-    TomlError(toml::de::Error),
-    TextureError(TextureError),
-    ImageError(ImageError),
+    #[error("TOML error: {0}")]
+    TomlError(#[from] toml::de::Error),
+    #[error("Texture error: {0}")]
+    TextureError(#[from] TextureError),
+    #[error("Image error: {0}")]
+    ImageError(#[from] ImageError),
+    #[error("Image buffer creation failed")]
     ImageBufferCreation,
-    ProgressBarTemplateError(TemplateError),
-    CameraError(CameraError),
+    #[error("Progress bar template error: {0}")]
+    ProgressBarTemplateError(#[from] TemplateError),
+    #[error("Camera error: {0}")]
+    CameraError(#[from] CameraError),
+    #[error("Invalid configuration: {0}")]
     InvalidConfiguration(String),
+    #[error("No circular orbit possible")]
     NoCircularOrbitPossible,
+    #[error("Radius is below RISCO")]
     BelowRISCO,
+    #[error("Radius is not finite")]
     NonFiniteRadius,
+    #[error("Number is below zero")]
     NumberBelowZero,
+    #[error("Denominator is close to zero")]
     DenominatorCloseToZero,
 }
 
