@@ -17,6 +17,12 @@ pub struct EuclideanSpaceSphericalSolver {}
 #[derive(Clone)]
 pub struct EuclideanSpaceSpherical {}
 
+impl Default for EuclideanSpaceSpherical {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl EuclideanSpaceSpherical {
     pub fn new() -> Self {
         EuclideanSpaceSpherical {}
@@ -55,10 +61,10 @@ impl GeodesicSolver for EuclideanSpaceSphericalSolver {
         let a_phi = -(2.0 / r) * v_phi * v_r - 2.0 * theta.cos() / theta.sin() * v_theta * v_phi;
 
         // y'
-        let y_new = EquationOfMotionState::from_column_slice(&[
+
+        EquationOfMotionState::from_column_slice(&[
             v_t, v_r, v_theta, v_phi, a_t, a_r, a_theta, a_phi,
-        ]);
-        y_new
+        ])
     }
 }
 
@@ -130,6 +136,27 @@ impl Geometry for EuclideanSpaceSpherical {
             CoordinateSystem::Cartesian => position.get_as_spherical()[0],
             CoordinateSystem::Spherical => position[1],
         }
+    }
+
+    fn get_constants_of_motion(
+        &self,
+        position: &Point,
+        momentum: &FourVector,
+    ) -> crate::geometry::geometry::ConstantsOfMotion {
+        let mut constants = crate::geometry::geometry::ConstantsOfMotion::default();
+
+        let r = position[1];
+        let theta = position[2];
+
+        // E = p_t = v^t
+        let e = momentum.vector[0];
+        constants.push("E", e);
+
+        // L_z = p_phi = g_phiphi v^phi = - r^2 sin^2(theta) v^phi
+        let l_z = -r * r * theta.sin() * theta.sin() * momentum.vector[3];
+        constants.push("L_z", l_z);
+
+        constants
     }
 }
 

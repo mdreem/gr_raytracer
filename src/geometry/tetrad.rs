@@ -34,12 +34,12 @@ impl Tetrad {
 
 impl Display for Tetrad {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
-        write!(f, "Tetrad\n")?;
-        write!(f, "  position: {:?}\n", self.position)?;
-        write!(f, "  t: {:?}\n", self.t)?;
-        write!(f, "  x: {:?}\n", self.x)?;
-        write!(f, "  y: {:?}\n", self.y)?;
-        write!(f, "  z: {:?}\n", self.z)?;
+        writeln!(f, "Tetrad")?;
+        writeln!(f, "  position: {:?}", self.position)?;
+        writeln!(f, "  t: {:?}", self.t)?;
+        writeln!(f, "  x: {:?}", self.x)?;
+        writeln!(f, "  y: {:?}", self.y)?;
+        writeln!(f, "  z: {:?}", self.z)?;
         Ok(())
     }
 }

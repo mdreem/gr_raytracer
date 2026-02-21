@@ -7,7 +7,7 @@ fn proj<G: Geometry>(geometry: &G, position: &Point, u: &FourVector, v: &FourVec
     let p1 = geometry.inner_product(position, v, u);
     let p2 = geometry.inner_product(position, u, u);
 
-    (p1 / p2) * u.clone()
+    (p1 / p2) * *u
 }
 
 pub fn gram_schmidt<G: Geometry>(
@@ -18,7 +18,7 @@ pub fn gram_schmidt<G: Geometry>(
     let mut orthonormal_vectors: Vec<FourVector> = Vec::new();
 
     for v in vectors {
-        let mut w = v.clone();
+        let mut w = *v;
 
         for u in &orthonormal_vectors {
             let projection = proj(geometry, position, u, &w);
