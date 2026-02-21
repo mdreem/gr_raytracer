@@ -485,6 +485,32 @@ impl Geometry for Kerr {
         let rho_sqr = compute_r_sqr(self.a, position[1], position[2], position[3]);
         rho_sqr.sqrt()
     }
+
+    fn get_constants_of_motion(
+        &self,
+        position: &Point,
+        momentum: &FourVector,
+    ) -> crate::geometry::geometry::ConstantsOfMotion {
+        let mut constants = crate::geometry::geometry::ConstantsOfMotion::default();
+        
+        let (x, y, z) = (position[1], position[2], position[3]);
+
+        // covariant momentum p_mu = g_{mu nu} p^nu
+        let covariant_metric = metric(self.radius, self.a, x, y, z);
+        let p_cov = covariant_metric * momentum.vector;
+        
+        // E = - p_mu dt^mu = - p_t
+        let e = -p_cov[0];
+        constants.push("E", e);
+        
+        // L_z is associated with rotation around z axis 
+        // d/dphi in Cartesian coords: x d/dy - y d/dx
+        // L_z = p_mu (dphi)^mu = p_x (-y) + p_y (x)
+        let l_z = -y * p_cov[1] + x * p_cov[2];
+        constants.push("L_z", l_z);
+
+        constants
+    }
 }
 
 impl SupportQuantities for Kerr {

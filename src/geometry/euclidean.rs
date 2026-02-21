@@ -149,6 +149,30 @@ impl Geometry for EuclideanSpace {
     fn get_radial_coordinate(&self, position: &Point) -> f64 {
         position.get_as_spherical()[0]
     }
+
+    fn get_constants_of_motion(
+        &self,
+        position: &Point,
+        momentum: &FourVector,
+    ) -> crate::geometry::geometry::ConstantsOfMotion {
+        let mut constants = crate::geometry::geometry::ConstantsOfMotion::default();
+        
+        let (x, y, _z) = (position[1], position[2], position[3]);
+
+        // E = p_t = g_tt v^t = v^t
+        let e = momentum.vector[0];
+        constants.push("E", e);
+        
+        // p_cov = (v^t, -v^x, -v^y, -v^z)
+        let p_x = -momentum.vector[1];
+        let p_y = -momentum.vector[2];
+        
+        // L_z = x p_y - y p_x
+        let l_z = x * p_y - y * p_x;
+        constants.push("L_z", l_z);
+
+        constants
+    }
 }
 
 impl SupportQuantities for EuclideanSpace {
