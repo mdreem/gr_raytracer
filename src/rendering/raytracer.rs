@@ -139,7 +139,7 @@ impl<'a, G: Geometry> Raytracer<'a, G> {
         if filename.ends_with(".hdr") {
             info!("Creating HDR image");
             let buffer =
-                self.render_section_to_buffer(from_row, from_col, to_row, to_col, &|x, y, z| {
+                self.render_section_to_buffer(from_row, from_col, to_row, to_col, |x, y, z| {
                     (x, y, z)
                 })?;
             let imgbuf_hdr: ImageBuffer<Rgb<f32>, Vec<f32>> =

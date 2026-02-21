@@ -24,7 +24,7 @@ fn integrate_blackbody_xyz(temperature: f64) -> CIETristimulus {
     let mut y_accum = 0.0;
     let mut z_accum = 0.0;
 
-    for i in 0..(num_steps as usize) {
+    for i in 0..num_steps {
         let lambda = MIN_WAVELENGTH * NM_TO_M + (i as f64 + 0.5) * step_size;
         let radiance = planck_spectral_radiance(lambda, temperature);
         x_accum += radiance * x_bar(lambda / NM_TO_M) * step_size;

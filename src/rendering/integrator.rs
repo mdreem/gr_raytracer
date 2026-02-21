@@ -80,13 +80,21 @@ impl<G: Geometry> Integrator<'_, G> {
         ray: &Ray,
     ) -> Result<(IntegratedRay, Option<StopReason>), RaytracerError> {
         let mut t = 0.0;
-        let geodesic_solver = self.geometry.get_geodesic_solver(&ray);
-        let mut y = geodesic_solver.create_initial_state(&ray);
+        let geodesic_solver = self.geometry.get_geodesic_solver(ray);
+        let mut y = geodesic_solver.create_initial_state(ray);
 
         let mut result: Vec<Step> = Vec::with_capacity(self.integration_configuration.max_steps);
         let x = Point::new(y[0], y[1], y[2], y[3], self.geometry.coordinate_system());
         let p = geodesic_solver.momentum_from_state(&y);
         result.push(Step { x, p, t, step: 0 });
+
+        #[cfg(debug_assertions)]
+        let initial_constants = self.geometry.get_constants_of_motion(&x, &p);
+
+        #[cfg(debug_assertions)]
+        let mut max_k_dot_k_drift = 0.0f64;
+        #[cfg(debug_assertions)]
+        let mut max_constant_drifts = vec![0.0f64; initial_constants.as_slice().len()];
 
         let mut h = self.integration_configuration.step_size;
         for i in 1..self.integration_configuration.max_steps {
@@ -102,14 +110,95 @@ impl<G: Geometry> Integrator<'_, G> {
 
             let x = Point::new(y[0], y[1], y[2], y[3], self.geometry.coordinate_system());
             let p = geodesic_solver.momentum_from_state(&y);
-            result.push(Step { x, p, t, step: i });
+            result.push(Step {
+                x,
+                p,
+                t,
+                step: i,
+            });
+
+            #[cfg(debug_assertions)]
+            {
+                let k_dot_k = self.geometry.inner_product(&x, &p, &p);
+                // For a photon, k.k should always be exactly 0.0
+                let k_drift = k_dot_k.abs();
+                if k_drift > max_k_dot_k_drift {
+                    max_k_dot_k_drift = k_drift;
+                }
+
+                let current_constants = self.geometry.get_constants_of_motion(&x, &p);
+
+                for (idx, ((_, initial_val), (_, current_val))) in initial_constants
+                    .as_slice()
+                    .iter()
+                    .zip(current_constants.as_slice().iter())
+                    .enumerate()
+                {
+                    // Relative drift, falling back to absolute if initial value is 0
+                    let drift = if initial_val.abs() > 1e-12 {
+                        (current_val - initial_val).abs() / initial_val.abs()
+                    } else {
+                        (current_val - initial_val).abs()
+                    };
+                    if drift > max_constant_drifts[idx] {
+                        max_constant_drifts[idx] = drift;
+                    }
+                }
+            }
+
             match self.should_stop(&last_y, &y, i) {
                 None => {}
-                Some(r) => return Ok((IntegratedRay::new(result), Some(r))),
+                Some(r) => {
+                    self.report_drifts(
+                        #[cfg(debug_assertions)]
+                        max_k_dot_k_drift,
+                        #[cfg(debug_assertions)]
+                        &initial_constants,
+                        #[cfg(debug_assertions)]
+                        &max_constant_drifts,
+                    );
+                    return Ok((IntegratedRay::new(result), Some(r)));
+                }
             }
         }
 
+        self.report_drifts(
+            #[cfg(debug_assertions)]
+            max_k_dot_k_drift,
+            #[cfg(debug_assertions)]
+            &initial_constants,
+            #[cfg(debug_assertions)]
+            &max_constant_drifts,
+        );
+
         Ok((IntegratedRay::new(result), None))
+    }
+
+    fn report_drifts(
+        &self,
+        #[cfg(debug_assertions)] max_k_dot_k_drift: f64,
+        #[cfg(debug_assertions)] initial_constants: &crate::geometry::geometry::ConstantsOfMotion,
+        #[cfg(debug_assertions)] max_constant_drifts: &[f64],
+    ) {
+        #[cfg(debug_assertions)]
+        {
+            let tolerance = 1e-4;
+            if max_k_dot_k_drift > tolerance {
+                log::warn!(
+                    "Large invariant drift detected! k.k drift: {:.3e}",
+                    max_k_dot_k_drift
+                );
+            }
+            for (idx, (name, _)) in initial_constants.as_slice().iter().enumerate() {
+                if max_constant_drifts[idx] > tolerance {
+                    log::warn!(
+                        "Large invariant drift detected! {} drift: {:.3e}",
+                        name,
+                        max_constant_drifts[idx]
+                    );
+                }
+            }
+        }
     }
 
     fn should_stop(

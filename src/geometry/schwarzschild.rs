@@ -196,6 +196,28 @@ impl Geometry for Schwarzschild {
             CoordinateSystem::Spherical => position[1],
         }
     }
+
+    fn get_constants_of_motion(
+        &self,
+        position: &Point,
+        momentum: &FourVector,
+    ) -> crate::geometry::geometry::ConstantsOfMotion {
+        let mut constants = crate::geometry::geometry::ConstantsOfMotion::default();
+
+        let r = position[1];
+        let theta = position[2];
+        let a = 1.0 - self.radius / r;
+
+        // E = p_t = g_tt v^t = a v^t
+        let e = a * momentum.vector[0];
+        constants.push("E", e);
+
+        // L_z = p_phi = g_phiphi v^phi = - r^2 sin^2(theta) v^phi
+        let l_z = -r * r * theta.sin() * theta.sin() * momentum.vector[3];
+        constants.push("L_z", l_z);
+
+        constants
+    }
 }
 
 impl SupportQuantities for Schwarzschild {

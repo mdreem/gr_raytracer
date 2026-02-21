@@ -102,7 +102,7 @@ impl TextureMap for TextureMapper {
         uv: &UVCoordinates,
         temperature_data: &TemperatureData,
     ) -> CIETristimulus {
-        let cie_tristimulus = self.bilinear(&uv);
+        let cie_tristimulus = self.bilinear(uv);
         let cie_tristimulus_beamed =
             cie_tristimulus.apply_beaming(temperature_data.redshift, self.beaming_exponent);
         cie_tristimulus_beamed.normalize(self.color_normalization)
@@ -247,7 +247,7 @@ impl TextureMap for CheckerMapper {
         let ut = (uv.u * self.width).floor() as usize;
         let vt = (uv.v * self.height).floor() as usize;
 
-        if (ut + vt) % 2 == 0 {
+        if (ut + vt).is_multiple_of(2) {
             self.c1
                 .apply_beaming(temperature_data.redshift, self.beaming_exponent)
                 .normalize(self.color_normalization)
@@ -263,6 +263,12 @@ pub type TextureMapHandle = Arc<dyn TextureMap + Send + Sync>;
 
 pub struct TextureMapperFactory {
     texture_map_map: std::collections::HashMap<String, TextureMapHandle>,
+}
+
+impl Default for TextureMapperFactory {
+    fn default() -> Self {
+        Self::new()
+    }
 }
 
 impl TextureMapperFactory {

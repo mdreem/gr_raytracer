@@ -56,6 +56,23 @@ pub trait SupportQuantities {
     ) -> Result<Box<dyn TemperatureComputer>, RaytracerError>;
 }
 
+#[derive(Debug, Clone, Default)]
+#[allow(dead_code)]
+pub struct ConstantsOfMotion {
+    constants: Vec<(&'static str, f64)>,
+}
+
+#[allow(dead_code)]
+impl ConstantsOfMotion {
+    pub fn push(&mut self, name: &'static str, value: f64) {
+        self.constants.push((name, value));
+    }
+
+    pub fn as_slice(&self) -> &[(&'static str, f64)] {
+        &self.constants
+    }
+}
+
 pub trait Geometry:
     InnerProduct + HasCoordinateSystem + Signature + SupportQuantities + Sync
 {
@@ -65,4 +82,8 @@ pub trait Geometry:
     fn closed_orbit(&self, position: &Point, step_index: usize, max_steps: usize) -> bool;
     fn get_geodesic_solver(&self, ray: &Ray) -> Box<dyn GeodesicSolver>;
     fn get_radial_coordinate(&self, position: &Point) -> f64;
+    /// Return the invariants along a geodesic, e.g. E and L_z.
+    #[allow(dead_code)]
+    fn get_constants_of_motion(&self, position: &Point, momentum: &FourVector)
+    -> ConstantsOfMotion;
 }

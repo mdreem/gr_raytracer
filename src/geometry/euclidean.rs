@@ -18,6 +18,12 @@ struct EuclideanSpacedSolver {}
 #[derive(Clone)]
 pub struct EuclideanSpace {}
 
+impl Default for EuclideanSpace {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl EuclideanSpace {
     pub fn new() -> Self {
         EuclideanSpace {}
@@ -54,9 +60,9 @@ impl HasCoordinateSystem for EuclideanSpace {
 impl InnerProduct for EuclideanSpace {
     fn inner_product(&self, _position: &Point, v: &FourVector, w: &FourVector) -> f64 {
         1.0 * v.vector[0] * w.vector[0]
-            + (-1.0) * v.vector[1] * w.vector[1]
-            + (-1.0) * v.vector[2] * w.vector[2]
-            + (-1.0) * v.vector[3] * w.vector[3]
+            + -v.vector[1] * w.vector[1]
+            + -v.vector[2] * w.vector[2]
+            + -v.vector[3] * w.vector[3]
     }
 }
 
@@ -98,7 +104,7 @@ impl Geometry for EuclideanSpace {
         );
         let e_phi = FourVector::new_cartesian(0.0, -phi.sin(), phi.cos(), 0.0);
 
-        Tetrad::new(position.clone(), e_t, e_phi, -e_theta, -e_r)
+        Tetrad::new(*position, e_t, e_phi, -e_theta, -e_r)
     }
 
     fn lorentz_transformation(&self, position: &Point, t_velocity: &FourVector) -> Matrix4<f64> {
@@ -148,6 +154,30 @@ impl Geometry for EuclideanSpace {
 
     fn get_radial_coordinate(&self, position: &Point) -> f64 {
         position.get_as_spherical()[0]
+    }
+
+    fn get_constants_of_motion(
+        &self,
+        position: &Point,
+        momentum: &FourVector,
+    ) -> crate::geometry::geometry::ConstantsOfMotion {
+        let mut constants = crate::geometry::geometry::ConstantsOfMotion::default();
+
+        let (x, y, _z) = (position[1], position[2], position[3]);
+
+        // E = p_t = g_tt v^t = v^t
+        let e = momentum.vector[0];
+        constants.push("E", e);
+
+        // p_cov = (v^t, -v^x, -v^y, -v^z)
+        let p_x = -momentum.vector[1];
+        let p_y = -momentum.vector[2];
+
+        // L_z = x p_y - y p_x
+        let l_z = x * p_y - y * p_x;
+        constants.push("L_z", l_z);
+
+        constants
     }
 }
 

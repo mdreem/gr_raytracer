@@ -45,9 +45,8 @@ fn compute_r_isco(a: f64, radius: f64) -> f64 {
     let z2 = (3.0 * a_s * a_s + z1 * z1).sqrt();
 
     // prograde ISCO radius
-    let r_isco = (3.0 + z2 - ((3.0 - z1) * (3.0 + z1 + 2.0 * z2)).sqrt()) * radius / 2.0;
 
-    r_isco
+    (3.0 + z2 - ((3.0 - z1) * (3.0 + z1 + 2.0 * z2)).sqrt()) * radius / 2.0
 }
 
 const NUM_LUT_STEPS: usize = 1000;
@@ -210,8 +209,8 @@ impl KerrTemperatureComputer {
 
     fn d_omega_dr(&self, r: f64) -> f64 {
         let h = 1e-10;
-        let d_omega_dr = (self.angular_velocity(r + h) - self.angular_velocity(r - h)) / (2.0 * h);
-        d_omega_dr
+
+        (self.angular_velocity(r + h) - self.angular_velocity(r - h)) / (2.0 * h)
     }
 
     fn compute_f(&self, r: f64) -> Result<f64, RaytracerError> {
