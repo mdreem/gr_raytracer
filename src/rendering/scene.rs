@@ -89,7 +89,7 @@ impl<'a, G: Geometry> Scene<'a, G> {
 
         if self.save_ray_data {
             let mut file = File::create(format!("ray-{}-{}.csv", ray.row, ray.col))
-                .expect("Unable to create file");
+                .map_err(RaytracerError::IoError)?;
             steps.save(&mut file)?;
         }
 
@@ -107,7 +107,9 @@ impl<'a, G: Geometry> Scene<'a, G> {
                 intersections.push(intersection_color);
             }
         }
-        let last_step = steps.steps.last().expect("No steps found");
+        let last_step = steps.steps.last().ok_or(RaytracerError::IntegrationError(
+            crate::rendering::integrator::IntegrationError::NoStepsProduced,
+        ))?;
 
         if let Some(reason) = stop_reason {
             match reason {
