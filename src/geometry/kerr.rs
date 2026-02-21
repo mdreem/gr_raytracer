@@ -18,7 +18,7 @@ use nalgebra::{Const, Matrix4, OVector, Vector3, Vector4};
 pub struct Kerr {
     pub radius: f64,
     pub a: f64,
-    horizon_epsilon: f64,
+    pub horizon_epsilon: f64,
 }
 
 struct KerrSolver {

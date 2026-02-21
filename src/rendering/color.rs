@@ -11,8 +11,9 @@ pub struct Color {
     pub alpha: u8,
 }
 
-#[derive(Deserialize, Serialize, Clone, Copy, PartialEq, Debug)]
+#[derive(Deserialize, Serialize, Default, Clone, Copy, PartialEq, Debug)]
 pub enum CIETristimulusNormalization {
+    #[default]
     NoNormalization,
     Chromaticity,
     EqualLuminance,

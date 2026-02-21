@@ -12,6 +12,7 @@ use crate::rendering::scene::EquationOfMotionState;
 use crate::rendering::temperature::{ConstantTemperatureComputer, TemperatureComputer};
 use nalgebra::{Const, Matrix4, OVector};
 
+
 pub struct EuclideanSpaceSphericalSolver {}
 
 #[derive(Clone)]

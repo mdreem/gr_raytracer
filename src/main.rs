@@ -5,13 +5,7 @@ mod rendering;
 mod scene_objects;
 
 use crate::cli::cli::{Action, App};
-use crate::cli::euclidean::{render_euclidean, render_euclidean_ray};
-use crate::cli::euclidean_spherical::{render_euclidean_spherical, render_euclidean_spherical_ray};
-use crate::cli::kerr::{render_kerr, render_kerr_ray, render_kerr_ray_at};
-use crate::cli::schwarzschild::{
-    render_schwarzschild, render_schwarzschild_ray, render_schwarzschild_ray_at,
-};
-use crate::configuration::{GeometryType, RenderConfig};
+use crate::configuration::RenderConfig;
 use crate::geometry::four_vector::FourVector;
 use crate::geometry::point::{CoordinateSystem, Point};
 use crate::rendering::raytracer::RaytracerError;
@@ -60,72 +54,23 @@ fn run() -> Result<(), RaytracerError> {
                 args.global_opts.camera_position[2],
             );
 
-            match config.geometry_type {
-                GeometryType::Euclidean => {
-                    info!("Rendering Euclidean geometry");
-                    render_euclidean(
-                        args.global_opts,
-                        config,
-                        Point::new_from_vector(position, CoordinateSystem::Cartesian),
-                        filename,
-                        from_row,
-                        from_col,
-                        to_row,
-                        to_col,
-                    )?;
-                }
-                GeometryType::EuclideanSpherical => {
-                    info!("Rendering Euclidean spherical geometry");
-                    render_euclidean_spherical(
-                        args.global_opts,
-                        config,
-                        Point::new_from_vector(position, CoordinateSystem::Cartesian),
-                        filename,
-                        from_row,
-                        from_col,
-                        to_row,
-                        to_col,
-                    )?;
-                }
-                GeometryType::Schwarzschild {
-                    radius,
-                    horizon_epsilon,
-                } => {
-                    info!("Rendering Schwarzschild geometry with radius: {}", radius);
-                    render_schwarzschild(
-                        radius,
-                        horizon_epsilon,
-                        args.global_opts,
-                        config,
-                        Point::new_from_vector(position, CoordinateSystem::Cartesian),
-                        filename,
-                        from_row,
-                        from_col,
-                        to_row,
-                        to_col,
-                    )?;
-                }
-                GeometryType::Kerr {
-                    radius,
-                    a,
-                    horizon_epsilon,
-                } => {
-                    info!("Rendering Kerr geometry with radius: {}", radius);
-                    render_kerr(
-                        radius,
-                        a,
-                        horizon_epsilon,
-                        args.global_opts,
-                        config,
-                        Point::new_from_vector(position, CoordinateSystem::Cartesian),
-                        filename,
-                        from_row,
-                        from_col,
-                        to_row,
-                        to_col,
-                    )?;
-                }
-            }
+            let geometry = config.geometry_type.get_renderable_geometry();
+            info!(
+                "Using coordinate system: {:?}",
+                geometry.coordinate_system()
+            );
+            let position = Point::new_from_vector(position, CoordinateSystem::Cartesian);
+
+            geometry.render(
+                args.global_opts,
+                config,
+                position,
+                filename,
+                from_row,
+                from_col,
+                to_row,
+                to_col,
+            )?;
         }
         Action::RenderRay { row, col, filename } => {
             let config_file = fs::read_to_string(args.config_file)
@@ -146,73 +91,17 @@ fn run() -> Result<(), RaytracerError> {
                 args.global_opts.camera_position[2],
             );
 
-            let mut file =
-                File::create(filename.clone()).map_err(RaytracerError::ConfigurationFileError)?;
-            match config.geometry_type {
-                GeometryType::Euclidean => {
-                    info!("Rendering ray in Euclidean geometry");
-                    render_euclidean_ray(
-                        row,
-                        col,
-                        args.global_opts,
-                        config,
-                        Point::new_from_vector(position, CoordinateSystem::Cartesian),
-                        &mut file,
-                    )?;
-                    info!("Saved integrated ray to {}", filename);
-                }
-                GeometryType::EuclideanSpherical => {
-                    info!("Rendering ray in Euclidean spherical geometry");
-                    render_euclidean_spherical_ray(
-                        row,
-                        col,
-                        args.global_opts,
-                        config,
-                        Point::new_from_vector(position, CoordinateSystem::Cartesian),
-                        &mut file,
-                    )?;
-                    info!("Saved integrated ray to {}", filename);
-                }
-                GeometryType::Schwarzschild {
-                    radius,
-                    horizon_epsilon,
-                } => {
-                    info!(
-                        "Rendering ray in Schwarzschild geometry with radius: {}",
-                        radius
-                    );
-                    render_schwarzschild_ray(
-                        radius,
-                        horizon_epsilon,
-                        row,
-                        col,
-                        args.global_opts,
-                        config,
-                        Point::new_from_vector(position, CoordinateSystem::Cartesian),
-                        &mut file,
-                    )?;
-                    info!("Saved integrated ray to {}", filename);
-                }
-                GeometryType::Kerr {
-                    radius,
-                    a,
-                    horizon_epsilon,
-                } => {
-                    info!("Rendering ray in Kerr geometry with radius: {}", radius);
-                    render_kerr_ray(
-                        radius,
-                        a,
-                        horizon_epsilon,
-                        row,
-                        col,
-                        args.global_opts,
-                        config,
-                        Point::new_from_vector(position, CoordinateSystem::Cartesian),
-                        &mut file,
-                    )?;
-                    info!("Saved integrated ray to {}", filename);
-                }
-            }
+            let mut file = File::create(filename.clone()).unwrap();
+            
+            config.geometry_type.get_renderable_geometry().render_ray(
+                row,
+                col,
+                args.global_opts.clone(),
+                config.clone(),
+                Point::new_from_vector(position, CoordinateSystem::Cartesian),
+                &mut file,
+            )?;
+            info!("Saved integrated ray to {}", filename);
         }
         Action::RenderRayAt {
             position,
@@ -237,49 +126,14 @@ fn run() -> Result<(), RaytracerError> {
                 .map_err(RaytracerError::ConfigurationFileError)?;
             let config: RenderConfig =
                 toml::from_str(config_file.as_str()).map_err(RaytracerError::TomlError)?;
-            match config.geometry_type {
-                GeometryType::Euclidean => {
-                    return Err(RaytracerError::InvalidConfiguration(
-                        "Rendering ray at not supported in Euclidean geometry yet".to_string(),
-                    ));
-                }
-                GeometryType::EuclideanSpherical => {
-                    return Err(RaytracerError::InvalidConfiguration(
-                        "Rendering ray at not supported in Euclidean spherical geometry yet"
-                            .to_string(),
-                    ));
-                }
-                GeometryType::Schwarzschild {
-                    radius,
-                    horizon_epsilon,
-                } => {
-                    render_schwarzschild_ray_at(
-                        radius,
-                        horizon_epsilon,
-                        Point::new_cartesian(0.0, position[0], position[1], position[2]),
-                        FourVector::new_cartesian(0.0, direction[0], direction[1], direction[2]),
-                        args.global_opts,
-                        &mut file,
-                    )?;
-                    info!("Saved integrated ray to {}", filename);
-                }
-                GeometryType::Kerr {
-                    radius,
-                    a,
-                    horizon_epsilon,
-                } => {
-                    render_kerr_ray_at(
-                        radius,
-                        a,
-                        horizon_epsilon,
-                        Point::new_cartesian(0.0, position[0], position[1], position[2]),
-                        FourVector::new_cartesian(0.0, direction[0], direction[1], direction[2]),
-                        args.global_opts,
-                        &mut file,
-                    )?;
-                    info!("Saved integrated ray to {}", filename);
-                }
-            }
+
+            config.geometry_type.get_renderable_geometry().render_ray_at(
+                Point::new_cartesian(0.0, position[0], position[1], position[2]),
+                FourVector::new_cartesian(0.0, direction[0], direction[1], direction[2]),
+                args.global_opts,
+                &mut file,
+            )?;
+            info!("Saved integrated ray to {}", filename);
         }
     }
 
