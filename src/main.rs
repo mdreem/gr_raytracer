@@ -46,7 +46,7 @@ fn run() -> Result<(), RaytracerError> {
                 toml::from_str(config_file.as_str()).map_err(RaytracerError::TomlError)?;
 
             if args.global_opts.camera_position.len() != 3 {
-                panic!("Camera position must be a vector of length 3");
+                return Err(RaytracerError::InvalidConfiguration("Camera position must be a vector of length 3".to_string()));
             }
             let position = Vector4::new(
                 0.0,
@@ -130,7 +130,7 @@ fn run() -> Result<(), RaytracerError> {
                 toml::from_str(config_file.as_str()).map_err(RaytracerError::TomlError)?;
 
             if args.global_opts.camera_position.len() != 3 {
-                panic!("Camera position must be a vector of length 3");
+                return Err(RaytracerError::InvalidConfiguration("Camera position must be a vector of length 3".to_string()));
             }
             let position = Vector4::new(
                 0.0,
@@ -213,13 +213,13 @@ fn run() -> Result<(), RaytracerError> {
             filename,
         } => {
             if position.len() != 3 {
-                panic!("Position must be a vector of length 3, got {:?}", position);
+                return Err(RaytracerError::InvalidConfiguration(format!("Position must be a vector of length 3, got {:?}", position)));
             }
             if direction.len() != 3 {
-                panic!(
+                return Err(RaytracerError::InvalidConfiguration(format!(
                     "Direction must be a vector of length 3, got {:?}",
                     direction
-                );
+                )));
             }
             let mut file =
                 File::create(filename.clone()).map_err(RaytracerError::ConfigurationFileError)?;
@@ -229,10 +229,10 @@ fn run() -> Result<(), RaytracerError> {
                 toml::from_str(config_file.as_str()).map_err(RaytracerError::TomlError)?;
             match config.geometry_type {
                 GeometryType::Euclidean => {
-                    panic!("Rendering ray at not supported in Euclidean geometry yet");
+                    return Err(RaytracerError::InvalidConfiguration("Rendering ray at not supported in Euclidean geometry yet".to_string()));
                 }
                 GeometryType::EuclideanSpherical => {
-                    panic!("Rendering ray at not supported in Euclidean spherical geometry yet");
+                    return Err(RaytracerError::InvalidConfiguration("Rendering ray at not supported in Euclidean spherical geometry yet".to_string()));
                 }
                 GeometryType::Schwarzschild {
                     radius,
