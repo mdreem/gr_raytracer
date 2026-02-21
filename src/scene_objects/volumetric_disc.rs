@@ -275,7 +275,7 @@ impl VolumetricDisc {
             let exited = if let Some(exit_distance) = cached_exit_distance {
                 d_o >= exit_distance
             } else {
-                self.does_exit(&p, &rd, d_s)
+                self.does_exit(&p, rd, d_s)
             };
             if exited {
                 trace!("  Ray exited disc at step {}, position {:?}", i, p,);

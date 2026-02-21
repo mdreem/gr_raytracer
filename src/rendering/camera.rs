@@ -39,7 +39,7 @@ pub fn lorentz_transform_tetrad<G: Geometry>(
     let z_vec = lorentz * tetrad.z.get_as_vector();
 
     Tetrad::new(
-        position.clone(),
+        *position,
         FourVector::new(
             t_vec[0],
             t_vec[1],
@@ -99,7 +99,7 @@ impl Camera {
         let (z, a_two_prime) = rotate(original_tetrad.z, a_prime, theta);
         let (x, y) = rotate(a_two_prime, b_prime, psi);
 
-        let rotated_tetrad = Tetrad::new(position.clone(), original_tetrad.t, x, y, z);
+        let rotated_tetrad = Tetrad::new(position, original_tetrad.t, x, y, z);
         debug!("rotated tetrad: {}", rotated_tetrad);
 
         let tetrad = lorentz_transform_tetrad(geometry, &rotated_tetrad, &position, &velocity);
@@ -149,7 +149,7 @@ impl Camera {
         let i_prime = (2.0 * tan_half_alpha / (self.rows as f64))
             * (shifted_column - (self.columns as f64 + 1.0) / 2.0);
         let j_prime = (2.0 * tan_half_alpha / (self.rows as f64))
-            * (shifted_row as f64 - (self.rows as f64 + 1.0) / 2.0);
+            * (shifted_row - (self.rows as f64 + 1.0) / 2.0);
 
         let w = self.tetrad.z + i_prime * self.tetrad.x + j_prime * self.tetrad.y;
         // Keep the paper-style notation w_squared = w·w. Its sign depends on the
