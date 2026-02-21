@@ -277,10 +277,7 @@ impl TemperatureComputer for KerrTemperatureComputer {
                     "For Disc config, use inner_radius >= {} ",
                     "(sqrt(r_isco^2 + a^2), a={})."
                 ),
-                radius,
-                self.r_isco,
-                min_cartesian_inner_radius,
-                self.a
+                radius, self.r_isco, min_cartesian_inner_radius, self.a
             );
             return Err(RaytracerError::BelowRISCO);
         }
