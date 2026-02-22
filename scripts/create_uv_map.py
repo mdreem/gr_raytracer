@@ -1,3 +1,4 @@
+#!/usr/bin/env -S uv run python
 from PIL import Image, ImageDraw, ImageFont
 import os
 

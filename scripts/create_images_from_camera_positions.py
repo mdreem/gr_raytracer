@@ -1,10 +1,10 @@
-#!/usr/bin/env python3
+#!/usr/bin/env -S uv run python
 import pandas as pd
 import subprocess
 
 WIDTH = 500
 HEIGHT = 500
-CONFIG_FILE = "schwarzschild.toml"
+CONFIG_FILE = "scene-definitions/schwarzschild.toml"
 POSITIONS_FILE = "camera_positions.csv"
 
 # takes a csv created using the script create_camera_trajectory.py

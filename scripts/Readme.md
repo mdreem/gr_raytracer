@@ -23,5 +23,6 @@ The manim animation expects a set of rays to animate in the `rays/` directory. Y
 `create_rays_positions.sh` or `create_rays_from_camera.sh` scripts.
 
 ```sh
-python -m manim scripts/animate-rays/main.py AnimateRays
+uv sync
+uv run manim scripts/animate-rays/main.py AnimateRays
 ```

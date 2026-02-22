@@ -50,6 +50,7 @@ model.
 ### Requirements
 
 - Rust toolchain (`cargo`)
+- `uv` for Python helper scripts (`brew install uv` on macOS)
 
 ### Build
 
@@ -87,7 +88,7 @@ This repository includes helper scripts for ray export and animation (Manim-base
 ### Plot/animate rays
 
 ```sh
-python -m manim scripts/animate-rays/main.py AnimateRays
+uv run manim scripts/animate-rays/main.py AnimateRays
 ```
 
 This command renders an animation from CSV ray data in `rays/`.

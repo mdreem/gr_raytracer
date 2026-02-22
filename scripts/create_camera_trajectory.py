@@ -1,4 +1,4 @@
-#!/usr/bin/env python3
+#!/usr/bin/env -S uv run python
 import numpy as np
 from scipy.interpolate import make_splprep
 import pandas as pd

@@ -1,4 +1,4 @@
-#!/usr/bin/env python3
+#!/usr/bin/env -S uv run python
 import os
 import sys
 import numpy as np
@@ -67,7 +67,7 @@ def plot_trajectories(trajectories, disk_radius):
 # Main execution
 if __name__ == "__main__":
     if len(sys.argv) < 2:
-        print("Usage: python script.py file1.csv file2.csv ...")
+        print("Usage: uv run python script.py file1.csv file2.csv ...")
         sys.exit(1)
 
     file_paths = sys.argv[1:]
