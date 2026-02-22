@@ -34,6 +34,8 @@ impl<'a, G: Geometry> RedshiftComputer<'a, G> {
     }
 
     fn to_physical_energy(&self, inner_product_energy: f64) -> f64 {
-        self.geometry.signature()[0] * inner_product_energy
+        let energy = self.geometry.signature()[0] * inner_product_energy;
+        debug_assert!(energy.is_finite());
+        energy
     }
 }
