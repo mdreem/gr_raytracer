@@ -1,3 +1,5 @@
+use crate::cli::cli::GlobalOpts;
+use crate::configuration::RenderConfig;
 use crate::geometry::four_vector::FourVector;
 use crate::geometry::point::{CoordinateSystem, Point};
 use crate::geometry::tetrad::Tetrad;
@@ -7,6 +9,7 @@ use crate::rendering::runge_kutta::OdeFunction;
 use crate::rendering::scene::EquationOfMotionState;
 use crate::rendering::temperature::TemperatureComputer;
 use nalgebra::{Const, Matrix4};
+use std::io::Write;
 
 pub trait GeodesicSolver: OdeFunction<Const<8>> + HasCoordinateSystem {
     fn geodesic(&self, t: f64, y: &EquationOfMotionState) -> EquationOfMotionState;
@@ -86,4 +89,36 @@ pub trait Geometry:
     #[allow(dead_code)]
     fn get_constants_of_motion(&self, position: &Point, momentum: &FourVector)
     -> ConstantsOfMotion;
+}
+
+pub trait RenderableGeometry: Geometry {
+    fn render(
+        &self,
+        opts: GlobalOpts,
+        config: RenderConfig,
+        camera_position: Point,
+        filename: String,
+        from_row: Option<u32>,
+        from_col: Option<u32>,
+        to_row: Option<u32>,
+        to_col: Option<u32>,
+    ) -> Result<(), RaytracerError>;
+
+    fn render_ray(
+        &self,
+        row: i64,
+        col: i64,
+        opts: GlobalOpts,
+        config: RenderConfig,
+        camera_position: Point,
+        write: &mut dyn Write,
+    ) -> Result<(), RaytracerError>;
+
+    fn render_ray_at(
+        &self,
+        position: Point,
+        direction: FourVector,
+        opts: GlobalOpts,
+        write: &mut dyn Write,
+    ) -> Result<(), RaytracerError>;
 }

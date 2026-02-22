@@ -110,12 +110,7 @@ impl<G: Geometry> Integrator<'_, G> {
 
             let x = Point::new(y[0], y[1], y[2], y[3], self.geometry.coordinate_system());
             let p = geodesic_solver.momentum_from_state(&y);
-            result.push(Step {
-                x,
-                p,
-                t,
-                step: i,
-            });
+            result.push(Step { x, p, t, step: i });
 
             #[cfg(debug_assertions)]
             {

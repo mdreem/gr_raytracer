@@ -60,7 +60,7 @@ cargo build --release
 ### Render a First Image
 
 ```sh
-cargo run --release -- --width=1500 --height=1500 --camera-position=10.0,0.0,0.8 --config-file scene-definitions/schwarzschild.toml render --filename=render.png
+cargo run --release -- --width=1500 --height=1500 --camera-position=-16.0,0.0,3.5 --theta=-3.142 --psi=0.0 --phi=0.0 --config-file scene-definitions/schwarzschild.toml render --filename=render.png
 ```
 
 - `--width` and `--height`: output resolution.

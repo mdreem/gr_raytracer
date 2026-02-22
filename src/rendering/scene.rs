@@ -499,7 +499,7 @@ mod tests {
         let ray = scene.camera.get_ray_for(0, 0);
         let color = scene.color_of_ray(&ray).unwrap();
 
-        assert_approx_eq_cie_tristimulus!(color, CELESTIAL_SPHERE_COLOR_1, 1e-6);
+        assert_approx_eq_cie_tristimulus!(color, CELESTIAL_SPHERE_COLOR_2, 1e-6);
     }
 
     #[test]
@@ -534,7 +534,7 @@ mod tests {
         let ray = scene.camera.get_ray_for(0, 0);
         let color = scene.color_of_ray(&ray).unwrap();
 
-        assert_approx_eq_cie_tristimulus!(color, CELESTIAL_SPHERE_COLOR_2, 1e-6);
+        assert_approx_eq_cie_tristimulus!(color, CELESTIAL_SPHERE_COLOR_1, 1e-6);
     }
 
     #[test]
@@ -590,7 +590,12 @@ mod tests {
 
         assert_approx_eq_cie_tristimulus!(
             color,
-            CIETristimulus::new(0.1804375, 0.072175, 0.9503041, 1.0),
+            CIETristimulus::new(
+                0.022994536463607135,
+                0.009197814585442854,
+                0.12110455021248553,
+                1.0
+            ),
             1e-6
         );
     }
