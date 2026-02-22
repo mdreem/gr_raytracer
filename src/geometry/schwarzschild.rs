@@ -586,12 +586,9 @@ mod tests {
         let ray_a = scene.camera.get_ray_for(5, 10);
         let ray_b = scene.camera.get_ray_for(0, 5);
 
-        println!("ray_a: {:?}", ray_a);
-        println!("ray_b: {:?}", ray_b);
-
         // ensure rays are rotated by 90 degrees.
         assert_abs_diff_eq!(ray_a.momentum.vector[2], ray_b.momentum.vector[3]);
-        assert_abs_diff_eq!(ray_a.momentum.vector[3], -ray_b.momentum.vector[2]);
+        assert_abs_diff_eq!(ray_a.momentum.vector[3], ray_b.momentum.vector[2]);
 
         let (trajectory_a, _) = scene
             .integrator
@@ -615,7 +612,7 @@ mod tests {
                     .get_spatial_vector_cartesian();
 
             assert_abs_diff_eq!(step_a_cartesian[0], step_b_cartesian[0], epsilon = 1e-5);
-            assert_abs_diff_eq!(step_a_cartesian[1], step_b_cartesian[2], epsilon = 1e-5);
+            assert_abs_diff_eq!(step_a_cartesian[1], -step_b_cartesian[2], epsilon = 1e-5);
             assert_abs_diff_eq!(step_a_cartesian[2], -step_b_cartesian[1], epsilon = 1e-5);
         }
     }

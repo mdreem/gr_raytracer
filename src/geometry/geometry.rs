@@ -1,4 +1,5 @@
-use std::io::Write;
+use crate::cli::cli::GlobalOpts;
+use crate::configuration::RenderConfig;
 use crate::geometry::four_vector::FourVector;
 use crate::geometry::point::{CoordinateSystem, Point};
 use crate::geometry::tetrad::Tetrad;
@@ -8,8 +9,7 @@ use crate::rendering::runge_kutta::OdeFunction;
 use crate::rendering::scene::EquationOfMotionState;
 use crate::rendering::temperature::TemperatureComputer;
 use nalgebra::{Const, Matrix4};
-use crate::cli::cli::GlobalOpts;
-use crate::configuration::RenderConfig;
+use std::io::Write;
 
 pub trait GeodesicSolver: OdeFunction<Const<8>> + HasCoordinateSystem {
     fn geodesic(&self, t: f64, y: &EquationOfMotionState) -> EquationOfMotionState;

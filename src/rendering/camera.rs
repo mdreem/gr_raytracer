@@ -1,9 +1,10 @@
 use crate::geometry::four_vector::FourVector;
 use crate::geometry::geometry::Geometry;
-use crate::geometry::point::Point;
+use crate::geometry::point::{CoordinateSystem, Point};
 use crate::geometry::tetrad::{Tetrad, TetradValidator};
 use crate::rendering::ray::Ray;
 use log::{debug, trace};
+use nalgebra::Vector3;
 
 #[derive(Debug, PartialEq, thiserror::Error)]
 pub enum CameraError {
@@ -20,6 +21,7 @@ pub struct Camera {
     pub velocity: FourVector,
     tetrad: Tetrad,
     spatial_signature: f64,
+    spatial_handedness: f64,
 }
 
 pub fn lorentz_transform_tetrad<G: Geometry>(
@@ -78,6 +80,53 @@ fn rotate(v1: FourVector, v2: FourVector, angle: f64) -> (FourVector, FourVector
     (v1_rotated, v2_rotated)
 }
 
+fn spatial_basis_vector_cartesian(position: &Point, vector: &FourVector) -> Vector3<f64> {
+    match vector.coordinate_system {
+        CoordinateSystem::Cartesian => Vector3::new(vector[1], vector[2], vector[3]),
+        CoordinateSystem::Spherical => {
+            let spherical_position = position.get_as_spherical();
+            let r = spherical_position[0];
+            let theta = spherical_position[1];
+            let phi = spherical_position[2];
+
+            let dr = vector[1];
+            let dtheta = vector[2];
+            let dphi = vector[3];
+
+            let sin_theta = theta.sin();
+            let cos_theta = theta.cos();
+            let sin_phi = phi.sin();
+            let cos_phi = phi.cos();
+
+            // Contravariant spherical spatial components transformed to Cartesian.
+            Vector3::new(
+                sin_theta * cos_phi * dr + r * cos_theta * cos_phi * dtheta
+                    - r * sin_theta * sin_phi * dphi,
+                sin_theta * sin_phi * dr
+                    + r * cos_theta * sin_phi * dtheta
+                    + r * sin_theta * cos_phi * dphi,
+                cos_theta * dr - r * sin_theta * dtheta,
+            )
+        }
+    }
+}
+
+fn spatial_handedness(position: &Point, tetrad: &Tetrad) -> f64 {
+    let x = spatial_basis_vector_cartesian(position, &tetrad.x);
+    let y = spatial_basis_vector_cartesian(position, &tetrad.y);
+    let z = spatial_basis_vector_cartesian(position, &tetrad.z);
+
+    let triple_product = x.dot(&y.cross(&z));
+    if !triple_product.is_finite() || triple_product.abs() <= 1e-12 {
+        return match tetrad.x.coordinate_system {
+            // Spherical tetrads in this codebase use a left-handed spatial convention.
+            CoordinateSystem::Spherical => -1.0,
+            CoordinateSystem::Cartesian => 1.0,
+        };
+    }
+    if triple_product >= 0.0 { 1.0 } else { -1.0 }
+}
+
 impl Camera {
     pub fn new<G: Geometry>(
         position: Point,
@@ -105,6 +154,7 @@ impl Camera {
         let tetrad = lorentz_transform_tetrad(geometry, &rotated_tetrad, &position, &velocity);
         debug!("lorentz transformed tetrad: {}", tetrad);
         tetrad_validator.validate(&tetrad)?;
+        let spatial_handedness = spatial_handedness(&position, &tetrad);
 
         let signature = geometry.signature();
         debug_assert!(
@@ -121,6 +171,7 @@ impl Camera {
             columns,
             tetrad,
             spatial_signature: signature[3],
+            spatial_handedness,
         })
     }
 
@@ -146,7 +197,8 @@ impl Camera {
         let tan_half_alpha = f64::tan(self.alpha / 2.0);
         // To ensure square pixels, we use the same angular scale for both directions.
         // alpha is treated as the vertical field of view (FOV).
-        let i_prime = (2.0 * tan_half_alpha / (self.rows as f64))
+        let i_prime = self.spatial_handedness
+            * (2.0 * tan_half_alpha / (self.rows as f64))
             * (shifted_column - (self.columns as f64 + 1.0) / 2.0);
         let j_prime = (2.0 * tan_half_alpha / (self.rows as f64))
             * (shifted_row - (self.rows as f64 + 1.0) / 2.0);
@@ -162,7 +214,8 @@ impl Camera {
     pub fn get_ray_for(&self, row: i64, column: i64) -> Ray {
         let direction = self.get_direction_for(row, column);
         trace!("direction ({}|{}): {:?}", row, column, direction);
-        let momentum = direction + self.tetrad.t; // Add T-component of the tetrad to get the momentum.
+        // Build a future-directed null ray in the local tetrad frame.
+        let momentum = direction + self.tetrad.t;
         Ray::new(row, column, self.position, momentum)
     }
 }
@@ -172,7 +225,8 @@ mod tests {
     use crate::geometry::euclidean::EuclideanSpace;
     use crate::geometry::euclidean_spherical::EuclideanSpaceSpherical;
     use crate::geometry::four_vector::FourVector;
-    use crate::geometry::geometry::InnerProduct;
+    use crate::geometry::geometry::{InnerProduct, Signature};
+    use crate::geometry::kerr::Kerr;
     use crate::geometry::point::{CoordinateSystem, Point};
     use crate::geometry::schwarzschild::Schwarzschild;
     use crate::geometry::spherical_coordinates_helper::{
@@ -209,7 +263,7 @@ mod tests {
         let corner_z = 0.24610591900311507;
         assert_abs_diff_eq!(
             top_left_corner.get_as_vector(),
-            FourVector::new_cartesian(0.0, corner_z, corner, corner).get_as_vector()
+            FourVector::new_cartesian(0.0, corner_z, -corner, corner).get_as_vector()
         );
         let top_left_corner_scalar =
             geometry.inner_product(&position, &top_left_corner, &top_left_corner);
@@ -217,7 +271,7 @@ mod tests {
 
         assert_abs_diff_eq!(
             top_right_corner.get_as_vector(),
-            FourVector::new_cartesian(0.0, corner_z, -corner, corner).get_as_vector()
+            FourVector::new_cartesian(0.0, corner_z, corner, corner).get_as_vector()
         );
         let top_right_corner_scalar =
             geometry.inner_product(&position, &top_right_corner, &top_right_corner);
@@ -232,7 +286,7 @@ mod tests {
 
         assert_abs_diff_eq!(
             bottom_left_corner.get_as_vector(),
-            FourVector::new_cartesian(0.0, corner_z, corner, -corner).get_as_vector()
+            FourVector::new_cartesian(0.0, corner_z, -corner, -corner).get_as_vector()
         );
         let bottom_left_corner_scalar =
             geometry.inner_product(&position, &bottom_left_corner, &bottom_left_corner);
@@ -240,7 +294,7 @@ mod tests {
 
         assert_abs_diff_eq!(
             bottom_right_corner.get_as_vector(),
-            FourVector::new_cartesian(0.0, corner_z, -corner, -corner).get_as_vector()
+            FourVector::new_cartesian(0.0, corner_z, corner, -corner).get_as_vector()
         );
         let bottom_right_corner_scalar =
             geometry.inner_product(&position, &bottom_right_corner, &bottom_right_corner);
@@ -338,5 +392,53 @@ mod tests {
                 );
             }
         }
+    }
+
+    #[test]
+    fn test_camera_ray_is_future_directed_for_plus_minus_minus_minus_signature() {
+        let position = cartesian_to_spherical(&Point::new_cartesian(0.0, 10.0, 0.0, 0.0));
+        let geometry = Schwarzschild::new(0.0, 0.0);
+        let velocity = FourVector::new_spherical(1.0, 0.0, 0.0, 0.0);
+        let camera = Camera::new(
+            position,
+            velocity,
+            PI / 2.0,
+            11,
+            11,
+            0.0,
+            0.0,
+            0.0,
+            &geometry,
+        )
+        .unwrap();
+
+        let ray = camera.get_ray_for(5, 5);
+        let orientation = geometry.signature()[0]
+            * geometry.inner_product(&ray.position, &camera.velocity, &ray.momentum);
+        assert!(orientation > 0.0);
+    }
+
+    #[test]
+    fn test_camera_ray_is_future_directed_for_minus_plus_plus_plus_signature() {
+        let position = Point::new_cartesian(0.0, 10.0, 0.0, 0.0);
+        let geometry = Kerr::new(0.0, 0.0, 0.0);
+        let velocity = FourVector::new_cartesian(1.0, 0.0, 0.0, 0.0);
+        let camera = Camera::new(
+            position,
+            velocity,
+            PI / 2.0,
+            11,
+            11,
+            0.0,
+            0.0,
+            0.0,
+            &geometry,
+        )
+        .unwrap();
+
+        let ray = camera.get_ray_for(5, 5);
+        let orientation = geometry.signature()[0]
+            * geometry.inner_product(&ray.position, &camera.velocity, &ray.momentum);
+        assert!(orientation > 0.0);
     }
 }

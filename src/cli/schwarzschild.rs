@@ -1,5 +1,5 @@
 use crate::cli::cli::GlobalOpts;
-use crate::cli::shared::{create_scene, integrate_and_save_ray, render};
+use crate::cli::shared::{assert_future_directed, create_scene, integrate_and_save_ray, render};
 use crate::configuration::RenderConfig;
 use crate::geometry::four_vector::FourVector;
 use crate::geometry::geometry::{Geometry, RenderableGeometry};
@@ -21,8 +21,20 @@ fn create_scene_internal<'a>(
     let camera_position_spherical = cartesian_to_spherical(&camera_position);
     let r = camera_position_spherical[1];
     let a = 1.0 - geometry.radius / r;
-    let momentum = FourVector::new_spherical(-1.0 / a.sqrt(), 0.0, 0.0, 0.0);
-    create_scene(geometry, camera_position_spherical, momentum, opts, config.clone())
+    let momentum = FourVector::new_spherical(1.0 / a.sqrt(), 0.0, 0.0, 0.0);
+    assert_future_directed(
+        "Schwarzschild camera four-velocity",
+        geometry,
+        &camera_position_spherical,
+        &momentum,
+    )?;
+    create_scene(
+        geometry,
+        camera_position_spherical,
+        momentum,
+        opts,
+        config.clone(),
+    )
 }
 
 impl RenderableGeometry for Schwarzschild {
@@ -82,14 +94,22 @@ impl RenderableGeometry for Schwarzschild {
         let r_d = theta.sin() * phi.cos() * direction[1]
             + theta.sin() * phi.sin() * direction[2]
             + theta.cos() * direction[3];
-        let theta_d = theta.cos() * phi.cos() * direction[1] + theta.cos() * phi.sin() * direction[2]
+        let theta_d = theta.cos() * phi.cos() * direction[1]
+            + theta.cos() * phi.sin() * direction[2]
             - theta.sin() * direction[3];
         let phi_d = -phi.sin() * direction[1] + phi.cos() * direction[2];
 
         let tetrad = self.get_tetrad_at(&position_spherical);
         info!("Tetrad at position {:?}: {}", position_spherical, tetrad);
 
-        let momentum = tetrad.t * 1.0 + tetrad.x * (phi_d) + tetrad.y * (-theta_d) + tetrad.z * (-r_d);
+        let momentum =
+            tetrad.t * 1.0 + tetrad.x * (phi_d) + tetrad.y * (-theta_d) + tetrad.z * (-r_d);
+        assert_future_directed(
+            "Schwarzschild render_ray_at momentum",
+            self,
+            &position_spherical,
+            &momentum,
+        )?;
 
         integrate_and_save_ray(self, position_spherical, momentum, opts, write)
     }

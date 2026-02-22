@@ -91,8 +91,8 @@ fn run() -> Result<(), RaytracerError> {
                 args.global_opts.camera_position[2],
             );
 
-            let mut file = File::create(filename.clone()).unwrap();
-            
+            let mut file = File::create(filename.clone()).map_err(RaytracerError::IoError)?;
+
             config.geometry_type.get_renderable_geometry().render_ray(
                 row,
                 col,
@@ -120,19 +120,21 @@ fn run() -> Result<(), RaytracerError> {
                     direction
                 )));
             }
-            let mut file =
-                File::create(filename.clone()).map_err(RaytracerError::ConfigurationFileError)?;
+            let mut file = File::create(filename.clone()).map_err(RaytracerError::IoError)?;
             let config_file = fs::read_to_string(args.config_file)
                 .map_err(RaytracerError::ConfigurationFileError)?;
             let config: RenderConfig =
                 toml::from_str(config_file.as_str()).map_err(RaytracerError::TomlError)?;
 
-            config.geometry_type.get_renderable_geometry().render_ray_at(
-                Point::new_cartesian(0.0, position[0], position[1], position[2]),
-                FourVector::new_cartesian(0.0, direction[0], direction[1], direction[2]),
-                args.global_opts,
-                &mut file,
-            )?;
+            config
+                .geometry_type
+                .get_renderable_geometry()
+                .render_ray_at(
+                    Point::new_cartesian(0.0, position[0], position[1], position[2]),
+                    FourVector::new_cartesian(0.0, direction[0], direction[1], direction[2]),
+                    args.global_opts,
+                    &mut file,
+                )?;
             info!("Saved integrated ray to {}", filename);
         }
     }

@@ -20,6 +20,35 @@ use std::f64::consts::PI;
 use std::io::Write;
 use std::sync::Arc;
 
+fn assert_directed<G: Geometry>(
+    context: &str,
+    geometry: &G,
+    position: &Point,
+    four_vector: &FourVector,
+    expected_sign: f64,
+) -> Result<(), RaytracerError> {
+    let t = four_vector[0];
+    let tetrad_t = geometry.get_tetrad_at(position).t;
+    let orientation =
+        geometry.signature()[0] * geometry.inner_product(position, &tetrad_t, four_vector);
+    if !(t.is_finite() && expected_sign * orientation > 0.0) {
+        return Err(RaytracerError::InvalidConfiguration(format!(
+            "{} has wrong time orientation (orientation={} with t={}).",
+            context, orientation, t
+        )));
+    }
+    Ok(())
+}
+
+pub(crate) fn assert_future_directed<G: Geometry>(
+    context: &str,
+    geometry: &G,
+    position: &Point,
+    four_vector: &FourVector,
+) -> Result<(), RaytracerError> {
+    assert_directed(context, geometry, position, four_vector, 1.0)
+}
+
 pub fn render<G: Geometry>(
     scene: Scene<G>,
     filename: String,
@@ -54,7 +83,8 @@ pub fn integrate_and_save_ray<G: Geometry>(
         opts.step_size,
         opts.epsilon,
     );
-    let integrator = crate::rendering::integrator::Integrator::new(geometry, integration_configuration);
+    let integrator =
+        crate::rendering::integrator::Integrator::new(geometry, integration_configuration);
 
     let (integrated_ray, stop_reason) = integrator.integrate(&ray)?;
     log::info!("Stop reason: {:?}", stop_reason);
