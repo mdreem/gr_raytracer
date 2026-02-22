@@ -1,4 +1,5 @@
 #!/bin/bash
+# Create rays from a fixed camera position, varying the ray direction by changing the horizontal pixel coordinate.
 
 set -euo pipefail
 

@@ -7,7 +7,7 @@ command=${1:-"cargo run --release --"}
 mkdir -p kerr_images
 for i in $(seq 0 0.025 0.5); do
   echo "Creating kerr black hole with a=$i"
-  cp kerr.toml kerr_images/kerr_a_${i}.toml
+  cp scripts/resources/kerr.toml kerr_images/kerr_a_${i}.toml
   sed -i.bak "s/^a=.*/a=${i}/" kerr_images/kerr_a_${i}.toml
   echo "Rendering image for a=$i"
   FILE="kerr_images/kerr_a_${i}.png"
@@ -15,7 +15,7 @@ for i in $(seq 0 0.025 0.5); do
   if [ -f "$FILE" ]; then
     echo "$FILE exists, skipping rendering."
   else
-    $command --width=500 --height=500 --max-steps=1000000 --camera-position=-10,0,0.5 --theta=1.62 --psi=1.57 --phi=0 --config-file kerr_images/kerr_a_${i}.toml render --filename "$FILE"
+    $command --width=500 --height=500 --max-steps=1000000 --camera-position=-15,0,1.0 --theta=1.62 --psi=1.57 --phi=0 --config-file kerr_images/kerr_a_${i}.toml render --filename "$FILE"
   fi
   a_padded=$(printf "%01.3f\n" ${i})
   magick "$FILE" -gravity Northwest -pointsize 30 -annotate +20+20 "a = ${a_padded}" "$FILE_ANNOTATED"
