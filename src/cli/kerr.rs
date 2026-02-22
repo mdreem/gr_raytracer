@@ -1,5 +1,5 @@
 use crate::cli::cli::GlobalOpts;
-use crate::cli::shared::{create_scene, integrate_and_save_ray, render};
+use crate::cli::shared::{assert_future_directed, create_scene, integrate_and_save_ray, render};
 use crate::configuration::RenderConfig;
 use crate::geometry::four_vector::FourVector;
 use crate::geometry::geometry::{Geometry, InnerProduct, RenderableGeometry};
@@ -32,6 +32,12 @@ fn create_scene_internal<'a>(
 ) -> Result<Scene<'a, Kerr>, RaytracerError> {
     let f = compute_f(geometry, &camera_position);
     let momentum = FourVector::new_cartesian(1.0 / (1.0 - f).sqrt(), 0.0, 0.0, 0.0);
+    assert_future_directed(
+        "Kerr camera four-velocity",
+        geometry,
+        &camera_position,
+        &momentum,
+    )?;
     create_scene(geometry, camera_position, momentum, opts, config.clone())
 }
 
@@ -88,7 +94,8 @@ impl RenderableGeometry for Kerr {
         let tetrad = self.get_tetrad_at(&position);
         info!("Tetrad at position {:?}: {}", position, tetrad);
 
-        let space_part = tetrad.x * direction[1] + tetrad.y * direction[2] + tetrad.z * direction[3];
+        let space_part =
+            tetrad.x * direction[1] + tetrad.y * direction[2] + tetrad.z * direction[3];
         let norm_space_part = self
             .inner_product(&position, &space_part, &space_part)
             .sqrt();
@@ -97,6 +104,7 @@ impl RenderableGeometry for Kerr {
             + tetrad.x * direction[1] / norm_space_part
             + tetrad.y * direction[2] / norm_space_part
             + tetrad.z * direction[3] / norm_space_part;
+        assert_future_directed("Kerr render_ray_at momentum", self, &position, &momentum)?;
 
         integrate_and_save_ray(self, position, momentum, opts, write)
     }

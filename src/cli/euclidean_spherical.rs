@@ -1,15 +1,15 @@
 use crate::cli::cli::GlobalOpts;
-use crate::cli::shared::{create_scene, integrate_and_save_ray, render};
+use crate::cli::shared::{assert_future_directed, create_scene, integrate_and_save_ray, render};
 use crate::configuration::RenderConfig;
 use crate::geometry::euclidean_spherical::EuclideanSpaceSpherical;
 use crate::geometry::four_vector::FourVector;
+use crate::geometry::geometry::RenderableGeometry;
 use crate::geometry::point::Point;
 use crate::geometry::spherical_coordinates_helper::cartesian_to_spherical;
 use crate::rendering::raytracer;
+use crate::rendering::raytracer::RaytracerError;
 use log::debug;
 use std::io::Write;
-use crate::geometry::geometry::RenderableGeometry;
-use crate::rendering::raytracer::RaytracerError;
 
 impl RenderableGeometry for EuclideanSpaceSpherical {
     fn render(
@@ -25,6 +25,12 @@ impl RenderableGeometry for EuclideanSpaceSpherical {
     ) -> Result<(), RaytracerError> {
         let camera_position = cartesian_to_spherical(&camera_position);
         let momentum = FourVector::new_spherical(1.0, 0.0, 0.0, 0.0);
+        assert_future_directed(
+            "Euclidean-spherical camera four-velocity",
+            self,
+            &camera_position,
+            &momentum,
+        )?;
         let scene = create_scene(self, camera_position, momentum, opts, config.clone())?;
 
         render(
@@ -49,6 +55,12 @@ impl RenderableGeometry for EuclideanSpaceSpherical {
     ) -> Result<(), RaytracerError> {
         let camera_position = cartesian_to_spherical(&camera_position);
         let momentum = FourVector::new_spherical(1.0, 0.0, 0.0, 0.0);
+        assert_future_directed(
+            "Euclidean-spherical camera four-velocity",
+            self,
+            &camera_position,
+            &momentum,
+        )?;
 
         let scene = create_scene(self, camera_position, momentum, opts, config.clone())?;
         let raytracer = raytracer::Raytracer::new(scene, config.color_normalization);
@@ -65,7 +77,24 @@ impl RenderableGeometry for EuclideanSpaceSpherical {
         opts: GlobalOpts,
         write: &mut dyn Write,
     ) -> Result<(), RaytracerError> {
-        integrate_and_save_ray(self, position, direction, opts, write)
+        let spatial_norm = (direction[1] * direction[1]
+            + direction[2] * direction[2]
+            + direction[3] * direction[3])
+            .sqrt();
+        if !(spatial_norm.is_finite() && spatial_norm > 0.0) {
+            return Err(RaytracerError::InvalidConfiguration(
+                "render_ray_at direction must have a non-zero finite spatial part.".to_string(),
+            ));
+        }
+        let momentum =
+            FourVector::new_spherical(spatial_norm, direction[1], direction[2], direction[3]);
+        assert_future_directed(
+            "Euclidean-spherical render_ray_at momentum",
+            self,
+            &position,
+            &momentum,
+        )?;
+
+        integrate_and_save_ray(self, position, momentum, opts, write)
     }
 }
-
