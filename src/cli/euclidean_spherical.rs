@@ -4,7 +4,7 @@ use crate::configuration::RenderConfig;
 use crate::geometry::euclidean_spherical::EuclideanSpaceSpherical;
 use crate::geometry::four_vector::FourVector;
 use crate::geometry::geometry::RenderableGeometry;
-use crate::geometry::point::Point;
+use crate::geometry::point::{CoordinateSystem, Point};
 use crate::geometry::spherical_coordinates_helper::cartesian_to_spherical;
 use crate::rendering::raytracer;
 use crate::rendering::raytracer::RaytracerError;
@@ -77,6 +77,37 @@ impl RenderableGeometry for EuclideanSpaceSpherical {
         opts: GlobalOpts,
         write: &mut dyn Write,
     ) -> Result<(), RaytracerError> {
+        if direction.coordinate_system != CoordinateSystem::Cartesian {
+            return Err(RaytracerError::InvalidConfiguration(
+                "Euclidean-spherical render_ray_at expects a Cartesian direction vector."
+                    .to_string(),
+            ));
+        }
+        let position_spherical = match position.coordinate_system {
+            CoordinateSystem::Cartesian => cartesian_to_spherical(&position),
+            CoordinateSystem::Spherical => position,
+        };
+
+        let r = position_spherical[1];
+        let theta = position_spherical[2];
+        let phi = position_spherical[3];
+        if !(r.is_finite() && r > 0.0) {
+            return Err(RaytracerError::InvalidConfiguration(format!(
+                "Euclidean-spherical render_ray_at requires r > 0, got r={}.",
+                r
+            )));
+        }
+        let sin_theta = theta.sin();
+        if !(sin_theta.is_finite() && sin_theta.abs() > 1e-12) {
+            return Err(RaytracerError::InvalidConfiguration(format!(
+                "Euclidean-spherical render_ray_at is undefined on the polar axis (theta={}).",
+                theta
+            )));
+        }
+
+        let dx = direction[1];
+        let dy = direction[2];
+        let dz = direction[3];
         let spatial_norm = (direction[1] * direction[1]
             + direction[2] * direction[2]
             + direction[3] * direction[3])
@@ -86,15 +117,23 @@ impl RenderableGeometry for EuclideanSpaceSpherical {
                 "render_ray_at direction must have a non-zero finite spatial part.".to_string(),
             ));
         }
-        let momentum =
-            FourVector::new_spherical(spatial_norm, direction[1], direction[2], direction[3]);
+
+        // Convert Cartesian spatial direction into spherical coordinate components.
+        let r_dot = sin_theta * phi.cos() * dx + sin_theta * phi.sin() * dy + theta.cos() * dz;
+        let theta_unit_dot =
+            theta.cos() * phi.cos() * dx + theta.cos() * phi.sin() * dy - sin_theta * dz;
+        let phi_unit_dot = -phi.sin() * dx + phi.cos() * dy;
+        let theta_dot = theta_unit_dot / r;
+        let phi_dot = phi_unit_dot / (r * sin_theta);
+
+        let momentum = FourVector::new_spherical(spatial_norm, r_dot, theta_dot, phi_dot);
         assert_future_directed(
             "Euclidean-spherical render_ray_at momentum",
             self,
-            &position,
+            &position_spherical,
             &momentum,
         )?;
 
-        integrate_and_save_ray(self, position, momentum, opts, write)
+        integrate_and_save_ray(self, position_spherical, momentum, opts, write)
     }
 }
