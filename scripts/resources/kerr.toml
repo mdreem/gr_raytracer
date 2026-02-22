@@ -1,0 +1,23 @@
+color_normalization = "EqualLuminance"
+celestial_temperature = 0.0
+
+[celestial_texture.Bitmap]
+beaming_exponent = 3.0
+path = "resources/cyan.png"
+color_normalization = "NoNormalization"
+
+[geometry_type.Kerr]
+radius = 1.0
+a=0.0
+horizon_epsilon = 1e-4
+
+[[objects]]
+
+[objects.Disc]
+inner_radius = 3.0
+outer_radius = 8.0
+temperature = 2500.0
+
+[objects.Disc.texture.BlackBody]
+beaming_exponent = 3.0
+color_normalization = "NoNormalization"
