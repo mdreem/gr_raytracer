@@ -5,7 +5,7 @@ set -euo pipefail
 command=${1:-"cargo run --release --"}
 
 mkdir -p kerr_images
-for i in $(seq 0 0.025 0.5); do
+for i in $(seq 0 0.010 0.5); do
   a_value=$(printf "%01.3f" ${i})
   if [[ "$a_value" == "0.500" ]]; then
     a_value="0.499"
@@ -24,7 +24,7 @@ for i in $(seq 0 0.025 0.5); do
   magick "$FILE" -gravity Northwest -pointsize 30 -annotate +20+20 "a = ${a_value}" "$FILE_ANNOTATED"
 done
 
-for i in $(seq 0 0.025 0.5); do
+for i in $(seq 0 0.010 0.5); do
   a_value=$(printf "%01.3f" ${i})
   if [[ "$a_value" == "0.500" ]]; then
     a_value="0.499"
