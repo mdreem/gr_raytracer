@@ -1,3 +1,4 @@
+#!/usr/bin/env -S uv run python
 from manim import *
 import pandas as pd
 from scipy.interpolate import interp1d
