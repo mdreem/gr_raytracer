@@ -158,7 +158,7 @@ gr_raytracer --width=501 --height=501 --max-steps=1000000 --camera-position=-5,0
 Animation of a Kerr black hole with `r_s = 1.0` and spin parameter `a` increasing from `0.0` to `0.5`.
 
 <p align="center">
-  <img src="./images/kerr_animation.gif" alt="Animation of Kerr black hole as spin parameter increases from 0 to 0.5" title="Kerr black hole animation with increasing spin">
+  <img src="./images/kerr_animation_grid.gif" alt="Animation of Kerr black hole as spin parameter increases from 0 to 0.5" title="Kerr black hole animation with increasing spin">
 </p>
 
 ## References
