@@ -16,8 +16,14 @@ target/
 #  option (not recommended) you can uncomment the following to ignore the entire idea folder.
 .idea/
 
+*.jpg
 *.png
 *.webp
+*.gif
 
 # use by manim
 media/
+kerr_images/
+extra_resources/
+rays/
+
