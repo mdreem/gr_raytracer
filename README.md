@@ -50,6 +50,7 @@ model.
 ### Requirements
 
 - Rust toolchain (`cargo`)
+- `uv` for Python helper scripts (`brew install uv` on macOS)
 
 ### Build
 
@@ -75,22 +76,24 @@ You can swap geometry, textures, and objects by choosing or editing a scene file
 
 ## Scripts
 
-This repository includes helper scripts for ray export and animation (Manim-based).
+This repository includes helper scripts for rendering workflows, ray export, plotting, and animation.
 
 ### Create rays
 
-- `scripts/create_rays_positions.sh`: Generates rays in Schwarzschild spacetime from a position and direction, then
+- `scripts/rays/create_rays_positions.sh`: Generates rays in Schwarzschild spacetime from a position and direction, then
   writes CSV files to `rays/`.
-- `scripts/create_rays_from_camera.sh`: Generates Schwarzschild rays starting from a camera and selected pixel, then
+- `scripts/rays/create_rays_from_camera.sh`: Generates Schwarzschild rays starting from a camera and selected pixel, then
   writes CSV files to `rays/`.
 
 ### Plot/animate rays
 
 ```sh
-python -m manim scripts/animate-rays/main.py AnimateRays
+uv run manim scripts/animate-rays/main.py AnimateRays
 ```
 
 This command renders an animation from CSV ray data in `rays/`.
+
+For the full script catalog and grouped layout, see [`scripts/Readme.md`](./scripts/Readme.md).
 
 ## Examples
 
@@ -157,7 +160,7 @@ gr_raytracer --width=501 --height=501 --max-steps=1000000 --camera-position=-5,0
 Animation of a Kerr black hole with `r_s = 1.0` and spin parameter `a` increasing from `0.0` to `0.5`.
 
 <p align="center">
-  <img src="./images/kerr_animation.gif" alt="Animation of Kerr black hole as spin parameter increases from 0 to 0.5" title="Kerr black hole animation with increasing spin">
+  <img src="./images/kerr_animation_grid.gif" alt="Animation of Kerr black hole as spin parameter increases from 0 to 0.5" title="Kerr black hole animation with increasing spin">
 </p>
 
 ## References
