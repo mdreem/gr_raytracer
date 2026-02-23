@@ -35,10 +35,11 @@ jobs:
       - name: Create release bundle (Unix)
         if: runner.os != 'Windows'
         shell: bash
+        env:
+          VERSION: ${{ github.event.release.tag_name }}
         run: |
           set -euo pipefail
 
-          VERSION="${GITHUB_REF_NAME}"
           TARGET="${{ matrix.target }}"
           BUNDLE_DIR="gr_raytracer-${VERSION}-${TARGET}"
           BUNDLE_ARCHIVE="${BUNDLE_DIR}.tar.gz"
@@ -55,10 +56,11 @@ jobs:
       - name: Create release bundle (Windows)
         if: runner.os == 'Windows'
         shell: pwsh
+        env:
+          VERSION: ${{ github.event.release.tag_name }}
         run: |
-          $Version = $env:GITHUB_REF_NAME
           $Target = "${{ matrix.target }}"
-          $BundleDir = "gr_raytracer-$Version-$Target"
+          $BundleDir = "gr_raytracer-$env:VERSION-$Target"
           $BundleArchive = "$BundleDir.zip"
 
           New-Item -ItemType Directory -Path $BundleDir -Force | Out-Null
@@ -74,6 +76,7 @@ jobs:
       - name: Upload release bundle
         uses: softprops/action-gh-release@v2 # TODO: pin to a full commit SHA.
         with:
+          tag_name: ${{ github.event.release.tag_name }}
           files: ${{ env.BUNDLE_ARCHIVE }}
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
