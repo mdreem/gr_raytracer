@@ -4,7 +4,7 @@
 //! in Boyer-Lindquist coordinates (t, r, θ, φ) and exploits the Carter constant to decouple
 //! the r and θ equations of motion.
 
-use nalgebra::Matrix4;
+use nalgebra::{Const, Matrix4, OVector};
 
 use crate::geometry::geometry::{
     ConstantsOfMotion, GeodesicSolver, Geometry, HasCoordinateSystem, InnerProduct, Signature,
@@ -15,6 +15,8 @@ use crate::geometry::point::{CoordinateSystem, Point};
 use crate::geometry::tetrad::Tetrad;
 use crate::rendering::ray::Ray;
 use crate::rendering::raytracer::RaytracerError;
+use crate::rendering::runge_kutta::OdeFunction;
+use crate::rendering::scene::EquationOfMotionState;
 use crate::rendering::temperature::{KerrTemperatureComputer, TemperatureComputer};
 
 fn sigma(r: f64, a: f64, theta: f64) -> f64 {
@@ -23,6 +25,92 @@ fn sigma(r: f64, a: f64, theta: f64) -> f64 {
 
 fn delta(r: f64, r_s: f64, a: f64) -> f64 {
     r * r - r_s * r + a * a
+}
+
+/// R(r) = [(r² + a²)E - aL_z]² - Δ[(L_z - aE)² + Q]
+fn potential_r(r: f64, r_s: f64, a: f64, e: f64, l_z: f64, q: f64) -> f64 {
+    let del = delta(r, r_s, a);
+    let p_r = (r * r + a * a) * e - a * l_z;
+    p_r * p_r - del * ((l_z - a * e).powi(2) + q)
+}
+
+/// R'(r) = 4rE[(r² + a²)E - aL_z] - (2r - r_s)[(L_z - aE)² + Q]
+fn potential_r_derivative(r: f64, r_s: f64, a: f64, e: f64, l_z: f64, q: f64) -> f64 {
+    let p_r = (r * r + a * a) * e - a * l_z;
+    let carter_term = (l_z - a * e).powi(2) + q;
+    4.0 * r * e * p_r - (2.0 * r - r_s) * carter_term
+}
+
+/// Θ(θ) = Q + a²E²cos²θ - L_z²cos²θ/sin²θ
+fn potential_theta(theta: f64, a: f64, e: f64, l_z: f64, q: f64) -> f64 {
+    let cos_t = theta.cos();
+    let sin_t = theta.sin();
+    q + a * a * e * e * cos_t * cos_t - l_z * l_z * cos_t * cos_t / (sin_t * sin_t)
+}
+
+/// Θ'(θ) = -2a²E²cosθsinθ + 2L_z²cosθ/sin³θ
+fn potential_theta_derivative(theta: f64, a: f64, e: f64, l_z: f64, q: f64) -> f64 {
+    let cos_t = theta.cos();
+    let sin_t = theta.sin();
+    -2.0 * a * a * e * e * cos_t * sin_t + 2.0 * l_z * l_z * cos_t / (sin_t.powi(3))
+}
+
+struct KerrBLSolver {
+    radius: f64,
+    a: f64,
+    e: f64,
+    l_z: f64,
+    q: f64,
+}
+
+impl HasCoordinateSystem for KerrBLSolver {
+    fn coordinate_system(&self) -> CoordinateSystem {
+        CoordinateSystem::BoyerLindquist { a: self.a }
+    }
+}
+
+impl OdeFunction<Const<8>> for KerrBLSolver {
+    fn apply(&self, t: f64, y: &OVector<f64, Const<8>>) -> OVector<f64, Const<8>> {
+        self.geodesic(t, y)
+    }
+}
+
+impl GeodesicSolver for KerrBLSolver {
+    fn geodesic(&self, _t: f64, y: &EquationOfMotionState) -> EquationOfMotionState {
+        let r = y[1];
+        let theta = y[2];
+        let v_r = y[4];
+        let v_theta = y[5];
+
+        let del = delta(r, self.radius, self.a);
+        let p_r = (r * r + self.a * self.a) * self.e - self.a * self.l_z;
+
+        // dt/dλ = (r²+a²)/Δ * P_r + a(L_z - aE sin²θ)
+        let sin_t = theta.sin();
+        let sin2 = sin_t * sin_t;
+        let dt = (r * r + self.a * self.a) / del * p_r + self.a * (self.l_z - self.a * self.e * sin2);
+
+        // dφ/dλ = a/Δ * P_r + L_z/sin²θ - aE
+        let dphi = self.a / del * p_r + self.l_z / sin2 - self.a * self.e;
+
+        // d²r/dλ² = R'(r)/2
+        let dv_r = potential_r_derivative(r, self.radius, self.a, self.e, self.l_z, self.q) / 2.0;
+
+        // d²θ/dλ² = Θ'(θ)/2
+        let dv_theta = potential_theta_derivative(theta, self.a, self.e, self.l_z, self.q) / 2.0;
+
+        EquationOfMotionState::from_column_slice(&[dt, v_r, v_theta, dphi, dv_r, dv_theta, 0.0, 0.0])
+    }
+
+    fn create_initial_state(&self, _ray: &Ray) -> EquationOfMotionState {
+        // Will be implemented in Task 5
+        todo!()
+    }
+
+    fn momentum_from_state(&self, _y: &EquationOfMotionState) -> FourVector {
+        // Will be implemented in Task 5
+        todo!()
+    }
 }
 
 /// Covariant BL Kerr metric g_μν. Signature (−,+,+,+).
@@ -298,5 +386,79 @@ mod tests {
         let kerr = KerrBL::new(1.0, 0.5, 1e-4);
         let position = Point::new(0.0, 7.5, 1.2, 0.8, CoordinateSystem::BoyerLindquist { a: 0.5 });
         assert_abs_diff_eq!(kerr.get_radial_coordinate(&position), 7.5);
+    }
+
+    #[test]
+    fn test_potential_r_non_negative_allowed_region() {
+        // R(r) must be non-negative for physically allowed radial motion
+        let r_s = 1.0;
+        let a = 0.5;
+        let r = 5.0;
+        let _theta = std::f64::consts::FRAC_PI_2;
+        let e = 1.0;
+        let l_z = 3.0;
+        // Q for equatorial orbit (theta=PI/2, p_theta=0): Q = 0
+        let q = 0.0;
+
+        let r_potential = potential_r(r, r_s, a, e, l_z, q);
+        assert!(r_potential >= 0.0, "R(r) must be non-negative for allowed motion");
+    }
+
+    #[test]
+    fn test_potential_derivatives_numerical() {
+        // Compare analytical derivatives against numerical finite differences
+        let r_s = 1.0;
+        let a = 0.5;
+        let e = 1.0;
+        let l_z = 3.0;
+        let q = 1.0;
+        let r = 5.0;
+        let h = 1e-7;
+
+        let dr_analytical = potential_r_derivative(r, r_s, a, e, l_z, q);
+        let dr_numerical = (potential_r(r + h, r_s, a, e, l_z, q)
+            - potential_r(r - h, r_s, a, e, l_z, q))
+            / (2.0 * h);
+        assert_abs_diff_eq!(dr_analytical, dr_numerical, epsilon = 1e-4);
+
+        let theta = 1.2;
+        let dth_analytical = potential_theta_derivative(theta, a, e, l_z, q);
+        let dth_numerical = (potential_theta(theta + h, a, e, l_z, q)
+            - potential_theta(theta - h, a, e, l_z, q))
+            / (2.0 * h);
+        assert_abs_diff_eq!(dth_analytical, dth_numerical, epsilon = 1e-4);
+    }
+
+    #[test]
+    fn test_geodesic_rhs_structure() {
+        // Verify the ODE RHS structure:
+        // ẏ[0] = dt/dλ, ẏ[1] = y[4], ẏ[2] = y[5], ẏ[3] = dφ/dλ,
+        // ẏ[4] = R'(r)/2, ẏ[5] = Θ'(θ)/2, ẏ[6] = 0, ẏ[7] = 0
+        let r_s = 1.0;
+        let a = 0.5;
+        let e = 1.0;
+        let l_z = 3.0;
+        let q = 1.0;
+        let solver = KerrBLSolver { radius: r_s, a, e, l_z, q };
+
+        let r = 5.0;
+        let theta = 1.2;
+        let v_r = 0.1;
+        let v_theta = -0.05;
+        let y = EquationOfMotionState::from_column_slice(&[0.0, r, theta, 0.0, v_r, v_theta, 0.0, 0.0]);
+
+        let rhs = solver.geodesic(0.0, &y);
+
+        // ẏ[1] = v_r = y[4]
+        assert_abs_diff_eq!(rhs[1], v_r, epsilon = 1e-12);
+        // ẏ[2] = v_theta = y[5]
+        assert_abs_diff_eq!(rhs[2], v_theta, epsilon = 1e-12);
+        // ẏ[4] = R'(r)/2
+        assert_abs_diff_eq!(rhs[4], potential_r_derivative(r, r_s, a, e, l_z, q) / 2.0, epsilon = 1e-12);
+        // ẏ[5] = Θ'(θ)/2
+        assert_abs_diff_eq!(rhs[5], potential_theta_derivative(theta, a, e, l_z, q) / 2.0, epsilon = 1e-12);
+        // ẏ[6] = 0, ẏ[7] = 0
+        assert_abs_diff_eq!(rhs[6], 0.0, epsilon = 1e-12);
+        assert_abs_diff_eq!(rhs[7], 0.0, epsilon = 1e-12);
     }
 }
