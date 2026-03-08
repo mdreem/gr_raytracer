@@ -108,6 +108,26 @@ fn spatial_basis_vector_cartesian(position: &Point, vector: &FourVector) -> Vect
                 cos_theta * dr - r * sin_theta * dtheta,
             )
         }
+        CoordinateSystem::BoyerLindquist { a } => {
+            let spherical_position = position.get_as_spherical();
+            let r = spherical_position[0];
+            let theta = spherical_position[1];
+            let phi = spherical_position[2];
+
+            let dr = vector[1];
+            let dtheta = vector[2];
+            let dphi = vector[3];
+
+            let (st, ct) = (theta.sin(), theta.cos());
+            let (sp, cp) = (phi.sin(), phi.cos());
+
+            // BL Jacobian: ∂x^Cart/∂x^BL applied to the spatial components.
+            Vector3::new(
+                st * cp * dr + (r * cp - a * sp) * ct * dtheta + (-r * sp - a * cp) * st * dphi,
+                st * sp * dr + (r * sp + a * cp) * ct * dtheta + (r * cp - a * sp) * st * dphi,
+                ct * dr - r * st * dtheta,
+            )
+        }
     }
 }
 
@@ -120,7 +140,7 @@ fn spatial_handedness(position: &Point, tetrad: &Tetrad) -> f64 {
     if !triple_product.is_finite() || triple_product.abs() <= 1e-12 {
         return match tetrad.x.coordinate_system {
             // Spherical tetrads in this codebase use a left-handed spatial convention.
-            CoordinateSystem::Spherical => -1.0,
+            CoordinateSystem::Spherical | CoordinateSystem::BoyerLindquist { .. } => -1.0,
             CoordinateSystem::Cartesian => 1.0,
         };
     }
