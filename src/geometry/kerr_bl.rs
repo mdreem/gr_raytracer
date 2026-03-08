@@ -148,24 +148,41 @@ impl GeodesicSolver for KerrBLSolver {
     }
 
     fn create_initial_state(&self, ray: &Ray) -> EquationOfMotionState {
-        let (x, y, z) = (ray.position[1], ray.position[2], ray.position[3]);
-        let r_sqr = compute_r_sqr(self.a, x, y, z);
-        let r = r_sqr.sqrt();
-        let theta = if r == 0.0 { 0.0 } else { (z / r).clamp(-1.0, 1.0).acos() };
-        let phi = (r * y - self.a * x).atan2(r * x + self.a * y);
-        let t = ray.position[0];
+        let (r, theta, phi, t, sign_r, sign_theta) = match ray.position.coordinate_system {
+            CoordinateSystem::BoyerLindquist { .. } => {
+                // BL ray: use position components directly; signs from BL contravariant momentum.
+                let r = ray.position[1];
+                let theta = ray.position[2];
+                let phi = ray.position[3];
+                let t = ray.position[0];
+                let sign_r = if ray.momentum[1] >= 0.0 { 1.0 } else { -1.0 };
+                let sign_theta = if ray.momentum[2] >= 0.0 { 1.0 } else { -1.0 };
+                (r, theta, phi, t, sign_r, sign_theta)
+            }
+            _ => {
+                // Cartesian: convert to BL coordinates using the BL Jacobian (not standard
+                // spherical), so that the stored φ_BL is consistent with `get_spatial_vector_cartesian`
+                // and the conserved quantities extracted by `get_geodesic_solver`.
+                let (x, y, z) = (ray.position[1], ray.position[2], ray.position[3]);
+                let r_sqr = compute_r_sqr(self.a, x, y, z);
+                let r = r_sqr.sqrt();
+                let theta = if r == 0.0 { 0.0 } else { (z / r).clamp(-1.0, 1.0).acos() };
+                // BL phi: atan2(r·y − a·x, r·x + a·y), consistent with cartesian_to_bl.
+                let phi_bl = (r * y - self.a * x).atan2(r * x + self.a * y);
+                let t = ray.position[0];
+                // Use the BL Jacobian ∂(Cart)/∂(BL) to convert p^Cart → p^BL (contravariant).
+                let j_bl = jacobian_bl_to_cartesian(self.a, r, theta, phi_bl);
+                let j_bl_inv = j_bl.try_inverse().expect("BL Jacobian should be invertible");
+                let p_bl_contra = j_bl_inv * ray.momentum.vector;
+                let sign_r = if p_bl_contra[1] >= 0.0 { 1.0 } else { -1.0 };
+                let sign_theta = if p_bl_contra[2] >= 0.0 { 1.0 } else { -1.0 };
+                (r, theta, phi_bl, t, sign_r, sign_theta)
+            }
+        };
 
-        // Compute initial Mino-time velocities from potentials (magnitude)
+        // Compute initial Mino-time velocities from potentials
         let r_pot = potential_r(r, self.radius, self.a, self.e, self.l_z, self.q);
         let th_pot = potential_theta(theta, self.a, self.e, self.l_z, self.q);
-
-        // Determine sign from initial Cartesian momentum direction
-        let jacobian = jacobian_bl_to_cartesian(self.a, r, theta, phi);
-        let jacobian_inv = jacobian.try_inverse().expect("Jacobian should be invertible");
-        let p_bl_contra = jacobian_inv * ray.momentum.vector;
-
-        let sign_r = if p_bl_contra[1] >= 0.0 { 1.0 } else { -1.0 };
-        let sign_theta = if p_bl_contra[2] >= 0.0 { 1.0 } else { -1.0 };
 
         let v_r = sign_r * r_pot.max(0.0).sqrt();
         let v_theta = sign_theta * th_pot.max(0.0).sqrt();
@@ -419,37 +436,58 @@ impl Geometry for KerrBL {
     }
 
     fn get_geodesic_solver(&self, ray: &Ray) -> Box<dyn GeodesicSolver> {
-        // Convert Cartesian position to BL coordinates
-        let (x, y, z) = (ray.position[1], ray.position[2], ray.position[3]);
-        let r_sqr = compute_r_sqr(self.a, x, y, z);
-        let r = r_sqr.sqrt();
-        let theta = if r == 0.0 { 0.0 } else { (z / r).clamp(-1.0, 1.0).acos() };
+        // Extract BL coordinates (r, θ, φ_BL) from the ray position and compute the
+        // BL conserved quantities E = -p_t^BL, L_z = p_φ^BL, and Carter constant Q.
+        //
+        // For BL rays the coordinates and momentum are used directly.
+        // For Cartesian (Kerr-Schild) rays the BL Jacobian ∂(Cart)/∂(BL) is used so that
+        // the stored BL phi φ_BL = atan2(r·y−a·x, r·x+a·y) is consistent with
+        // `create_initial_state` and `Point::get_spatial_vector_cartesian`.
+        let (r, theta, phi_bl) = match ray.position.coordinate_system {
+            CoordinateSystem::BoyerLindquist { .. } => {
+                // BL ray: coordinates are already in Boyer-Lindquist form.
+                (ray.position[1], ray.position[2], ray.position[3])
+            }
+            _ => {
+                // Cartesian: compute BL r, θ, and φ_BL = atan2(r·y − a·x, r·x + a·y).
+                let (x, y, z) = (ray.position[1], ray.position[2], ray.position[3]);
+                let r_sqr = compute_r_sqr(self.a, x, y, z);
+                let r = r_sqr.sqrt();
+                let theta = if r == 0.0 { 0.0 } else { (z / r).clamp(-1.0, 1.0).acos() };
+                let phi_bl = (r * y - self.a * x).atan2(r * x + self.a * y);
+                (r, theta, phi_bl)
+            }
+        };
 
-        // Extract E and L_z from the Kerr-Schild covariant momentum, matching
-        // the same formula used by kerr::Kerr::get_constants_of_motion so that
-        // the conserved quantities are consistent between the two representations.
-        let f = r_sqr * r * self.radius / (r_sqr * r_sqr + self.a * self.a * z * z);
-        let k_x = (r * x + self.a * y) / (r_sqr + self.a * self.a);
-        let k_y = (r * y - self.a * x) / (r_sqr + self.a * self.a);
-        let k_z = z / r;
-        let p = &ray.momentum.vector;
-        // p_cov^KS = (η + f k⊗k) p^contra
-        let p_t_ks = (-1.0 + f) * p[0] + f * k_x * p[1] + f * k_y * p[2] + f * k_z * p[3];
-        let p_x_ks = f * k_x * p[0] + (1.0 + f * k_x * k_x) * p[1] + f * k_x * k_y * p[2] + f * k_x * k_z * p[3];
-        let p_y_ks = f * k_y * p[0] + f * k_y * k_x * p[1] + (1.0 + f * k_y * k_y) * p[2] + f * k_y * k_z * p[3];
-        let e = -p_t_ks;
-        let l_z = -y * p_x_ks + x * p_y_ks;
+        // Compute conserved quantities (E, L_z, Q) via the BL metric.
+        // For BL rays, the contravariant momentum is already in BL components.
+        // For Cartesian rays, convert p^Cart → p^BL using the BL Jacobian inverse.
+        let (e, l_z, p_theta) = match ray.position.coordinate_system {
+            CoordinateSystem::BoyerLindquist { .. } => {
+                // BL ray: lower with BL metric directly.
+                let g = metric_bl(self.radius, self.a, r, theta);
+                let p_bl_cov = g * ray.momentum.vector;
+                let e = -p_bl_cov[0];
+                let l_z = p_bl_cov[3];
+                let p_theta = p_bl_cov[2];
+                (e, l_z, p_theta)
+            }
+            _ => {
+                // Cartesian (KS) ray: convert p^Cart → p^BL using the BL Jacobian
+                // ∂(Cart)/∂(BL) evaluated at (r, θ, φ_BL).  Then lower with BL metric.
+                let j_bl = jacobian_bl_to_cartesian(self.a, r, theta, phi_bl);
+                let j_bl_inv = j_bl.try_inverse().expect("BL Jacobian should be invertible");
+                let p_bl_contra = j_bl_inv * ray.momentum.vector;
+                let g = metric_bl(self.radius, self.a, r, theta);
+                let p_bl_cov = g * p_bl_contra;
+                let e = -p_bl_cov[0];
+                let l_z = p_bl_cov[3];
+                let p_theta = p_bl_cov[2];
+                (e, l_z, p_theta)
+            }
+        };
 
-        // Compute the BL theta-covariant momentum to derive the Carter constant Q.
-        // Use the Jacobian to get the BL contravariant momentum, then lower with BL metric.
-        let phi = (r * y - self.a * x).atan2(r * x + self.a * y);
-        let jacobian = jacobian_bl_to_cartesian(self.a, r, theta, phi);
-        let jacobian_inv = jacobian.try_inverse().expect("Jacobian should be invertible");
-        let p_bl_contra = jacobian_inv * ray.momentum.vector;
-        let g = metric_bl(self.radius, self.a, r, theta);
-        let p_bl_cov = g * p_bl_contra;
-        let p_theta = p_bl_cov[2];
-
+        // Carter constant Q from the BL θ-momentum.
         let cos_t = theta.cos();
         let sin_t = theta.sin();
         let q = p_theta * p_theta + cos_t * cos_t * (l_z * l_z / (sin_t * sin_t) - self.a * self.a * e * e);
