@@ -1,14 +1,25 @@
+//! Boyer-Lindquist Kerr geometry using separated geodesic equations (complete integrability).
+//!
+//! Unlike the Kerr-Schild Cartesian implementation in `geometry/kerr.rs`, this module works
+//! in Boyer-Lindquist coordinates (t, r, θ, φ) and exploits the Carter constant to decouple
+//! the r and θ equations of motion.
+
 use nalgebra::Matrix4;
 
+// Metric helper functions are consumed by the Geometry trait impls added in later tasks.
+// The #[allow(dead_code)] is temporary until those impls are complete.
+#[allow(dead_code)]
 fn sigma(r: f64, a: f64, theta: f64) -> f64 {
     r * r + a * a * theta.cos().powi(2)
 }
 
+#[allow(dead_code)]
 fn delta(r: f64, r_s: f64, a: f64) -> f64 {
     r * r - r_s * r + a * a
 }
 
 /// Covariant BL Kerr metric g_μν. Signature (−,+,+,+).
+#[allow(dead_code)]
 fn metric_bl(r_s: f64, a: f64, r: f64, theta: f64) -> Matrix4<f64> {
     let sig = sigma(r, a, theta);
     let sin_t = theta.sin();
@@ -31,6 +42,7 @@ fn metric_bl(r_s: f64, a: f64, r: f64, theta: f64) -> Matrix4<f64> {
 }
 
 /// Contravariant BL Kerr metric g^μν.
+#[allow(dead_code)]
 fn metric_bl_contravariant(r_s: f64, a: f64, r: f64, theta: f64) -> Matrix4<f64> {
     let sig = sigma(r, a, theta);
     let del = delta(r, r_s, a);
@@ -50,6 +62,7 @@ fn metric_bl_contravariant(r_s: f64, a: f64, r: f64, theta: f64) -> Matrix4<f64>
     g
 }
 
+#[allow(dead_code)]
 #[derive(Clone, Debug)]
 pub struct KerrBL {
     pub radius: f64,          // r_s = 2M (Schwarzschild radius)
