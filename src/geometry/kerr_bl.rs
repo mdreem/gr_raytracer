@@ -240,6 +240,7 @@ fn metric_bl(r_s: f64, a: f64, r: f64, theta: f64) -> Matrix4<f64> {
 }
 
 /// Contravariant BL Kerr metric g^μν.
+#[allow(dead_code)]
 fn metric_bl_contravariant(r_s: f64, a: f64, r: f64, theta: f64) -> Matrix4<f64> {
     let sig = sigma(r, a, theta);
     let del = delta(r, r_s, a);
