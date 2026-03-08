@@ -279,15 +279,42 @@ impl InnerProduct for KerrBL {
 }
 
 impl SupportQuantities for KerrBL {
-    fn get_stationary_velocity_at(&self, _position: &Point) -> FourVector {
-        todo!()
+    fn get_stationary_velocity_at(&self, position: &Point) -> FourVector {
+        // ZAMO (zero angular momentum observer) velocity
+        let r = position[1];
+        let theta = position[2];
+        let sig = sigma(r, self.a, theta);
+        let sin2 = theta.sin().powi(2);
+        let g_tph = -self.a * self.radius * r * sin2 / sig;
+        let g_phph = (r * r + self.a * self.a + self.a * self.a * self.radius * r * sin2 / sig) * sin2;
+        let g_tt = -(1.0 - self.radius * r / sig);
+        let omega = -g_tph / g_phph;
+        let ut = (-1.0 / (g_tt + 2.0 * g_tph * omega + g_phph * omega * omega)).sqrt();
+        FourVector::new_boyer_lindquist(self.a, ut, 0.0, 0.0, ut * omega)
     }
 
     fn get_circular_orbit_velocity_at(
         &self,
-        _position: &Point,
+        position: &Point,
     ) -> Result<FourVector, RaytracerError> {
-        todo!()
+        let r = position[1];
+        let m = 0.5 * self.radius;
+        let omega = m.sqrt() / (r.powf(1.5) + self.a * m.sqrt());
+
+        let theta = position[2];
+        let sig = sigma(r, self.a, theta);
+        let sin2 = theta.sin().powi(2);
+        let g_tt = -(1.0 - self.radius * r / sig);
+        let g_tph = -self.a * self.radius * r * sin2 / sig;
+        let g_phph = (r * r + self.a * self.a + self.a * self.a * self.radius * r * sin2 / sig) * sin2;
+
+        let ut_pre = g_tt + 2.0 * omega * g_tph + omega * omega * g_phph;
+        if ut_pre >= 0.0 {
+            return Err(RaytracerError::NoCircularOrbitPossible);
+        }
+        let ut = (-ut_pre).sqrt().recip();
+        let uphi = omega * ut;
+        Ok(FourVector::new_boyer_lindquist(self.a, ut, 0.0, 0.0, uphi))
     }
 
     fn get_temperature_computer(
@@ -306,12 +333,66 @@ impl SupportQuantities for KerrBL {
 }
 
 impl Geometry for KerrBL {
-    fn get_tetrad_at(&self, _position: &Point) -> Tetrad {
-        todo!()
+    fn get_tetrad_at(&self, position: &Point) -> Tetrad {
+        use crate::geometry::gram_schmidt::gram_schmidt;
+        let r = position[1];
+        let theta = position[2];
+        let a = self.a;
+        let r_s = self.radius;
+
+        let sig = sigma(r, a, theta);
+        let sin_t = theta.sin();
+        let sin2 = sin_t * sin_t;
+
+        // ZAMO angular velocity: ω = -g_tφ/g_φφ
+        let g_tph = -a * r_s * r * sin2 / sig;
+        let g_phph = (r * r + a * a + a * a * r_s * r * sin2 / sig) * sin2;
+        let omega = -g_tph / g_phph;
+
+        // ZAMO four-velocity: u^μ = u^t (1, 0, 0, ω)
+        // Normalization: g_μν u^μ u^ν = -1
+        let g_tt = -(1.0 - r_s * r / sig);
+        let ut_sq = -1.0 / (g_tt + 2.0 * g_tph * omega + g_phph * omega * omega);
+        let ut = ut_sq.sqrt();
+
+        let coord_sys = CoordinateSystem::BoyerLindquist { a };
+        let e_t = FourVector::new(ut, 0.0, 0.0, ut * omega, coord_sys);
+        let e_r = FourVector::new(0.0, 1.0, 0.0, 0.0, coord_sys);
+        let e_th = FourVector::new(0.0, 0.0, 1.0, 0.0, coord_sys);
+        let e_ph = FourVector::new(0.0, 0.0, 0.0, 1.0, coord_sys);
+
+        let basis = gram_schmidt(self, position, &[e_t, e_r, e_th, e_ph]);
+        Tetrad::new(*position, basis[0], basis[1], basis[2], basis[3])
     }
 
-    fn lorentz_transformation(&self, _position: &Point, _velocity: &FourVector) -> Matrix4<f64> {
-        todo!()
+    fn lorentz_transformation(&self, position: &Point, velocity: &FourVector) -> Matrix4<f64> {
+        let mut matrix = Matrix4::zeros();
+        let g = metric_bl(self.radius, self.a, position[1], position[2]);
+        let tetrad_t = self.get_tetrad_at(position).t;
+
+        let gamma = -(tetrad_t.vector.transpose() * g * velocity.vector)[(0, 0)];
+
+        let uv = tetrad_t.vector + velocity.vector;
+        let uv_lower = g * uv;
+
+        for mu in 0..4 {
+            for nu in 0..4 {
+                let mut res = 0.0;
+                if mu == nu {
+                    res = 1.0;
+                }
+
+                let a = 1.0 / (1.0 + gamma);
+                let b = uv[mu];
+                let c = uv_lower[nu];
+                res += a * b * c;
+
+                res -= 2.0 * (g * tetrad_t.vector)[nu] * velocity.vector[mu];
+
+                matrix[(mu, nu)] = res;
+            }
+        }
+        matrix
     }
 
     fn inside_horizon(&self, position: &Point) -> bool {
@@ -324,7 +405,11 @@ impl Geometry for KerrBL {
         position[1] <= r_plus + self.horizon_epsilon
     }
 
-    fn closed_orbit(&self, _position: &Point, _step_index: usize, _max_steps: usize) -> bool {
+    fn closed_orbit(&self, position: &Point, step_index: usize, max_steps: usize) -> bool {
+        let r = position[1];
+        if step_index == max_steps - 1 && r <= self.radius {
+            return true;
+        }
         false
     }
 
@@ -621,6 +706,36 @@ mod tests {
 
         assert_abs_diff_eq!(kerr_e, bl_e, epsilon = 1e-6);
         assert_abs_diff_eq!(kerr_lz, bl_lz, epsilon = 1e-6);
+    }
+
+    #[test]
+    fn test_tetrad_orthonormal() {
+        let a = 0.5;
+        let kerr_bl = KerrBL::new(1.0, a, 1e-4);
+        let position = Point::new(0.0, 5.0, 1.2, 0.8, CoordinateSystem::BoyerLindquist { a });
+        let tetrad = kerr_bl.get_tetrad_at(&position);
+
+        assert_abs_diff_eq!(kerr_bl.inner_product(&position, &tetrad.t, &tetrad.t), -1.0, epsilon = 1e-10);
+        assert_abs_diff_eq!(kerr_bl.inner_product(&position, &tetrad.x, &tetrad.x), 1.0, epsilon = 1e-10);
+        assert_abs_diff_eq!(kerr_bl.inner_product(&position, &tetrad.y, &tetrad.y), 1.0, epsilon = 1e-10);
+        assert_abs_diff_eq!(kerr_bl.inner_product(&position, &tetrad.z, &tetrad.z), 1.0, epsilon = 1e-10);
+
+        assert_abs_diff_eq!(kerr_bl.inner_product(&position, &tetrad.t, &tetrad.x), 0.0, epsilon = 1e-10);
+        assert_abs_diff_eq!(kerr_bl.inner_product(&position, &tetrad.t, &tetrad.y), 0.0, epsilon = 1e-10);
+        assert_abs_diff_eq!(kerr_bl.inner_product(&position, &tetrad.t, &tetrad.z), 0.0, epsilon = 1e-10);
+        assert_abs_diff_eq!(kerr_bl.inner_product(&position, &tetrad.x, &tetrad.y), 0.0, epsilon = 1e-10);
+        assert_abs_diff_eq!(kerr_bl.inner_product(&position, &tetrad.x, &tetrad.z), 0.0, epsilon = 1e-10);
+        assert_abs_diff_eq!(kerr_bl.inner_product(&position, &tetrad.y, &tetrad.z), 0.0, epsilon = 1e-10);
+    }
+
+    #[test]
+    fn test_zamo_velocity_normalized() {
+        let a = 0.5;
+        let kerr_bl = KerrBL::new(1.0, a, 1e-4);
+        let position = Point::new(0.0, 5.0, 1.2, 0.0, CoordinateSystem::BoyerLindquist { a });
+        let v = kerr_bl.get_stationary_velocity_at(&position);
+        let norm = kerr_bl.inner_product(&position, &v, &v);
+        assert_abs_diff_eq!(norm, -1.0, epsilon = 1e-10);
     }
 
     #[test]
