@@ -98,6 +98,10 @@ impl Signature for KerrBL {
 
 impl InnerProduct for KerrBL {
     fn inner_product(&self, position: &Point, v: &FourVector, w: &FourVector) -> f64 {
+        debug_assert!(
+            matches!(position.coordinate_system, CoordinateSystem::BoyerLindquist { .. }),
+            "inner_product expects BL coordinates"
+        );
         let r = position[1];
         let theta = position[2];
         let g = metric_bl(self.radius, self.a, r, theta);
@@ -151,6 +155,9 @@ impl Geometry for KerrBL {
     fn inside_horizon(&self, position: &Point) -> bool {
         // r_plus = M + sqrt(M^2 - a^2) where M = radius/2 (since radius = r_s = 2M)
         let m = self.radius / 2.0;
+        if self.a > m {
+            return false;
+        }
         let r_plus = m + (m * m - self.a * self.a).sqrt();
         position[1] <= r_plus + self.horizon_epsilon
     }
@@ -180,8 +187,6 @@ impl Geometry for KerrBL {
 mod tests {
     use super::*;
     use approx::assert_abs_diff_eq;
-    use crate::geometry::point::CoordinateSystem;
-    use crate::geometry::geometry::InnerProduct;
 
     #[test]
     fn test_bl_metric_inverse() {
@@ -241,6 +246,39 @@ mod tests {
         let k = FourVector::new_boyer_lindquist(0.5, kt, kr, 0.0, 0.0);
         let ip = kerr.inner_product(&position, &k, &k);
         assert_abs_diff_eq!(ip, 0.0, epsilon = 1e-10);
+    }
+
+    #[test]
+    fn test_inner_product_with_cross_term() {
+        // Test that the g_tφ cross-term is correctly included.
+        // For a vector with both k^t and k^φ nonzero, the inner product
+        // must match the manual computation using the full metric.
+        let r_s = 1.0;
+        let a = 0.5;
+        let r = 5.0;
+        let theta = std::f64::consts::FRAC_PI_2;
+        let kerr = KerrBL::new(r_s, a, 1e-4);
+        let position = Point::new(0.0, r, theta, 0.0, CoordinateSystem::BoyerLindquist { a });
+
+        let g = metric_bl(r_s, a, r, theta);
+        // Arbitrary vector with all components nonzero
+        let kt = 1.0_f64;
+        let kr = 0.3_f64;
+        let kth = 0.1_f64;
+        let kph = 0.5_f64;
+        let k = FourVector::new_boyer_lindquist(a, kt, kr, kth, kph);
+
+        // Manual computation using the metric
+        let components = [kt, kr, kth, kph];
+        let mut expected = 0.0_f64;
+        for mu in 0..4 {
+            for nu in 0..4 {
+                expected += g[(mu, nu)] * components[mu] * components[nu];
+            }
+        }
+
+        let ip = kerr.inner_product(&position, &k, &k);
+        assert_abs_diff_eq!(ip, expected, epsilon = 1e-12);
     }
 
     #[test]
