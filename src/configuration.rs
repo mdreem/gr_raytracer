@@ -22,12 +22,18 @@ pub enum GeometryType {
         a: f64,
         horizon_epsilon: f64,
     },
+    KerrBL {
+        radius: f64,
+        a: f64,
+        horizon_epsilon: f64,
+    },
 }
 
 use crate::geometry::euclidean::EuclideanSpace;
 use crate::geometry::euclidean_spherical::EuclideanSpaceSpherical;
 use crate::geometry::geometry::RenderableGeometry;
 use crate::geometry::kerr::Kerr;
+use crate::geometry::kerr_bl::KerrBL;
 use crate::geometry::schwarzschild::Schwarzschild;
 
 impl GeometryType {
@@ -44,6 +50,11 @@ impl GeometryType {
                 a,
                 horizon_epsilon,
             } => Box::new(Kerr::new(*radius, *a, *horizon_epsilon)),
+            GeometryType::KerrBL {
+                radius,
+                a,
+                horizon_epsilon,
+            } => Box::new(KerrBL::new(*radius, *a, *horizon_epsilon)),
         }
     }
 }

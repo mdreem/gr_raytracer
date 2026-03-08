@@ -257,6 +257,17 @@ impl KerrBL {
             horizon_epsilon,
         }
     }
+
+    pub fn cartesian_to_bl(&self, position: &Point) -> Point {
+        let x = position[1];
+        let y = position[2];
+        let z = position[3];
+        let r_sqr = compute_r_sqr(self.a, x, y, z);
+        let r = r_sqr.sqrt();
+        let theta = if r == 0.0 { 0.0 } else { (z / r).clamp(-1.0, 1.0).acos() };
+        let phi = (r * y - self.a * x).atan2(r * x + self.a * y);
+        Point::new(position[0], r, theta, phi, CoordinateSystem::BoyerLindquist { a: self.a })
+    }
 }
 
 impl HasCoordinateSystem for KerrBL {
