@@ -87,7 +87,7 @@ impl RenderableGeometry for EuclideanSpaceSpherical {
         }
         let position_spherical = match position.coordinate_system {
             CoordinateSystem::Cartesian => cartesian_to_spherical(&position),
-            CoordinateSystem::Spherical => position,
+            CoordinateSystem::Spherical | CoordinateSystem::BoyerLindquist { .. } => position,
         };
 
         let r = position_spherical[1];
