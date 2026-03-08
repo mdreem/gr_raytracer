@@ -50,6 +50,19 @@ fn delta(r: f64, r_s: f64, a: f64) -> f64 {
     r * r - r_s * r + a * a
 }
 
+/// Compute ZAMO angular velocity ω and u^t normalization factor.
+/// ZAMO = Zero Angular Momentum Observer / locally non-rotating frame.
+fn zamo_params(r_s: f64, a: f64, r: f64, theta: f64) -> (f64, f64) {
+    let sig = sigma(r, a, theta);
+    let sin2 = theta.sin().powi(2);
+    let g_tph = -a * r_s * r * sin2 / sig;
+    let g_phph = (r * r + a * a + a * a * r_s * r * sin2 / sig) * sin2;
+    let g_tt = -(1.0 - r_s * r / sig);
+    let omega = -g_tph / g_phph;
+    let ut = (-1.0 / (g_tt + 2.0 * g_tph * omega + g_phph * omega * omega)).sqrt();
+    (omega, ut)
+}
+
 /// R(r) = [(r² + a²)E - aL_z]² - Δ[(L_z - aE)² + Q]
 fn potential_r(r: f64, r_s: f64, a: f64, e: f64, l_z: f64, q: f64) -> f64 {
     let del = delta(r, r_s, a);
@@ -281,15 +294,7 @@ impl InnerProduct for KerrBL {
 impl SupportQuantities for KerrBL {
     fn get_stationary_velocity_at(&self, position: &Point) -> FourVector {
         // ZAMO (zero angular momentum observer) velocity
-        let r = position[1];
-        let theta = position[2];
-        let sig = sigma(r, self.a, theta);
-        let sin2 = theta.sin().powi(2);
-        let g_tph = -self.a * self.radius * r * sin2 / sig;
-        let g_phph = (r * r + self.a * self.a + self.a * self.a * self.radius * r * sin2 / sig) * sin2;
-        let g_tt = -(1.0 - self.radius * r / sig);
-        let omega = -g_tph / g_phph;
-        let ut = (-1.0 / (g_tt + 2.0 * g_tph * omega + g_phph * omega * omega)).sqrt();
+        let (omega, ut) = zamo_params(self.radius, self.a, position[1], position[2]);
         FourVector::new_boyer_lindquist(self.a, ut, 0.0, 0.0, ut * omega)
     }
 
@@ -340,20 +345,9 @@ impl Geometry for KerrBL {
         let a = self.a;
         let r_s = self.radius;
 
-        let sig = sigma(r, a, theta);
-        let sin_t = theta.sin();
-        let sin2 = sin_t * sin_t;
-
-        // ZAMO angular velocity: ω = -g_tφ/g_φφ
-        let g_tph = -a * r_s * r * sin2 / sig;
-        let g_phph = (r * r + a * a + a * a * r_s * r * sin2 / sig) * sin2;
-        let omega = -g_tph / g_phph;
-
         // ZAMO four-velocity: u^μ = u^t (1, 0, 0, ω)
         // Normalization: g_μν u^μ u^ν = -1
-        let g_tt = -(1.0 - r_s * r / sig);
-        let ut_sq = -1.0 / (g_tt + 2.0 * g_tph * omega + g_phph * omega * omega);
-        let ut = ut_sq.sqrt();
+        let (omega, ut) = zamo_params(r_s, a, r, theta);
 
         let coord_sys = CoordinateSystem::BoyerLindquist { a };
         let e_t = FourVector::new(ut, 0.0, 0.0, ut * omega, coord_sys);
