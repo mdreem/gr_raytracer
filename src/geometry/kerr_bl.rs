@@ -42,6 +42,11 @@ fn potential_r_derivative(r: f64, r_s: f64, a: f64, e: f64, l_z: f64, q: f64) ->
 }
 
 /// Θ(θ) = Q + a²E²cos²θ - L_z²cos²θ/sin²θ
+///
+/// This form is valid for **massless (photon) geodesics** (μ = 0). For massive particles
+/// there would be an additional `−a²cos²θ` term from the mass contribution to the Carter
+/// constant identity. All rays in this renderer are null geodesics, so μ = 0 is assumed
+/// throughout.
 fn potential_theta(theta: f64, a: f64, e: f64, l_z: f64, q: f64) -> f64 {
     let cos_t = theta.cos();
     let sin_t = theta.sin();
@@ -49,7 +54,11 @@ fn potential_theta(theta: f64, a: f64, e: f64, l_z: f64, q: f64) -> f64 {
 }
 
 /// Θ'(θ) = -2a²E²cosθsinθ + 2L_z²cosθ/sin³θ
-fn potential_theta_derivative(theta: f64, a: f64, e: f64, l_z: f64, q: f64) -> f64 {
+///
+/// This form is valid for **massless (photon) geodesics** (μ = 0). For massive particles
+/// there would be an additional `+2a²cosθsinθ` term from the mass contribution. All rays
+/// in this renderer are null geodesics, so μ = 0 is assumed throughout.
+fn potential_theta_derivative(theta: f64, a: f64, e: f64, l_z: f64, _q: f64) -> f64 {
     let cos_t = theta.cos();
     let sin_t = theta.sin();
     -2.0 * a * a * e * e * cos_t * sin_t + 2.0 * l_z * l_z * cos_t / (sin_t.powi(3))
@@ -394,7 +403,6 @@ mod tests {
         let r_s = 1.0;
         let a = 0.5;
         let r = 5.0;
-        let _theta = std::f64::consts::FRAC_PI_2;
         let e = 1.0;
         let l_z = 3.0;
         // Q for equatorial orbit (theta=PI/2, p_theta=0): Q = 0
@@ -449,10 +457,20 @@ mod tests {
 
         let rhs = solver.geodesic(0.0, &y);
 
+        // ẏ[0] = dt/dλ = (r²+a²)/Δ * P_r + a(L_z - aE sin²θ)
+        let del = r * r - r_s * r + a * a;
+        let p_r = (r * r + a * a) * e - a * l_z;
+        let sin2 = theta.sin().powi(2);
+        let expected_dt = (r * r + a * a) / del * p_r + a * (l_z - a * e * sin2);
+        assert_abs_diff_eq!(rhs[0], expected_dt, epsilon = 1e-12);
+
         // ẏ[1] = v_r = y[4]
         assert_abs_diff_eq!(rhs[1], v_r, epsilon = 1e-12);
         // ẏ[2] = v_theta = y[5]
         assert_abs_diff_eq!(rhs[2], v_theta, epsilon = 1e-12);
+        // ẏ[3] = dφ/dλ = a/Δ * P_r + L_z/sin²θ - aE
+        let expected_dphi = a / del * p_r + l_z / sin2 - a * e;
+        assert_abs_diff_eq!(rhs[3], expected_dphi, epsilon = 1e-12);
         // ẏ[4] = R'(r)/2
         assert_abs_diff_eq!(rhs[4], potential_r_derivative(r, r_s, a, e, l_z, q) / 2.0, epsilon = 1e-12);
         // ẏ[5] = Θ'(θ)/2
