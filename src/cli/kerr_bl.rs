@@ -78,22 +78,23 @@ impl RenderableGeometry for KerrBL {
         opts: GlobalOpts,
         write: &mut dyn Write,
     ) -> Result<(), RaytracerError> {
-        let tetrad = self.get_tetrad_at(&position);
-        info!("Tetrad at position {:?}: {}", position, tetrad);
+        let position_bl = self.cartesian_to_bl(&position);
+        let tetrad = self.get_tetrad_at(&position_bl);
+        info!("Tetrad at position {:?}: {}", position_bl, tetrad);
 
         let space_part =
             tetrad.x * direction[1] + tetrad.y * direction[2] + tetrad.z * direction[3];
         let norm_space_part = self
-            .inner_product(&position, &space_part, &space_part)
+            .inner_product(&position_bl, &space_part, &space_part)
             .sqrt();
 
         let momentum = tetrad.t * 1.0
             + tetrad.x * direction[1] / norm_space_part
             + tetrad.y * direction[2] / norm_space_part
             + tetrad.z * direction[3] / norm_space_part;
-        assert_future_directed("KerrBL render_ray_at momentum", self, &position, &momentum)?;
+        assert_future_directed("KerrBL render_ray_at momentum", self, &position_bl, &momentum)?;
 
-        integrate_and_save_ray(self, position, momentum, opts, write)
+        integrate_and_save_ray(self, position_bl, momentum, opts, write)
     }
 }
 
@@ -113,8 +114,9 @@ mod tests {
         let horizon_epsilon = 1e-5;
         let geometry = KerrBL::new(radius, a, horizon_epsilon);
 
-        // Provide a BL position for render_ray_at (equatorial plane, r=18)
-        let position = Point::new(0.0, 18.0, PI / 2.0, 0.0, CoordinateSystem::BoyerLindquist { a });
+        // Provide a Cartesian position for render_ray_at (equatorial plane, r=18, phi=0)
+        // cartesian_to_bl will convert this to BL (r=18, theta=PI/2, phi=0)
+        let position = Point::new(0.0, 18.0, 0.0, 0.0, CoordinateSystem::Cartesian);
         // Direction: purely radial inward in BL frame
         let direction = FourVector::new(0.0, 1.0, 0.0, 0.0, CoordinateSystem::BoyerLindquist { a });
 
