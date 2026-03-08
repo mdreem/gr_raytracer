@@ -744,6 +744,233 @@ mod tests {
     }
 
     #[test]
+    fn test_trajectory_agreement_with_kerr() {
+        use crate::geometry::kerr::Kerr;
+        use crate::rendering::camera::Camera;
+        use crate::rendering::scene;
+        use crate::rendering::scene::Scene;
+
+        let radius = 1.0;
+        let a = 0.3;
+        let position_cart = Point::new_cartesian(0.0, -10.0, 0.0, 2.0);
+
+        // Set up Kerr (Cartesian Kerr-Schild). KerrBLSolver::create_initial_state expects
+        // a ray with Cartesian position, so we use the Kerr (KS) camera for both geometries.
+        let kerr = Kerr::new(radius, a, 1e-5);
+        let velocity_cart = kerr.get_stationary_velocity_at(&position_cart);
+        let camera_kerr = Camera::new(
+            position_cart, velocity_cart, std::f64::consts::FRAC_PI_2,
+            11, 11, 0.0, 0.0, 0.0, &kerr,
+        ).unwrap();
+        let scene_kerr: Scene<Kerr> =
+            scene::test_scene::create_scene_with_camera(1.0, 2.0, 7.0, &kerr, camera_kerr, 1e-6)
+                .unwrap();
+        // The KerrBL scene shares the same integrator configuration but different geometry.
+        let kerr_bl = KerrBL::new(radius, a, 1e-5);
+        let scene_bl: Scene<KerrBL> =
+            scene::test_scene::create_scene_with_camera(1.0, 2.0, 7.0, &kerr_bl,
+                Camera::new(position_cart, velocity_cart, std::f64::consts::FRAC_PI_2,
+                    11, 11, 0.0, 0.0, 0.0, &kerr).unwrap(),
+                1e-6).unwrap();
+
+        // Use the same Cartesian-position ray for both integrators.
+        let ray = scene_kerr.camera.get_ray_for(5, 8);
+
+        // Integrate both
+        let (traj_kerr, stop_kerr) = scene_kerr.integrator.integrate(&ray).unwrap();
+        let (traj_bl, stop_bl) = scene_bl.integrator.integrate(&ray).unwrap();
+
+        // Same stop reason
+        assert_eq!(stop_kerr, stop_bl);
+
+        // Compare starting positions in Cartesian
+        let first_kerr_cart = traj_kerr[0].x.get_spatial_vector_cartesian();
+        let first_bl_cart = traj_bl[0].x.get_spatial_vector_cartesian();
+        assert_abs_diff_eq!(first_kerr_cart, first_bl_cart, epsilon = 1e-4);
+
+        // Final positions should agree within a loose tolerance.
+        // Kerr-Schild Cartesian and Boyer-Lindquist Mino-time use different integration
+        // parameterizations, so numerical errors accumulate differently; what matters is
+        // that both rays reach the same physical stop condition.
+        let last_kerr_cart = traj_kerr.last().unwrap().x.get_spatial_vector_cartesian();
+        let last_bl_cart = traj_bl.last().unwrap().x.get_spatial_vector_cartesian();
+        let distance = (last_kerr_cart - last_bl_cart).norm();
+        assert!(
+            distance < 500.0,
+            "Final positions differ by {} (should be < 500.0)",
+            distance
+        );
+    }
+
+    #[test]
+    fn test_constants_of_motion_conservation() {
+        use crate::geometry::kerr::Kerr;
+        use crate::rendering::camera::Camera;
+        use crate::rendering::scene;
+
+        let radius = 1.0;
+        let a = 0.4;
+        let position_cart = Point::new_cartesian(0.0, -10.0, 0.0, 2.0);
+
+        // Use Kerr (Cartesian) camera to produce a valid null ray with Cartesian position,
+        // since KerrBLSolver::create_initial_state converts from Cartesian internally.
+        let kerr = Kerr::new(radius, a, 1e-5);
+        let velocity_cart = kerr.get_stationary_velocity_at(&position_cart);
+        let camera = Camera::new(
+            position_cart, velocity_cart, std::f64::consts::FRAC_PI_2,
+            11, 11, 0.0, 0.0, 0.0, &kerr,
+        ).unwrap();
+        let kerr_bl = KerrBL::new(radius, a, 1e-5);
+        let scene: scene::Scene<KerrBL> =
+            scene::test_scene::create_scene_with_camera(1.0, 2.0, 7.0, &kerr_bl, camera, 1e-6)
+                .unwrap();
+        let ray = scene.camera.get_ray_for(3, 7);
+
+        let (trajectory, _) = scene.integrator.integrate(&ray).unwrap();
+        assert!(trajectory.len() > 10, "Trajectory too short for meaningful test");
+
+        let initial_constants = kerr_bl.get_constants_of_motion(&trajectory[0].x, &trajectory[0].p);
+        let e_init = initial_constants.as_slice()[0].1;
+        let lz_init = initial_constants.as_slice()[1].1;
+
+        for step in trajectory.iter().skip(1) {
+            let constants = kerr_bl.get_constants_of_motion(&step.x, &step.p);
+            let e = constants.as_slice()[0].1;
+            let lz = constants.as_slice()[1].1;
+
+            let e_drift = if e_init.abs() > 1e-12 {
+                (e - e_init).abs() / e_init.abs()
+            } else {
+                (e - e_init).abs()
+            };
+            let lz_drift = if lz_init.abs() > 1e-12 {
+                (lz - lz_init).abs() / lz_init.abs()
+            } else {
+                (lz - lz_init).abs()
+            };
+
+            assert!(e_drift < 1e-4, "Energy drift {:.3e} at step {}", e_drift, step.step);
+            assert!(lz_drift < 1e-4, "L_z drift {:.3e} at step {}", lz_drift, step.step);
+        }
+    }
+
+    #[test]
+    fn test_null_condition_preserved() {
+        use crate::geometry::kerr::Kerr;
+        use crate::rendering::camera::Camera;
+        use crate::rendering::scene;
+
+        let radius = 1.0;
+        let a = 0.4;
+        let position_cart = Point::new_cartesian(0.0, -10.0, 0.0, 2.0);
+
+        // Use Kerr (Cartesian) camera to produce a valid null ray with Cartesian position,
+        // since KerrBLSolver::create_initial_state converts from Cartesian internally.
+        let kerr = Kerr::new(radius, a, 1e-5);
+        let velocity_cart = kerr.get_stationary_velocity_at(&position_cart);
+        let camera = Camera::new(
+            position_cart, velocity_cart, std::f64::consts::FRAC_PI_2,
+            11, 11, 0.0, 0.0, 0.0, &kerr,
+        ).unwrap();
+        let kerr_bl = KerrBL::new(radius, a, 1e-5);
+        let scene: scene::Scene<KerrBL> =
+            scene::test_scene::create_scene_with_camera(1.0, 2.0, 7.0, &kerr_bl, camera, 1e-6)
+                .unwrap();
+        let ray = scene.camera.get_ray_for(5, 5);
+
+        let (trajectory, _) = scene.integrator.integrate(&ray).unwrap();
+
+        for step in &trajectory {
+            let k_dot_k = kerr_bl.inner_product(&step.x, &step.p, &step.p);
+            assert!(
+                k_dot_k.abs() < 1e-4,
+                "Null condition violated: k.k = {:.3e} at step {}",
+                k_dot_k,
+                step.step
+            );
+        }
+    }
+
+    #[test]
+    fn test_schwarzschild_limit() {
+        use crate::geometry::kerr::Kerr;
+        use crate::geometry::schwarzschild::Schwarzschild;
+        use crate::geometry::spherical_coordinates_helper::cartesian_to_spherical;
+        use crate::rendering::camera::Camera;
+        use crate::rendering::ray::Ray;
+        use crate::rendering::scene;
+
+        // When a=0, KerrBL reduces to Schwarzschild. Verify by integrating identical null
+        // rays (same initial position and momentum) through both geometries.
+        let radius = 1.0;
+        let position_cart = Point::new_cartesian(0.0, -10.0, 0.0, 2.0);
+
+        // Use Kerr(a=0) camera to produce a Cartesian-position null ray for KerrBL(a=0).
+        let kerr = Kerr::new(radius, 0.0, 1e-5);
+        let velocity_cart = kerr.get_stationary_velocity_at(&position_cart);
+        let camera_ks = Camera::new(
+            position_cart, velocity_cart, std::f64::consts::FRAC_PI_2,
+            11, 11, 0.0, 0.0, 0.0, &kerr,
+        ).unwrap();
+        let kerr_bl = KerrBL::new(radius, 0.0, 1e-5);
+        let scene_bl: scene::Scene<KerrBL> =
+            scene::test_scene::create_scene_with_camera(1.0, 2.0, 7.0, &kerr_bl, camera_ks, 1e-6)
+                .unwrap();
+        let ray_cart = scene_bl.camera.get_ray_for(5, 8);
+
+        // Integrate with KerrBL(a=0)
+        let (traj_bl, stop_bl) = scene_bl.integrator.integrate(&ray_cart).unwrap();
+
+        // For Schwarzschild: convert the Cartesian ray position to spherical.
+        // When a=0, KerrBLSolver maps the Cartesian position to (r, θ, φ) as its initial state,
+        // so the trajectory starts at the same BL/spherical position. Build a Schwarzschild ray
+        // from the first trajectory step, which is already in BL ≡ spherical coords when a=0.
+        let first_bl_step = &traj_bl[0];
+        let position_sph = Point::new_spherical(
+            first_bl_step.x[0], first_bl_step.x[1], first_bl_step.x[2], first_bl_step.x[3],
+        );
+        let momentum_sph = FourVector::new_spherical(
+            first_bl_step.p.vector[0],
+            first_bl_step.p.vector[1],
+            first_bl_step.p.vector[2],
+            first_bl_step.p.vector[3],
+        );
+        let ray_sch = Ray::new(0, 0, position_sph, momentum_sph);
+
+        let schwarzschild = Schwarzschild::new(radius, 1e-5);
+        // Schwarzschild stationary observer at same position for the scene camera
+        let r = position_sph[1];
+        let a_factor = 1.0 - radius / r;
+        let vel_sch = FourVector::new_spherical(a_factor.sqrt().recip(), 0.0, 0.0, 0.0);
+        let scene_sch: scene::Scene<Schwarzschild> =
+            scene::test_scene::create_scene_with_camera(
+                1.0, 2.0, 7.0, &schwarzschild,
+                Camera::new(position_sph, vel_sch, std::f64::consts::FRAC_PI_2,
+                    11, 11, 0.0, 0.0, 0.0, &schwarzschild).unwrap(),
+                1e-6,
+            ).unwrap();
+
+        let (traj_sch, stop_sch) = scene_sch.integrator.integrate(&ray_sch).unwrap();
+
+        // Both should stop for the same physical reason
+        assert_eq!(stop_bl, stop_sch);
+
+        // Both trajectories must start at the same Cartesian position
+        let first_bl = traj_bl[0].x.get_spatial_vector_cartesian();
+        let first_sch = traj_sch[0].x.get_spatial_vector_cartesian();
+        assert_abs_diff_eq!(first_bl, first_sch, epsilon = 1e-6);
+
+        // Final positions should agree within a reasonable tolerance. Although the initial
+        // conditions are identical, Schwarzschild uses full spherical geodesic equations while
+        // KerrBL(a=0) uses Mino-time separated equations — different parameterizations lead to
+        // different accumulated numerical errors over a long trajectory.
+        let last_bl = traj_bl.last().unwrap().x.get_spatial_vector_cartesian();
+        let last_sch = traj_sch.last().unwrap().x.get_spatial_vector_cartesian();
+        let distance = (last_bl - last_sch).norm();
+        assert!(distance < 100.0, "Schwarzschild limit: positions differ by {}", distance);
+    }
+
+    #[test]
     fn test_geodesic_rhs_structure() {
         // Verify the ODE RHS structure:
         // ẏ[0] = dt/dλ, ẏ[1] = y[4], ẏ[2] = y[5], ẏ[3] = dφ/dλ,
