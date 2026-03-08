@@ -134,7 +134,10 @@ impl Geometry for EuclideanSpaceSpherical {
     fn get_radial_coordinate(&self, position: &Point) -> f64 {
         match position.coordinate_system {
             CoordinateSystem::Cartesian => position.get_as_spherical()[0],
-            CoordinateSystem::Spherical | CoordinateSystem::BoyerLindquist { .. } => position[1],
+            CoordinateSystem::Spherical => position[1],
+            CoordinateSystem::BoyerLindquist { .. } => {
+                unreachable!("BoyerLindquist coordinates should not be used with EuclideanSpherical")
+            }
         }
     }
 

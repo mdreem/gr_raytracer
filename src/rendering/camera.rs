@@ -139,7 +139,7 @@ fn spatial_handedness(position: &Point, tetrad: &Tetrad) -> f64 {
     let triple_product = x.dot(&y.cross(&z));
     if !triple_product.is_finite() || triple_product.abs() <= 1e-12 {
         return match tetrad.x.coordinate_system {
-            // Spherical tetrads in this codebase use a left-handed spatial convention.
+            // Spherical and BoyerLindquist tetrads in this codebase use a left-handed spatial convention.
             CoordinateSystem::Spherical | CoordinateSystem::BoyerLindquist { .. } => -1.0,
             CoordinateSystem::Cartesian => 1.0,
         };
