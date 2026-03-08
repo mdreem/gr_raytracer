@@ -19,6 +19,29 @@ use crate::rendering::runge_kutta::OdeFunction;
 use crate::rendering::scene::EquationOfMotionState;
 use crate::rendering::temperature::{KerrTemperatureComputer, TemperatureComputer};
 
+/// Compute r² in Boyer-Lindquist from Cartesian (x, y, z) using the Kerr-Schild relation.
+fn compute_r_sqr(a: f64, x: f64, y: f64, z: f64) -> f64 {
+    let rho_sqr = x * x + y * y + z * z;
+    0.5 * (rho_sqr - a * a + ((rho_sqr - a * a).powi(2) + 4.0 * a * a * z * z).sqrt())
+}
+
+/// Jacobian ∂(x^Cartesian)/∂(x^BL) as a 4×4 matrix.
+/// Row μ, column ν = ∂x^μ_Cart / ∂x^ν_BL
+fn jacobian_bl_to_cartesian(a: f64, r: f64, theta: f64, phi: f64) -> Matrix4<f64> {
+    let (st, ct) = (theta.sin(), theta.cos());
+    let (sp, cp) = (phi.sin(), phi.cos());
+
+    #[rustfmt::skip]
+    let data = [
+        1.0, 0.0,        0.0,                  0.0,
+        0.0, st * cp,    (r * cp - a * sp) * ct, (-r * sp - a * cp) * st,
+        0.0, st * sp,    (r * sp + a * cp) * ct, ( r * cp - a * sp) * st,
+        0.0, ct,         -r * st,                0.0,
+    ];
+
+    Matrix4::from_row_slice(&data)
+}
+
 fn sigma(r: f64, a: f64, theta: f64) -> f64 {
     r * r + a * a * theta.cos().powi(2)
 }
@@ -111,14 +134,56 @@ impl GeodesicSolver for KerrBLSolver {
         EquationOfMotionState::from_column_slice(&[dt, v_r, v_theta, dphi, dv_r, dv_theta, 0.0, 0.0])
     }
 
-    fn create_initial_state(&self, _ray: &Ray) -> EquationOfMotionState {
-        // Will be implemented in Task 5
-        todo!()
+    fn create_initial_state(&self, ray: &Ray) -> EquationOfMotionState {
+        let (x, y, z) = (ray.position[1], ray.position[2], ray.position[3]);
+        let r_sqr = compute_r_sqr(self.a, x, y, z);
+        let r = r_sqr.sqrt();
+        let theta = if r == 0.0 { 0.0 } else { (z / r).clamp(-1.0, 1.0).acos() };
+        let phi = (r * y - self.a * x).atan2(r * x + self.a * y);
+        let t = ray.position[0];
+
+        // Compute initial Mino-time velocities from potentials (magnitude)
+        let r_pot = potential_r(r, self.radius, self.a, self.e, self.l_z, self.q);
+        let th_pot = potential_theta(theta, self.a, self.e, self.l_z, self.q);
+
+        // Determine sign from initial Cartesian momentum direction
+        let jacobian = jacobian_bl_to_cartesian(self.a, r, theta, phi);
+        let jacobian_inv = jacobian.try_inverse().expect("Jacobian should be invertible");
+        let p_bl_contra = jacobian_inv * ray.momentum.vector;
+
+        let sign_r = if p_bl_contra[1] >= 0.0 { 1.0 } else { -1.0 };
+        let sign_theta = if p_bl_contra[2] >= 0.0 { 1.0 } else { -1.0 };
+
+        let v_r = sign_r * r_pot.max(0.0).sqrt();
+        let v_theta = sign_theta * th_pot.max(0.0).sqrt();
+
+        EquationOfMotionState::from_column_slice(&[t, r, theta, phi, v_r, v_theta, 0.0, 0.0])
     }
 
-    fn momentum_from_state(&self, _y: &EquationOfMotionState) -> FourVector {
-        // Will be implemented in Task 5
-        todo!()
+    fn momentum_from_state(&self, y: &EquationOfMotionState) -> FourVector {
+        let r = y[1];
+        let theta = y[2];
+        let v_r = y[4];     // dr/dλ
+        let v_theta = y[5]; // dθ/dλ
+
+        let del = delta(r, self.radius, self.a);
+        let sig = sigma(r, self.a, theta);
+        let sin2 = theta.sin().powi(2);
+        let p_r_term = (r * r + self.a * self.a) * self.e - self.a * self.l_z;
+
+        // Algebraic Mino-time velocities for t and φ
+        let dt_dlambda = (r * r + self.a * self.a) / del * p_r_term
+            + self.a * (self.l_z - self.a * self.e * sin2);
+        let dphi_dlambda = self.a / del * p_r_term + self.l_z / sin2 - self.a * self.e;
+
+        // Convert Mino-time velocities to affine-parameter momentum: p^μ = (1/Σ) dx^μ/dλ
+        FourVector::new_boyer_lindquist(
+            self.a,
+            dt_dlambda / sig,
+            v_r / sig,
+            v_theta / sig,
+            dphi_dlambda / sig,
+        )
     }
 }
 
@@ -263,8 +328,49 @@ impl Geometry for KerrBL {
         false
     }
 
-    fn get_geodesic_solver(&self, _ray: &Ray) -> Box<dyn GeodesicSolver> {
-        todo!()
+    fn get_geodesic_solver(&self, ray: &Ray) -> Box<dyn GeodesicSolver> {
+        // Convert Cartesian position to BL coordinates
+        let (x, y, z) = (ray.position[1], ray.position[2], ray.position[3]);
+        let r_sqr = compute_r_sqr(self.a, x, y, z);
+        let r = r_sqr.sqrt();
+        let theta = if r == 0.0 { 0.0 } else { (z / r).clamp(-1.0, 1.0).acos() };
+
+        // Extract E and L_z from the Kerr-Schild covariant momentum, matching
+        // the same formula used by kerr::Kerr::get_constants_of_motion so that
+        // the conserved quantities are consistent between the two representations.
+        let f = r_sqr * r * self.radius / (r_sqr * r_sqr + self.a * self.a * z * z);
+        let k_x = (r * x + self.a * y) / (r_sqr + self.a * self.a);
+        let k_y = (r * y - self.a * x) / (r_sqr + self.a * self.a);
+        let k_z = z / r;
+        let p = &ray.momentum.vector;
+        // p_cov^KS = (η + f k⊗k) p^contra
+        let p_t_ks = (-1.0 + f) * p[0] + f * k_x * p[1] + f * k_y * p[2] + f * k_z * p[3];
+        let p_x_ks = f * k_x * p[0] + (1.0 + f * k_x * k_x) * p[1] + f * k_x * k_y * p[2] + f * k_x * k_z * p[3];
+        let p_y_ks = f * k_y * p[0] + f * k_y * k_x * p[1] + (1.0 + f * k_y * k_y) * p[2] + f * k_y * k_z * p[3];
+        let e = -p_t_ks;
+        let l_z = -y * p_x_ks + x * p_y_ks;
+
+        // Compute the BL theta-covariant momentum to derive the Carter constant Q.
+        // Use the Jacobian to get the BL contravariant momentum, then lower with BL metric.
+        let phi = (r * y - self.a * x).atan2(r * x + self.a * y);
+        let jacobian = jacobian_bl_to_cartesian(self.a, r, theta, phi);
+        let jacobian_inv = jacobian.try_inverse().expect("Jacobian should be invertible");
+        let p_bl_contra = jacobian_inv * ray.momentum.vector;
+        let g = metric_bl(self.radius, self.a, r, theta);
+        let p_bl_cov = g * p_bl_contra;
+        let p_theta = p_bl_cov[2];
+
+        let cos_t = theta.cos();
+        let sin_t = theta.sin();
+        let q = p_theta * p_theta + cos_t * cos_t * (l_z * l_z / (sin_t * sin_t) - self.a * self.a * e * e);
+
+        Box::new(KerrBLSolver {
+            radius: self.radius,
+            a: self.a,
+            e,
+            l_z,
+            q,
+        })
     }
 
     fn get_radial_coordinate(&self, position: &Point) -> f64 {
@@ -273,10 +379,20 @@ impl Geometry for KerrBL {
 
     fn get_constants_of_motion(
         &self,
-        _position: &Point,
-        _momentum: &FourVector,
+        position: &Point,
+        momentum: &FourVector,
     ) -> ConstantsOfMotion {
-        todo!()
+        let r = position[1];
+        let theta = position[2];
+        let g = metric_bl(self.radius, self.a, r, theta);
+        let p_cov = g * momentum.vector;
+        let e = -p_cov[0];
+        let l_z = p_cov[3];
+
+        let mut constants = ConstantsOfMotion::default();
+        constants.push("E", e);
+        constants.push("L_z", l_z);
+        constants
     }
 }
 
@@ -435,6 +551,76 @@ mod tests {
             - potential_theta(theta - h, a, e, l_z, q))
             / (2.0 * h);
         assert_abs_diff_eq!(dth_analytical, dth_numerical, epsilon = 1e-4);
+    }
+
+    #[test]
+    fn test_initial_null_condition() {
+        let radius = 1.0;
+        let a = 0.5;
+        let position = Point::new_cartesian(0.0, -10.0, 0.0, 2.0);
+        let kerr_bl = KerrBL::new(radius, a, 1e-4);
+
+        // Use the existing Kerr geometry to create a valid null ray
+        let kerr = crate::geometry::kerr::Kerr::new(radius, a, 1e-4);
+        use crate::geometry::geometry::SupportQuantities;
+        let velocity = kerr.get_stationary_velocity_at(&position);
+        let camera = crate::rendering::camera::Camera::new(
+            position, velocity, std::f64::consts::FRAC_PI_2,
+            11, 11, 0.0, 0.0, 0.0, &kerr,
+        ).unwrap();
+        let ray = camera.get_ray_for(5, 5);
+
+        let solver = kerr_bl.get_geodesic_solver(&ray);
+        let state = solver.create_initial_state(&ray);
+        let p = solver.momentum_from_state(&state);
+        let pos = Point::new(
+            state[0], state[1], state[2], state[3],
+            CoordinateSystem::BoyerLindquist { a },
+        );
+
+        let null_check = kerr_bl.inner_product(&pos, &p, &p);
+        assert_abs_diff_eq!(null_check, 0.0, epsilon = 1e-8);
+    }
+
+    #[test]
+    fn test_initial_conditions_constants_match_kerr() {
+        use crate::geometry::kerr::Kerr;
+        use crate::geometry::geometry::{Geometry, SupportQuantities};
+        use crate::rendering::camera::Camera;
+
+        let radius = 1.0;
+        let a = 0.5;
+        let position = Point::new_cartesian(0.0, -10.0, 0.0, 2.0);
+
+        let kerr = Kerr::new(radius, a, 1e-4);
+        let kerr_bl = KerrBL::new(radius, a, 1e-4);
+
+        let velocity = kerr.get_stationary_velocity_at(&position);
+        let camera_kerr = Camera::new(
+            position, velocity, std::f64::consts::FRAC_PI_2,
+            11, 11, 0.0, 0.0, 0.0, &kerr,
+        ).unwrap();
+        let ray = camera_kerr.get_ray_for(5, 5);
+
+        // Get constants from existing Kerr geometry (Cartesian Kerr-Schild)
+        let kerr_constants = kerr.get_constants_of_motion(&ray.position, &ray.momentum);
+        let kerr_e = kerr_constants.as_slice()[0].1;
+        let kerr_lz = kerr_constants.as_slice()[1].1;
+
+        // Get constants from KerrBL
+        let solver = kerr_bl.get_geodesic_solver(&ray);
+        let state = solver.create_initial_state(&ray);
+        let p = solver.momentum_from_state(&state);
+        let position_bl = Point::new(
+            state[0], state[1], state[2], state[3],
+            CoordinateSystem::BoyerLindquist { a },
+        );
+        let bl_constants = kerr_bl.get_constants_of_motion(&position_bl, &p);
+        let bl_e = bl_constants.as_slice()[0].1;
+        let bl_lz = bl_constants.as_slice()[1].1;
+
+        assert_abs_diff_eq!(kerr_e, bl_e, epsilon = 1e-6);
+        assert_abs_diff_eq!(kerr_lz, bl_lz, epsilon = 1e-6);
     }
 
     #[test]
