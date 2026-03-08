@@ -11,6 +11,16 @@ use std::ops::{Add, Index, Neg};
 pub enum CoordinateSystem {
     Cartesian,
     Spherical,
+    /// Boyer-Lindquist coordinates (t, r, θ, φ) for the Kerr metric.
+    ///
+    /// The Cartesian embedding used is the null-tetrad convention consistent with
+    /// the Kerr-Schild form used in `geometry/kerr.rs`:
+    ///   x = (r cosφ − a sinφ) sinθ
+    ///   y = (r sinφ + a cosφ) sinθ
+    ///   z = r cosθ
+    ///
+    /// Note: this differs from the oblate-spheroidal convention
+    /// (x = √(r²+a²) sinθ cosφ) used in some references.
     BoyerLindquist { a: f64 },
 }
 
@@ -141,12 +151,7 @@ impl Point {
                 let v = cartesian_to_spherical(&self);
                 Vector3::new(v[1], v[2], v[3])
             }
-            Spherical => Vector3::new(
-                self.vector[1],
-                wrap_theta(self.vector[2]),
-                wrap_phi(self.vector[3]),
-            ),
-            BoyerLindquist { .. } => Vector3::new(
+            Spherical | BoyerLindquist { .. } => Vector3::new(
                 self.vector[1],
                 wrap_theta(self.vector[2]),
                 wrap_phi(self.vector[3]),
@@ -203,12 +208,12 @@ mod tests {
         let phi = 0.8_f64;
         let bl = Point::new(0.0, r, theta, phi, CoordinateSystem::BoyerLindquist { a });
         let cart = bl.to_cartesian();
-        let expected_x = (r * phi.cos() - a * phi.sin()) * theta.sin();
-        let expected_y = (r * phi.sin() + a * phi.cos()) * theta.sin();
-        let expected_z = r * theta.cos();
-        assert_abs_diff_eq!(cart[1], expected_x, epsilon = 1e-12);
-        assert_abs_diff_eq!(cart[2], expected_y, epsilon = 1e-12);
-        assert_abs_diff_eq!(cart[3], expected_z, epsilon = 1e-12);
+        // Expected values computed independently: x = (r cosφ - a sinφ) sinθ, etc.
+        // cos(0.8) ≈ 0.6967067093471654, sin(0.8) ≈ 0.7173560908995228
+        // sin(1.2) ≈ 0.9320390309173473, cos(1.2) ≈ 0.3623577544766736
+        assert_abs_diff_eq!(cart[1], 2.91248746519832302226_f64, epsilon = 1e-10);
+        assert_abs_diff_eq!(cart[2], 3.66769851865865170737_f64, epsilon = 1e-10);
+        assert_abs_diff_eq!(cart[3], 1.81178877238336810684_f64, epsilon = 1e-10);
     }
 
     #[test]
