@@ -50,8 +50,9 @@ cargo run --release -- \
 
 ## Notes
 
-- `--max-steps=1000000` is needed for KerrBL which uses finer integration steps near the
-  horizon. Schwarzschild and Kerr can use lower values (e.g. 100000) if speed matters.
+- `--max-steps=1000000` is used here for safety, but the default (15000) works fine for all
+  three geometries at this camera position. Increase it if rays near the horizon terminate
+  early with a `MaxSteps` stop reason.
 - KerrBL is significantly faster than Kerr (~8-9× at 500×500, benchmarked at ~112s vs ~13s)
   because it uses separated equations of motion (Carter constant) instead of a generic ODE
   integrator.
