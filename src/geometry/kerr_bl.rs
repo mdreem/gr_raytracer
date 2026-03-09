@@ -508,10 +508,16 @@ impl Geometry for KerrBL {
     fn get_radial_coordinate(&self, position: &Point) -> f64 {
         match position.coordinate_system {
             CoordinateSystem::BoyerLindquist { .. } => position[1],
-            _ => {
-                // Disc intersections return Cartesian points; convert to BL r.
+            CoordinateSystem::Cartesian => {
+                // Disc intersections (disc.rs) always produce Cartesian points.
                 let (x, y, z) = (position[1], position[2], position[3]);
                 compute_r_sqr(self.a, x, y, z).sqrt()
+            }
+            CoordinateSystem::Spherical => {
+                unreachable!(
+                    "KerrBL::get_radial_coordinate called with Spherical coordinates; \
+                     only BoyerLindquist and Cartesian are expected"
+                )
             }
         }
     }
