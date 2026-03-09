@@ -53,9 +53,8 @@ cargo run --release -- \
 - `--max-steps=1000000` is used here for safety, but the default (15000) works fine for all
   three geometries at this camera position. Increase it if rays near the horizon terminate
   early with a `MaxSteps` stop reason.
-- KerrBL is significantly faster than Kerr (~8-9× at 500×500, benchmarked at ~112s vs ~13s)
-  because it uses separated equations of motion (Carter constant) instead of a generic ODE
-  integrator.
+- KerrBL is significantly faster than Kerr (~8-9× at 500×500) because it uses separated
+  equations of motion (Carter constant) instead of a generic ODE integrator.
 - The spin parameter `a=0.499` (nearly maximal) is set in the TOML files.
 - Rendering is parallelised with Rayon. To control the number of threads, set
   `RAYON_NUM_THREADS` before running:
