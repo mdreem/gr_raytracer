@@ -652,6 +652,28 @@ mod tests {
         assert_abs_diff_eq!(kerr.get_radial_coordinate(&position), 7.5);
     }
 
+    /// Disc intersections always return Cartesian points (see disc.rs `Intersection`).
+    /// Verify `get_radial_coordinate` gives the correct BL r even for Cartesian input,
+    /// and that BL and Cartesian inputs at the same physical position agree.
+    #[test]
+    fn test_get_radial_coordinate_cartesian_input() {
+        let a = 0.5_f64;
+        let kerr = KerrBL::new(1.0, a, 1e-4);
+
+        // Pick BL coordinates and convert to Cartesian (the embedding used by disc.rs).
+        let r = 7.5_f64;
+        let theta = std::f64::consts::FRAC_PI_2; // equatorial — simplest case
+        let phi = 0.8_f64;
+        let bl_pos = Point::new(0.0, r, theta, phi, CoordinateSystem::BoyerLindquist { a });
+        let cart_pos = bl_pos.to_cartesian(); // uses the BL→Cartesian embedding
+
+        // Both coordinate representations of the same physical point must give the same r.
+        let r_from_bl = kerr.get_radial_coordinate(&bl_pos);
+        let r_from_cart = kerr.get_radial_coordinate(&cart_pos);
+        assert_abs_diff_eq!(r_from_bl, r, epsilon = 1e-10);
+        assert_abs_diff_eq!(r_from_cart, r, epsilon = 1e-10);
+    }
+
     #[test]
     fn test_potential_r_non_negative_allowed_region() {
         // R(r) must be non-negative for physically allowed radial motion
