@@ -57,3 +57,8 @@ cargo run --release -- \
   because it uses separated equations of motion (Carter constant) instead of a generic ODE
   integrator.
 - The spin parameter `a=0.499` (nearly maximal) is set in the TOML files.
+- Rendering is parallelised with Rayon. To control the number of threads, set
+  `RAYON_NUM_THREADS` before running:
+  ```bash
+  RAYON_NUM_THREADS=4 cargo run --release -- ...
+  ```
