@@ -384,7 +384,10 @@ impl Geometry for KerrBL {
         let e_th = FourVector::new(0.0, 0.0, 1.0, 0.0, coord_sys);
         let e_ph = FourVector::new(0.0, 0.0, 0.0, 1.0, coord_sys);
 
-        let basis = gram_schmidt(self, position, &[e_t, e_r, e_th, e_ph]);
+        // Order matches Schwarzschild convention: (t, phi, theta, r) so that
+        // Tetrad.z (forward/away-from-camera) = radial direction and the camera
+        // looks inward by default, consistent with Kerr and Schwarzschild.
+        let basis = gram_schmidt(self, position, &[e_t, e_ph, e_th, e_r]);
         Tetrad::new(*position, basis[0], basis[1], basis[2], basis[3])
     }
 
@@ -503,7 +506,14 @@ impl Geometry for KerrBL {
     }
 
     fn get_radial_coordinate(&self, position: &Point) -> f64 {
-        position[1]
+        match position.coordinate_system {
+            CoordinateSystem::BoyerLindquist { .. } => position[1],
+            _ => {
+                // Disc intersections return Cartesian points; convert to BL r.
+                let (x, y, z) = (position[1], position[2], position[3]);
+                compute_r_sqr(self.a, x, y, z).sqrt()
+            }
+        }
     }
 
     fn get_constants_of_motion(
