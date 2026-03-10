@@ -534,9 +534,22 @@ impl Geometry for KerrBL {
         let e = -p_cov[0];
         let l_z = p_cov[3];
 
+        // Carter constant Q = p_θ² + cos²θ (L_z²/sin²θ − a²E²)
+        // (null geodesic / massless form, μ = 0).
+        // p_θ here is the covariant BL component p_cov[2] = g_θθ p^θ = Σ p^θ.
+        // Near sin²θ = 0 (axis) the L_z²/sin²θ term diverges; guard with a
+        // small floor to produce a finite value. For geodesics that actually
+        // reach the axis L_z must be 0, so the guarded term vanishes anyway.
+        let p_theta_cov = p_cov[2];
+        let cos_t = theta.cos();
+        let sin2 = theta.sin().powi(2);
+        let q = p_theta_cov * p_theta_cov
+            + cos_t * cos_t * (l_z * l_z / sin2.max(1e-28) - self.a * self.a * e * e);
+
         let mut constants = ConstantsOfMotion::default();
         constants.push("E", e);
         constants.push("L_z", l_z);
+        constants.push("Q", q);
         constants
     }
 }
