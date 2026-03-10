@@ -992,11 +992,13 @@ mod tests {
         let initial_constants = kerr_bl.get_constants_of_motion(&trajectory[0].x, &trajectory[0].p);
         let e_init = initial_constants.as_slice()[0].1;
         let lz_init = initial_constants.as_slice()[1].1;
+        let q_init = initial_constants.as_slice()[2].1;
 
         for step in trajectory.iter().skip(1) {
             let constants = kerr_bl.get_constants_of_motion(&step.x, &step.p);
             let e = constants.as_slice()[0].1;
             let lz = constants.as_slice()[1].1;
+            let q = constants.as_slice()[2].1;
 
             let e_drift = if e_init.abs() > 1e-12 {
                 (e - e_init).abs() / e_init.abs()
@@ -1008,9 +1010,15 @@ mod tests {
             } else {
                 (lz - lz_init).abs()
             };
+            let q_drift = if q_init.abs() > 1e-12 {
+                (q - q_init).abs() / q_init.abs()
+            } else {
+                (q - q_init).abs()
+            };
 
             assert!(e_drift < 1e-4, "Energy drift {:.3e} at step {}", e_drift, step.step);
             assert!(lz_drift < 1e-4, "L_z drift {:.3e} at step {}", lz_drift, step.step);
+            assert!(q_drift < 1e-4, "Carter Q drift {:.3e} at step {}", q_drift, step.step);
         }
     }
 
