@@ -812,22 +812,16 @@ mod tests {
         assert!(e_cart > 0.5 && e_cart < 2.0, "BL E from Cartesian ray = {e_cart} out of expected range");
 
         // --- Test with a BL ray input ---
-        // Build a BL ray directly: take the same Cartesian position and convert to BL,
-        // then convert the Cartesian contravariant momentum to BL via the Jacobian inverse.
-        // This avoids creating a full scene (which requires stable circular orbits for the
-        // disk temperature computer and may fail for some spin values).
-        let position_bl = kerr_bl.cartesian_to_bl(&ray_cart.position);
-        let (x2, y2, z2) = (ray_cart.position[1], ray_cart.position[2], ray_cart.position[3]);
-        let r2 = compute_r_sqr(a, x2, y2, z2).sqrt();
-        let theta2 = if r2 == 0.0 { 0.0 } else { (z2 / r2).clamp(-1.0, 1.0).acos() };
-        let phi_bl2 = (r2 * y2 - a * x2).atan2(r2 * x2 + a * y2);
-        let j2 = jacobian_bl_to_cartesian(a, r2, theta2, phi_bl2);
-        let j2_inv = j2.try_inverse().expect("BL Jacobian invertible");
-        let p2_bl = j2_inv * ray_cart.momentum.vector;
-        let momentum_bl = FourVector::new_boyer_lindquist(a,
-            p2_bl[0], p2_bl[1], p2_bl[2], p2_bl[3]);
-        let ray_bl = crate::rendering::ray::Ray::new(ray_cart.row, ray_cart.col,
-            position_bl, momentum_bl);
+        // Build a BL ray by going through the production code path:
+        // get_geodesic_solver handles Cartesian input, create_initial_state converts to BL internally.
+        let solver_via_cart = kerr_bl.get_geodesic_solver(&ray_cart);
+        let state_from_cart = solver_via_cart.create_initial_state(&ray_cart);
+        let position_bl = Point::new(
+            state_from_cart[0], state_from_cart[1], state_from_cart[2], state_from_cart[3],
+            CoordinateSystem::BoyerLindquist { a },
+        );
+        let p_bl_fv = solver_via_cart.momentum_from_state(&state_from_cart);
+        let ray_bl = crate::rendering::ray::Ray::new(ray_cart.row, ray_cart.col, position_bl, p_bl_fv);
 
         let solver_bl = kerr_bl.get_geodesic_solver(&ray_bl);
         let state_bl = solver_bl.create_initial_state(&ray_bl);
@@ -900,7 +894,6 @@ mod tests {
         use crate::geometry::geometry::SupportQuantities;
         use crate::geometry::kerr::Kerr;
         use crate::rendering::camera::Camera;
-        use crate::rendering::ray::Ray;
         use crate::rendering::scene;
         use crate::rendering::scene::Scene;
 
@@ -919,25 +912,10 @@ mod tests {
         let ray_kerr = scene_kerr.camera.get_ray_for(5, 8);
 
         // KerrBL (Boyer-Lindquist) scene.
-        // To test that both integrators integrate the SAME null geodesic, convert the
-        // Cartesian Kerr ray to Boyer-Lindquist coordinates. The BL Jacobian maps
-        // the contravariant momentum from Cartesian to BL. The KerrBL integrator then
-        // uses these BL coordinates directly (Fix 1/Fix 2: coordinate-aware solver).
+        // Pass the Cartesian ray directly — get_geodesic_solver handles the
+        // Cartesian → BL conversion internally via create_initial_state.
         let kerr_bl = KerrBL::new(radius, a, 1e-5);
         let position_bl = kerr_bl.cartesian_to_bl(&ray_kerr.position);
-
-        // Convert Cartesian contravariant momentum → BL via the BL Jacobian inverse.
-        let (x, y, z) = (ray_kerr.position[1], ray_kerr.position[2], ray_kerr.position[3]);
-        let r_sqr = compute_r_sqr(a, x, y, z);
-        let r_val = r_sqr.sqrt();
-        let theta_val = if r_val == 0.0 { 0.0 } else { (z / r_val).clamp(-1.0, 1.0).acos() };
-        let phi_bl_val = (r_val * y - a * x).atan2(r_val * x + a * y);
-        let j_bl = jacobian_bl_to_cartesian(a, r_val, theta_val, phi_bl_val);
-        let j_bl_inv = j_bl.try_inverse().expect("BL Jacobian invertible");
-        let p_bl_contra = j_bl_inv * ray_kerr.momentum.vector;
-        let momentum_bl = FourVector::new_boyer_lindquist(a,
-            p_bl_contra[0], p_bl_contra[1], p_bl_contra[2], p_bl_contra[3]);
-        let ray_bl = Ray::new(ray_kerr.row, ray_kerr.col, position_bl, momentum_bl);
 
         let velocity_bl = kerr_bl.get_stationary_velocity_at(&position_bl);
         let camera_bl = Camera::new(position_bl, velocity_bl, std::f64::consts::FRAC_PI_2,
@@ -947,7 +925,7 @@ mod tests {
                 .unwrap();
 
         let (traj_kerr, stop_kerr) = scene_kerr.integrator.integrate(&ray_kerr).unwrap();
-        let (traj_bl, stop_bl) = scene_bl.integrator.integrate(&ray_bl).unwrap();
+        let (traj_bl, stop_bl) = scene_bl.integrator.integrate(&ray_kerr).unwrap();
 
         assert_eq!(stop_kerr, stop_bl);
 
