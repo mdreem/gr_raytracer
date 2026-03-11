@@ -14,7 +14,7 @@ horizon_epsilon = 1e-4
 [[objects]]
 
 [objects.Disc]
-inner_radius = 0.795
+inner_radius = 0.795  # outside prograde ISCO (r_ISCO ≈ 0.619 r_s for a=0.499, M=r_s/2)
 outer_radius = 15.0
 temperature = 2000.0
 
