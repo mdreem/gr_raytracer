@@ -30,7 +30,7 @@ pub struct App {
     #[clap(flatten)]
     pub global_opts: GlobalOpts,
     #[arg(short, long)]
-    pub config_file: String,
+    pub config_file: Option<String>,
     #[command(subcommand)]
     pub action: Action,
 }
@@ -64,5 +64,11 @@ pub enum Action {
         direction: Vec<f64>,
         #[arg(long, default_value = "rendered-ray-at.csv")]
         filename: String,
+    },
+    Blackbody {
+        #[arg(short, long)]
+        temperature: f64,
+        #[arg(short, long, default_value = "1.0")]
+        redshift: f64,
     },
 }
