@@ -71,4 +71,20 @@ pub enum Action {
         #[arg(short, long, default_value = "1.0")]
         redshift: f64,
     },
+    BlackbodySpectrum {
+        #[arg(long, default_value = "1000.0")]
+        min_temperature: f64,
+        #[arg(long, default_value = "10000.0")]
+        max_temperature: f64,
+        #[arg(long, default_value = "0.5")]
+        min_redshift: f64,
+        #[arg(long, default_value = "2.0")]
+        max_redshift: f64,
+        #[arg(long, default_value = "1000")]
+        width: u32,
+        #[arg(long, default_value = "1000")]
+        height: u32,
+        #[arg(short, long, default_value = "blackbody_spectrum.png")]
+        filename: String,
+    },
 }
