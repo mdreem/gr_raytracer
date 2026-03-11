@@ -912,8 +912,11 @@ mod tests {
         let ray_kerr = scene_kerr.camera.get_ray_for(5, 8);
 
         // KerrBL (Boyer-Lindquist) scene.
-        // Pass the Cartesian ray directly — get_geodesic_solver handles the
-        // Cartesian → BL conversion internally via create_initial_state.
+        // cartesian_to_bl is still needed here to build a BL-coordinate camera for the
+        // scene constructor (which requires a BL-coordinate observer velocity). The camera
+        // does not affect which geodesic is traced; ray_kerr is passed directly to
+        // integrator.integrate below, and get_geodesic_solver handles the Cartesian → BL
+        // conversion internally via create_initial_state.
         let kerr_bl = KerrBL::new(radius, a, 1e-5);
         let position_bl = kerr_bl.cartesian_to_bl(&ray_kerr.position);
 
