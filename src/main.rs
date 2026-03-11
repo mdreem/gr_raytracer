@@ -16,6 +16,8 @@ use std::fs;
 use std::fs::File;
 use std::time::Instant;
 
+use crate::cli::blackbody::print_blackbody_color;
+
 fn main() {
     env_logger::Builder::from_env(env_logger::Env::default().default_filter_or("info")).init();
     if let Err(e) = run() {
@@ -26,8 +28,30 @@ fn main() {
 
 fn run() -> Result<(), RaytracerError> {
     let args = App::parse();
-
     let start = Instant::now();
+
+    if let Action::Blackbody {
+        temperature,
+        redshift,
+    } = args.action
+    {
+        print_blackbody_color(temperature, redshift);
+        return Ok(());
+    }
+
+    let config_path = args.config_file.as_ref().ok_or_else(|| {
+        RaytracerError::InvalidConfiguration("Config file is required for this action".to_string())
+    })?;
+    if !std::path::Path::new(config_path).exists() {
+        return Err(RaytracerError::InvalidConfiguration(format!(
+            "Config file not found: {}",
+            config_path
+        )));
+    }
+    let config_content =
+        fs::read_to_string(config_path).map_err(RaytracerError::ConfigurationFileError)?;
+    let config: RenderConfig = toml::from_str(&config_content).map_err(RaytracerError::TomlError)?;
+
     match args.action {
         Action::Render {
             filename,
@@ -36,12 +60,6 @@ fn run() -> Result<(), RaytracerError> {
             to_row,
             to_col,
         } => {
-            let config_file = fs::read_to_string(args.config_file)
-                .map_err(RaytracerError::ConfigurationFileError)?;
-
-            let config: RenderConfig =
-                toml::from_str(config_file.as_str()).map_err(RaytracerError::TomlError)?;
-
             if args.global_opts.camera_position.len() != 3 {
                 return Err(RaytracerError::InvalidConfiguration(
                     "Camera position must be a vector of length 3".to_string(),
@@ -73,12 +91,6 @@ fn run() -> Result<(), RaytracerError> {
             )?;
         }
         Action::RenderRay { row, col, filename } => {
-            let config_file = fs::read_to_string(args.config_file)
-                .map_err(RaytracerError::ConfigurationFileError)?;
-
-            let config: RenderConfig =
-                toml::from_str(config_file.as_str()).map_err(RaytracerError::TomlError)?;
-
             if args.global_opts.camera_position.len() != 3 {
                 return Err(RaytracerError::InvalidConfiguration(
                     "Camera position must be a vector of length 3".to_string(),
@@ -121,10 +133,6 @@ fn run() -> Result<(), RaytracerError> {
                 )));
             }
             let mut file = File::create(filename.clone()).map_err(RaytracerError::IoError)?;
-            let config_file = fs::read_to_string(args.config_file)
-                .map_err(RaytracerError::ConfigurationFileError)?;
-            let config: RenderConfig =
-                toml::from_str(config_file.as_str()).map_err(RaytracerError::TomlError)?;
 
             config
                 .geometry_type
@@ -137,6 +145,7 @@ fn run() -> Result<(), RaytracerError> {
                 )?;
             info!("Saved integrated ray to {}", filename);
         }
+        Action::Blackbody { .. } => unreachable!(),
     }
 
     let duration = start.elapsed();
