@@ -1220,11 +1220,6 @@ mod tests {
         let redshift_bl = redshift_computer_bl.compute_redshift(last_bl, observer_energy_bl);
         let redshift_sch = redshift_computer_sch.compute_redshift(last_sch, observer_energy_sch);
 
-        println!("KerrBL redshift: {redshift_bl:.6}");
-        println!("Schwarzschild redshift: {redshift_sch:.6}");
-        println!("KerrBL traj len: {}", traj_bl.len());
-        println!("Schwarzschild traj len: {}", traj_sch.len());
-
         assert_abs_diff_eq!(redshift_bl, redshift_sch, epsilon = 0.01);
     }
 
