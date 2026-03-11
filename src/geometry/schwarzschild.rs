@@ -193,7 +193,12 @@ impl Geometry for Schwarzschild {
     fn get_radial_coordinate(&self, position: &Point) -> f64 {
         match position.coordinate_system {
             CoordinateSystem::Cartesian => position.get_as_spherical()[0],
-            CoordinateSystem::Spherical | CoordinateSystem::BoyerLindquist { .. } => position[1],
+            CoordinateSystem::Spherical => position[1],
+            // BL with a=0 reduces to Schwarzschild spherical; position[1] is r in both.
+            CoordinateSystem::BoyerLindquist { a } => {
+                debug_assert_eq!(a, 0.0, "Schwarzschild only accepts BL coordinates with a=0");
+                position[1]
+            }
         }
     }
 
