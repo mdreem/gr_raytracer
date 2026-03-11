@@ -11,6 +11,7 @@ pub fn run_blackbody(temperature: f64, redshift: f64) {
     );
     println!("XYZ:  {:.4}, {:.4}, {:.4}", cie_xyz.x, cie_xyz.y, cie_xyz.z);
     println!("sRGB: R={}, G={}, B={}", color.r, color.g, color.b);
+    println!("Color block: \x1b[48;2;{};{};{}m      \x1b[0m", color.r, color.g, color.b);
 }
 
 pub fn run_blackbody_spectrum(
