@@ -21,6 +21,13 @@ pub enum CoordinateSystem {
     ///
     /// Note: this differs from the oblate-spheroidal convention
     /// (x = √(r²+a²) sinθ cosφ) used in some references.
+    ///
+    /// # Note on equality
+    /// `PartialEq` is derived, which compares `a` with exact `f64` equality.
+    /// This is correct as long as `a` is always initialised from the same
+    /// compile-time constant (e.g. `kerr_bl.a`) rather than an independent
+    /// floating-point computation. Do not compare `CoordinateSystem` values
+    /// whose `a` fields have been computed independently.
     BoyerLindquist { a: f64 },
 }
 
@@ -151,6 +158,10 @@ impl Point {
                 let v = cartesian_to_spherical(&self);
                 Vector3::new(v[1], v[2], v[3])
             }
+            // For BoyerLindquist coordinates, this returns the BL (r, θ, φ) components
+            // with angle normalisation applied. Callers that need to convert BL vectors
+            // (e.g. for a Jacobian) must use the BL Jacobian, not the standard spherical
+            // Jacobian — the BL Cartesian embedding differs from oblate-spheroidal when a ≠ 0.
             Spherical | BoyerLindquist { .. } => Vector3::new(
                 self.vector[1],
                 wrap_theta(self.vector[2]),
