@@ -968,9 +968,11 @@ mod tests {
         let last_kerr_cart = traj_kerr.last().unwrap().x.get_spatial_vector_cartesian();
         let last_bl_cart = traj_bl.last().unwrap().x.get_spatial_vector_cartesian();
         let distance = (last_kerr_cart - last_bl_cart).norm();
+        // The observed worst-case difference is ~1114 units on a 10000-unit celestial sphere.
+        // Tolerance is set to 1.25× the observed value.
         assert!(
-            distance < 2000.0,
-            "Final positions differ by {} (should be < 2000)",
+            distance < 1393.0,
+            "Final positions differ by {:.1} (should be < 1393.0)",
             distance
         );
     }
