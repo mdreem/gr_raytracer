@@ -19,6 +19,11 @@ use crate::rendering::runge_kutta::OdeFunction;
 use crate::rendering::scene::EquationOfMotionState;
 use crate::rendering::temperature::{KerrTemperatureComputer, TemperatureComputer};
 
+/// Floor for sin²θ used when computing L_z²/sin²θ in the Carter constant Q.
+/// Prevents division by zero for rays exactly on the rotation axis (θ=0 or π),
+/// which cannot arise for physical rays but may occur due to floating-point rounding.
+const SIN2_FLOOR: f64 = 1e-28;
+
 /// Compute r² in Boyer-Lindquist from Cartesian (x, y, z) using the Kerr-Schild relation.
 fn compute_r_sqr(a: f64, x: f64, y: f64, z: f64) -> f64 {
     let rho_sqr = x * x + y * y + z * z;
@@ -507,7 +512,7 @@ impl Geometry for KerrBL {
         let cos_t = theta.cos();
         let sin_t = theta.sin();
         let sin2 = sin_t * sin_t;
-        let q = p_theta * p_theta + cos_t * cos_t * (l_z * l_z / sin2.max(1e-28) - self.a * self.a * e * e);
+        let q = p_theta * p_theta + cos_t * cos_t * (l_z * l_z / sin2.max(SIN2_FLOOR) - self.a * self.a * e * e);
 
         Box::new(KerrBLSolver {
             radius: self.radius,
@@ -557,7 +562,7 @@ impl Geometry for KerrBL {
         let cos_t = theta.cos();
         let sin2 = theta.sin().powi(2);
         let q = p_theta_cov * p_theta_cov
-            + cos_t * cos_t * (l_z * l_z / sin2.max(1e-28) - self.a * self.a * e * e);
+            + cos_t * cos_t * (l_z * l_z / sin2.max(SIN2_FLOOR) - self.a * self.a * e * e);
 
         let mut constants = ConstantsOfMotion::default();
         constants.push("E", e);
@@ -1150,16 +1155,18 @@ mod tests {
         let a = 0.0;
         let position_cart = Point::new_cartesian(0.0, -10.0, 0.0, 2.0);
 
-        // KerrBL(a=0) scene
+        // KerrBL(a=0) scene. The camera is constructed in Cartesian coordinates
+        // (using the Kerr stationary velocity); get_geodesic_solver handles the
+        // Cartesian-to-BL conversion internally when integrating the geodesic.
         let kerr = Kerr::new(radius, a, 1e-5);
         let velocity_cart = kerr.get_stationary_velocity_at(&position_cart);
-        let camera_bl = Camera::new(
+        let camera_cart = Camera::new(
             position_cart, velocity_cart.clone(),
             std::f64::consts::FRAC_PI_2, 11, 11, 0.0, 0.0, 0.0, &kerr,
         ).unwrap();
         let kerr_bl = KerrBL::new(radius, a, 1e-5);
         let scene_bl: scene::Scene<KerrBL> =
-            scene::test_scene::create_scene_with_camera(1.0, 2.0, 7.0, &kerr_bl, camera_bl, 1e-6)
+            scene::test_scene::create_scene_with_camera(1.0, 2.0, 7.0, &kerr_bl, camera_cart, 1e-6)
                 .unwrap();
 
         // Schwarzschild scene: same camera position, spherical coords
