@@ -1134,6 +1134,101 @@ mod tests {
     }
 
     #[test]
+    fn test_redshift_agreement_schwarzschild_limit() {
+        // When a=0, KerrBL reduces to Schwarzschild. Verify that the redshift factor
+        // (emitter energy / observer energy) agrees between the two geometries for
+        // a ray that hits the disc. This validates momentum_from_state and the
+        // full rendering pipeline end-to-end.
+        use crate::geometry::kerr::Kerr;
+        use crate::geometry::schwarzschild::Schwarzschild;
+        use crate::geometry::spherical_coordinates_helper::cartesian_to_spherical;
+        use crate::rendering::camera::Camera;
+        use crate::rendering::redshift::RedshiftComputer;
+        use crate::rendering::scene;
+
+        let radius = 1.0;
+        let a = 0.0;
+        let position_cart = Point::new_cartesian(0.0, -10.0, 0.0, 2.0);
+
+        // KerrBL(a=0) scene
+        let kerr = Kerr::new(radius, a, 1e-5);
+        let velocity_cart = kerr.get_stationary_velocity_at(&position_cart);
+        let camera_bl = Camera::new(
+            position_cart, velocity_cart.clone(),
+            std::f64::consts::FRAC_PI_2, 11, 11, 0.0, 0.0, 0.0, &kerr,
+        ).unwrap();
+        let kerr_bl = KerrBL::new(radius, a, 1e-5);
+        let scene_bl: scene::Scene<KerrBL> =
+            scene::test_scene::create_scene_with_camera(1.0, 2.0, 7.0, &kerr_bl, camera_bl, 1e-6)
+                .unwrap();
+
+        // Schwarzschild scene: same camera position, spherical coords
+        let position_sph = cartesian_to_spherical(&position_cart);
+        let schwarzschild = Schwarzschild::new(radius, 1e-5);
+        let r_val = position_sph[1];
+        let a_factor = 1.0 - radius / r_val;
+        let velocity_sph = FourVector::new_spherical(a_factor.sqrt().recip(), 0.0, 0.0, 0.0);
+        let camera_sch = Camera::new(
+            position_sph, velocity_sph.clone(),
+            std::f64::consts::FRAC_PI_2, 11, 11, 0.0, 0.0, 0.0, &schwarzschild,
+        ).unwrap();
+        let scene_sch: scene::Scene<Schwarzschild> =
+            scene::test_scene::create_scene_with_camera(1.0, 2.0, 7.0, &schwarzschild, camera_sch, 1e-6)
+                .unwrap();
+
+        // Integrate the same pixel in both geometries and collect trajectories
+        let ray_bl = scene_bl.camera.get_ray_for(3, 7);
+        let ray_sch = scene_sch.camera.get_ray_for(3, 7);
+
+        let (traj_bl, _) = scene_bl.integrator.integrate(&ray_bl).unwrap();
+        let (traj_sch, _) = scene_sch.integrator.integrate(&ray_sch).unwrap();
+
+        assert!(traj_bl.len() > 2, "KerrBL trajectory too short: {} steps", traj_bl.len());
+        assert!(traj_sch.len() > 2, "Schwarzschild trajectory too short: {} steps", traj_sch.len());
+
+        // Compute observer energies (g_μν v^μ_obs k^ν at the camera position).
+        // KerrBL::inner_product requires BL coordinates; the first trajectory step is already
+        // in BL coords (KerrBLSolver::create_initial_state converts Cartesian → BL internally).
+        // Build a BL-coordinate Ray from the first step so that inner_product does not panic.
+        let redshift_computer_bl = RedshiftComputer::new(&kerr_bl);
+        let redshift_computer_sch = RedshiftComputer::new(&schwarzschild);
+
+        let first_bl = &traj_bl[0];
+        let ray_bl_coords = Ray::new(
+            ray_bl.row, ray_bl.col,
+            first_bl.x,
+            first_bl.p,
+        );
+        // Observer velocity in BL coords: stationary observer at the initial BL position.
+        // When a=0, this is u^μ = ((1-r_s/r)^{-1/2}, 0, 0, 0) in BL ≡ Schwarzschild coords.
+        let r_bl = first_bl.x[1];
+        let a_factor_bl = 1.0 - radius / r_bl;
+        let velocity_bl = FourVector::new(
+            a_factor_bl.sqrt().recip(), 0.0, 0.0, 0.0,
+            crate::geometry::point::CoordinateSystem::BoyerLindquist { a },
+        );
+        let observer_energy_bl = redshift_computer_bl.get_observer_energy(&ray_bl_coords, &velocity_bl);
+        let observer_energy_sch = redshift_computer_sch.get_observer_energy(&ray_sch, &velocity_sph);
+
+        // Compare the redshift at the last trajectory step.
+        // Both geometries trace the same physical geodesic (a=0), so the redshift
+        // factor (which depends on g_μν at the emission point and the local ZAMO
+        // velocity) must agree within integration tolerance.
+        let last_bl = traj_bl.last().unwrap();
+        let last_sch = traj_sch.last().unwrap();
+
+        let redshift_bl = redshift_computer_bl.compute_redshift(last_bl, observer_energy_bl);
+        let redshift_sch = redshift_computer_sch.compute_redshift(last_sch, observer_energy_sch);
+
+        println!("KerrBL redshift: {redshift_bl:.6}");
+        println!("Schwarzschild redshift: {redshift_sch:.6}");
+        println!("KerrBL traj len: {}", traj_bl.len());
+        println!("Schwarzschild traj len: {}", traj_sch.len());
+
+        assert_abs_diff_eq!(redshift_bl, redshift_sch, epsilon = 0.01);
+    }
+
+    #[test]
     fn test_geodesic_rhs_structure() {
         // Verify the ODE RHS structure:
         // ẏ[0] = dt/dλ, ẏ[1] = y[4], ẏ[2] = y[5], ẏ[3] = dφ/dλ,
