@@ -83,6 +83,10 @@ fn potential_r_derivative(r: f64, r_s: f64, a: f64, e: f64, l_z: f64, q: f64) ->
 /// there would be an additional `−a²cos²θ` term from the mass contribution to the Carter
 /// constant identity. All rays in this renderer are null geodesics, so μ = 0 is assumed
 /// throughout.
+///
+/// NOTE: the L_z²cos²θ/sin²θ term diverges at the poles (θ = 0, π). This function
+/// assumes θ is bounded away from the poles. Near-axial trajectories with L_z ≈ 0
+/// are safe; others will produce ±inf which the caller must handle.
 fn potential_theta(theta: f64, a: f64, e: f64, l_z: f64, q: f64) -> f64 {
     let cos_t = theta.cos();
     let sin_t = theta.sin();
@@ -94,6 +98,8 @@ fn potential_theta(theta: f64, a: f64, e: f64, l_z: f64, q: f64) -> f64 {
 /// This form is valid for **massless (photon) geodesics** (μ = 0). For massive particles
 /// there would be an additional `+2a²cosθsinθ` term from the mass contribution. All rays
 /// in this renderer are null geodesics, so μ = 0 is assumed throughout.
+///
+/// NOTE: the 2L_z²cosθ/sin³θ term diverges at the poles. Same caveat as potential_theta.
 fn potential_theta_derivative(theta: f64, a: f64, e: f64, l_z: f64, _q: f64) -> f64 {
     let cos_t = theta.cos();
     let sin_t = theta.sin();
@@ -135,7 +141,13 @@ impl GeodesicSolver for KerrBLSolver {
         let sin2 = sin_t * sin_t;
         let dt = (r * r + self.a * self.a) / del * p_r + self.a * (self.l_z - self.a * self.e * sin2);
 
-        // dφ/dλ = a/Δ * P_r + L_z/sin²θ - aE
+        // dφ/dλ = a/Δ * P_r + L_z/sin²θ − aE
+        // NOTE: L_z/sin²θ diverges as θ → 0 or π (the poles). This implementation
+        // assumes θ stays bounded away from the poles throughout the integration.
+        // A ray that reaches θ = 0 or π will produce ±inf here, which propagates
+        // to NaN in subsequent steps and is caught by the integrator's CoordinateIsNan
+        // check. For geodesics with L_z ≠ 0, the θ potential Θ(θ) is repulsive near
+        // the axis, so well-behaved rays do not reach θ = 0 or π.
         let dphi = self.a / del * p_r + self.l_z / sin2 - self.a * self.e;
 
         // d²r/dλ² = R'(r)/2
@@ -494,7 +506,8 @@ impl Geometry for KerrBL {
         // Carter constant Q from the BL θ-momentum.
         let cos_t = theta.cos();
         let sin_t = theta.sin();
-        let q = p_theta * p_theta + cos_t * cos_t * (l_z * l_z / (sin_t * sin_t) - self.a * self.a * e * e);
+        let sin2 = sin_t * sin_t;
+        let q = p_theta * p_theta + cos_t * cos_t * (l_z * l_z / sin2.max(1e-28) - self.a * self.a * e * e);
 
         Box::new(KerrBLSolver {
             radius: self.radius,
