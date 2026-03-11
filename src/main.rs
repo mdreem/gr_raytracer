@@ -16,7 +16,7 @@ use std::fs;
 use std::fs::File;
 use std::time::Instant;
 
-use crate::cli::blackbody::print_blackbody_color;
+use crate::cli::blackbody::{run_blackbody, run_blackbody_spectrum};
 
 fn main() {
     env_logger::Builder::from_env(env_logger::Env::default().default_filter_or("info")).init();
@@ -30,14 +30,37 @@ fn run() -> Result<(), RaytracerError> {
     let args = App::parse();
     let start = Instant::now();
 
-    if let Action::Blackbody {
-        temperature,
-        redshift,
-    } = args.action
-    {
-        print_blackbody_color(temperature, redshift);
-        return Ok(());
+    match &args.action {
+        Action::Blackbody {
+            temperature,
+            redshift,
+        } => {
+            run_blackbody(*temperature, *redshift);
+            return Ok(());
+        }
+        Action::BlackbodySpectrum {
+            min_temperature,
+            max_temperature,
+            min_redshift,
+            max_redshift,
+            width,
+            height,
+            filename,
+        } => {
+            run_blackbody_spectrum(
+                *min_temperature,
+                *max_temperature,
+                *min_redshift,
+                *max_redshift,
+                *width,
+                *height,
+                filename.clone(),
+            );
+            return Ok(());
+        }
+        _ => {}
     }
+
 
     let config_path = args.config_file.as_ref().ok_or_else(|| {
         RaytracerError::InvalidConfiguration("Config file is required for this action".to_string())
@@ -145,7 +168,7 @@ fn run() -> Result<(), RaytracerError> {
                 )?;
             info!("Saved integrated ray to {}", filename);
         }
-        Action::Blackbody { .. } => unreachable!(),
+        Action::Blackbody { .. } | Action::BlackbodySpectrum { .. } => unreachable!(),
     }
 
     let duration = start.elapsed();
