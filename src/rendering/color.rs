@@ -1,3 +1,4 @@
+use clap::ValueEnum;
 use image::Rgba;
 use nalgebra::{Matrix3, Vector3};
 use serde::{Deserialize, Serialize};
@@ -11,7 +12,7 @@ pub struct Color {
     pub alpha: u8,
 }
 
-#[derive(Deserialize, Serialize, Default, Clone, Copy, PartialEq, Debug)]
+#[derive(Deserialize, Serialize, Default, Clone, Copy, PartialEq, Debug, ValueEnum)]
 pub enum CIETristimulusNormalization {
     #[default]
     NoNormalization,

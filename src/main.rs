@@ -34,8 +34,9 @@ fn run() -> Result<(), RaytracerError> {
         Action::Blackbody {
             temperature,
             redshift,
+            normalization,
         } => {
-            run_blackbody(*temperature, *redshift);
+            run_blackbody(*temperature, *redshift, *normalization);
             return Ok(());
         }
         Action::BlackbodySpectrum {
@@ -46,6 +47,7 @@ fn run() -> Result<(), RaytracerError> {
             width,
             height,
             filename,
+            normalization,
         } => {
             run_blackbody_spectrum(
                 *min_temperature,
@@ -55,12 +57,12 @@ fn run() -> Result<(), RaytracerError> {
                 *width,
                 *height,
                 filename.clone(),
+                *normalization,
             );
             return Ok(());
         }
         _ => {}
     }
-
 
     let config_path = args.config_file.as_ref().ok_or_else(|| {
         RaytracerError::InvalidConfiguration("Config file is required for this action".to_string())
@@ -73,7 +75,8 @@ fn run() -> Result<(), RaytracerError> {
     }
     let config_content =
         fs::read_to_string(config_path).map_err(RaytracerError::ConfigurationFileError)?;
-    let config: RenderConfig = toml::from_str(&config_content).map_err(RaytracerError::TomlError)?;
+    let config: RenderConfig =
+        toml::from_str(&config_content).map_err(RaytracerError::TomlError)?;
 
     match args.action {
         Action::Render {
