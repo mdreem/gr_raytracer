@@ -2,7 +2,7 @@ use crate::rendering::black_body_radiation::get_cie_xyz_of_black_body_redshifted
 use crate::rendering::color::{CIETristimulusNormalization, xyz_to_srgb};
 
 pub fn run_blackbody(temperature: f64, redshift: f64, normalization: CIETristimulusNormalization) {
-    let cie_xyz = get_cie_xyz_of_black_body_redshifted(temperature * redshift);
+    let cie_xyz = get_cie_xyz_of_black_body_redshifted(temperature, redshift);
     let color = xyz_to_srgb(&cie_xyz.normalize(normalization), 1.0);
     println!(
         "Blackbody color at T={}K (redshift={}):",
@@ -57,7 +57,7 @@ pub fn run_blackbody_spectrum(
             min_temperature + x * (max_temperature - min_temperature) / (width as f64 - 1.0);
         let redshift = min_redshift + y * (max_redshift - min_redshift) / (height as f64 - 1.0);
 
-        let cie_xyz = get_cie_xyz_of_black_body_redshifted(temperature * redshift);
+        let cie_xyz = get_cie_xyz_of_black_body_redshifted(temperature, redshift);
         let color = xyz_to_srgb(&cie_xyz.normalize(normalization), 1.0);
 
         p[0] = color.r;
