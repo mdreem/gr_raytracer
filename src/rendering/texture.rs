@@ -145,6 +145,11 @@ impl BlackBodyMapper {
         }
     }
 
+    pub fn blackbody_xyz(&self, temperature: f64, redshift: f64) -> CIETristimulus {
+        self.sample_blackbody(temperature * redshift)
+            .mul_color_part(redshift.powi(-5))
+    }
+
     fn sample_blackbody(&self, temperature: f64) -> CIETristimulus {
         let Some((first_log_t, first_color)) = self.color_profile.first().copied() else {
             error!("BlackBodyMapper color_profile is empty; falling back to black.");
@@ -201,10 +206,7 @@ impl TextureMap for BlackBodyMapper {
         temperature_data: &TemperatureData,
     ) -> CIETristimulus {
         let redshift = temperature_data.redshift;
-        // B(λ*s, T) = (1/s⁵) * B(λ, T*s), so XYZ(T, s) = (1/s⁵) * LUT(T*s).
-        let c = self
-            .sample_blackbody(temperature_data.temperature * redshift)
-            .mul_color_part(redshift.powi(-5));
+        let c = self.blackbody_xyz(temperature_data.temperature, redshift);
         let c_beamed = c.apply_beaming(redshift, self.beaming_exponent);
         c_beamed.normalize(self.color_normalization)
     }
@@ -305,8 +307,10 @@ impl TextureMapperFactory {
 
 #[cfg(test)]
 mod tests {
-    use crate::rendering::color::CIETristimulus;
-    use crate::rendering::texture::{TemperatureData, TextureMap, TextureMapper};
+    use approx::assert_relative_eq;
+    use crate::rendering::black_body_radiation::get_cie_xyz_of_black_body_redshifted;
+    use crate::rendering::color::{CIETristimulus, CIETristimulusNormalization};
+    use crate::rendering::texture::{BlackBodyMapper, TemperatureData, TextureMap, TextureMapper};
 
     fn get_red() -> CIETristimulus {
         CIETristimulus::from_rgba(&image::Rgba([255, 0, 0, 255]))
@@ -401,6 +405,25 @@ mod tests {
         assert_eq!(color.y, get_blue().y);
         assert_eq!(color.z, get_blue().z);
         assert_eq!(color.alpha, 128.0 / 255.0);
+    }
+
+    #[test]
+    fn test_blackbody_lut_matches_direct_integration() {
+        let mapper = BlackBodyMapper::new(0.0, CIETristimulusNormalization::NoNormalization);
+
+        for &temperature in &[1_000.0, 5_000.0, 10_000.0, 100_000.0] {
+            for &redshift in &[0.5, 1.0, 2.0] {
+                let lut = mapper.blackbody_xyz(temperature, redshift);
+                let direct = get_cie_xyz_of_black_body_redshifted(temperature, redshift);
+
+                assert_relative_eq!(lut.x, direct.x, max_relative = 0.02,
+                    epsilon = 1e-14);
+                assert_relative_eq!(lut.y, direct.y, max_relative = 0.02,
+                    epsilon = 1e-14);
+                assert_relative_eq!(lut.z, direct.z, max_relative = 0.02,
+                    epsilon = 1e-14);
+            }
+        }
     }
 
     #[test]
