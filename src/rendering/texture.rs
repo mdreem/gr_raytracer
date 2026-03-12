@@ -1,9 +1,9 @@
 use crate::rendering::black_body_radiation::get_cie_xyz_of_black_body_redshifted;
 use crate::rendering::color::{CIETristimulus, CIETristimulusNormalization, Color, srgb_to_xyz};
+use log::{error, warn};
 use crate::rendering::raytracer::RaytracerError;
 use crate::rendering::texture::TextureError::DecodeError;
 use image::{DynamicImage, GenericImageView, ImageReader};
-use log::{error, warn};
 use std::sync::Arc;
 
 #[derive(Debug, thiserror::Error)]
@@ -134,7 +134,7 @@ impl BlackBodyMapper {
         for i in 0..NUM_COLOR_LUT_STEPS {
             let log_t = min_log + (i as f64) * step;
             let t = 10.0_f64.powf(log_t);
-            let color = get_cie_xyz_of_black_body_redshifted(t);
+            let color = get_cie_xyz_of_black_body_redshifted(t, 1.0);
             color_profile.push((log_t, color));
         }
 
@@ -200,9 +200,12 @@ impl TextureMap for BlackBodyMapper {
         _uv: &UVCoordinates,
         temperature_data: &TemperatureData,
     ) -> CIETristimulus {
-        let effective_temp = temperature_data.temperature * temperature_data.redshift;
-        let c = self.sample_blackbody(effective_temp);
-        let c_beamed = c.apply_beaming(temperature_data.redshift, self.beaming_exponent);
+        let redshift = temperature_data.redshift;
+        // B(λ*s, T) = (1/s⁵) * B(λ, T*s), so XYZ(T, s) = (1/s⁵) * LUT(T*s).
+        let c = self
+            .sample_blackbody(temperature_data.temperature * redshift)
+            .mul_color_part(redshift.powi(-5));
+        let c_beamed = c.apply_beaming(redshift, self.beaming_exponent);
         c_beamed.normalize(self.color_normalization)
     }
 }
