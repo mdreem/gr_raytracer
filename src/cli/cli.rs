@@ -1,4 +1,4 @@
-use crate::rendering::color::CIETristimulusNormalization;
+use crate::rendering::color::{CIETristimulusNormalization, ToneMappingMethod};
 use clap::{Args, Parser, Subcommand};
 
 #[derive(Debug, Args, Clone)]
@@ -23,6 +23,8 @@ pub struct GlobalOpts {
     pub theta: f64,
     #[arg(long, default_value = "0.0")]
     pub psi: f64,
+    #[arg(long, default_value = "reinhard")]
+    pub tone_mapping: ToneMappingMethod,
 }
 
 #[derive(Parser)]
@@ -91,5 +93,7 @@ pub enum Action {
         filename: String,
         #[arg(long, default_value = "equal-luminance")]
         normalization: CIETristimulusNormalization,
+        #[arg(long, default_value = "reinhard")]
+        tone_mapping: ToneMappingMethod,
     },
 }
