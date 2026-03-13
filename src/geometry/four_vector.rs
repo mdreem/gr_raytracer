@@ -92,6 +92,13 @@ impl FourVector {
         }
     }
 
+    pub fn new_boyer_lindquist(a: f64, t: f64, r: f64, theta: f64, phi: f64) -> FourVector {
+        FourVector {
+            coordinate_system: CoordinateSystem::BoyerLindquist { a },
+            vector: Vector4::new(t, r, theta, phi),
+        }
+    }
+
     pub fn get_as_vector(self) -> Vector4<f64> {
         self.vector
     }
