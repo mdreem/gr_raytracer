@@ -4,7 +4,7 @@ use crate::geometry::four_vector::FourVector;
 use crate::geometry::geometry::Geometry;
 use crate::geometry::point::Point;
 use crate::rendering::camera::Camera;
-use crate::rendering::color::{CIETristimulusNormalization, Color};
+use crate::rendering::color::{CIETristimulusNormalization, Color, ToneMappingMethod};
 use crate::rendering::integrator::IntegrationConfiguration;
 use crate::rendering::raytracer;
 use crate::rendering::raytracer::RaytracerError;
@@ -53,12 +53,13 @@ pub fn render<G: Geometry>(
     scene: Scene<G>,
     filename: String,
     color_normalization: CIETristimulusNormalization,
+    tone_mapping: ToneMappingMethod,
     from_row: Option<u32>,
     from_col: Option<u32>,
     to_row: Option<u32>,
     to_col: Option<u32>,
 ) -> Result<(), RaytracerError> {
-    let raytracer = raytracer::Raytracer::new(scene, color_normalization);
+    let raytracer = raytracer::Raytracer::new(scene, color_normalization, tone_mapping);
     raytracer.render_section(
         from_row.unwrap_or(0),
         from_col.unwrap_or(0),
