@@ -42,7 +42,9 @@ impl<'a, G: Geometry> Objects<'a, G> {
         // The step size can be rather large, so it makes sense to sort the objects by their
         // distance to the y_start point.
         for hittable in &self.objects {
-            if let Some(intersection_data) = hittable.intersects(&y_start_point, &y_end_point) {
+            if let Some(intersection_data) =
+                hittable.intersects(&y_start_point, &y_end_point, self.geometry)
+            {
                 let intersection_point = intersection_data
                     .intersection_point
                     .get_spatial_vector_cartesian();
@@ -66,7 +68,8 @@ impl<'a, G: Geometry> Objects<'a, G> {
                         intersection_point: intersection_data.intersection_point,
                         direction: intersection_data.direction,
                     };
-                    resulting_color = Some(hittable.color_at_uv(&color_computation_data));
+                    resulting_color =
+                        Some(hittable.color_at_uv(&color_computation_data, self.geometry));
                 }
             }
         }

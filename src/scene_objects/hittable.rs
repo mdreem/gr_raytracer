@@ -21,8 +21,17 @@ pub struct ColorComputationData {
 }
 
 pub trait Hittable: Sync {
-    fn intersects(&self, y_start: &Point, y_end: &Point) -> Option<Intersection>;
-    fn color_at_uv(&self, color_computation_data: &ColorComputationData) -> CIETristimulus;
+    fn intersects(
+        &self,
+        y_start: &Point,
+        y_end: &Point,
+        geometry: &dyn Geometry,
+    ) -> Option<Intersection>;
+    fn color_at_uv(
+        &self,
+        color_computation_data: &ColorComputationData,
+        geometry: &dyn Geometry,
+    ) -> CIETristimulus;
     fn energy_of_emitter(
         &self,
         geometry: &dyn Geometry,

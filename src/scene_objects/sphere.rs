@@ -59,7 +59,12 @@ fn solve_for_t(y_start_spatial: Vector3<f64>, direction: Vector3<f64>, r: f64) -
 
 impl Hittable for Sphere {
     // y_start and y_end have to be Cartesian.
-    fn intersects(&self, y_start: &Point, y_end: &Point) -> Option<Intersection> {
+    fn intersects(
+        &self,
+        y_start: &Point,
+        y_end: &Point,
+        _geometry: &dyn Geometry,
+    ) -> Option<Intersection> {
         debug_assert_eq!(self.position.coordinate_system, CoordinateSystem::Cartesian);
 
         let y_start_cartesian = y_start.to_cartesian();
@@ -111,7 +116,11 @@ impl Hittable for Sphere {
         None
     }
 
-    fn color_at_uv(&self, color_computation_data: &ColorComputationData) -> CIETristimulus {
+    fn color_at_uv(
+        &self,
+        color_computation_data: &ColorComputationData,
+        _geometry: &dyn Geometry,
+    ) -> CIETristimulus {
         self.texture_mapper.color_at_uv(
             &color_computation_data.uv,
             &color_computation_data.temperature_data,
@@ -166,37 +175,41 @@ mod tests {
 
     #[test]
     fn test_sphere_intersection_center_sphere() {
+        let geometry = crate::geometry::euclidean::EuclideanSpace::new();
         let sphere = create_sphere_at(0.0, 0.0, 0.0);
         let y_start = Point::new_cartesian(0.0, 1.1, 0.0, 0.0);
         let y_end = Point::new_cartesian(0.0, 0.9, 0.0, 0.0);
 
-        assert!(sphere.intersects(&y_start, &y_end).is_some());
+        assert!(sphere.intersects(&y_start, &y_end, &geometry).is_some());
     }
 
     #[test]
     fn test_sphere_intersection_center_sphere_no_intersection() {
+        let geometry = crate::geometry::euclidean::EuclideanSpace::new();
         let sphere = create_sphere_at(0.0, 0.0, 0.0);
         let y_start = Point::new_cartesian(0.0, 1.1, 0.0, 0.0);
         let y_end = Point::new_cartesian(0.0, 1.01, 0.0, 0.0);
 
-        assert!(sphere.intersects(&y_start, &y_end).is_none());
+        assert!(sphere.intersects(&y_start, &y_end, &geometry).is_none());
     }
 
     #[test]
     fn test_sphere_intersection_moved_sphere() {
+        let geometry = crate::geometry::euclidean::EuclideanSpace::new();
         let sphere = create_sphere_at(5.0, 0.0, 0.0);
         let y_start = Point::new_cartesian(0.0, 6.1, 0.0, 0.0);
         let y_end = Point::new_cartesian(0.0, 5.9, 0.0, 0.0);
 
-        assert!(sphere.intersects(&y_start, &y_end).is_some());
+        assert!(sphere.intersects(&y_start, &y_end, &geometry).is_some());
     }
 
     #[test]
     fn test_sphere_intersection_moved_sphere_misses() {
+        let geometry = crate::geometry::euclidean::EuclideanSpace::new();
         let sphere = create_sphere_at(5.0, 0.0, 0.0);
         let y_start = Point::new_cartesian(0.0, 6.1, 0.0, 0.0);
         let y_end = Point::new_cartesian(0.0, 6.01, 0.0, 0.0);
 
-        assert!(sphere.intersects(&y_start, &y_end).is_none());
+        assert!(sphere.intersects(&y_start, &y_end, &geometry).is_none());
     }
 }

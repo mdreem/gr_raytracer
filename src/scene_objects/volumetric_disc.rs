@@ -150,16 +150,23 @@ impl VolumetricDisc {
         UVCoordinates { u, v }
     }
 
-    fn does_exit(&self, p: &Vector3<f64>, rd: &Vector3<f64>, t: f64) -> bool {
+    fn does_exit(
+        &self,
+        p: &Vector3<f64>,
+        rd: &Vector3<f64>,
+        t: f64,
+        geometry: &dyn Geometry,
+    ) -> bool {
         let point_from = Point::new_cartesian(0.0, p[0], p[1], p[2]);
         let point_to =
             Point::new_cartesian(0.0, p[0] + rd[0] * t, p[1] + rd[1] * t, p[2] + rd[2] * t);
-        if let Some(intersection) = self.intersects(&point_from, &point_to) {
+        if let Some(intersection) = self.intersects(&point_from, &point_to, geometry) {
             let exit = intersection.t > MIN_INTERSECTION_T;
             if exit {
                 trace!(
                     "  does_exit found intersection at t={} ( > {}), breaking.",
-                    intersection.t, MIN_INTERSECTION_T
+                    intersection.t,
+                    MIN_INTERSECTION_T
                 );
             }
             exit
@@ -200,8 +207,9 @@ impl VolumetricDisc {
         ro: &Vector3<f64>,
         rd: &Vector3<f64>,
         redshift: f64,
+        geometry: &dyn Geometry,
     ) -> Result<CIETristimulus, RaytracerError> {
-        self.raymarch_constant_step_internal(ro, rd, redshift, true)
+        self.raymarch_constant_step_internal(ro, rd, redshift, true, geometry)
     }
 
     fn raymarch_constant_step_internal(
@@ -210,6 +218,7 @@ impl VolumetricDisc {
         rd: &Vector3<f64>,
         redshift: f64,
         use_cached_exit: bool,
+        geometry: &dyn Geometry,
     ) -> Result<CIETristimulus, RaytracerError> {
         let sigma_a = self.absorption;
         let sigma_s = self.scattering;
@@ -275,7 +284,7 @@ impl VolumetricDisc {
             let exited = if let Some(exit_distance) = cached_exit_distance {
                 d_o >= exit_distance
             } else {
-                self.does_exit(&p, rd, d_s)
+                self.does_exit(&p, rd, d_s, geometry)
             };
             if exited {
                 trace!("  Ray exited disc at step {}, position {:?}", i, p,);
@@ -478,7 +487,12 @@ pub enum CylinderIntersection {
 }
 
 impl Hittable for VolumetricDisc {
-    fn intersects(&self, y_start: &Point, y_end: &Point) -> Option<Intersection> {
+    fn intersects(
+        &self,
+        y_start: &Point,
+        y_end: &Point,
+        _geometry: &dyn Geometry,
+    ) -> Option<Intersection> {
         let y_start_spatial = y_start.get_spatial_vector_cartesian();
         let y_end_spatial = y_end.get_spatial_vector_cartesian();
 
@@ -552,7 +566,11 @@ impl Hittable for VolumetricDisc {
         })
     }
 
-    fn color_at_uv(&self, color_computation_data: &ColorComputationData) -> CIETristimulus {
+    fn color_at_uv(
+        &self,
+        color_computation_data: &ColorComputationData,
+        geometry: &dyn Geometry,
+    ) -> CIETristimulus {
         let ro = color_computation_data
             .intersection_point
             .get_spatial_vector_cartesian();
@@ -564,8 +582,13 @@ impl Hittable for VolumetricDisc {
         )
         .normalize();
 
-        self.raymarch_constant_step(&ro, &rd, color_computation_data.temperature_data.redshift)
-            .unwrap_or_else(|e| {
+        self.raymarch_constant_step(
+            &ro,
+            &rd,
+            color_computation_data.temperature_data.redshift,
+            geometry,
+        )
+        .unwrap_or_else(|e| {
                 log::warn!("Raymarching failed: {}", e);
                 CIETristimulus::new(0.0, 0.0, 0.0, 0.0)
             })
@@ -654,20 +677,22 @@ mod tests {
 
     #[test]
     fn test_volumetric_disc_intersection_exists() {
+        let geometry = crate::geometry::euclidean::EuclideanSpace::new();
         let disc = create_disc();
         let y_start = Point::new_cartesian(0.0, 0.5, 0.0, 0.0);
         let y_end = Point::new_cartesian(0.0, 1.5, 0.0, 0.0);
 
-        assert!(disc.intersects(&y_start, &y_end).is_some());
+        assert!(disc.intersects(&y_start, &y_end, &geometry).is_some());
     }
 
     #[test]
     fn test_volumetric_disc_intersection_miss_above_caps() {
+        let geometry = crate::geometry::euclidean::EuclideanSpace::new();
         let disc = create_disc();
         let y_start = Point::new_cartesian(0.0, 1.5, 0.0, 2.0);
         let y_end = Point::new_cartesian(0.0, 2.5, 0.0, 2.0);
 
-        assert!(disc.intersects(&y_start, &y_end).is_none());
+        assert!(disc.intersects(&y_start, &y_end, &geometry).is_none());
     }
 
     #[test]
@@ -685,12 +710,13 @@ mod tests {
 
     #[test]
     fn test_volumetric_disc_raymarch_produces_opacity() {
+        let geometry = crate::geometry::euclidean::EuclideanSpace::new();
         let disc = create_disc();
         let ro = Vector3::new(2.0, 0.0, 0.0);
         let rd = Vector3::new(1.0, 0.0, 0.0);
 
         let color = disc
-            .raymarch_constant_step(&ro, &rd, 1.0)
+            .raymarch_constant_step(&ro, &rd, 1.0, &geometry)
             .expect("raymarch should succeed");
 
         assert!(color.alpha > 0.0);
@@ -719,14 +745,15 @@ mod tests {
             Vector3::new(1.0, 1.0, 1.0),
             1.0,
         );
+        let geometry = crate::geometry::euclidean::EuclideanSpace::new();
         let ro = Vector3::new(2.0, 0.0, 0.0);
         let rd = Vector3::new(1.0, 0.0, 0.0);
 
         let cached = disc
-            .raymarch_constant_step_internal(&ro, &rd, 1.0, true)
+            .raymarch_constant_step_internal(&ro, &rd, 1.0, true, &geometry)
             .expect("raymarch should succeed");
         let legacy = disc
-            .raymarch_constant_step_internal(&ro, &rd, 1.0, false)
+            .raymarch_constant_step_internal(&ro, &rd, 1.0, false, &geometry)
             .expect("raymarch should succeed");
 
         assert_abs_diff_eq!(cached.x, legacy.x, epsilon = 1e-10);

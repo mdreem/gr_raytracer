@@ -38,7 +38,12 @@ impl Hittable for Disc {
     // here. See with current test setup. Intersection should be at t=7.63. With z=-2.442748091.
     // The intersection should be with an interval crossing y=0. But it seems to happen near 0 with
     // both coordinates.
-    fn intersects(&self, y_start: &Point, y_end: &Point) -> Option<Intersection> {
+    fn intersects(
+        &self,
+        y_start: &Point,
+        y_end: &Point,
+        geometry: &dyn Geometry,
+    ) -> Option<Intersection> {
         // z x y
         let normal = Vector3::new(0.0, 0.0, 1.0);
         let center = Vector3::new(0.0, 0.0, 0.0);
@@ -57,28 +62,28 @@ impl Hittable for Disc {
         }
 
         let intersection_point = y_start_spatial + t * direction;
-        let rr = intersection_point.norm_squared();
 
-        if rr >= self.center_disk_inner_radius * self.center_disk_inner_radius
-            && rr <= self.center_disk_outer_radius * self.center_disk_outer_radius
-        {
+        let intersection_point_p = Point::new_cartesian(
+            0.0,
+            intersection_point[0],
+            intersection_point[1],
+            intersection_point[2],
+        );
+        let r = geometry.get_radial_coordinate(&intersection_point_p);
+
+        if r >= self.center_disk_inner_radius && r <= self.center_disk_outer_radius {
             let vector_in_plane = intersection_point - center;
 
             let phi = vector_in_plane[1].atan2(vector_in_plane[0]); // phi in x-y plane.
-            let r = (rr.sqrt() - self.center_disk_inner_radius)
+            let r_normalized = (r - self.center_disk_inner_radius)
                 / (self.center_disk_outer_radius - self.center_disk_inner_radius);
 
-            let u = 0.5 + 0.5 * r * phi.cos();
-            let v = 0.5 + 0.5 * r * phi.sin();
+            let u = 0.5 + 0.5 * r_normalized * phi.cos();
+            let v = 0.5 + 0.5 * r_normalized * phi.sin();
 
             Some(Intersection {
                 uv: UVCoordinates { u, v },
-                intersection_point: Point::new_cartesian(
-                    0.0,
-                    intersection_point[0],
-                    intersection_point[1],
-                    intersection_point[2],
-                ),
+                intersection_point: intersection_point_p,
                 t,
                 direction: FourVector::new_cartesian(0.0, direction[0], direction[1], direction[2]),
             })
@@ -87,7 +92,11 @@ impl Hittable for Disc {
         }
     }
 
-    fn color_at_uv(&self, color_computation_data: &ColorComputationData) -> CIETristimulus {
+    fn color_at_uv(
+        &self,
+        color_computation_data: &ColorComputationData,
+        _geometry: &dyn Geometry,
+    ) -> CIETristimulus {
         self.texture_mapper.color_at_uv(
             &color_computation_data.uv,
             &color_computation_data.temperature_data,
