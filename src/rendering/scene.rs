@@ -40,7 +40,13 @@ pub fn get_position(y: &EquationOfMotionState, coordinate_system: CoordinateSyst
             CoordinateSystem::Spherical,
         )),
         CoordinateSystem::BoyerLindquist { a } => {
-            let bl = Point::new(y[0], y[1], y[2], y[3], CoordinateSystem::BoyerLindquist { a });
+            let bl = Point::new(
+                y[0],
+                y[1],
+                y[2],
+                y[3],
+                CoordinateSystem::BoyerLindquist { a },
+            );
             bl.to_cartesian()
         }
     }
