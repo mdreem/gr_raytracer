@@ -18,7 +18,7 @@ fn planck_spectral_radiance(lambda: f64, temperature: f64) -> f64 {
 fn integrate_blackbody_xyz(temperature: f64, redshift: f64) -> CIETristimulus {
     let interval = (MAX_WAVELENGTH - MIN_WAVELENGTH) * NM_TO_M; // in meters
     let step_size = 1.0 * NM_TO_M; // in meters
-    let num_steps = ((interval / step_size).floor()) as usize;
+    let num_steps = (interval / step_size).floor() as usize;
 
     let mut x_accum = 0.0;
     let mut y_accum = 0.0;

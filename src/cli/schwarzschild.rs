@@ -6,6 +6,7 @@ use crate::geometry::geometry::{Geometry, RenderableGeometry};
 use crate::geometry::point::Point;
 use crate::geometry::schwarzschild::Schwarzschild;
 use crate::geometry::spherical_coordinates_helper::cartesian_to_spherical;
+use crate::rendering::color::ToneMappingMethod;
 use crate::rendering::raytracer;
 use crate::rendering::raytracer::RaytracerError;
 use crate::rendering::scene::Scene;
@@ -49,12 +50,14 @@ impl RenderableGeometry for Schwarzschild {
         to_row: Option<u32>,
         to_col: Option<u32>,
     ) -> Result<(), RaytracerError> {
+        let tone_mapping = opts.tone_mapping;
         let scene = create_scene_internal(self, opts, &config, camera_position)?;
 
         render(
             scene,
             filename,
             config.color_normalization,
+            tone_mapping,
             from_row,
             from_col,
             to_row,
@@ -73,7 +76,7 @@ impl RenderableGeometry for Schwarzschild {
     ) -> Result<(), RaytracerError> {
         let scene = create_scene_internal(self, opts, &config, camera_position)?;
 
-        let raytracer = raytracer::Raytracer::new(scene, config.color_normalization);
+        let raytracer = raytracer::Raytracer::new(scene, config.color_normalization, ToneMappingMethod::default());
         let (integrated_ray, stop_reason) = raytracer.integrate_ray_at_point(row, col)?;
         info!("Stop reason: {:?}", stop_reason);
         integrated_ray.save(write)?;
