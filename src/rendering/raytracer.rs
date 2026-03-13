@@ -1,17 +1,18 @@
 use crate::geometry::geometry::Geometry;
 use crate::rendering::camera::CameraError;
-use crate::rendering::color;
-use crate::rendering::color::{CIETristimulusNormalization, xyz_to_srgb};
+use crate::rendering::color::{
+    CIETristimulus, ToneMappingMethod, linear_srgb_to_srgb_buffer, xyz_to_linear_srgb_buffer,
+};
 use crate::rendering::integrator::{IntegrationError, StopReason};
 use crate::rendering::ray::IntegratedRay;
 use crate::rendering::scene::Scene;
 use crate::rendering::texture::TextureError;
-use image::{ImageBuffer, ImageError, ImageFormat, Primitive, Rgb};
+use image::{ImageBuffer, ImageError, ImageFormat, Rgb};
 use indicatif::style::TemplateError;
 use log::{debug, error, info};
 use rayon::iter::IndexedParallelIterator;
+use rayon::iter::IntoParallelRefMutIterator;
 use rayon::iter::ParallelIterator;
-use rayon::prelude::ParallelSliceMut;
 use std::io;
 use std::sync::atomic::{AtomicUsize, Ordering};
 
@@ -51,14 +52,14 @@ pub enum RaytracerError {
 
 pub struct Raytracer<'a, G: Geometry> {
     pub scene: Scene<'a, G>,
-    color_normalization: CIETristimulusNormalization,
+    tone_mapping: ToneMappingMethod,
 }
 
 impl<'a, G: Geometry> Raytracer<'a, G> {
-    pub fn new(scene: Scene<'a, G>, color_normalization: CIETristimulusNormalization) -> Self {
+    pub fn new(scene: Scene<'a, G>, tone_mapping: ToneMappingMethod) -> Self {
         Self {
             scene,
-            color_normalization,
+            tone_mapping,
         }
     }
 
@@ -70,20 +71,17 @@ impl<'a, G: Geometry> Raytracer<'a, G> {
         debug!("color: {:?}", color);
     }
 
-    pub fn render_section_to_buffer<F, B: Primitive + Sync + Send>(
+    fn render_section_to_cie_buffer(
         &self,
         from_row: u32,
         from_col: u32,
         to_row: u32,
         to_col: u32,
-        buffer_transformer: F,
-    ) -> Result<Vec<B>, RaytracerError>
-    where
-        F: Fn(f32, f32, f32) -> (B, B, B) + Sync,
-    {
+    ) -> Result<Vec<CIETristimulus>, RaytracerError> {
         let count = AtomicUsize::new(0);
         let max_count = (to_row - from_row) * (to_col - from_col);
-        let mut buffer: Vec<B> = vec![B::zero(); 3 * max_count as usize];
+        let mut buffer: Vec<CIETristimulus> =
+            vec![CIETristimulus::new(0.0, 0.0, 0.0, 1.0); max_count as usize];
 
         use indicatif::{ProgressBar, ProgressStyle};
         let pb = ProgressBar::new(max_count as u64);
@@ -91,7 +89,7 @@ impl<'a, G: Geometry> Raytracer<'a, G> {
             .map_err(RaytracerError::ProgressBarTemplateError)?
             .progress_chars("█▇▆▅▄▃▂▁  "));
 
-        buffer.par_chunks_mut(3).enumerate().for_each(|(i, p)| {
+        buffer.par_iter_mut().enumerate().for_each(|(i, p)| {
             count.fetch_add(1, Ordering::SeqCst);
             pb.set_position(count.load(Ordering::Relaxed) as u64);
 
@@ -104,17 +102,8 @@ impl<'a, G: Geometry> Raytracer<'a, G> {
                 .get_ray_for((y + from_row) as i64, (x + from_col) as i64);
 
             match self.scene.color_of_ray(&ray) {
-                Ok(cie_tristimulus) => {
-                    (p[0], p[1], p[2]) = buffer_transformer(
-                        cie_tristimulus.x as f32,
-                        cie_tristimulus.y as f32,
-                        cie_tristimulus.z as f32,
-                    );
-                }
+                Ok(cie_tristimulus) => *p = cie_tristimulus,
                 Err(err) => {
-                    p[0] = B::zero();
-                    p[1] = B::zero();
-                    p[2] = B::zero();
                     error!(
                         "Unable to compute color for ray at pixel ({}, {}): {:?}",
                         x + from_col,
@@ -138,10 +127,11 @@ impl<'a, G: Geometry> Raytracer<'a, G> {
     ) -> Result<(), RaytracerError> {
         if filename.ends_with(".hdr") {
             info!("Creating HDR image");
-            let buffer =
-                self.render_section_to_buffer(from_row, from_col, to_row, to_col, |x, y, z| {
-                    (x, y, z)
-                })?;
+            let raw_cie = self.render_section_to_cie_buffer(from_row, from_col, to_row, to_col)?;
+            let buffer: Vec<f32> = raw_cie
+                .into_iter()
+                .flat_map(|c| [c.x as f32, c.y as f32, c.z as f32])
+                .collect();
             let imgbuf_hdr: ImageBuffer<Rgb<f32>, Vec<f32>> =
                 image::ImageBuffer::from_vec(to_col - from_col, to_row - from_row, buffer)
                     .ok_or(RaytracerError::ImageBufferCreation)?;
@@ -150,18 +140,12 @@ impl<'a, G: Geometry> Raytracer<'a, G> {
                 .map_err(RaytracerError::ImageError)?;
         } else {
             info!("Creating non-HDR image");
-            let color_normalization = self.color_normalization;
-            let buffer =
-                self.render_section_to_buffer(from_row, from_col, to_row, to_col, |x, y, z| {
-                    let cie_tristimulus = color::CIETristimulus {
-                        x: x as f64,
-                        y: y as f64,
-                        z: z as f64,
-                        alpha: 1.0,
-                    };
-                    let color = xyz_to_srgb(&cie_tristimulus.normalize(color_normalization), 1.0);
-                    (color.r, color.g, color.b)
-                })?;
+            info!("Tone mapping method: {:?}", self.tone_mapping);
+            let cie_pixels =
+                self.render_section_to_cie_buffer(from_row, from_col, to_row, to_col)?;
+            let linear_srgb = xyz_to_linear_srgb_buffer(&cie_pixels);
+            let colors = linear_srgb_to_srgb_buffer(&linear_srgb, 1.0, self.tone_mapping);
+            let buffer: Vec<u8> = colors.iter().flat_map(|c| [c.r, c.g, c.b]).collect();
             let imgbuf: ImageBuffer<Rgb<u8>, Vec<u8>> =
                 image::ImageBuffer::from_vec(to_col - from_col, to_row - from_row, buffer)
                     .ok_or(RaytracerError::ImageBufferCreation)?;

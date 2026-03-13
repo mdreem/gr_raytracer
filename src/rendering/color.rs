@@ -1,3 +1,4 @@
+use clap::ValueEnum;
 use image::Rgba;
 use nalgebra::{Matrix3, Vector3};
 use serde::{Deserialize, Serialize};
@@ -11,12 +12,11 @@ pub struct Color {
     pub alpha: u8,
 }
 
-#[derive(Deserialize, Serialize, Default, Clone, Copy, PartialEq, Debug)]
-pub enum CIETristimulusNormalization {
+#[derive(Deserialize, Serialize, Default, Clone, Copy, PartialEq, Debug, ValueEnum)]
+pub enum ToneMappingMethod {
     #[default]
-    NoNormalization,
-    Chromaticity,
-    EqualLuminance,
+    Reinhard,
+    GlobalLinear,
 }
 
 #[derive(Debug, PartialEq, Copy, Clone)]
@@ -65,48 +65,6 @@ impl CIETristimulus {
         let z = (other.z * af + self.z * ab * (1.0 - af)) / ao;
 
         CIETristimulus { x, y, z, alpha: ao }
-    }
-
-    pub fn normalize(&self, method: CIETristimulusNormalization) -> CIETristimulus {
-        match method {
-            CIETristimulusNormalization::NoNormalization => *self,
-            CIETristimulusNormalization::Chromaticity => {
-                let sum = self.x + self.y + self.z;
-                if sum == 0.0 {
-                    CIETristimulus {
-                        x: 0.0,
-                        y: 0.0,
-                        z: 0.0,
-                        alpha: self.alpha,
-                    }
-                } else {
-                    CIETristimulus {
-                        x: self.x / sum,
-                        y: self.y / sum,
-                        z: self.z / sum,
-                        alpha: self.alpha,
-                    }
-                }
-            }
-            CIETristimulusNormalization::EqualLuminance => {
-                if self.y == 0.0 {
-                    CIETristimulus {
-                        x: 0.0,
-                        y: 0.0,
-                        z: 0.0,
-                        alpha: self.alpha,
-                    }
-                } else {
-                    let scale = 1.0 / self.y;
-                    CIETristimulus {
-                        x: self.x * scale,
-                        y: 1.0,
-                        z: self.z * scale,
-                        alpha: self.alpha,
-                    }
-                }
-            }
-        }
     }
 
     /// Applies relativistic beaming effect based on redshift and beaming exponent.
@@ -251,6 +209,71 @@ pub fn xyz_to_srgb(cie_tristimulus: &CIETristimulus, exposure: f64) -> Color {
         b,
         alpha: 255,
     }
+}
+
+pub fn xyz_to_linear_srgb_buffer(cie_tristimulus: &Vec<CIETristimulus>) -> Vec<Vector3<f64>> {
+    cie_tristimulus
+        .iter()
+        .map(|c| xyz_to_linear_srgb(c))
+        .collect()
+}
+
+pub fn linear_srgb_to_srgb_buffer(
+    linear_rgb: &Vec<Vector3<f64>>,
+    exposure: f64,
+    tone_mapping_method: ToneMappingMethod,
+) -> Vec<Color> {
+    let scale = match tone_mapping_method {
+        ToneMappingMethod::Reinhard => 1.0,
+        ToneMappingMethod::GlobalLinear => {
+            let max_r = linear_rgb
+                .iter()
+                .map(|c| c.x * exposure)
+                .fold(0.0, f64::max);
+            let max_g = linear_rgb
+                .iter()
+                .map(|c| c.y * exposure)
+                .fold(0.0, f64::max);
+            let max_b = linear_rgb
+                .iter()
+                .map(|c| c.z * exposure)
+                .fold(0.0, f64::max);
+            let max_component = max_r.max(max_g).max(max_b);
+            if max_component > 0.0 {
+                1.0 / max_component
+            } else {
+                1.0
+            }
+        }
+    };
+
+    linear_rgb
+        .iter()
+        .map(|c| c * exposure)
+        .map(|c| match tone_mapping_method {
+            ToneMappingMethod::Reinhard => {
+                let l_in = 0.2126 * c.x + 0.7152 * c.y + 0.0722 * c.z;
+                if l_in > 0.0 {
+                    let l_out = l_in / (1.0 + l_in);
+                    c * (l_out / l_in)
+                } else {
+                    c
+                }
+            }
+            ToneMappingMethod::GlobalLinear => scale * c,
+        })
+        .map(|v_lin| {
+            let r = (compand_srgb(v_lin.x.max(0.0)) * 255.0).round() as u8;
+            let g = (compand_srgb(v_lin.y.max(0.0)) * 255.0).round() as u8;
+            let b = (compand_srgb(v_lin.z.max(0.0)) * 255.0).round() as u8;
+            Color {
+                r,
+                g,
+                b,
+                alpha: 255,
+            }
+        })
+        .collect()
 }
 
 fn inv_compand_srgb(u: f64) -> f64 {

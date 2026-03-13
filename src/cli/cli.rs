@@ -1,3 +1,4 @@
+use crate::rendering::color::ToneMappingMethod;
 use clap::{Args, Parser, Subcommand};
 
 #[derive(Debug, Args, Clone)]
@@ -22,6 +23,8 @@ pub struct GlobalOpts {
     pub theta: f64,
     #[arg(long, default_value = "0.0")]
     pub psi: f64,
+    #[arg(long, default_value = "reinhard")]
+    pub tone_mapping: ToneMappingMethod,
 }
 
 #[derive(Parser)]
@@ -30,7 +33,7 @@ pub struct App {
     #[clap(flatten)]
     pub global_opts: GlobalOpts,
     #[arg(short, long)]
-    pub config_file: String,
+    pub config_file: Option<String>,
     #[command(subcommand)]
     pub action: Action,
 }
@@ -63,6 +66,28 @@ pub enum Action {
         #[arg(short, long, value_delimiter = ',')]
         direction: Vec<f64>,
         #[arg(long, default_value = "rendered-ray-at.csv")]
+        filename: String,
+    },
+    Blackbody {
+        #[arg(short, long)]
+        temperature: f64,
+        #[arg(short, long, default_value = "1.0")]
+        redshift: f64,
+    },
+    BlackbodySpectrum {
+        #[arg(long, default_value = "1000.0")]
+        min_temperature: f64,
+        #[arg(long, default_value = "10000.0")]
+        max_temperature: f64,
+        #[arg(long, default_value = "0.5")]
+        min_redshift: f64,
+        #[arg(long, default_value = "2.0")]
+        max_redshift: f64,
+        #[arg(long, default_value = "1000")]
+        width: u32,
+        #[arg(long, default_value = "1000")]
+        height: u32,
+        #[arg(short, long, default_value = "blackbody_spectrum.png")]
         filename: String,
     },
 }
