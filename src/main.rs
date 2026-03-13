@@ -46,7 +46,6 @@ fn run() -> Result<(), RaytracerError> {
             width,
             height,
             filename,
-            tone_mapping,
         } => {
             run_blackbody_spectrum(
                 *min_temperature,
@@ -56,7 +55,7 @@ fn run() -> Result<(), RaytracerError> {
                 *width,
                 *height,
                 filename.clone(),
-                *tone_mapping,
+                args.global_opts.tone_mapping,
             );
             return Ok(());
         }
