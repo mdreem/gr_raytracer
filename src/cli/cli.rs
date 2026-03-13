@@ -89,7 +89,5 @@ pub enum Action {
         height: u32,
         #[arg(short, long, default_value = "blackbody_spectrum.png")]
         filename: String,
-        #[arg(long, default_value = "reinhard")]
-        tone_mapping: ToneMappingMethod,
     },
 }
