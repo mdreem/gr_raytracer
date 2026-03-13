@@ -32,8 +32,8 @@ See the [Image Gallery](./images/images.md) for more rendered outputs.
 
 ## Features
 
-- Multi-geometry ray tracing: `Euclidean`, `EuclideanSpherical`, `Schwarzschild`, and `Kerr`.
-- Geodesic integration with RKF45.
+- Multi-geometry ray tracing: `Euclidean`, `EuclideanSpherical`, `Schwarzschild`, `Kerr` (Kerr-Schild), and `KerrBL` (Boyer-Lindquist).
+- Geodesic integration with RKF45; `KerrBL` uses separated equations of motion via Carter's constant (therefore faster than `Kerr`).
 - Relativistic shading effects: gravitational and Doppler redshift plus relativistic beaming.
 - Physically motivated emission: black-body spectrum integration in CIE XYZ.
 - Scene primitives: `Sphere`, `Disc`, and Perlin-noise-based `VolumetricDisc`.
