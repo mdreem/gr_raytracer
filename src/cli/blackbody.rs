@@ -1,12 +1,12 @@
 use crate::rendering::black_body_radiation::get_cie_xyz_of_black_body_redshifted;
 use crate::rendering::color::{
-    CIETristimulus, CIETristimulusNormalization, ToneMappingMethod, linear_srgb_to_srgb_buffer,
-    xyz_to_linear_srgb_buffer, xyz_to_srgb,
+    CIETristimulus, ToneMappingMethod, linear_srgb_to_srgb_buffer, xyz_to_linear_srgb_buffer,
+    xyz_to_srgb,
 };
 
-pub fn run_blackbody(temperature: f64, redshift: f64, normalization: CIETristimulusNormalization) {
+pub fn run_blackbody(temperature: f64, redshift: f64) {
     let cie_xyz = get_cie_xyz_of_black_body_redshifted(temperature, redshift);
-    let color = xyz_to_srgb(&cie_xyz.normalize(normalization), 1.0);
+    let color = xyz_to_srgb(&cie_xyz, 1.0);
     println!(
         "Blackbody color at T={}K (redshift={}):",
         temperature, redshift
@@ -33,7 +33,6 @@ pub fn run_blackbody_spectrum(
     width: u32,
     height: u32,
     filename: String,
-    normalization: CIETristimulusNormalization,
     tone_mapping: ToneMappingMethod,
 ) {
     use indicatif::{ProgressBar, ProgressStyle};
@@ -70,7 +69,7 @@ pub fn run_blackbody_spectrum(
         let redshift = min_redshift + y * (max_redshift - min_redshift) / (height as f64 - 1.0);
 
         let cie_xyz = get_cie_xyz_of_black_body_redshifted(temperature, redshift);
-        p[0] = cie_xyz.normalize(normalization);
+        p[0] = cie_xyz;
     });
 
     let linear_srgb = xyz_to_linear_srgb_buffer(&cie_pixels);
