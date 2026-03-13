@@ -80,7 +80,6 @@ mod tests {
     use crate::geometry::euclidean::EuclideanSpace;
     use crate::geometry::four_vector::FourVector;
     use crate::geometry::point::Point;
-    use crate::rendering::color::CIETristimulusNormalization::NoNormalization;
     use crate::rendering::color::Color;
     use crate::rendering::texture::CheckerMapper;
     use crate::scene_objects::sphere::Sphere;
@@ -96,7 +95,6 @@ mod tests {
                 5.0,
                 Color::new(color, color, color, 255),
                 Color::new(color, color, color, 255),
-                NoNormalization,
             )),
             Point::new_cartesian(0.0, x, y, z),
             0.0,

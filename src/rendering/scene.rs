@@ -175,7 +175,6 @@ pub mod test_scene {
     use crate::geometry::geometry::Geometry;
     use crate::geometry::point::Point;
     use crate::rendering::camera::Camera;
-    use crate::rendering::color::CIETristimulusNormalization::NoNormalization;
     use crate::rendering::color::{Color, srgb_to_xyz};
     use crate::rendering::raytracer::RaytracerError;
     use crate::rendering::scene::{IntegrationConfiguration, Scene, TextureData};
@@ -231,7 +230,6 @@ pub mod test_scene {
             100.0,
             Color::new(0, 255, 0, 255),
             Color::new(0, 100, 0, 255),
-            NoNormalization,
         ));
         println!(
             "color celestial 1: {:?}",
@@ -247,7 +245,6 @@ pub mod test_scene {
             10.0,
             Color::new(0, 0, 255, 255),
             Color::new(0, 0, 100, 255),
-            NoNormalization,
         ));
         println!(
             "color disk 1: {:?}",
@@ -263,7 +260,6 @@ pub mod test_scene {
             10.0,
             Color::new(255, 0, 0, 255),
             Color::new(100, 0, 0, 255),
-            NoNormalization,
         ));
         println!(
             "color sphere 1: {:?}",

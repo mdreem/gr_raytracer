@@ -598,7 +598,6 @@ impl SceneObject for VolumetricDisc {}
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::rendering::color::CIETristimulusNormalization::NoNormalization;
     use crate::rendering::color::Color;
     use crate::rendering::texture::{CheckerMapper, TemperatureData, TextureMap};
     use approx::assert_abs_diff_eq;
@@ -636,7 +635,6 @@ mod tests {
                 5.0,
                 Color::new(255, 0, 0, 255),
                 Color::new(0, 0, 255, 255),
-                NoNormalization,
             )),
             Box::new(DummyTemperatureComputer),
             Vector3::new(0.0, 0.0, 1.0),

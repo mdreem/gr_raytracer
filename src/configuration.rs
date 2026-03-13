@@ -1,10 +1,8 @@
-use crate::rendering::color::CIETristimulusNormalization;
 use serde::{Deserialize, Serialize};
 
 #[derive(Deserialize, Serialize, Default, Clone)]
 pub struct RenderConfig {
     pub geometry_type: GeometryType,
-    pub color_normalization: CIETristimulusNormalization,
     pub objects: Vec<ObjectsConfig>,
     pub celestial_texture: TextureConfig,
     pub celestial_temperature: f64,
@@ -55,7 +53,6 @@ pub enum TextureConfig {
     Bitmap {
         beaming_exponent: f64,
         path: String,
-        color_normalization: CIETristimulusNormalization,
     },
     Checker {
         beaming_exponent: f64,
@@ -63,11 +60,9 @@ pub enum TextureConfig {
         height: f64,
         color1: (u8, u8, u8),
         color2: (u8, u8, u8),
-        color_normalization: CIETristimulusNormalization,
     },
     BlackBody {
         beaming_exponent: f64,
-        color_normalization: CIETristimulusNormalization,
     },
 }
 
@@ -75,7 +70,6 @@ impl Default for TextureConfig {
     fn default() -> Self {
         TextureConfig::BlackBody {
             beaming_exponent: 3.0,
-            color_normalization: CIETristimulusNormalization::default(),
         }
     }
 }
@@ -128,7 +122,6 @@ impl Default for ObjectsConfig {
 #[cfg(test)]
 mod tests {
     use crate::configuration::{GeometryType, ObjectsConfig, RenderConfig, TextureConfig};
-    use crate::rendering::color::CIETristimulusNormalization::NoNormalization;
 
     #[test]
     #[ignore]
@@ -137,9 +130,7 @@ mod tests {
             celestial_texture: TextureConfig::Bitmap {
                 beaming_exponent: 3.0,
                 path: String::from("resources/celestial_sphere.png"),
-                color_normalization: NoNormalization,
             },
-            color_normalization: NoNormalization,
             celestial_temperature: 1500.0,
             geometry_type: GeometryType::Schwarzschild {
                 radius: 2.0,
@@ -152,7 +143,6 @@ mod tests {
                     texture: TextureConfig::Bitmap {
                         beaming_exponent: 3.0,
                         path: String::from("resources/sphere.png"),
-                        color_normalization: NoNormalization,
                     },
                     temperature: 4500.0,
                 },
@@ -165,7 +155,6 @@ mod tests {
                         height: 0.5,
                         color1: (255, 0, 0),
                         color2: (0, 0, 255),
-                        color_normalization: NoNormalization,
                     },
                     temperature: 5500.0,
                 },
@@ -174,7 +163,6 @@ mod tests {
                     position: (4.4, 5.5, 6.6),
                     texture: TextureConfig::BlackBody {
                         beaming_exponent: 3.0,
-                        color_normalization: NoNormalization,
                     },
                     temperature: 6500.0,
                 },
@@ -189,13 +177,11 @@ mod tests {
     #[test]
     fn test_deserialize() {
         let toml_str = r#"
-            color_normalization = "NoNormalization"
             celestial_temperature = 1500.0
 
             [celestial_texture.Bitmap]
             beaming_exponent = 3.0
             path = "resources/celestial_sphere.png"
-            color_normalization = "NoNormalization"
 
             [geometry_type.Schwarzschild]
             radius = 2.0
@@ -211,7 +197,6 @@ mod tests {
             [objects.Sphere.texture.Bitmap]
             beaming_exponent = 3.0
             path = "resources/sphere.png"
-            color_normalization = "NoNormalization"
 
             [[objects]]
 
@@ -226,7 +211,6 @@ mod tests {
             height = 0.5
             color1 = [255, 0, 0]
             color2 = [0, 0, 255]
-            color_normalization = "NoNormalization"
         "#;
 
         let config: RenderConfig = toml::from_str(toml_str).unwrap();
@@ -235,7 +219,6 @@ mod tests {
             TextureConfig::Bitmap {
                 beaming_exponent: 3.0,
                 path: String::from("resources/celestial_sphere.png"),
-                color_normalization: NoNormalization,
             }
         );
         assert_eq!(config.celestial_temperature, 1500.0);
@@ -264,7 +247,6 @@ mod tests {
                 &TextureConfig::Bitmap {
                     beaming_exponent: 3.0,
                     path: String::from("resources/sphere.png"),
-                    color_normalization: NoNormalization,
                 }
             );
             assert_eq!(*temperature, 5500.0);
