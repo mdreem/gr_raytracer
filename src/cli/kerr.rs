@@ -116,6 +116,7 @@ mod tests {
     use crate::cli::cli::GlobalOpts;
     use crate::geometry::four_vector::FourVector;
     use crate::geometry::point::Point;
+    use crate::rendering::color::ToneMappingMethod;
     use std::f64::consts::PI;
     use std::io::BufWriter;
 
@@ -137,6 +138,7 @@ mod tests {
             theta: PI / 2.0,
             psi: PI / 2.0,
             camera_position: vec![],
+            tone_mapping: ToneMappingMethod::Reinhard,
         };
         let geometry = Kerr::new(radius, a, horizon_epsilon);
         let mut output_buffer = BufWriter::new(Vec::new());

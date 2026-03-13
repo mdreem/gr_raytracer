@@ -20,6 +20,13 @@ pub enum CIETristimulusNormalization {
     EqualLuminance,
 }
 
+#[derive(Deserialize, Serialize, Default, Clone, Copy, PartialEq, Debug, ValueEnum)]
+pub enum ToneMappingMethod {
+    #[default]
+    Reinhard,
+    GlobalLinear,
+}
+
 #[derive(Debug, PartialEq, Copy, Clone)]
 pub struct CIETristimulus {
     pub x: f64,
@@ -252,6 +259,71 @@ pub fn xyz_to_srgb(cie_tristimulus: &CIETristimulus, exposure: f64) -> Color {
         b,
         alpha: 255,
     }
+}
+
+pub fn xyz_to_linear_srgb_buffer(cie_tristimulus: &Vec<CIETristimulus>) -> Vec<Vector3<f64>> {
+    cie_tristimulus
+        .iter()
+        .map(|c| xyz_to_linear_srgb(c))
+        .collect()
+}
+
+pub fn linear_srgb_to_srgb_buffer(
+    linear_rgb: &Vec<Vector3<f64>>,
+    exposure: f64,
+    tone_mapping_method: ToneMappingMethod,
+) -> Vec<Color> {
+    let scale = match tone_mapping_method {
+        ToneMappingMethod::Reinhard => 1.0,
+        ToneMappingMethod::GlobalLinear => {
+            let max_r = linear_rgb
+                .iter()
+                .map(|c| c.x * exposure)
+                .fold(0.0, f64::max);
+            let max_g = linear_rgb
+                .iter()
+                .map(|c| c.y * exposure)
+                .fold(0.0, f64::max);
+            let max_b = linear_rgb
+                .iter()
+                .map(|c| c.z * exposure)
+                .fold(0.0, f64::max);
+            let max_component = max_r.max(max_g).max(max_b);
+            if max_component > 0.0 {
+                1.0 / max_component
+            } else {
+                1.0
+            }
+        }
+    };
+
+    linear_rgb
+        .iter()
+        .map(|c| c * exposure)
+        .map(|c| match tone_mapping_method {
+            ToneMappingMethod::Reinhard => {
+                let l_in = 0.2126 * c.x + 0.7152 * c.y + 0.0722 * c.z;
+                if l_in > 0.0 {
+                    let l_out = l_in / (1.0 + l_in);
+                    c * (l_out / l_in)
+                } else {
+                    c
+                }
+            }
+            ToneMappingMethod::GlobalLinear => scale * c,
+        })
+        .map(|v_lin| {
+            let r = (compand_srgb(v_lin.x.max(0.0)) * 255.0).round() as u8;
+            let g = (compand_srgb(v_lin.y.max(0.0)) * 255.0).round() as u8;
+            let b = (compand_srgb(v_lin.z.max(0.0)) * 255.0).round() as u8;
+            Color {
+                r,
+                g,
+                b,
+                alpha: 255,
+            }
+        })
+        .collect()
 }
 
 fn inv_compand_srgb(u: f64) -> f64 {

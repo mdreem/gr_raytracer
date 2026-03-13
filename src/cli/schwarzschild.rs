@@ -121,6 +121,7 @@ mod tests {
     use crate::cli::cli::GlobalOpts;
     use crate::geometry::four_vector::FourVector;
     use crate::geometry::point::Point;
+    use crate::rendering::color::ToneMappingMethod;
     use std::io::BufWriter;
 
     #[test]
@@ -140,6 +141,7 @@ mod tests {
             theta: 0.0,
             psi: 0.0,
             camera_position: vec![],
+            tone_mapping: ToneMappingMethod::Reinhard,
         };
         let geometry = Schwarzschild::new(radius, horizon_epsilon);
         let mut output_buffer = BufWriter::new(Vec::new());

@@ -1,9 +1,9 @@
 use crate::rendering::black_body_radiation::get_cie_xyz_of_black_body_redshifted;
 use crate::rendering::color::{CIETristimulus, CIETristimulusNormalization, Color, srgb_to_xyz};
-use log::{error, warn};
 use crate::rendering::raytracer::RaytracerError;
 use crate::rendering::texture::TextureError::DecodeError;
 use image::{DynamicImage, GenericImageView, ImageReader};
+use log::{error, warn};
 use std::sync::Arc;
 
 #[derive(Debug, thiserror::Error)]
@@ -307,10 +307,10 @@ impl TextureMapperFactory {
 
 #[cfg(test)]
 mod tests {
-    use approx::assert_relative_eq;
     use crate::rendering::black_body_radiation::get_cie_xyz_of_black_body_redshifted;
     use crate::rendering::color::{CIETristimulus, CIETristimulusNormalization};
     use crate::rendering::texture::{BlackBodyMapper, TemperatureData, TextureMap, TextureMapper};
+    use approx::assert_relative_eq;
 
     fn get_red() -> CIETristimulus {
         CIETristimulus::from_rgba(&image::Rgba([255, 0, 0, 255]))
@@ -416,12 +416,9 @@ mod tests {
                 let lut = mapper.blackbody_xyz(temperature, redshift);
                 let direct = get_cie_xyz_of_black_body_redshifted(temperature, redshift);
 
-                assert_relative_eq!(lut.x, direct.x, max_relative = 0.02,
-                    epsilon = 1e-14);
-                assert_relative_eq!(lut.y, direct.y, max_relative = 0.02,
-                    epsilon = 1e-14);
-                assert_relative_eq!(lut.z, direct.z, max_relative = 0.02,
-                    epsilon = 1e-14);
+                assert_relative_eq!(lut.x, direct.x, max_relative = 0.02, epsilon = 1e-14);
+                assert_relative_eq!(lut.y, direct.y, max_relative = 0.02, epsilon = 1e-14);
+                assert_relative_eq!(lut.z, direct.z, max_relative = 0.02, epsilon = 1e-14);
             }
         }
     }

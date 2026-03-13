@@ -40,7 +40,7 @@ fn assert_directed<G: Geometry>(
     Ok(())
 }
 
-pub(crate) fn assert_future_directed<G: Geometry>(
+pub fn assert_future_directed<G: Geometry>(
     context: &str,
     geometry: &G,
     position: &Point,

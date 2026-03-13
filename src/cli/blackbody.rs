@@ -1,5 +1,8 @@
 use crate::rendering::black_body_radiation::get_cie_xyz_of_black_body_redshifted;
-use crate::rendering::color::{CIETristimulusNormalization, xyz_to_srgb};
+use crate::rendering::color::{
+    CIETristimulus, CIETristimulusNormalization, ToneMappingMethod, linear_srgb_to_srgb_buffer,
+    xyz_to_linear_srgb_buffer, xyz_to_srgb,
+};
 
 pub fn run_blackbody(temperature: f64, redshift: f64, normalization: CIETristimulusNormalization) {
     let cie_xyz = get_cie_xyz_of_black_body_redshifted(temperature, redshift);
@@ -31,13 +34,22 @@ pub fn run_blackbody_spectrum(
     height: u32,
     filename: String,
     normalization: CIETristimulusNormalization,
+    tone_mapping: ToneMappingMethod,
 ) {
     use indicatif::{ProgressBar, ProgressStyle};
     use rayon::prelude::*;
     use std::sync::atomic::{AtomicUsize, Ordering};
 
     let total_pixels = (width * height) as usize;
-    let mut pixels = vec![0u8; total_pixels * 4];
+    let mut cie_pixels = vec![
+        CIETristimulus {
+            x: 0.0,
+            y: 0.0,
+            z: 0.0,
+            alpha: 0.0
+        };
+        total_pixels
+    ];
 
     let pb = ProgressBar::new(total_pixels as u64);
     pb.set_style(ProgressStyle::with_template("🔥 {spinner:.green} [{elapsed_precise}] [{wide_bar:.blue}] {pos}/{len} ({percent_precise}%, {eta})")
@@ -46,7 +58,7 @@ pub fn run_blackbody_spectrum(
 
     let count = AtomicUsize::new(0);
 
-    pixels.par_chunks_mut(4).enumerate().for_each(|(i, p)| {
+    cie_pixels.par_chunks_mut(1).enumerate().for_each(|(i, p)| {
         count.fetch_add(1, Ordering::SeqCst);
         pb.set_position(count.load(Ordering::Relaxed) as u64);
 
@@ -58,13 +70,20 @@ pub fn run_blackbody_spectrum(
         let redshift = min_redshift + y * (max_redshift - min_redshift) / (height as f64 - 1.0);
 
         let cie_xyz = get_cie_xyz_of_black_body_redshifted(temperature, redshift);
-        let color = xyz_to_srgb(&cie_xyz.normalize(normalization), 1.0);
-
-        p[0] = color.r;
-        p[1] = color.g;
-        p[2] = color.b;
-        p[3] = color.alpha;
+        p[0] = cie_xyz.normalize(normalization);
     });
+
+    let linear_srgb = xyz_to_linear_srgb_buffer(&cie_pixels);
+    let srgb = linear_srgb_to_srgb_buffer(&linear_srgb, 1.0, tone_mapping);
+
+    let mut pixels = vec![0u8; 4 * total_pixels];
+
+    for (i, color) in srgb.iter().enumerate() {
+        pixels[4 * i] = color.r;
+        pixels[4 * i + 1] = color.g;
+        pixels[4 * i + 2] = color.b;
+        pixels[4 * i + 3] = color.alpha;
+    }
 
     pb.finish();
 
