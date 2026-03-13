@@ -6,11 +6,11 @@
 
 use nalgebra::{Const, Matrix4, OVector};
 
+use crate::geometry::four_vector::FourVector;
 use crate::geometry::geometry::{
     ConstantsOfMotion, GeodesicSolver, Geometry, HasCoordinateSystem, InnerProduct, Signature,
     SupportQuantities,
 };
-use crate::geometry::four_vector::FourVector;
 use crate::geometry::point::{CoordinateSystem, Point};
 use crate::geometry::tetrad::Tetrad;
 use crate::rendering::ray::Ray;
@@ -144,7 +144,8 @@ impl GeodesicSolver for KerrBLSolver {
         // dt/dλ = (r²+a²)/Δ * P_r + a(L_z - aE sin²θ)
         let sin_t = theta.sin();
         let sin2 = sin_t * sin_t;
-        let dt = (r * r + self.a * self.a) / del * p_r + self.a * (self.l_z - self.a * self.e * sin2);
+        let dt =
+            (r * r + self.a * self.a) / del * p_r + self.a * (self.l_z - self.a * self.e * sin2);
 
         // dφ/dλ = a/Δ * P_r + L_z/sin²θ − aE
         // NOTE: L_z/sin²θ diverges as θ → 0 or π (the poles). This implementation
@@ -161,7 +162,9 @@ impl GeodesicSolver for KerrBLSolver {
         // d²θ/dλ² = Θ'(θ)/2
         let dv_theta = potential_theta_derivative(theta, self.a, self.e, self.l_z, self.q) / 2.0;
 
-        EquationOfMotionState::from_column_slice(&[dt, v_r, v_theta, dphi, dv_r, dv_theta, 0.0, 0.0])
+        EquationOfMotionState::from_column_slice(&[
+            dt, v_r, v_theta, dphi, dv_r, dv_theta, 0.0, 0.0,
+        ])
     }
 
     fn create_initial_state(&self, ray: &Ray) -> EquationOfMotionState {
@@ -183,13 +186,19 @@ impl GeodesicSolver for KerrBLSolver {
                 let (x, y, z) = (ray.position[1], ray.position[2], ray.position[3]);
                 let r_sqr = compute_r_sqr(self.a, x, y, z);
                 let r = r_sqr.sqrt();
-                let theta = if r == 0.0 { 0.0 } else { (z / r).clamp(-1.0, 1.0).acos() };
+                let theta = if r == 0.0 {
+                    0.0
+                } else {
+                    (z / r).clamp(-1.0, 1.0).acos()
+                };
                 // BL phi: atan2(r·y − a·x, r·x + a·y), consistent with cartesian_to_bl.
                 let phi_bl = (r * y - self.a * x).atan2(r * x + self.a * y);
                 let t = ray.position[0];
                 // Use the BL Jacobian ∂(Cart)/∂(BL) to convert p^Cart → p^BL (contravariant).
                 let j_bl = jacobian_bl_to_cartesian(self.a, r, theta, phi_bl);
-                let j_bl_inv = j_bl.try_inverse().expect("BL Jacobian should be invertible");
+                let j_bl_inv = j_bl
+                    .try_inverse()
+                    .expect("BL Jacobian should be invertible");
                 let p_bl_contra = j_bl_inv * ray.momentum.vector;
                 let sign_r = if p_bl_contra[1] >= 0.0 { 1.0 } else { -1.0 };
                 let sign_theta = if p_bl_contra[2] >= 0.0 { 1.0 } else { -1.0 };
@@ -210,7 +219,7 @@ impl GeodesicSolver for KerrBLSolver {
     fn momentum_from_state(&self, y: &EquationOfMotionState) -> FourVector {
         let r = y[1];
         let theta = y[2];
-        let v_r = y[4];     // dr/dλ
+        let v_r = y[4]; // dr/dλ
         let v_theta = y[5]; // dθ/dλ
 
         let del = delta(r, self.radius, self.a);
@@ -279,8 +288,8 @@ fn metric_bl_contravariant(r_s: f64, a: f64, r: f64, theta: f64) -> Matrix4<f64>
 
 #[derive(Clone, Debug)]
 pub struct KerrBL {
-    pub radius: f64,          // r_s = 2M (Schwarzschild radius)
-    pub a: f64,               // spin parameter
+    pub radius: f64, // r_s = 2M (Schwarzschild radius)
+    pub a: f64,      // spin parameter
     pub horizon_epsilon: f64,
 }
 
@@ -299,9 +308,19 @@ impl KerrBL {
         let z = position[3];
         let r_sqr = compute_r_sqr(self.a, x, y, z);
         let r = r_sqr.sqrt();
-        let theta = if r == 0.0 { 0.0 } else { (z / r).clamp(-1.0, 1.0).acos() };
+        let theta = if r == 0.0 {
+            0.0
+        } else {
+            (z / r).clamp(-1.0, 1.0).acos()
+        };
         let phi = (r * y - self.a * x).atan2(r * x + self.a * y);
-        Point::new(position[0], r, theta, phi, CoordinateSystem::BoyerLindquist { a: self.a })
+        Point::new(
+            position[0],
+            r,
+            theta,
+            phi,
+            CoordinateSystem::BoyerLindquist { a: self.a },
+        )
     }
 }
 
@@ -320,7 +339,10 @@ impl Signature for KerrBL {
 impl InnerProduct for KerrBL {
     fn inner_product(&self, position: &Point, v: &FourVector, w: &FourVector) -> f64 {
         debug_assert!(
-            matches!(position.coordinate_system, CoordinateSystem::BoyerLindquist { .. }),
+            matches!(
+                position.coordinate_system,
+                CoordinateSystem::BoyerLindquist { .. }
+            ),
             "inner_product expects BL coordinates"
         );
         let r = position[1];
@@ -357,7 +379,8 @@ impl SupportQuantities for KerrBL {
         let sin2 = theta.sin().powi(2);
         let g_tt = -(1.0 - self.radius * r / sig);
         let g_tph = -self.a * self.radius * r * sin2 / sig;
-        let g_phph = (r * r + self.a * self.a + self.a * self.a * self.radius * r * sin2 / sig) * sin2;
+        let g_phph =
+            (r * r + self.a * self.a + self.a * self.a * self.radius * r * sin2 / sig) * sin2;
 
         let ut_pre = g_tt + 2.0 * omega * g_tph + omega * omega * g_phph;
         if ut_pre >= 0.0 {
@@ -474,7 +497,11 @@ impl Geometry for KerrBL {
                 let (x, y, z) = (ray.position[1], ray.position[2], ray.position[3]);
                 let r_sqr = compute_r_sqr(self.a, x, y, z);
                 let r = r_sqr.sqrt();
-                let theta = if r == 0.0 { 0.0 } else { (z / r).clamp(-1.0, 1.0).acos() };
+                let theta = if r == 0.0 {
+                    0.0
+                } else {
+                    (z / r).clamp(-1.0, 1.0).acos()
+                };
                 let phi_bl = (r * y - self.a * x).atan2(r * x + self.a * y);
                 (r, theta, phi_bl)
             }
@@ -497,7 +524,9 @@ impl Geometry for KerrBL {
                 // Cartesian (KS) ray: convert p^Cart → p^BL using the BL Jacobian
                 // ∂(Cart)/∂(BL) evaluated at (r, θ, φ_BL).  Then lower with BL metric.
                 let j_bl = jacobian_bl_to_cartesian(self.a, r, theta, phi_bl);
-                let j_bl_inv = j_bl.try_inverse().expect("BL Jacobian should be invertible");
+                let j_bl_inv = j_bl
+                    .try_inverse()
+                    .expect("BL Jacobian should be invertible");
                 let p_bl_contra = j_bl_inv * ray.momentum.vector;
                 let g = metric_bl(self.radius, self.a, r, theta);
                 let p_bl_cov = g * p_bl_contra;
@@ -512,7 +541,8 @@ impl Geometry for KerrBL {
         let cos_t = theta.cos();
         let sin_t = theta.sin();
         let sin2 = sin_t * sin_t;
-        let q = p_theta * p_theta + cos_t * cos_t * (l_z * l_z / sin2.max(SIN2_FLOOR) - self.a * self.a * e * e);
+        let q = p_theta * p_theta
+            + cos_t * cos_t * (l_z * l_z / sin2.max(SIN2_FLOOR) - self.a * self.a * e * e);
 
         Box::new(KerrBLSolver {
             radius: self.radius,
@@ -625,7 +655,13 @@ mod tests {
         let kerr = KerrBL::new(1.0, 0.5, 1e-4);
         let r = 5.0;
         let theta = std::f64::consts::FRAC_PI_2;
-        let position = Point::new(0.0, r, theta, 0.0, CoordinateSystem::BoyerLindquist { a: 0.5 });
+        let position = Point::new(
+            0.0,
+            r,
+            theta,
+            0.0,
+            CoordinateSystem::BoyerLindquist { a: 0.5 },
+        );
 
         // Construct a null vector from metric: g_μν k^μ k^ν = 0
         // For a radial null ray: k^t and k^r with g_tt (k^t)^2 + g_rr (k^r)^2 = 0
@@ -676,8 +712,20 @@ mod tests {
         let m = 0.5_f64; // M = r_s/2
         let r_plus = m + (m * m - 0.3_f64 * 0.3_f64).sqrt();
 
-        let inside = Point::new(0.0, r_plus - 0.01, 1.0, 0.0, CoordinateSystem::BoyerLindquist { a: 0.3 });
-        let outside = Point::new(0.0, r_plus + 0.1, 1.0, 0.0, CoordinateSystem::BoyerLindquist { a: 0.3 });
+        let inside = Point::new(
+            0.0,
+            r_plus - 0.01,
+            1.0,
+            0.0,
+            CoordinateSystem::BoyerLindquist { a: 0.3 },
+        );
+        let outside = Point::new(
+            0.0,
+            r_plus + 0.1,
+            1.0,
+            0.0,
+            CoordinateSystem::BoyerLindquist { a: 0.3 },
+        );
         assert!(kerr.inside_horizon(&inside));
         assert!(!kerr.inside_horizon(&outside));
     }
@@ -685,7 +733,13 @@ mod tests {
     #[test]
     fn test_get_radial_coordinate() {
         let kerr = KerrBL::new(1.0, 0.5, 1e-4);
-        let position = Point::new(0.0, 7.5, 1.2, 0.8, CoordinateSystem::BoyerLindquist { a: 0.5 });
+        let position = Point::new(
+            0.0,
+            7.5,
+            1.2,
+            0.8,
+            CoordinateSystem::BoyerLindquist { a: 0.5 },
+        );
         assert_abs_diff_eq!(kerr.get_radial_coordinate(&position), 7.5);
     }
 
@@ -723,7 +777,10 @@ mod tests {
         let q = 0.0;
 
         let r_potential = potential_r(r, r_s, a, e, l_z, q);
-        assert!(r_potential >= 0.0, "R(r) must be non-negative for allowed motion");
+        assert!(
+            r_potential >= 0.0,
+            "R(r) must be non-negative for allowed motion"
+        );
     }
 
     #[test]
@@ -763,16 +820,27 @@ mod tests {
         use crate::geometry::geometry::SupportQuantities;
         let velocity = kerr.get_stationary_velocity_at(&position);
         let camera = crate::rendering::camera::Camera::new(
-            position, velocity, std::f64::consts::FRAC_PI_2,
-            11, 11, 0.0, 0.0, 0.0, &kerr,
-        ).unwrap();
+            position,
+            velocity,
+            std::f64::consts::FRAC_PI_2,
+            11,
+            11,
+            0.0,
+            0.0,
+            0.0,
+            &kerr,
+        )
+        .unwrap();
         let ray = camera.get_ray_for(5, 5);
 
         let solver = kerr_bl.get_geodesic_solver(&ray);
         let state = solver.create_initial_state(&ray);
         let p = solver.momentum_from_state(&state);
         let pos = Point::new(
-            state[0], state[1], state[2], state[3],
+            state[0],
+            state[1],
+            state[2],
+            state[3],
             CoordinateSystem::BoyerLindquist { a },
         );
 
@@ -789,8 +857,8 @@ mod tests {
     ///   3. Both values are in the same ballpark (within 50% of each other).
     #[test]
     fn test_e_lz_consistency_between_ks_and_bl() {
-        use crate::geometry::kerr::Kerr;
         use crate::geometry::geometry::{Geometry, SupportQuantities};
+        use crate::geometry::kerr::Kerr;
         use crate::rendering::camera::Camera;
 
         let radius = 1.0;
@@ -802,19 +870,37 @@ mod tests {
         let kerr_bl = KerrBL::new(radius, a, 1e-4);
 
         let velocity_ks = kerr.get_stationary_velocity_at(&position_cart);
-        let camera_ks = Camera::new(position_cart, velocity_ks, std::f64::consts::FRAC_PI_2,
-            11, 11, 0.0, 0.0, 0.0, &kerr).unwrap();
+        let camera_ks = Camera::new(
+            position_cart,
+            velocity_ks,
+            std::f64::consts::FRAC_PI_2,
+            11,
+            11,
+            0.0,
+            0.0,
+            0.0,
+            &kerr,
+        )
+        .unwrap();
         let ray_cart = camera_ks.get_ray_for(5, 8);
 
         let solver_cart = kerr_bl.get_geodesic_solver(&ray_cart);
         let state_cart = solver_cart.create_initial_state(&ray_cart);
         let p_cart = solver_cart.momentum_from_state(&state_cart);
-        let pos_cart_bl = Point::new(state_cart[0], state_cart[1], state_cart[2], state_cart[3],
-            CoordinateSystem::BoyerLindquist { a });
+        let pos_cart_bl = Point::new(
+            state_cart[0],
+            state_cart[1],
+            state_cart[2],
+            state_cart[3],
+            CoordinateSystem::BoyerLindquist { a },
+        );
         let constants_cart = kerr_bl.get_constants_of_motion(&pos_cart_bl, &p_cart);
         let e_cart = constants_cart.as_slice()[0].1;
         // The solver's E is physically reasonable (positive, O(1) value).
-        assert!(e_cart > 0.5 && e_cart < 2.0, "BL E from Cartesian ray = {e_cart} out of expected range");
+        assert!(
+            e_cart > 0.5 && e_cart < 2.0,
+            "BL E from Cartesian ray = {e_cart} out of expected range"
+        );
 
         // --- Test with a BL ray input ---
         // Build a BL ray by going through the production code path:
@@ -822,17 +908,26 @@ mod tests {
         let solver_via_cart = kerr_bl.get_geodesic_solver(&ray_cart);
         let state_from_cart = solver_via_cart.create_initial_state(&ray_cart);
         let position_bl = Point::new(
-            state_from_cart[0], state_from_cart[1], state_from_cart[2], state_from_cart[3],
+            state_from_cart[0],
+            state_from_cart[1],
+            state_from_cart[2],
+            state_from_cart[3],
             CoordinateSystem::BoyerLindquist { a },
         );
         let p_bl_fv = solver_via_cart.momentum_from_state(&state_from_cart);
-        let ray_bl = crate::rendering::ray::Ray::new(ray_cart.row, ray_cart.col, position_bl, p_bl_fv);
+        let ray_bl =
+            crate::rendering::ray::Ray::new(ray_cart.row, ray_cart.col, position_bl, p_bl_fv);
 
         let solver_bl = kerr_bl.get_geodesic_solver(&ray_bl);
         let state_bl = solver_bl.create_initial_state(&ray_bl);
         let p_bl = solver_bl.momentum_from_state(&state_bl);
-        let pos_bl_start = Point::new(state_bl[0], state_bl[1], state_bl[2], state_bl[3],
-            CoordinateSystem::BoyerLindquist { a });
+        let pos_bl_start = Point::new(
+            state_bl[0],
+            state_bl[1],
+            state_bl[2],
+            state_bl[3],
+            CoordinateSystem::BoyerLindquist { a },
+        );
         let constants_bl = kerr_bl.get_constants_of_motion(&pos_bl_start, &p_bl);
         let e_bl = constants_bl.as_slice()[0].1;
         let lz_bl = constants_bl.as_slice()[1].1;
@@ -840,10 +935,16 @@ mod tests {
         // BL internal consistency: get_constants_of_motion at initial state must
         // reproduce the same E and L_z that the solver uses throughout integration.
         // This ensures the solver is seeded correctly from both input coordinate systems.
-        assert!(e_bl > 0.5 && e_bl < 2.0, "BL E from BL ray = {e_bl} out of expected range");
+        assert!(
+            e_bl > 0.5 && e_bl < 2.0,
+            "BL E from BL ray = {e_bl} out of expected range"
+        );
 
         // L_z for the BL camera ray is finite and in a physically reasonable range.
-        assert!(lz_bl.is_finite(), "BL L_z from BL ray must be finite, got {lz_bl}");
+        assert!(
+            lz_bl.is_finite(),
+            "BL L_z from BL ray must be finite, got {lz_bl}"
+        );
         assert!(e_cart > 0.5, "Cartesian-ray BL E is positive");
         assert!(e_bl > 0.5, "BL-ray BL E is positive");
 
@@ -851,9 +952,11 @@ mod tests {
         // the same geodesic at large r. They will differ at O(r_s/r) ~ 10% because
         // KS and BL use different time coordinates.
         let e_relative_diff = (e_cart - e_bl).abs() / e_bl.abs();
-        assert!(e_relative_diff < 0.5,
+        assert!(
+            e_relative_diff < 0.5,
             "BL E from Cart ({e_cart}) and BL ({e_bl}) differ by {:.1}% > 50%",
-            e_relative_diff * 100.0);
+            e_relative_diff * 100.0
+        );
 
         // Sanity-check: BL E and KS E should agree at large r (r=10, asymptotically flat).
         // L_z is NOT compared across coordinates: KS L_z = -y·p_x + x·p_y (Cartesian angular
@@ -871,17 +974,57 @@ mod tests {
         let position = Point::new(0.0, 5.0, 1.2, 0.8, CoordinateSystem::BoyerLindquist { a });
         let tetrad = kerr_bl.get_tetrad_at(&position);
 
-        assert_abs_diff_eq!(kerr_bl.inner_product(&position, &tetrad.t, &tetrad.t), -1.0, epsilon = 1e-10);
-        assert_abs_diff_eq!(kerr_bl.inner_product(&position, &tetrad.x, &tetrad.x), 1.0, epsilon = 1e-10);
-        assert_abs_diff_eq!(kerr_bl.inner_product(&position, &tetrad.y, &tetrad.y), 1.0, epsilon = 1e-10);
-        assert_abs_diff_eq!(kerr_bl.inner_product(&position, &tetrad.z, &tetrad.z), 1.0, epsilon = 1e-10);
+        assert_abs_diff_eq!(
+            kerr_bl.inner_product(&position, &tetrad.t, &tetrad.t),
+            -1.0,
+            epsilon = 1e-10
+        );
+        assert_abs_diff_eq!(
+            kerr_bl.inner_product(&position, &tetrad.x, &tetrad.x),
+            1.0,
+            epsilon = 1e-10
+        );
+        assert_abs_diff_eq!(
+            kerr_bl.inner_product(&position, &tetrad.y, &tetrad.y),
+            1.0,
+            epsilon = 1e-10
+        );
+        assert_abs_diff_eq!(
+            kerr_bl.inner_product(&position, &tetrad.z, &tetrad.z),
+            1.0,
+            epsilon = 1e-10
+        );
 
-        assert_abs_diff_eq!(kerr_bl.inner_product(&position, &tetrad.t, &tetrad.x), 0.0, epsilon = 1e-10);
-        assert_abs_diff_eq!(kerr_bl.inner_product(&position, &tetrad.t, &tetrad.y), 0.0, epsilon = 1e-10);
-        assert_abs_diff_eq!(kerr_bl.inner_product(&position, &tetrad.t, &tetrad.z), 0.0, epsilon = 1e-10);
-        assert_abs_diff_eq!(kerr_bl.inner_product(&position, &tetrad.x, &tetrad.y), 0.0, epsilon = 1e-10);
-        assert_abs_diff_eq!(kerr_bl.inner_product(&position, &tetrad.x, &tetrad.z), 0.0, epsilon = 1e-10);
-        assert_abs_diff_eq!(kerr_bl.inner_product(&position, &tetrad.y, &tetrad.z), 0.0, epsilon = 1e-10);
+        assert_abs_diff_eq!(
+            kerr_bl.inner_product(&position, &tetrad.t, &tetrad.x),
+            0.0,
+            epsilon = 1e-10
+        );
+        assert_abs_diff_eq!(
+            kerr_bl.inner_product(&position, &tetrad.t, &tetrad.y),
+            0.0,
+            epsilon = 1e-10
+        );
+        assert_abs_diff_eq!(
+            kerr_bl.inner_product(&position, &tetrad.t, &tetrad.z),
+            0.0,
+            epsilon = 1e-10
+        );
+        assert_abs_diff_eq!(
+            kerr_bl.inner_product(&position, &tetrad.x, &tetrad.y),
+            0.0,
+            epsilon = 1e-10
+        );
+        assert_abs_diff_eq!(
+            kerr_bl.inner_product(&position, &tetrad.x, &tetrad.z),
+            0.0,
+            epsilon = 1e-10
+        );
+        assert_abs_diff_eq!(
+            kerr_bl.inner_product(&position, &tetrad.y, &tetrad.z),
+            0.0,
+            epsilon = 1e-10
+        );
     }
 
     #[test]
@@ -909,8 +1052,18 @@ mod tests {
         // Kerr (Cartesian Kerr-Schild) scene.
         let kerr = Kerr::new(radius, a, 1e-5);
         let velocity_cart = kerr.get_stationary_velocity_at(&position_cart);
-        let camera_kerr = Camera::new(position_cart, velocity_cart, std::f64::consts::FRAC_PI_2,
-            11, 11, 0.0, 0.0, 0.0, &kerr).unwrap();
+        let camera_kerr = Camera::new(
+            position_cart,
+            velocity_cart,
+            std::f64::consts::FRAC_PI_2,
+            11,
+            11,
+            0.0,
+            0.0,
+            0.0,
+            &kerr,
+        )
+        .unwrap();
         let scene_kerr: Scene<Kerr> =
             scene::test_scene::create_scene_with_camera(1.0, 2.0, 7.0, &kerr, camera_kerr, 1e-6)
                 .unwrap();
@@ -926,8 +1079,18 @@ mod tests {
         let position_bl = kerr_bl.cartesian_to_bl(&ray_kerr.position);
 
         let velocity_bl = kerr_bl.get_stationary_velocity_at(&position_bl);
-        let camera_bl = Camera::new(position_bl, velocity_bl, std::f64::consts::FRAC_PI_2,
-            11, 11, 0.0, 0.0, 0.0, &kerr_bl).unwrap();
+        let camera_bl = Camera::new(
+            position_bl,
+            velocity_bl,
+            std::f64::consts::FRAC_PI_2,
+            11,
+            11,
+            0.0,
+            0.0,
+            0.0,
+            &kerr_bl,
+        )
+        .unwrap();
         let scene_bl: Scene<KerrBL> =
             scene::test_scene::create_scene_with_camera(1.0, 2.0, 7.0, &kerr_bl, camera_bl, 1e-6)
                 .unwrap();
@@ -978,9 +1141,17 @@ mod tests {
         let kerr = Kerr::new(radius, a, 1e-5);
         let velocity_cart = kerr.get_stationary_velocity_at(&position_cart);
         let camera = Camera::new(
-            position_cart, velocity_cart, std::f64::consts::FRAC_PI_2,
-            11, 11, 0.0, 0.0, 0.0, &kerr,
-        ).unwrap();
+            position_cart,
+            velocity_cart,
+            std::f64::consts::FRAC_PI_2,
+            11,
+            11,
+            0.0,
+            0.0,
+            0.0,
+            &kerr,
+        )
+        .unwrap();
         let kerr_bl = KerrBL::new(radius, a, 1e-5);
         let scene: scene::Scene<KerrBL> =
             scene::test_scene::create_scene_with_camera(1.0, 2.0, 7.0, &kerr_bl, camera, 1e-6)
@@ -988,7 +1159,10 @@ mod tests {
         let ray = scene.camera.get_ray_for(3, 7);
 
         let (trajectory, _) = scene.integrator.integrate(&ray).unwrap();
-        assert!(trajectory.len() > 10, "Trajectory too short for meaningful test");
+        assert!(
+            trajectory.len() > 10,
+            "Trajectory too short for meaningful test"
+        );
 
         let initial_constants = kerr_bl.get_constants_of_motion(&trajectory[0].x, &trajectory[0].p);
         let e_init = initial_constants.as_slice()[0].1;
@@ -1017,9 +1191,24 @@ mod tests {
                 (q - q_init).abs()
             };
 
-            assert!(e_drift < 1e-4, "Energy drift {:.3e} at step {}", e_drift, step.step);
-            assert!(lz_drift < 1e-4, "L_z drift {:.3e} at step {}", lz_drift, step.step);
-            assert!(q_drift < 1e-4, "Carter Q drift {:.3e} at step {}", q_drift, step.step);
+            assert!(
+                e_drift < 1e-4,
+                "Energy drift {:.3e} at step {}",
+                e_drift,
+                step.step
+            );
+            assert!(
+                lz_drift < 1e-4,
+                "L_z drift {:.3e} at step {}",
+                lz_drift,
+                step.step
+            );
+            assert!(
+                q_drift < 1e-4,
+                "Carter Q drift {:.3e} at step {}",
+                q_drift,
+                step.step
+            );
         }
     }
 
@@ -1038,9 +1227,17 @@ mod tests {
         let kerr = Kerr::new(radius, a, 1e-5);
         let velocity_cart = kerr.get_stationary_velocity_at(&position_cart);
         let camera = Camera::new(
-            position_cart, velocity_cart, std::f64::consts::FRAC_PI_2,
-            11, 11, 0.0, 0.0, 0.0, &kerr,
-        ).unwrap();
+            position_cart,
+            velocity_cart,
+            std::f64::consts::FRAC_PI_2,
+            11,
+            11,
+            0.0,
+            0.0,
+            0.0,
+            &kerr,
+        )
+        .unwrap();
         let kerr_bl = KerrBL::new(radius, a, 1e-5);
         let scene: scene::Scene<KerrBL> =
             scene::test_scene::create_scene_with_camera(1.0, 2.0, 7.0, &kerr_bl, camera, 1e-6)
@@ -1077,9 +1274,17 @@ mod tests {
         let kerr = Kerr::new(radius, 0.0, 1e-5);
         let velocity_cart = kerr.get_stationary_velocity_at(&position_cart);
         let camera_ks = Camera::new(
-            position_cart, velocity_cart, std::f64::consts::FRAC_PI_2,
-            11, 11, 0.0, 0.0, 0.0, &kerr,
-        ).unwrap();
+            position_cart,
+            velocity_cart,
+            std::f64::consts::FRAC_PI_2,
+            11,
+            11,
+            0.0,
+            0.0,
+            0.0,
+            &kerr,
+        )
+        .unwrap();
         let kerr_bl = KerrBL::new(radius, 0.0, 1e-5);
         let scene_bl: scene::Scene<KerrBL> =
             scene::test_scene::create_scene_with_camera(1.0, 2.0, 7.0, &kerr_bl, camera_ks, 1e-6)
@@ -1095,7 +1300,10 @@ mod tests {
         // from the first trajectory step, which is already in BL ≡ spherical coords when a=0.
         let first_bl_step = &traj_bl[0];
         let position_sph = Point::new_spherical(
-            first_bl_step.x[0], first_bl_step.x[1], first_bl_step.x[2], first_bl_step.x[3],
+            first_bl_step.x[0],
+            first_bl_step.x[1],
+            first_bl_step.x[2],
+            first_bl_step.x[3],
         );
         let momentum_sph = FourVector::new_spherical(
             first_bl_step.p.vector[0],
@@ -1110,13 +1318,26 @@ mod tests {
         let r = position_sph[1];
         let a_factor = 1.0 - radius / r;
         let vel_sch = FourVector::new_spherical(a_factor.sqrt().recip(), 0.0, 0.0, 0.0);
-        let scene_sch: scene::Scene<Schwarzschild> =
-            scene::test_scene::create_scene_with_camera(
-                1.0, 2.0, 7.0, &schwarzschild,
-                Camera::new(position_sph, vel_sch, std::f64::consts::FRAC_PI_2,
-                    11, 11, 0.0, 0.0, 0.0, &schwarzschild).unwrap(),
-                1e-6,
-            ).unwrap();
+        let scene_sch: scene::Scene<Schwarzschild> = scene::test_scene::create_scene_with_camera(
+            1.0,
+            2.0,
+            7.0,
+            &schwarzschild,
+            Camera::new(
+                position_sph,
+                vel_sch,
+                std::f64::consts::FRAC_PI_2,
+                11,
+                11,
+                0.0,
+                0.0,
+                0.0,
+                &schwarzschild,
+            )
+            .unwrap(),
+            1e-6,
+        )
+        .unwrap();
 
         let (traj_sch, stop_sch) = scene_sch.integrator.integrate(&ray_sch).unwrap();
 
@@ -1135,7 +1356,11 @@ mod tests {
         let last_bl = traj_bl.last().unwrap().x.get_spatial_vector_cartesian();
         let last_sch = traj_sch.last().unwrap().x.get_spatial_vector_cartesian();
         let distance = (last_bl - last_sch).norm();
-        assert!(distance < 100.0, "Schwarzschild limit: positions differ by {}", distance);
+        assert!(
+            distance < 100.0,
+            "Schwarzschild limit: positions differ by {}",
+            distance
+        );
     }
 
     #[test]
@@ -1161,9 +1386,17 @@ mod tests {
         let kerr = Kerr::new(radius, a, 1e-5);
         let velocity_cart = kerr.get_stationary_velocity_at(&position_cart);
         let camera_cart = Camera::new(
-            position_cart, velocity_cart.clone(),
-            std::f64::consts::FRAC_PI_2, 11, 11, 0.0, 0.0, 0.0, &kerr,
-        ).unwrap();
+            position_cart,
+            velocity_cart.clone(),
+            std::f64::consts::FRAC_PI_2,
+            11,
+            11,
+            0.0,
+            0.0,
+            0.0,
+            &kerr,
+        )
+        .unwrap();
         let kerr_bl = KerrBL::new(radius, a, 1e-5);
         let scene_bl: scene::Scene<KerrBL> =
             scene::test_scene::create_scene_with_camera(1.0, 2.0, 7.0, &kerr_bl, camera_cart, 1e-6)
@@ -1176,12 +1409,26 @@ mod tests {
         let a_factor = 1.0 - radius / r_val;
         let velocity_sph = FourVector::new_spherical(a_factor.sqrt().recip(), 0.0, 0.0, 0.0);
         let camera_sch = Camera::new(
-            position_sph, velocity_sph.clone(),
-            std::f64::consts::FRAC_PI_2, 11, 11, 0.0, 0.0, 0.0, &schwarzschild,
-        ).unwrap();
-        let scene_sch: scene::Scene<Schwarzschild> =
-            scene::test_scene::create_scene_with_camera(1.0, 2.0, 7.0, &schwarzschild, camera_sch, 1e-6)
-                .unwrap();
+            position_sph,
+            velocity_sph.clone(),
+            std::f64::consts::FRAC_PI_2,
+            11,
+            11,
+            0.0,
+            0.0,
+            0.0,
+            &schwarzschild,
+        )
+        .unwrap();
+        let scene_sch: scene::Scene<Schwarzschild> = scene::test_scene::create_scene_with_camera(
+            1.0,
+            2.0,
+            7.0,
+            &schwarzschild,
+            camera_sch,
+            1e-6,
+        )
+        .unwrap();
 
         // Integrate the same pixel in both geometries and collect trajectories
         let ray_bl = scene_bl.camera.get_ray_for(3, 7);
@@ -1190,8 +1437,16 @@ mod tests {
         let (traj_bl, _) = scene_bl.integrator.integrate(&ray_bl).unwrap();
         let (traj_sch, _) = scene_sch.integrator.integrate(&ray_sch).unwrap();
 
-        assert!(traj_bl.len() > 2, "KerrBL trajectory too short: {} steps", traj_bl.len());
-        assert!(traj_sch.len() > 2, "Schwarzschild trajectory too short: {} steps", traj_sch.len());
+        assert!(
+            traj_bl.len() > 2,
+            "KerrBL trajectory too short: {} steps",
+            traj_bl.len()
+        );
+        assert!(
+            traj_sch.len() > 2,
+            "Schwarzschild trajectory too short: {} steps",
+            traj_sch.len()
+        );
 
         // Compute observer energies (g_μν v^μ_obs k^ν at the camera position).
         // KerrBL::inner_product requires BL coordinates; the first trajectory step is already
@@ -1201,21 +1456,22 @@ mod tests {
         let redshift_computer_sch = RedshiftComputer::new(&schwarzschild);
 
         let first_bl = &traj_bl[0];
-        let ray_bl_coords = Ray::new(
-            ray_bl.row, ray_bl.col,
-            first_bl.x,
-            first_bl.p,
-        );
+        let ray_bl_coords = Ray::new(ray_bl.row, ray_bl.col, first_bl.x, first_bl.p);
         // Observer velocity in BL coords: stationary observer at the initial BL position.
         // When a=0, this is u^μ = ((1-r_s/r)^{-1/2}, 0, 0, 0) in BL ≡ Schwarzschild coords.
         let r_bl = first_bl.x[1];
         let a_factor_bl = 1.0 - radius / r_bl;
         let velocity_bl = FourVector::new(
-            a_factor_bl.sqrt().recip(), 0.0, 0.0, 0.0,
+            a_factor_bl.sqrt().recip(),
+            0.0,
+            0.0,
+            0.0,
             crate::geometry::point::CoordinateSystem::BoyerLindquist { a },
         );
-        let observer_energy_bl = redshift_computer_bl.get_observer_energy(&ray_bl_coords, &velocity_bl);
-        let observer_energy_sch = redshift_computer_sch.get_observer_energy(&ray_sch, &velocity_sph);
+        let observer_energy_bl =
+            redshift_computer_bl.get_observer_energy(&ray_bl_coords, &velocity_bl);
+        let observer_energy_sch =
+            redshift_computer_sch.get_observer_energy(&ray_sch, &velocity_sph);
 
         // Compare the redshift at the last trajectory step.
         // Both geometries trace the same physical geodesic (a=0), so the redshift
@@ -1240,13 +1496,20 @@ mod tests {
         let e = 1.0;
         let l_z = 3.0;
         let q = 1.0;
-        let solver = KerrBLSolver { radius: r_s, a, e, l_z, q };
+        let solver = KerrBLSolver {
+            radius: r_s,
+            a,
+            e,
+            l_z,
+            q,
+        };
 
         let r = 5.0;
         let theta = 1.2;
         let v_r = 0.1;
         let v_theta = -0.05;
-        let y = EquationOfMotionState::from_column_slice(&[0.0, r, theta, 0.0, v_r, v_theta, 0.0, 0.0]);
+        let y =
+            EquationOfMotionState::from_column_slice(&[0.0, r, theta, 0.0, v_r, v_theta, 0.0, 0.0]);
 
         let rhs = solver.geodesic(0.0, &y);
 
@@ -1265,9 +1528,17 @@ mod tests {
         let expected_dphi = a / del * p_r + l_z / sin2 - a * e;
         assert_abs_diff_eq!(rhs[3], expected_dphi, epsilon = 1e-12);
         // ẏ[4] = R'(r)/2
-        assert_abs_diff_eq!(rhs[4], potential_r_derivative(r, r_s, a, e, l_z, q) / 2.0, epsilon = 1e-12);
+        assert_abs_diff_eq!(
+            rhs[4],
+            potential_r_derivative(r, r_s, a, e, l_z, q) / 2.0,
+            epsilon = 1e-12
+        );
         // ẏ[5] = Θ'(θ)/2
-        assert_abs_diff_eq!(rhs[5], potential_theta_derivative(theta, a, e, l_z, q) / 2.0, epsilon = 1e-12);
+        assert_abs_diff_eq!(
+            rhs[5],
+            potential_theta_derivative(theta, a, e, l_z, q) / 2.0,
+            epsilon = 1e-12
+        );
         // ẏ[6] = 0, ẏ[7] = 0
         assert_abs_diff_eq!(rhs[6], 0.0, epsilon = 1e-12);
         assert_abs_diff_eq!(rhs[7], 0.0, epsilon = 1e-12);

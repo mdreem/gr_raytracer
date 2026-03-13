@@ -136,7 +136,9 @@ impl Geometry for EuclideanSpaceSpherical {
             CoordinateSystem::Cartesian => position.get_as_spherical()[0],
             CoordinateSystem::Spherical => position[1],
             CoordinateSystem::BoyerLindquist { .. } => {
-                unreachable!("BoyerLindquist coordinates should not be used with EuclideanSpherical")
+                unreachable!(
+                    "BoyerLindquist coordinates should not be used with EuclideanSpherical"
+                )
             }
         }
     }

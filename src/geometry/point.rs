@@ -28,7 +28,9 @@ pub enum CoordinateSystem {
     /// compile-time constant (e.g. `kerr_bl.a`) rather than an independent
     /// floating-point computation. Do not compare `CoordinateSystem` values
     /// whose `a` fields have been computed independently.
-    BoyerLindquist { a: f64 },
+    BoyerLindquist {
+        a: f64,
+    },
 }
 
 #[derive(Clone, Copy, Debug)]
@@ -204,7 +206,13 @@ mod tests {
     #[test]
     fn test_boyer_lindquist_to_cartesian_a_zero() {
         // When a=0, BL should match standard spherical
-        let bl = Point::new(0.0, 5.0, 1.2, 0.8, CoordinateSystem::BoyerLindquist { a: 0.0 });
+        let bl = Point::new(
+            0.0,
+            5.0,
+            1.2,
+            0.8,
+            CoordinateSystem::BoyerLindquist { a: 0.0 },
+        );
         let sph = Point::new_spherical(0.0, 5.0, 1.2, 0.8);
         let bl_cart = bl.to_cartesian();
         let sph_cart = sph.to_cartesian();
@@ -229,7 +237,17 @@ mod tests {
 
     #[test]
     fn test_boyer_lindquist_radial_distance() {
-        let bl = Point::new(0.0, 7.0, 1.0, 2.0, CoordinateSystem::BoyerLindquist { a: 0.5 });
-        assert_abs_diff_eq!(bl.radial_distance_spatial_part_squared(), 49.0, epsilon = 1e-12);
+        let bl = Point::new(
+            0.0,
+            7.0,
+            1.0,
+            2.0,
+            CoordinateSystem::BoyerLindquist { a: 0.5 },
+        );
+        assert_abs_diff_eq!(
+            bl.radial_distance_spatial_part_squared(),
+            49.0,
+            epsilon = 1e-12
+        );
     }
 }

@@ -5,6 +5,7 @@ use crate::geometry::four_vector::FourVector;
 use crate::geometry::geometry::{Geometry, InnerProduct, RenderableGeometry, SupportQuantities};
 use crate::geometry::kerr_bl::KerrBL;
 use crate::geometry::point::Point;
+use crate::rendering::color::ToneMappingMethod;
 use crate::rendering::raytracer;
 use crate::rendering::raytracer::RaytracerError;
 use crate::rendering::scene::Scene;
@@ -40,12 +41,13 @@ impl RenderableGeometry for KerrBL {
         to_row: Option<u32>,
         to_col: Option<u32>,
     ) -> Result<(), RaytracerError> {
+        let tone_mapping = opts.tone_mapping;
         let scene = create_scene_internal(self, opts, &config, camera_position)?;
 
         render(
             scene,
             filename,
-            config.color_normalization,
+            tone_mapping,
             from_row,
             from_col,
             to_row,
@@ -64,7 +66,7 @@ impl RenderableGeometry for KerrBL {
     ) -> Result<(), RaytracerError> {
         let scene = create_scene_internal(self, opts, &config, camera_position)?;
 
-        let raytracer = raytracer::Raytracer::new(scene, config.color_normalization);
+        let raytracer = raytracer::Raytracer::new(scene, ToneMappingMethod::default());
         let (integrated_ray, stop_reason) = raytracer.integrate_ray_at_point(row, col)?;
         info!("Stop reason: {:?}", stop_reason);
         integrated_ray.save(write)?;
@@ -92,7 +94,12 @@ impl RenderableGeometry for KerrBL {
             + tetrad.x * direction[1] / norm_space_part
             + tetrad.y * direction[2] / norm_space_part
             + tetrad.z * direction[3] / norm_space_part;
-        assert_future_directed("KerrBL render_ray_at momentum", self, &position_bl, &momentum)?;
+        assert_future_directed(
+            "KerrBL render_ray_at momentum",
+            self,
+            &position_bl,
+            &momentum,
+        )?;
 
         integrate_and_save_ray(self, position_bl, momentum, opts, write)
     }
@@ -104,6 +111,7 @@ mod tests {
     use crate::cli::cli::GlobalOpts;
     use crate::geometry::four_vector::FourVector;
     use crate::geometry::point::{CoordinateSystem, Point};
+    use crate::rendering::color::ToneMappingMethod;
     use std::f64::consts::PI;
     use std::io::BufWriter;
 
@@ -131,6 +139,7 @@ mod tests {
             theta: PI / 2.0,
             psi: PI / 2.0,
             camera_position: vec![],
+            tone_mapping: ToneMappingMethod::Reinhard,
         };
 
         let mut output_buffer = BufWriter::new(Vec::new());
