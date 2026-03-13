@@ -4,7 +4,7 @@ use crate::geometry::four_vector::FourVector;
 use crate::geometry::geometry::Geometry;
 use crate::geometry::point::Point;
 use crate::rendering::camera::Camera;
-use crate::rendering::color::{CIETristimulusNormalization, Color, ToneMappingMethod};
+use crate::rendering::color::{Color, ToneMappingMethod};
 use crate::rendering::integrator::IntegrationConfiguration;
 use crate::rendering::raytracer;
 use crate::rendering::raytracer::RaytracerError;
@@ -52,14 +52,13 @@ pub fn assert_future_directed<G: Geometry>(
 pub fn render<G: Geometry>(
     scene: Scene<G>,
     filename: String,
-    color_normalization: CIETristimulusNormalization,
     tone_mapping: ToneMappingMethod,
     from_row: Option<u32>,
     from_col: Option<u32>,
     to_row: Option<u32>,
     to_col: Option<u32>,
 ) -> Result<(), RaytracerError> {
-    let raytracer = raytracer::Raytracer::new(scene, color_normalization, tone_mapping);
+    let raytracer = raytracer::Raytracer::new(scene, tone_mapping);
     raytracer.render_section(
         from_row.unwrap_or(0),
         from_col.unwrap_or(0),
@@ -283,31 +282,23 @@ fn get_texture_mapper(
         TextureConfig::Bitmap {
             beaming_exponent,
             path,
-            color_normalization,
-        } => texture_mapper_factory.get_texture_mapper(
-            beaming_exponent,
-            path,
-            color_normalization,
-        )?,
+        } => texture_mapper_factory.get_texture_mapper(beaming_exponent, path)?,
         TextureConfig::Checker {
             beaming_exponent,
             width,
             height,
             color1,
             color2,
-            color_normalization,
         } => Arc::new(CheckerMapper::new(
             beaming_exponent,
             width,
             height,
             Color::new(color1.0, color1.1, color1.2, 255),
             Color::new(color2.0, color2.1, color2.2, 255),
-            color_normalization,
         )),
-        TextureConfig::BlackBody {
-            beaming_exponent,
-            color_normalization,
-        } => Arc::new(BlackBodyMapper::new(beaming_exponent, color_normalization)),
+        TextureConfig::BlackBody { beaming_exponent } => {
+            Arc::new(BlackBodyMapper::new(beaming_exponent))
+        }
     };
     Ok(texture_mapper_sphere)
 }

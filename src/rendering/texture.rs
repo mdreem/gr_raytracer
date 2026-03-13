@@ -1,5 +1,5 @@
 use crate::rendering::black_body_radiation::get_cie_xyz_of_black_body_redshifted;
-use crate::rendering::color::{CIETristimulus, CIETristimulusNormalization, Color, srgb_to_xyz};
+use crate::rendering::color::{CIETristimulus, Color, srgb_to_xyz};
 use crate::rendering::raytracer::RaytracerError;
 use crate::rendering::texture::TextureError::DecodeError;
 use image::{DynamicImage, GenericImageView, ImageReader};
@@ -41,15 +41,10 @@ pub trait TextureMap: Sync {
 pub struct TextureMapper {
     beaming_exponent: f64,
     image: DynamicImage,
-    color_normalization: CIETristimulusNormalization,
 }
 
 impl TextureMapper {
-    pub fn new(
-        beaming_exponent: f64,
-        filename: String,
-        color_normalization: CIETristimulusNormalization,
-    ) -> Result<TextureMapper, RaytracerError> {
+    pub fn new(beaming_exponent: f64, filename: String) -> Result<TextureMapper, RaytracerError> {
         let image = ImageReader::open(filename)
             .map_err(TextureError::IoError)
             .map_err(RaytracerError::TextureError)?
@@ -60,7 +55,6 @@ impl TextureMapper {
         Ok(TextureMapper {
             beaming_exponent,
             image,
-            color_normalization,
         })
     }
 
@@ -102,17 +96,14 @@ impl TextureMap for TextureMapper {
         uv: &UVCoordinates,
         temperature_data: &TemperatureData,
     ) -> CIETristimulus {
-        let cie_tristimulus = self.bilinear(uv);
-        let cie_tristimulus_beamed =
-            cie_tristimulus.apply_beaming(temperature_data.redshift, self.beaming_exponent);
-        cie_tristimulus_beamed.normalize(self.color_normalization)
+        self.bilinear(uv)
+            .apply_beaming(temperature_data.redshift, self.beaming_exponent)
     }
 }
 
 #[derive(Clone)]
 pub struct BlackBodyMapper {
     beaming_exponent: f64,
-    color_normalization: CIETristimulusNormalization,
     /// Precomputed blackbody colors indexed by log10(temperature).
     color_profile: Vec<(f64, CIETristimulus)>,
 }
@@ -122,10 +113,7 @@ const MIN_TEMPERATURE: f64 = 10.0;
 const MAX_TEMPERATURE: f64 = 10_000_000.0;
 
 impl BlackBodyMapper {
-    pub fn new(
-        beaming_exponent: f64,
-        color_normalization: CIETristimulusNormalization,
-    ) -> BlackBodyMapper {
+    pub fn new(beaming_exponent: f64) -> BlackBodyMapper {
         let mut color_profile = Vec::with_capacity(NUM_COLOR_LUT_STEPS);
         let min_log = MIN_TEMPERATURE.log10();
         let max_log = MAX_TEMPERATURE.log10();
@@ -140,7 +128,6 @@ impl BlackBodyMapper {
 
         BlackBodyMapper {
             beaming_exponent,
-            color_normalization,
             color_profile,
         }
     }
@@ -206,9 +193,8 @@ impl TextureMap for BlackBodyMapper {
         temperature_data: &TemperatureData,
     ) -> CIETristimulus {
         let redshift = temperature_data.redshift;
-        let c = self.blackbody_xyz(temperature_data.temperature, redshift);
-        let c_beamed = c.apply_beaming(redshift, self.beaming_exponent);
-        c_beamed.normalize(self.color_normalization)
+        self.blackbody_xyz(temperature_data.temperature, redshift)
+            .apply_beaming(redshift, self.beaming_exponent)
     }
 }
 
@@ -219,7 +205,6 @@ pub struct CheckerMapper {
     height: f64,
     c1: CIETristimulus,
     c2: CIETristimulus,
-    color_normalization: CIETristimulusNormalization,
 }
 
 impl CheckerMapper {
@@ -230,7 +215,6 @@ impl CheckerMapper {
         height: f64,
         c1: Color,
         c2: Color,
-        color_normalization: CIETristimulusNormalization,
     ) -> CheckerMapper {
         CheckerMapper {
             beaming_exponent,
@@ -238,7 +222,6 @@ impl CheckerMapper {
             height,
             c1: srgb_to_xyz(&c1),
             c2: srgb_to_xyz(&c2),
-            color_normalization,
         }
     }
 }
@@ -255,11 +238,9 @@ impl TextureMap for CheckerMapper {
         if (ut + vt).is_multiple_of(2) {
             self.c1
                 .apply_beaming(temperature_data.redshift, self.beaming_exponent)
-                .normalize(self.color_normalization)
         } else {
             self.c2
                 .apply_beaming(temperature_data.redshift, self.beaming_exponent)
-                .normalize(self.color_normalization)
         }
     }
 }
@@ -287,11 +268,9 @@ impl TextureMapperFactory {
         &mut self,
         beaming_exponent: f64,
         filename: String,
-        color_normalization: CIETristimulusNormalization,
     ) -> Result<TextureMapHandle, RaytracerError> {
         if self.texture_map_map.get(&filename).is_none() {
-            let new_mapper =
-                TextureMapper::new(beaming_exponent, filename.clone(), color_normalization)?;
+            let new_mapper = TextureMapper::new(beaming_exponent, filename.clone())?;
             self.texture_map_map
                 .insert(filename.clone(), Arc::new(new_mapper));
         }
@@ -308,7 +287,7 @@ impl TextureMapperFactory {
 #[cfg(test)]
 mod tests {
     use crate::rendering::black_body_radiation::get_cie_xyz_of_black_body_redshifted;
-    use crate::rendering::color::{CIETristimulus, CIETristimulusNormalization};
+    use crate::rendering::color::CIETristimulus;
     use crate::rendering::texture::{BlackBodyMapper, TemperatureData, TextureMap, TextureMapper};
     use approx::assert_relative_eq;
 
@@ -333,7 +312,6 @@ mod tests {
         let texture_mapper = TextureMapper {
             beaming_exponent: 3.0,
             image: dynamic_image,
-            color_normalization: super::CIETristimulusNormalization::NoNormalization,
         };
         texture_mapper
     }
@@ -409,7 +387,7 @@ mod tests {
 
     #[test]
     fn test_blackbody_lut_matches_direct_integration() {
-        let mapper = BlackBodyMapper::new(0.0, CIETristimulusNormalization::NoNormalization);
+        let mapper = BlackBodyMapper::new(0.0);
 
         for &temperature in &[1_000.0, 5_000.0, 10_000.0, 100_000.0] {
             for &redshift in &[0.5, 1.0, 2.0] {

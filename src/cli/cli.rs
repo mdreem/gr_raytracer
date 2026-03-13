@@ -1,4 +1,4 @@
-use crate::rendering::color::{CIETristimulusNormalization, ToneMappingMethod};
+use crate::rendering::color::ToneMappingMethod;
 use clap::{Args, Parser, Subcommand};
 
 #[derive(Debug, Args, Clone)]
@@ -73,8 +73,6 @@ pub enum Action {
         temperature: f64,
         #[arg(short, long, default_value = "1.0")]
         redshift: f64,
-        #[arg(long, default_value = "equal-luminance")]
-        normalization: CIETristimulusNormalization,
     },
     BlackbodySpectrum {
         #[arg(long, default_value = "1000.0")]
@@ -91,8 +89,6 @@ pub enum Action {
         height: u32,
         #[arg(short, long, default_value = "blackbody_spectrum.png")]
         filename: String,
-        #[arg(long, default_value = "equal-luminance")]
-        normalization: CIETristimulusNormalization,
         #[arg(long, default_value = "reinhard")]
         tone_mapping: ToneMappingMethod,
     },

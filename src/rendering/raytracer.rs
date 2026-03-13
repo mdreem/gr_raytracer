@@ -1,8 +1,7 @@
 use crate::geometry::geometry::Geometry;
 use crate::rendering::camera::CameraError;
 use crate::rendering::color::{
-    CIETristimulus, CIETristimulusNormalization, ToneMappingMethod,
-    xyz_to_linear_srgb_buffer, linear_srgb_to_srgb_buffer,
+    CIETristimulus, ToneMappingMethod, linear_srgb_to_srgb_buffer, xyz_to_linear_srgb_buffer,
 };
 use crate::rendering::integrator::{IntegrationError, StopReason};
 use crate::rendering::ray::IntegratedRay;
@@ -12,8 +11,8 @@ use image::{ImageBuffer, ImageError, ImageFormat, Rgb};
 use indicatif::style::TemplateError;
 use log::{debug, error, info};
 use rayon::iter::IndexedParallelIterator;
-use rayon::iter::ParallelIterator;
 use rayon::iter::IntoParallelRefMutIterator;
+use rayon::iter::ParallelIterator;
 use std::io;
 use std::sync::atomic::{AtomicUsize, Ordering};
 
@@ -53,19 +52,13 @@ pub enum RaytracerError {
 
 pub struct Raytracer<'a, G: Geometry> {
     pub scene: Scene<'a, G>,
-    color_normalization: CIETristimulusNormalization,
     tone_mapping: ToneMappingMethod,
 }
 
 impl<'a, G: Geometry> Raytracer<'a, G> {
-    pub fn new(
-        scene: Scene<'a, G>,
-        color_normalization: CIETristimulusNormalization,
-        tone_mapping: ToneMappingMethod,
-    ) -> Self {
+    pub fn new(scene: Scene<'a, G>, tone_mapping: ToneMappingMethod) -> Self {
         Self {
             scene,
-            color_normalization,
             tone_mapping,
         }
     }
@@ -148,11 +141,8 @@ impl<'a, G: Geometry> Raytracer<'a, G> {
         } else {
             info!("Creating non-HDR image");
             info!("Tone mapping method: {:?}", self.tone_mapping);
-            let raw_cie = self.render_section_to_cie_buffer(from_row, from_col, to_row, to_col)?;
-            let cie_pixels: Vec<CIETristimulus> = raw_cie
-                .into_iter()
-                .map(|c| c.normalize(self.color_normalization))
-                .collect();
+            let cie_pixels =
+                self.render_section_to_cie_buffer(from_row, from_col, to_row, to_col)?;
             let linear_srgb = xyz_to_linear_srgb_buffer(&cie_pixels);
             let colors = linear_srgb_to_srgb_buffer(&linear_srgb, 1.0, self.tone_mapping);
             let buffer: Vec<u8> = colors.iter().flat_map(|c| [c.r, c.g, c.b]).collect();

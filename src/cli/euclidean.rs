@@ -36,7 +36,6 @@ impl RenderableGeometry for EuclideanSpace {
         render(
             scene,
             filename,
-            config.color_normalization,
             tone_mapping,
             from_row,
             from_col,
@@ -63,7 +62,7 @@ impl RenderableGeometry for EuclideanSpace {
         )?;
 
         let scene = create_scene(self, camera_position, momentum, opts, config.clone())?;
-        let raytracer = raytracer::Raytracer::new(scene, config.color_normalization, ToneMappingMethod::default());
+        let raytracer = raytracer::Raytracer::new(scene, ToneMappingMethod::default());
         let (integrated_ray, stop_reason) = raytracer.integrate_ray_at_point(row, col)?;
         debug!("Stop reason: {:?}", stop_reason);
         integrated_ray.save(write)?;

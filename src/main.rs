@@ -34,9 +34,8 @@ fn run() -> Result<(), RaytracerError> {
         Action::Blackbody {
             temperature,
             redshift,
-            normalization,
         } => {
-            run_blackbody(*temperature, *redshift, *normalization);
+            run_blackbody(*temperature, *redshift);
             return Ok(());
         }
         Action::BlackbodySpectrum {
@@ -47,7 +46,6 @@ fn run() -> Result<(), RaytracerError> {
             width,
             height,
             filename,
-            normalization,
             tone_mapping,
         } => {
             run_blackbody_spectrum(
@@ -58,7 +56,6 @@ fn run() -> Result<(), RaytracerError> {
                 *width,
                 *height,
                 filename.clone(),
-                *normalization,
                 *tone_mapping,
             );
             return Ok(());
