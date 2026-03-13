@@ -237,12 +237,13 @@ mod tests {
         // location, so it must be in world coordinates. Regression test for
         // a bug where it was returned in the sphere's own local frame
         // (i.e. relative to the sphere's center) instead.
+        let geometry = crate::geometry::euclidean::EuclideanSpace::new();
         let sphere = create_sphere_at(0.0, 0.0, 20.0);
         let y_start = Point::new_cartesian(0.0, 0.0, 0.0, 22.0);
         let y_end = Point::new_cartesian(0.0, 0.0, 0.0, 19.5);
 
         let intersection = sphere
-            .intersects(&y_start, &y_end)
+            .intersects(&y_start, &y_end, &geometry)
             .expect("ray should hit sphere");
         let hit = intersection
             .intersection_point

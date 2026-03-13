@@ -165,7 +165,8 @@ impl VolumetricDisc {
             if exit {
                 trace!(
                     "  does_exit found intersection at t={} ( > {}), breaking.",
-                    intersection.t, MIN_INTERSECTION_T
+                    intersection.t,
+                    MIN_INTERSECTION_T
                 );
             }
             exit
