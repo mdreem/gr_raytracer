@@ -1,7 +1,6 @@
 # General Relativity Raytracer (Rust)
 
 [![CI](https://github.com/mdreem/gr_raytracer/actions/workflows/ci.yaml/badge.svg)](https://github.com/mdreem/gr_raytracer/actions/workflows/ci.yaml)
-[![Release](https://github.com/mdreem/gr_raytracer/actions/workflows/release.yaml/badge.svg)](https://github.com/mdreem/gr_raytracer/actions/workflows/release.yaml)
 [![Latest Release](https://img.shields.io/github/v/release/mdreem/gr_raytracer)](https://github.com/mdreem/gr_raytracer/releases)
 [![License](https://img.shields.io/github/license/mdreem/gr_raytracer)](https://github.com/mdreem/gr_raytracer/blob/main/LICENSE)
 [![Downloads](https://img.shields.io/github/downloads/mdreem/gr_raytracer/total)](https://github.com/mdreem/gr_raytracer/releases)
