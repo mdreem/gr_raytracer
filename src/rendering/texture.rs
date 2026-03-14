@@ -479,10 +479,9 @@ mod tests {
         for &temperature in &[1_000.0, 5_000.0, 10_000.0, 100_000.0] {
             for &redshift in &[0.5, 1.0, 2.0] {
                 let lut = mapper.blackbody_xyz(temperature, redshift);
-                // The LUT computes B_λ(λ, gT) via temperature rescaling.
-                // The direct integration now includes the g^5 factor, so
-                // integrate(T, g) = g^5·B_λ(gλ, T) = B_λ(λ, gT) as well.
-                let direct = get_cie_xyz_of_black_body_redshifted(temperature, redshift);
+                // A redshifted blackbody at T with factor g is equivalent to
+                // an unredshifted blackbody at effective temperature T*g.
+                let direct = get_cie_xyz_of_black_body_redshifted(temperature * redshift, 1.0);
 
                 assert_relative_eq!(lut.x, direct.x, max_relative = 0.02, epsilon = 1e-14);
                 assert_relative_eq!(lut.y, direct.y, max_relative = 0.02, epsilon = 1e-14);
