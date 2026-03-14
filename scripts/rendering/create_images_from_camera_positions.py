@@ -2,9 +2,9 @@
 import pandas as pd
 import subprocess
 
-WIDTH = 500
-HEIGHT = 500
-CONFIG_FILE = "scene-definitions/schwarzschild.toml"
+WIDTH = 1280
+HEIGHT = 720
+CONFIG_FILE = "scene-definitions/schwarzschild-blackbody-disc.toml"
 POSITIONS_FILE = "camera_positions.csv"
 
 # takes a csv created using the script create_camera_trajectory.py
@@ -21,6 +21,9 @@ for idx, row in df.iterrows():
             "run",
             "--release",
             "--",
+            "--theta=-3.142",
+            "--psi=0.0",
+            "--phi=0.0",
             f"--width={WIDTH}",
             f"--height={HEIGHT}",
             f"--camera-position={position_str}",
