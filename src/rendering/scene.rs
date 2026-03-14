@@ -158,13 +158,17 @@ impl<'a, G: Geometry> Scene<'a, G> {
                 steps.len()
             );
         }
-        let mut result = CIETristimulus::new(0.0, 0.0, 0.0, 1.0);
+        Ok(self.composite_intersections(&intersections))
+    }
+
+    fn composite_intersections(&self, intersections: &[CIETristimulus]) -> CIETristimulus {
+        let mut result = CIETristimulus::new(0.0, 0.0, 0.0, 0.0);
 
         for color in intersections.iter().rev() {
             result = result.blend(color)
         }
 
-        Ok(result)
+        result
     }
 
     fn get_uv_coordinates(&self, step_far: &Step) -> UVCoordinates {
