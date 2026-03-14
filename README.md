@@ -110,7 +110,7 @@ https://github.com/user-attachments/assets/c1ce889b-6186-4ce5-b613-fecae3af03ef
 
 ### Flyover of a Schwarzschild black hole (video)
 
-https://github.com/user-attachments/assets/914d3134-53db-4084-8a5f-1728d8460594
+https://github.com/user-attachments/assets/3183cada-07a2-4186-b9ad-f937cd7c73d8
 
 Background image source: https://commons.wikimedia.org/wiki/File:Messier_object_025.jpg
 
