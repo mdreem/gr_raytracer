@@ -24,9 +24,16 @@ fn integrate_blackbody_xyz(temperature: f64, redshift: f64) -> CIETristimulus {
     let mut y_accum = 0.0;
     let mut z_accum = 0.0;
 
+    // The observed spectral radiance for a redshifted blackbody is:
+    //   I_obs,λ(λ_obs) = g^5 ·=* B_λ(g*λ_obs, T) = B_λ(λ_obs, gT)
+    // where g = ν_obs/ν_emit (the frequency ratio / redshift parameter).
+    // The g^5 arises from g^3 (relativistic invariant I_ν/ν^3) and g^2 (Jacobian
+    // |dν/dλ| for the per-wavelength conversion).
+    let g5 = redshift.powi(5);
+
     for i in 0..num_steps {
         let lambda = MIN_WAVELENGTH * NM_TO_M + (i as f64 + 0.5) * step_size;
-        let radiance = planck_spectral_radiance(lambda * redshift, temperature);
+        let radiance = g5 * planck_spectral_radiance(lambda * redshift, temperature);
         x_accum += radiance * x_bar(lambda / NM_TO_M) * step_size;
         y_accum += radiance * y_bar(lambda / NM_TO_M) * step_size;
         z_accum += radiance * z_bar(lambda / NM_TO_M) * step_size;

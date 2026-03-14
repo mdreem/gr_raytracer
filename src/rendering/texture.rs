@@ -103,7 +103,6 @@ impl TextureMap for TextureMapper {
 
 #[derive(Clone)]
 pub struct BlackBodyMapper {
-    beaming_exponent: f64,
     /// Precomputed blackbody colors indexed by log10(temperature).
     color_profile: Vec<(f64, CIETristimulus)>,
 }
@@ -113,7 +112,7 @@ const MIN_TEMPERATURE: f64 = 10.0;
 const MAX_TEMPERATURE: f64 = 10_000_000.0;
 
 impl BlackBodyMapper {
-    pub fn new(beaming_exponent: f64) -> BlackBodyMapper {
+    pub fn new() -> BlackBodyMapper {
         let mut color_profile = Vec::with_capacity(NUM_COLOR_LUT_STEPS);
         let min_log = MIN_TEMPERATURE.log10();
         let max_log = MAX_TEMPERATURE.log10();
@@ -126,10 +125,7 @@ impl BlackBodyMapper {
             color_profile.push((log_t, color));
         }
 
-        BlackBodyMapper {
-            beaming_exponent,
-            color_profile,
-        }
+        BlackBodyMapper { color_profile }
     }
 
     pub fn blackbody_xyz(&self, temperature: f64, redshift: f64) -> CIETristimulus {
@@ -191,9 +187,11 @@ impl TextureMap for BlackBodyMapper {
         _uv: &UVCoordinates,
         temperature_data: &TemperatureData,
     ) -> CIETristimulus {
-        let redshift = temperature_data.redshift;
-        self.blackbody_xyz(temperature_data.temperature, redshift)
-            .apply_beaming(redshift, self.beaming_exponent)
+        // No apply_beaming here: the temperature shift T → g·T already encodes
+        // the full relativistic intensity transformation for a thermal spectrum
+        // (I_obs,λ(λ) = B_λ(λ, gT)), so an additional g^n factor would
+        // double-count the effect.
+        self.blackbody_xyz(temperature_data.temperature, temperature_data.redshift)
     }
 }
 
@@ -386,14 +384,15 @@ mod tests {
 
     #[test]
     fn test_blackbody_lut_matches_direct_integration() {
-        let mapper = BlackBodyMapper::new(0.0);
+        let mapper = BlackBodyMapper::new();
 
         for &temperature in &[1_000.0, 5_000.0, 10_000.0, 100_000.0] {
             for &redshift in &[0.5, 1.0, 2.0] {
                 let lut = mapper.blackbody_xyz(temperature, redshift);
-                // A redshifted blackbody at T with factor g is equivalent to
-                // an unredshifted blackbody at effective temperature T*g.
-                let direct = get_cie_xyz_of_black_body_redshifted(temperature * redshift, 1.0);
+                // The LUT computes B_λ(λ, gT) via temperature rescaling.
+                // The direct integration now includes the g^5 factor, so
+                // integrate(T, g) = g^5·B_λ(gλ, T) = B_λ(λ, gT) as well.
+                let direct = get_cie_xyz_of_black_body_redshifted(temperature, redshift);
 
                 assert_relative_eq!(lut.x, direct.x, max_relative = 0.02, epsilon = 1e-14);
                 assert_relative_eq!(lut.y, direct.y, max_relative = 0.02, epsilon = 1e-14);
