@@ -26,4 +26,4 @@ noise_scale = [25.0, 15.0, 40.0]
 noise_offset = -0.3
 
 [objects.VolumetricDisc.texture.BlackBody]
-beaming_exponent = 7.0
+beaming_exponent = 2.0
