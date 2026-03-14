@@ -1,4 +1,6 @@
+use crate::geometry::four_vector::FourVector;
 use crate::geometry::geometry::Geometry;
+use crate::geometry::point::Point;
 use crate::rendering::color::CIETristimulus;
 use crate::rendering::integrator::Step;
 use crate::rendering::raytracer::RaytracerError;
@@ -51,7 +53,9 @@ impl<'a, G: Geometry> Objects<'a, G> {
                 let distance = (intersection_point - y_start_cartesian).norm();
                 if distance < shortest_distance {
                     shortest_distance = distance;
-                    let emitter_energy = hittable.energy_of_emitter(self.geometry, y_start)?;
+                    let emitter_step = interpolate_step(y_start, y_end, intersection_data.t);
+                    let emitter_energy =
+                        hittable.energy_of_emitter(self.geometry, &emitter_step)?;
                     let redshift = redshift_computer
                         .compute_redshift_from_energies(emitter_energy, observer_energy);
                     let temperature = hittable.temperature_of_emitter(
@@ -77,6 +81,26 @@ impl<'a, G: Geometry> Objects<'a, G> {
     }
 }
 
+fn interpolate_step(y_start: &Step, y_end: &Step, t: f64) -> Step {
+    let t = t.clamp(0.0, 1.0);
+
+    let x_vector = y_start.x.vector + t * (y_end.x.vector - y_start.x.vector);
+    let p_vector = y_start.p.vector + t * (y_end.p.vector - y_start.p.vector);
+
+    Step {
+        x: Point::new_from_vector(x_vector, y_start.x.coordinate_system),
+        p: FourVector::new(
+            p_vector[0],
+            p_vector[1],
+            p_vector[2],
+            p_vector[3],
+            y_start.p.coordinate_system,
+        ),
+        t: y_start.t + t * (y_end.t - y_start.t),
+        step: y_start.step,
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -88,6 +112,34 @@ mod tests {
     use crate::scene_objects::sphere::Sphere;
     use approx::assert_abs_diff_eq;
     use std::sync::Arc;
+
+    #[test]
+    fn test_interpolate_step_midpoint() {
+        let y_start = Step {
+            t: 2.0,
+            step: 10,
+            x: Point::new_cartesian(0.0, 0.0, 2.0, 4.0),
+            p: FourVector::new_cartesian(1.0, 2.0, 3.0, 4.0),
+        };
+
+        let y_end = Step {
+            t: 6.0,
+            step: 20,
+            x: Point::new_cartesian(4.0, 8.0, 10.0, 12.0),
+            p: FourVector::new_cartesian(5.0, 6.0, 7.0, 8.0),
+        };
+
+        let mid = interpolate_step(&y_start, &y_end, 0.5);
+        assert_abs_diff_eq!(mid.t, 4.0);
+        assert_abs_diff_eq!(mid.x[0], 2.0);
+        assert_abs_diff_eq!(mid.x[1], 4.0);
+        assert_abs_diff_eq!(mid.x[2], 6.0);
+        assert_abs_diff_eq!(mid.x[3], 8.0);
+        assert_abs_diff_eq!(mid.p[0], 3.0);
+        assert_abs_diff_eq!(mid.p[1], 4.0);
+        assert_abs_diff_eq!(mid.p[2], 5.0);
+        assert_abs_diff_eq!(mid.p[3], 6.0);
+    }
 
     fn create_sphere_at(x: f64, y: f64, z: f64, radius: f64, color: u8) -> Box<dyn SceneObject> {
         Box::new(Sphere::new(

@@ -165,8 +165,7 @@ impl VolumetricDisc {
             if exit {
                 trace!(
                     "  does_exit found intersection at t={} ( > {}), breaking.",
-                    intersection.t,
-                    MIN_INTERSECTION_T
+                    intersection.t, MIN_INTERSECTION_T
                 );
             }
             exit
@@ -589,9 +588,9 @@ impl Hittable for VolumetricDisc {
             geometry,
         )
         .unwrap_or_else(|e| {
-                log::warn!("Raymarching failed: {}", e);
-                CIETristimulus::new(0.0, 0.0, 0.0, 0.0)
-            })
+            log::warn!("Raymarching failed: {}", e);
+            CIETristimulus::new(0.0, 0.0, 0.0, 0.0)
+        })
     }
 
     fn energy_of_emitter(
