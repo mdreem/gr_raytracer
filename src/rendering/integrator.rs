@@ -202,7 +202,10 @@ impl<G: Geometry> Integrator<'_, G> {
         cur_y: &EquationOfMotionState,
         step_index: usize,
     ) -> Option<StopReason> {
-        if cur_y[0].is_nan() || cur_y[1].is_nan() || cur_y[2].is_nan() || cur_y[3].is_nan() {
+        // Catch both NaN and ±infinity, and check momentum components too —
+        // momentum can blow up at coordinate singularities (e.g. the BL polar
+        // axis) even when positions stay finite for one more step.
+        if !cur_y.iter().all(|v| v.is_finite()) {
             debug!("last_y: {:?}", _last_y);
             debug!(
                 "spherical last_y: {:?}",
