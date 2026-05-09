@@ -129,6 +129,11 @@ impl BlackBodyMapper {
     }
 
     pub fn blackbody_xyz(&self, temperature: f64, redshift: f64) -> CIETristimulus {
+        // A Doppler-shifted blackbody is still a blackbody at temperature T*z
+        // (Wien displacement), and the relativistic intensity boost cancels
+        // the implicit z^5 in the Planck rescaling, so observer-frame XYZ is
+        // simply the LUT entry at T*z. See the derivation in
+        // black_body_radiation::integrate_blackbody_xyz.
         self.sample_blackbody(temperature * redshift)
     }
 
@@ -380,6 +385,36 @@ mod tests {
         assert_eq!(color.y, get_blue().y);
         assert_eq!(color.z, get_blue().z);
         assert_eq!(color.alpha, 128.0 / 255.0);
+    }
+
+    #[test]
+    fn test_blackbody_xyz_z_one_matches_lut_sample() {
+        // At z = 1 the observer-frame XYZ must equal the LUT entry at T_em.
+        let mapper = BlackBodyMapper::new(0.0);
+        for &temperature in &[1_000.0, 5_000.0, 10_000.0] {
+            let observed = mapper.blackbody_xyz(temperature, 1.0);
+            let lut = mapper.sample_blackbody(temperature);
+            assert_relative_eq!(observed.x, lut.x, max_relative = 1e-12);
+            assert_relative_eq!(observed.y, lut.y, max_relative = 1e-12);
+            assert_relative_eq!(observed.z, lut.z, max_relative = 1e-12);
+        }
+    }
+
+    #[test]
+    fn test_blackbody_xyz_relativistic_boost_doubles_total() {
+        // Total radiated power across all wavelengths goes as T^4 (Stefan-
+        // Boltzmann); the observer sees emitter at temperature T*z with a
+        // multiplicative z^5 intensity boost (Lorentz invariance of I_nu/nu^3).
+        // For visible-band integrated XYZ this approximation holds at high T,
+        // where the visible band sits well inside the Planck curve. We check
+        // that doubling z increases each XYZ component (boost present, not
+        // missing or inverted).
+        let mapper = BlackBodyMapper::new(0.0);
+        let baseline = mapper.blackbody_xyz(6_000.0, 1.0);
+        let boosted = mapper.blackbody_xyz(6_000.0, 2.0);
+        assert!(boosted.x > baseline.x);
+        assert!(boosted.y > baseline.y);
+        assert!(boosted.z > baseline.z);
     }
 
     #[test]

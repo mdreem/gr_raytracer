@@ -16,6 +16,11 @@ fn planck_spectral_radiance(lambda: f64, temperature: f64) -> f64 {
 }
 
 fn integrate_blackbody_xyz(temperature: f64, redshift: f64) -> CIETristimulus {
+    // Observer-frame specific intensity for an emitter blackbody at temperature
+    // `temperature` and redshift z = nu_obs / nu_em is
+    //     I_lambda^obs(lambda_obs) = z^5 * B_lambda(lambda_obs * z, T_em).
+    // This factor of z^5 is the relativistic intensity boost (equivalently
+    // I_nu / nu^3 is Lorentz invariant).
     let interval = (MAX_WAVELENGTH - MIN_WAVELENGTH) * NM_TO_M; // in meters
     let step_size = 1.0 * NM_TO_M; // in meters
     let num_steps = (interval / step_size).floor() as usize;
@@ -38,7 +43,8 @@ fn integrate_blackbody_xyz(temperature: f64, redshift: f64) -> CIETristimulus {
         y_accum += radiance * y_bar(lambda / NM_TO_M) * step_size;
         z_accum += radiance * z_bar(lambda / NM_TO_M) * step_size;
     }
-    CIETristimulus::new(x_accum, y_accum, z_accum, 1.0)
+    let boost = redshift.powi(5);
+    CIETristimulus::new(x_accum * boost, y_accum * boost, z_accum * boost, 1.0)
 }
 
 pub fn get_cie_xyz_of_black_body_redshifted(temperature: f64, redshift: f64) -> CIETristimulus {

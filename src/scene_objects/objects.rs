@@ -81,7 +81,12 @@ impl<'a, G: Geometry> Objects<'a, G> {
     }
 }
 
+/// Linearly interpolate an integration `Step` to the parameter `t` in [0, 1]
+/// between `y_start` (t = 0) and `y_end` (t = 1).
 fn interpolate_step(y_start: &Step, y_end: &Step, t: f64) -> Step {
+    debug_assert_eq!(y_start.x.coordinate_system, y_end.x.coordinate_system);
+    debug_assert_eq!(y_start.p.coordinate_system, y_end.p.coordinate_system);
+
     let t = t.clamp(0.0, 1.0);
 
     let x_vector = y_start.x.vector + t * (y_end.x.vector - y_start.x.vector);
