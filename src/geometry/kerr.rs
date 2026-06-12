@@ -11,7 +11,7 @@ use crate::rendering::raytracer::RaytracerError;
 use crate::rendering::runge_kutta::OdeFunction;
 use crate::rendering::scene::EquationOfMotionState;
 use crate::rendering::temperature::{KerrTemperatureComputer, TemperatureComputer};
-use log::{debug, error, trace};
+use log::{debug, error, trace, warn};
 use nalgebra::{Const, Matrix4, OVector, Vector3, Vector4};
 
 #[derive(Clone, Debug)]
@@ -109,6 +109,15 @@ fn metric_contravariant(radius: f64, a: f64, x: f64, y: f64, z: f64) -> Matrix4<
 
 impl Kerr {
     pub fn new(radius: f64, a: f64, horizon_epsilon: f64) -> Self {
+        if a > radius / 2.0 {
+            warn!(
+                "Kerr constructed with a = {} > M = {} (naked singularity). \
+                 No event horizon exists; the horizon-stop in `inside_horizon` is disabled \
+                 and rays may spiral arbitrarily close to r = 0.",
+                a,
+                radius / 2.0
+            );
+        }
         Kerr {
             radius,
             a,
@@ -461,17 +470,25 @@ impl Geometry for Kerr {
         }
         let (x, y, z) = (position[1], position[2], position[3]);
         let r = compute_r_sqr(self.a, x, y, z).sqrt();
-        let rp = 0.5 * self.radius
-            + ((0.5 * self.radius) * (0.5 * self.radius) - self.a * self.a).sqrt();
+        // Guard against FP rounding at extremal Kerr (a == M) producing a
+        // negative argument; mathematically the discriminant is >= 0 here.
+        let m = 0.5 * self.radius;
+        let disc = (m * m - self.a * self.a).max(0.0);
+        let rp = m + disc.sqrt();
         r <= rp + self.horizon_epsilon
     }
 
     fn closed_orbit(&self, position: &Point, step_index: usize, max_steps: usize) -> bool {
+        // The ray ran out of step budget without escaping or being absorbed.
+        // If it's still in the strong-field region (within ~5·r_s of the
+        // origin), classify it as trapped so the renderer paints it dark
+        // rather than as the celestial-sphere fallback colour. Outside that
+        // distance the ray is plausibly escaping and we leave the rendering
+        // path unchanged (`None` stop reason). The earlier condition
+        // `r <= self.radius` only fired inside the horizon, which the
+        // dedicated horizon stop already catches.
         let r = self.get_radial_coordinate(position);
-        if step_index == max_steps - 1 && r <= self.radius {
-            return true;
-        }
-        false
+        step_index == max_steps - 1 && r < 5.0 * self.radius
     }
 
     fn get_geodesic_solver(&self, _ray: &Ray) -> Box<dyn GeodesicSolver> {
