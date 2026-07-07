@@ -99,14 +99,18 @@ impl<G: Geometry> Integrator<'_, G> {
         let mut h = self.integration_configuration.step_size;
         for i in 1..self.integration_configuration.max_steps {
             let last_y = y;
-            (y, h) = rkf45(
+            let (y_new, h_taken, h_next) = rkf45(
                 &y,
                 t,
                 h,
                 self.integration_configuration.epsilon,
                 &*geodesic_solver,
             )?;
-            t += h;
+            y = y_new;
+            // Advance the affine parameter by the step actually taken, and carry
+            // the controller's suggestion into the next iteration.
+            t += h_taken;
+            h = h_next;
 
             let x = Point::new(y[0], y[1], y[2], y[3], self.geometry.coordinate_system());
             let p = geodesic_solver.momentum_from_state(&y);

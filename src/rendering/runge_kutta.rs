@@ -112,13 +112,24 @@ where
     (y_new, truncation_error)
 }
 
+/// Advance the ODE by one adaptive RKF45 step.
+///
+/// Returns `(y_new, h_taken, h_next)`:
+/// * `y_new`    — the state advanced by `h_taken`,
+/// * `h_taken`  — the step size actually used to produce `y_new` (use this to
+///   advance the affine parameter, i.e. `t += h_taken`),
+/// * `h_next`   — the suggested step size for the following call.
+///
+/// Keeping `h_taken` and `h_next` separate matters: the controller's proposed
+/// next step can differ from the step just taken, so advancing `t` by the
+/// proposal would desynchronise the recorded parameterisation from the state.
 pub fn rkf45<D: Dim>(
     y: &OVector<f64, D>,
     t: f64,
     h: f64,
     epsilon: f64,
     f: &dyn OdeFunction<D>,
-) -> Result<(OVector<f64, D>, f64), RaytracerError>
+) -> Result<(OVector<f64, D>, f64, f64), RaytracerError>
 where
     DefaultAllocator: Allocator<D>,
 {
@@ -140,7 +151,7 @@ where
             // Halve the step size and retry — but if we have already hit the
             // minimum step, accept what we have rather than aborting the ray.
             if h_cur <= H_MIN {
-                return Ok((y_new, h_cur));
+                return Ok((y_new, h_cur, h_cur));
             }
             h_cur = (h_proposed / 2.0).clamp(H_MIN, H_MAX);
         } else {
@@ -150,7 +161,7 @@ where
             } else {
                 h_proposed
             };
-            return Ok((y_new, h_next));
+            return Ok((y_new, h_cur, h_next));
         }
     }
     Err(RaytracerError::IntegrationError(
@@ -197,23 +208,21 @@ mod tests {
         let mut t = 0.0;
         let mut h = step_size;
         while t <= 25.0 {
-            (y, h) = rkf45(&y, t, h, 1e-10, &simple_equation).unwrap();
-            t += h;
+            let (y_new, h_taken, h_next) = rkf45(&y, t, h, 1e-10, &simple_equation).unwrap();
+            y = y_new;
+            t += h_taken;
+            h = h_next;
         }
-        // Tolerance is loose because the loop's `t` bookkeeping uses the
-        // *proposed* next step rather than the step actually taken, and
-        // because the H_MAX clamp makes more steps necessary, slightly
-        // increasing accumulated FP roundoff.
-        assert_abs_diff_eq!(y, solution_simple_equation(t - h), epsilon = 1e-3);
+        // `t` now advances by the step actually taken, so the state stays in
+        // sync with the affine parameter and we can assert against solution(t).
+        assert_abs_diff_eq!(y, solution_simple_equation(t), epsilon = 1e-5);
 
         while t <= 50.0 {
-            (y, h) = rkf45(&y, t, h, 1e-10, &simple_equation).unwrap();
-            t += h;
+            let (y_new, h_taken, h_next) = rkf45(&y, t, h, 1e-10, &simple_equation).unwrap();
+            y = y_new;
+            t += h_taken;
+            h = h_next;
         }
-        // Tolerance is loose because the loop's `t` bookkeeping uses the
-        // *proposed* next step rather than the step actually taken, and
-        // because the H_MAX clamp makes more steps necessary, slightly
-        // increasing accumulated FP roundoff.
-        assert_abs_diff_eq!(y, solution_simple_equation(t - h), epsilon = 1e-3);
+        assert_abs_diff_eq!(y, solution_simple_equation(t), epsilon = 1e-5);
     }
 }

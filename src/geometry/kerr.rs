@@ -1,6 +1,7 @@
 use crate::geometry::four_vector::FourVector;
 use crate::geometry::geometry::{
     GeodesicSolver, Geometry, HasCoordinateSystem, InnerProduct, Signature, SupportQuantities,
+    TRAPPED_ORBIT_RADIUS_FACTOR,
 };
 use crate::geometry::gram_schmidt::gram_schmidt;
 use crate::geometry::point::CoordinateSystem::Cartesian;
@@ -488,7 +489,7 @@ impl Geometry for Kerr {
         // `r <= self.radius` only fired inside the horizon, which the
         // dedicated horizon stop already catches.
         let r = self.get_radial_coordinate(position);
-        step_index == max_steps - 1 && r < 5.0 * self.radius
+        step_index == max_steps - 1 && r < TRAPPED_ORBIT_RADIUS_FACTOR * self.radius
     }
 
     fn get_geodesic_solver(&self, _ray: &Ray) -> Box<dyn GeodesicSolver> {
