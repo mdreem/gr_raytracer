@@ -76,6 +76,14 @@ impl ConstantsOfMotion {
     }
 }
 
+/// Radius, in units of the Schwarzschild radius `r_s`, within which a photon
+/// that has exhausted the integrator's step budget without escaping or being
+/// absorbed is classified as trapped (a bound / closed orbit). The threshold
+/// comfortably contains the photon sphere (1.5·r_s) and the accretion disc
+/// while staying well inside the celestial sphere. Shared by the
+/// `closed_orbit` implementations of the black-hole geometries.
+pub const TRAPPED_ORBIT_RADIUS_FACTOR: f64 = 5.0;
+
 pub trait Geometry:
     InnerProduct + HasCoordinateSystem + Signature + SupportQuantities + Sync
 {
