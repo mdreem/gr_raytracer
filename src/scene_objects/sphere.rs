@@ -91,8 +91,11 @@ impl Hittable for Sphere {
                 Some(t) => t,
             };
 
+            // UV mapping needs the hit point in the sphere's own local frame
+            // (so e.g. the texture's north pole is always the sphere's own
+            // north pole, regardless of where the sphere sits in the scene).
             let point_on_sphere_spatial = y_start_spatial + t * direction;
-            let point_on_sphere = cartesian_to_spherical(&Point::new(
+            let point_on_sphere_local = cartesian_to_spherical(&Point::new(
                 0.0,
                 point_on_sphere_spatial[0],
                 point_on_sphere_spatial[1],
@@ -100,14 +103,27 @@ impl Hittable for Sphere {
                 CoordinateSystem::Cartesian,
             ));
 
-            let theta = point_on_sphere[2];
-            let phi = point_on_sphere[3];
+            let theta = point_on_sphere_local[2];
+            let phi = point_on_sphere_local[3];
             let u = (PI + phi) / (2.0 * PI);
             let v = theta / PI;
 
+            // `Intersection::intersection_point` itself must be world-space:
+            // it's used (via `energy_of_emitter`) to evaluate the geometry's
+            // fields (e.g. the stationary observer's velocity) at the
+            // emitter's actual location relative to the black hole, not
+            // relative to the sphere's own center.
+            let position_spatial = self.position.get_spatial_vector_cartesian();
+            let point_on_sphere_world = Point::new_cartesian(
+                0.0,
+                point_on_sphere_spatial[0] + position_spatial[0],
+                point_on_sphere_spatial[1] + position_spatial[1],
+                point_on_sphere_spatial[2] + position_spatial[2],
+            );
+
             return Some(Intersection {
                 uv: UVCoordinates { u: 1.0 - u, v },
-                intersection_point: point_on_sphere,
+                intersection_point: point_on_sphere_world,
                 t,
                 direction: FourVector::new_cartesian(0.0, direction[0], direction[1], direction[2]),
             });
@@ -156,6 +172,7 @@ mod tests {
     use crate::rendering::color::Color;
     use crate::rendering::texture::CheckerMapper;
     use crate::scene_objects::hittable::Hittable;
+    use approx::assert_abs_diff_eq;
     use std::sync::Arc;
 
     fn create_sphere_at(x: f64, y: f64, z: f64) -> Sphere {
@@ -211,5 +228,29 @@ mod tests {
         let y_end = Point::new_cartesian(0.0, 6.01, 0.0, 0.0);
 
         assert!(sphere.intersects(&y_start, &y_end, &geometry).is_none());
+    }
+
+    #[test]
+    fn test_sphere_intersection_point_is_world_space_not_sphere_local() {
+        // `intersection_point` is used downstream (via `energy_of_emitter`)
+        // to evaluate the black hole's fields at the emitter's true
+        // location, so it must be in world coordinates. Regression test for
+        // a bug where it was returned in the sphere's own local frame
+        // (i.e. relative to the sphere's center) instead.
+        let sphere = create_sphere_at(0.0, 0.0, 20.0);
+        let y_start = Point::new_cartesian(0.0, 0.0, 0.0, 22.0);
+        let y_end = Point::new_cartesian(0.0, 0.0, 0.0, 19.5);
+
+        let intersection = sphere
+            .intersects(&y_start, &y_end)
+            .expect("ray should hit sphere");
+        let hit = intersection
+            .intersection_point
+            .get_spatial_vector_cartesian();
+
+        // World-space hit point is near z = 21 (top of the sphere, facing
+        // the ray's origin). A sphere-local point would incorrectly read
+        // z ≈ 1 (relative to the sphere's own center at z = 20).
+        assert_abs_diff_eq!(hit[2], 21.0, epsilon = 1e-9);
     }
 }
