@@ -1,6 +1,7 @@
 use crate::geometry::four_vector::FourVector;
 use crate::geometry::geometry::{
     GeodesicSolver, Geometry, HasCoordinateSystem, InnerProduct, Signature, SupportQuantities,
+    TRAPPED_ORBIT_RADIUS_FACTOR,
 };
 use crate::geometry::point::CoordinateSystem::Spherical;
 use crate::geometry::point::{CoordinateSystem, Point};
@@ -187,7 +188,7 @@ impl Geometry for Schwarzschild {
         // photon. The 5·r_s threshold is generous enough to include the
         // photon sphere (1.5·r_s) and the typical disc region while being
         // safely inside the celestial sphere.
-        step_index == max_steps - 1 && position[1] < 5.0 * self.radius
+        step_index == max_steps - 1 && position[1] < TRAPPED_ORBIT_RADIUS_FACTOR * self.radius
     }
 
     fn get_geodesic_solver(&self, _ray: &Ray) -> Box<dyn GeodesicSolver> {

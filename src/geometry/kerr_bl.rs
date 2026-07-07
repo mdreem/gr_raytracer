@@ -9,7 +9,7 @@ use nalgebra::{Const, Matrix4, OVector};
 use crate::geometry::four_vector::FourVector;
 use crate::geometry::geometry::{
     ConstantsOfMotion, GeodesicSolver, Geometry, HasCoordinateSystem, InnerProduct, Signature,
-    SupportQuantities,
+    SupportQuantities, TRAPPED_ORBIT_RADIUS_FACTOR,
 };
 use crate::geometry::point::{CoordinateSystem, Point};
 use crate::geometry::tetrad::Tetrad;
@@ -491,7 +491,7 @@ impl Geometry for KerrBL {
         // horizon, which the dedicated `inside_horizon` stop already
         // handles.
         let r = position[1];
-        step_index == max_steps - 1 && r < 5.0 * self.radius
+        step_index == max_steps - 1 && r < TRAPPED_ORBIT_RADIUS_FACTOR * self.radius
     }
 
     fn get_geodesic_solver(&self, ray: &Ray) -> Box<dyn GeodesicSolver> {
