@@ -27,4 +27,5 @@ noise_scale = [125.0, 115.0, 160.0]
 noise_offset = -1.2
 
 [objects.VolumetricDisc.texture.BlackBody]
-beaming_exponent = 2.0
+beaming_exponent = 4.0
+color_normalization = "EqualLuminance"

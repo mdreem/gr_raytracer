@@ -296,7 +296,9 @@ fn get_texture_mapper(
             Color::new(color1.0, color1.1, color1.2, 255),
             Color::new(color2.0, color2.1, color2.2, 255),
         )),
-        TextureConfig::BlackBody { .. } => Arc::new(BlackBodyMapper::new()),
+        TextureConfig::BlackBody { beaming_exponent } => {
+            Arc::new(BlackBodyMapper::new(beaming_exponent))
+        }
     };
     Ok(texture_mapper_sphere)
 }
