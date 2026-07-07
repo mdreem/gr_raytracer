@@ -1,10 +1,47 @@
+use crate::geometry::four_vector::FourVector;
 use crate::geometry::geometry::Geometry;
+use crate::geometry::point::Point;
 use crate::rendering::color::CIETristimulus;
 use crate::rendering::integrator::Step;
 use crate::rendering::raytracer::RaytracerError;
 use crate::rendering::redshift::RedshiftComputer;
 use crate::rendering::texture::TemperatureData;
 use crate::scene_objects::hittable::{ColorComputationData, Hittable};
+
+/// Build the integration `Step` at the exact object intersection: the position
+/// is the already-solved intersection point (exact, not interpolated), and the
+/// momentum is linearly interpolated between `y_start` (t = 0) and `y_end`
+/// (t = 1). The momentum has no closed-form solve at the intersection, so
+/// linear interpolation in the integrator's native coordinate system is the
+/// best available estimate; using the exact intersection point for position
+/// avoids the mismatch that comes from interpolating curvilinear coordinates
+/// (r, theta, phi) along what is really a straight line in Cartesian space.
+///
+/// `Hittable::intersects` implementations are free to tag their returned
+/// point in whatever convention is easiest for that object (e.g. `Sphere`
+/// always returns `Spherical`, `Disc` always returns `Cartesian`), which does
+/// not necessarily match the geometry's own native coordinate system that
+/// `energy_of_emitter`'s inner products and velocity fields assume. Convert
+/// the intersection point into `y_start`/`y_end`'s coordinate system (the
+/// geometry's native one) before using it as the step's position.
+fn step_at_intersection(y_start: &Step, y_end: &Step, intersection_point: Point, t: f64) -> Step {
+    debug_assert_eq!(y_start.x.coordinate_system, y_end.x.coordinate_system);
+    debug_assert_eq!(y_start.p.coordinate_system, y_end.p.coordinate_system);
+    let cs = y_start.p.coordinate_system;
+    let s = 1.0 - t;
+    Step {
+        t: s * y_start.t + t * y_end.t,
+        step: y_start.step,
+        x: intersection_point.to_coordinate_system(y_start.x.coordinate_system),
+        p: FourVector::new(
+            s * y_start.p[0] + t * y_end.p[0],
+            s * y_start.p[1] + t * y_end.p[1],
+            s * y_start.p[2] + t * y_end.p[2],
+            s * y_start.p[3] + t * y_end.p[3],
+            cs,
+        ),
+    }
+}
 
 pub trait SceneObject: Hittable {}
 
@@ -49,7 +86,14 @@ impl<'a, G: Geometry> Objects<'a, G> {
                 let distance = (intersection_point - y_start_cartesian).norm();
                 if distance < shortest_distance {
                     shortest_distance = distance;
-                    let emitter_energy = hittable.energy_of_emitter(self.geometry, y_start)?;
+                    let intersection_step = step_at_intersection(
+                        y_start,
+                        y_end,
+                        intersection_data.intersection_point,
+                        intersection_data.t,
+                    );
+                    let emitter_energy =
+                        hittable.energy_of_emitter(self.geometry, &intersection_step)?;
                     let redshift = redshift_computer
                         .compute_redshift_from_energies(emitter_energy, observer_energy);
                     let temperature = hittable.temperature_of_emitter(
@@ -168,5 +212,50 @@ mod tests {
             .unwrap();
         assert!(result_2.is_some());
         assert_abs_diff_eq!(result_2.unwrap().x, 0.121, epsilon = 1e-2);
+    }
+
+    #[test]
+    fn test_intersect_disc_with_schwarzschild_native_spherical_steps() {
+        // Regression test: Schwarzschild's native coordinate system is
+        // Spherical, but Disc::intersects always tags its returned
+        // intersection point Cartesian. An inclined (non-equatorial) ray
+        // that crosses the disc plane must not panic or silently misread
+        // the mismatched coordinate tags when building the emitter step.
+        use crate::geometry::schwarzschild::Schwarzschild;
+        use crate::rendering::temperature::ConstantTemperatureComputer;
+        use crate::scene_objects::disc::Disc;
+
+        let geometry = Schwarzschild::new(2.0, 1e-4);
+        let mut objects = Objects::new(&geometry);
+        objects.add_object(Box::new(Disc::new(
+            4.0,
+            10.0,
+            Arc::new(CheckerMapper::new(
+                3.0,
+                5.0,
+                5.0,
+                Color::new(100, 100, 100, 255),
+                Color::new(200, 200, 200, 255),
+            )),
+            Box::new(ConstantTemperatureComputer::new(5000.0)),
+        )));
+
+        // r = 6 (inside the disc annulus), phi = 0, theta straddling the
+        // equatorial plane pi/2 where the disc lives.
+        let step_start = Step {
+            t: 0.0,
+            step: 0,
+            x: Point::new_spherical(0.0, 6.0, std::f64::consts::FRAC_PI_2 - 0.3, 0.0),
+            p: FourVector::new_spherical(1.0, 0.0, 0.1, 0.0),
+        };
+        let step_end = Step {
+            t: 1.0,
+            step: 1,
+            x: Point::new_spherical(0.0, 6.0, std::f64::consts::FRAC_PI_2 + 0.3, 0.0),
+            p: FourVector::new_spherical(1.0, 0.0, 0.1, 0.0),
+        };
+
+        let result = objects.intersects(&step_start, &step_end, 1.0).unwrap();
+        assert!(result.is_some());
     }
 }

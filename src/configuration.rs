@@ -80,7 +80,7 @@ pub enum TextureConfig {
 impl Default for TextureConfig {
     fn default() -> Self {
         TextureConfig::BlackBody {
-            beaming_exponent: 3.0,
+            beaming_exponent: 0.0,
         }
     }
 }
@@ -135,7 +135,6 @@ mod tests {
     use crate::configuration::{GeometryType, ObjectsConfig, RenderConfig, TextureConfig};
 
     #[test]
-    #[ignore]
     fn test_serialize() {
         let config = RenderConfig {
             celestial_texture: TextureConfig::Bitmap {
@@ -180,9 +179,17 @@ mod tests {
             ],
         };
 
-        let config_str = toml::to_string(&config).unwrap();
-        println!("{}", config_str);
-        assert!(false);
+        let config_str = toml::to_string(&config).expect("RenderConfig must be serialisable");
+
+        // Round-trip via string: deserialising and re-serialising must produce
+        // an identical TOML representation. RenderConfig and ObjectsConfig do
+        // not derive PartialEq, so we compare the canonical TOML form rather
+        // than the structs directly.
+        let round_tripped: RenderConfig =
+            toml::from_str(&config_str).expect("serialised RenderConfig must deserialise");
+        let round_tripped_str =
+            toml::to_string(&round_tripped).expect("round-tripped RenderConfig must reserialise");
+        assert_eq!(config_str, round_tripped_str);
     }
 
     #[test]
