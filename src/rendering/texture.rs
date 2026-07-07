@@ -192,10 +192,9 @@ impl TextureMap for BlackBodyMapper {
         _uv: &UVCoordinates,
         temperature_data: &TemperatureData,
     ) -> CIETristimulus {
-        // No apply_beaming here: the temperature shift T → g·T already encodes
-        // the full relativistic intensity transformation for a thermal spectrum
-        // (I_obs,λ(λ) = B_λ(λ, gT)), so an additional g^n factor would
-        // double-count the effect.
+        // No `apply_beaming` here: `blackbody_xyz` already returns the exact,
+        // physically-boosted observer-frame intensity (see its doc comment).
+        // Applying `apply_beaming` on top would double-count that boost.
         self.blackbody_xyz(temperature_data.temperature, temperature_data.redshift)
     }
 }
@@ -290,7 +289,9 @@ impl TextureMapperFactory {
 mod tests {
     use crate::rendering::black_body_radiation::get_cie_xyz_of_black_body_redshifted;
     use crate::rendering::color::CIETristimulus;
-    use crate::rendering::texture::{BlackBodyMapper, TemperatureData, TextureMap, TextureMapper};
+    use crate::rendering::texture::{
+        BlackBodyMapper, TemperatureData, TextureMap, TextureMapper, UVCoordinates,
+    };
     use approx::assert_relative_eq;
 
     fn get_red() -> CIETristimulus {
@@ -390,7 +391,7 @@ mod tests {
     #[test]
     fn test_blackbody_xyz_z_one_matches_lut_sample() {
         // At z = 1 the observer-frame XYZ must equal the LUT entry at T_em.
-        let mapper = BlackBodyMapper::new(0.0);
+        let mapper = BlackBodyMapper::new();
         for &temperature in &[1_000.0, 5_000.0, 10_000.0] {
             let observed = mapper.blackbody_xyz(temperature, 1.0);
             let lut = mapper.sample_blackbody(temperature);
@@ -409,12 +410,33 @@ mod tests {
         // where the visible band sits well inside the Planck curve. We check
         // that doubling z increases each XYZ component (boost present, not
         // missing or inverted).
-        let mapper = BlackBodyMapper::new(0.0);
+        let mapper = BlackBodyMapper::new();
         let baseline = mapper.blackbody_xyz(6_000.0, 1.0);
         let boosted = mapper.blackbody_xyz(6_000.0, 2.0);
         assert!(boosted.x > baseline.x);
         assert!(boosted.y > baseline.y);
         assert!(boosted.z > baseline.z);
+    }
+
+    #[test]
+    fn test_blackbody_color_at_uv_does_not_double_apply_beaming() {
+        // color_at_uv must not multiply blackbody_xyz's already-physical z^5
+        // boost by an additional beaming factor. Use redshift != 1 so the bug
+        // would actually show up as a mismatch.
+        let mapper = BlackBodyMapper::new();
+        let temperature_data = TemperatureData {
+            temperature: 6_000.0,
+            redshift: 1.5,
+        };
+        let uv = UVCoordinates { u: 0.0, v: 0.0 };
+
+        let rendered = mapper.color_at_uv(&uv, &temperature_data);
+        let expected =
+            mapper.blackbody_xyz(temperature_data.temperature, temperature_data.redshift);
+
+        assert_relative_eq!(rendered.x, expected.x, max_relative = 1e-12);
+        assert_relative_eq!(rendered.y, expected.y, max_relative = 1e-12);
+        assert_relative_eq!(rendered.z, expected.z, max_relative = 1e-12);
     }
 
     #[test]
