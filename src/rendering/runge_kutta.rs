@@ -61,6 +61,18 @@ const MAX_RETRY_STEP: i32 = 100;
 /// Hard cap on a single step. Prevents the controller from proposing huge
 /// jumps when the local truncation error is near zero (which made `h_new`
 /// blow up to +inf in the previous code path).
+///
+/// Do not raise this to fix celestial-sphere reachability at large
+/// max_radius/max_steps ratios (see IntegrationConfiguration) — it was tried
+/// and reverted. The adaptive controller only slows down for *curvature*,
+/// not for scene objects, so in flat or weakly-curved regions (e.g. anywhere
+/// in `EuclideanSpace`, or far from the black hole) nothing stops the step
+/// size from reaching H_MAX almost immediately; a large H_MAX then makes it
+/// trivial to tunnel straight through small nearby objects (confirmed: with
+/// H_MAX = 1000 or even 10, `test_color_of_ray_hits_sphere*` start missing a
+/// radius-2 sphere at r = 10). If the celestial sphere is unreachable within
+/// budget for a given scene, raise `max_steps` (or `IntegrationConfiguration`
+/// generally) instead of this constant.
 const H_MAX: f64 = 1.0;
 /// Lower bound on a single step. If the controller demands a smaller step,
 /// we accept whatever solution is at hand rather than spinning to
