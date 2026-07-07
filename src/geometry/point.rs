@@ -1,6 +1,6 @@
 use crate::geometry::point::CoordinateSystem::{BoyerLindquist, Cartesian, Spherical};
 use crate::geometry::spherical_coordinates_helper::{
-    cartesian_to_spherical, spherical_to_cartesian,
+    cartesian_to_boyer_lindquist, cartesian_to_spherical, spherical_to_cartesian,
 };
 use nalgebra::{Vector3, Vector4};
 use std::cmp::PartialEq;
@@ -150,6 +150,21 @@ impl Point {
                 let z = r * theta.cos();
                 Point::new_cartesian(t, x, y, z)
             }
+        }
+    }
+
+    /// Convert this point into `target`'s coordinate system. Used to bring a
+    /// point produced in one convention (e.g. a scene object's intersection
+    /// point) into the coordinate system a geometry's own computations
+    /// (inner products, tetrads, ...) assume.
+    pub fn to_coordinate_system(self, target: CoordinateSystem) -> Point {
+        if self.coordinate_system == target {
+            return self;
+        }
+        match target {
+            Cartesian => self.to_cartesian(),
+            Spherical => cartesian_to_spherical(&self.to_cartesian()),
+            BoyerLindquist { a } => cartesian_to_boyer_lindquist(a, &self.to_cartesian()),
         }
     }
 
