@@ -206,10 +206,9 @@ impl<G: Geometry> Integrator<'_, G> {
         cur_y: &EquationOfMotionState,
         step_index: usize,
     ) -> Option<StopReason> {
-        // Catch both NaN and ±infinity, and check momentum components too —
-        // momentum can blow up at coordinate singularities (e.g. the BL polar
-        // axis) even when positions stay finite for one more step.
-        if !cur_y.iter().all(|v| v.is_finite()) {
+        // Position must be finite to evaluate anything below; if it isn't,
+        // there's no reliable state to check horizon/escape against.
+        if !cur_y.iter().take(4).all(|v| v.is_finite()) {
             debug!("last_y: {:?}", _last_y);
             debug!(
                 "spherical last_y: {:?}",
@@ -250,6 +249,83 @@ impl<G: Geometry> Integrator<'_, G> {
             return Some(CelestialSphereReached);
         }
 
+        // Momentum can blow up at coordinate singularities (e.g. the BL polar
+        // axis) even when the position stays finite for one more step. Check
+        // this only after the position-based conditions above, so a ray that
+        // has already escaped past max_radius or crossed the horizon isn't
+        // misclassified as a failure just because its momentum diverged
+        // afterward (e.g. from grazing the polar axis far from the origin).
+        if !cur_y.iter().skip(4).all(|v| v.is_finite()) {
+            debug!("last_y: {:?}", _last_y);
+            debug!(
+                "spherical last_y: {:?}",
+                get_position(_last_y, self.geometry.coordinate_system()).get_as_spherical()
+            );
+            return Some(CoordinateIsNan);
+        }
+
         None
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::geometry::schwarzschild::Schwarzschild;
+
+    #[test]
+    fn test_should_stop_prefers_celestial_sphere_over_nonfinite_momentum() {
+        // A ray whose position has already escaped past max_radius but whose
+        // momentum has since diverged (e.g. from grazing a coordinate
+        // singularity far from the origin) must be classified as having
+        // reached the celestial sphere, not as a NaN failure.
+        let geometry = Schwarzschild::new(2.0, 1e-5);
+        let integration_configuration = IntegrationConfiguration::new(100, 100.0, 0.01, 1e-5);
+        let integrator = Integrator::new(&geometry, integration_configuration);
+
+        let last_y =
+            EquationOfMotionState::from_column_slice(&[0.0, 200.0, 1.0, 0.0, 1.0, 1.0, 0.0, 0.0]);
+        let cur_y = EquationOfMotionState::from_column_slice(&[
+            0.0,
+            200.0, // position: well past max_radius = 100
+            1.0,
+            0.0,
+            1.0,
+            1.0,
+            0.0,
+            f64::INFINITY, // momentum component diverged
+        ]);
+
+        assert_eq!(
+            integrator.should_stop(&last_y, &cur_y, 1),
+            Some(StopReason::CelestialSphereReached)
+        );
+    }
+
+    #[test]
+    fn test_should_stop_detects_nonfinite_momentum_when_not_escaped() {
+        // If the ray hasn't escaped/crossed the horizon, non-finite momentum
+        // must still be caught.
+        let geometry = Schwarzschild::new(2.0, 1e-5);
+        let integration_configuration = IntegrationConfiguration::new(100, 100.0, 0.01, 1e-5);
+        let integrator = Integrator::new(&geometry, integration_configuration);
+
+        let last_y =
+            EquationOfMotionState::from_column_slice(&[0.0, 10.0, 1.0, 0.0, 1.0, 1.0, 0.0, 0.0]);
+        let cur_y = EquationOfMotionState::from_column_slice(&[
+            0.0,
+            10.0, // position: well within max_radius = 100
+            1.0,
+            0.0,
+            1.0,
+            1.0,
+            0.0,
+            f64::NAN,
+        ]);
+
+        assert_eq!(
+            integrator.should_stop(&last_y, &cur_y, 1),
+            Some(StopReason::CoordinateIsNan)
+        );
     }
 }

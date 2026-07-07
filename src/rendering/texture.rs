@@ -103,12 +103,11 @@ impl TextureMap for TextureMapper {
 
 #[derive(Clone)]
 pub struct BlackBodyMapper {
-    /// Kept for `TextureConfig::BlackBody` schema/API compatibility. Not
-    /// applied in `color_at_uv`: `blackbody_xyz` already returns the exact
-    /// physical relativistic intensity boost (z^5, see its doc comment), so
-    /// multiplying by an additional `redshift^beaming_exponent` there would
-    /// double-count that boost.
-    #[allow(dead_code)]
+    /// Extra *artistic* redshift exponent applied on top of `blackbody_xyz`'s
+    /// already-physical z^5 boost (see its doc comment): total boost is
+    /// `z^(5 + beaming_exponent)`. 0.0 renders the physically exact spectrum;
+    /// scenes that want a stronger beaming look (e.g. the accretion-disc
+    /// examples in scene-definitions/) can dial this up.
     beaming_exponent: f64,
     /// Precomputed blackbody colors indexed by log10(temperature).
     color_profile: Vec<(f64, CIETristimulus)>,
@@ -202,10 +201,11 @@ impl TextureMap for BlackBodyMapper {
         _uv: &UVCoordinates,
         temperature_data: &TemperatureData,
     ) -> CIETristimulus {
-        // No `apply_beaming` here: `blackbody_xyz` already returns the exact,
-        // physically-boosted observer-frame intensity (see its doc comment).
-        // Applying `apply_beaming` on top would double-count that boost.
-        self.blackbody_xyz(temperature_data.temperature, temperature_data.redshift)
+        let redshift = temperature_data.redshift;
+        // blackbody_xyz already includes the physical z^5 boost; beaming_exponent
+        // is a separate, purely artistic multiplier on top of that (0.0 = none).
+        self.blackbody_xyz(temperature_data.temperature, redshift)
+            .apply_beaming(redshift, self.beaming_exponent)
     }
 }
 
@@ -429,13 +429,10 @@ mod tests {
     }
 
     #[test]
-    fn test_blackbody_color_at_uv_does_not_double_apply_beaming() {
-        // color_at_uv must not multiply blackbody_xyz's already-physical z^5
-        // boost by an additional redshift^beaming_exponent factor. Use a
-        // non-zero, production-realistic beaming_exponent (3.0, the config
-        // default) and a redshift != 1 so the bug (an extra z^3 factor)
-        // would actually show up as a mismatch.
-        let mapper = BlackBodyMapper::new(3.0);
+    fn test_blackbody_color_at_uv_with_zero_beaming_exponent_matches_physical_boost() {
+        // beaming_exponent = 0.0 must leave blackbody_xyz's already-physical
+        // z^5 boost untouched (z^(5+0) = z^5).
+        let mapper = BlackBodyMapper::new(0.0);
         let temperature_data = TemperatureData {
             temperature: 6_000.0,
             redshift: 1.5,
@@ -449,6 +446,30 @@ mod tests {
         assert_relative_eq!(rendered.x, expected.x, max_relative = 1e-12);
         assert_relative_eq!(rendered.y, expected.y, max_relative = 1e-12);
         assert_relative_eq!(rendered.z, expected.z, max_relative = 1e-12);
+    }
+
+    #[test]
+    fn test_blackbody_color_at_uv_stacks_artistic_beaming_on_top_of_physical_boost() {
+        // A non-zero beaming_exponent must multiply blackbody_xyz's z^5
+        // physical boost by an additional z^beaming_exponent factor, i.e.
+        // color_at_uv = blackbody_xyz(...) * redshift^beaming_exponent.
+        let mapper = BlackBodyMapper::new(4.0);
+        let temperature_data = TemperatureData {
+            temperature: 6_000.0,
+            redshift: 1.5,
+        };
+        let uv = UVCoordinates { u: 0.0, v: 0.0 };
+
+        let rendered = mapper.color_at_uv(&uv, &temperature_data);
+        let base = mapper.blackbody_xyz(temperature_data.temperature, temperature_data.redshift);
+        let expected = base.apply_beaming(temperature_data.redshift, 4.0);
+
+        assert_relative_eq!(rendered.x, expected.x, max_relative = 1e-12);
+        assert_relative_eq!(rendered.y, expected.y, max_relative = 1e-12);
+        assert_relative_eq!(rendered.z, expected.z, max_relative = 1e-12);
+        // Sanity: the extra factor must actually change the result relative
+        // to the pure-physical (beaming_exponent = 0) case.
+        assert!(rendered.x != base.x);
     }
 
     #[test]
