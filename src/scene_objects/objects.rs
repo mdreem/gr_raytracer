@@ -8,27 +8,22 @@ use crate::rendering::redshift::RedshiftComputer;
 use crate::rendering::texture::TemperatureData;
 use crate::scene_objects::hittable::{ColorComputationData, Hittable};
 
-/// Linearly interpolate an integration `Step` to the parameter `t` in [0, 1]
-/// between `y_start` (t = 0) and `y_end` (t = 1). The interpolation happens
-/// in the integrator's native coordinate system, which is consistent with
-/// how the intersection parameter `t` itself is computed (a straight-line
-/// interpolation of the same state). For small step sizes this is accurate
-/// to the same order as the geodesic integration scheme.
-fn lerp_step(y_start: &Step, y_end: &Step, t: f64) -> Step {
-    debug_assert_eq!(y_start.x.coordinate_system, y_end.x.coordinate_system);
+/// Build the integration `Step` at the exact object intersection: the position
+/// is the already-solved intersection point (exact, not interpolated), and the
+/// momentum is linearly interpolated between `y_start` (t = 0) and `y_end`
+/// (t = 1). The momentum has no closed-form solve at the intersection, so
+/// linear interpolation in the integrator's native coordinate system is the
+/// best available estimate; using the exact intersection point for position
+/// avoids the mismatch that comes from interpolating curvilinear coordinates
+/// (r, theta, phi) along what is really a straight line in Cartesian space.
+fn step_at_intersection(y_start: &Step, y_end: &Step, intersection_point: Point, t: f64) -> Step {
     debug_assert_eq!(y_start.p.coordinate_system, y_end.p.coordinate_system);
-    let cs = y_start.x.coordinate_system;
+    let cs = y_start.p.coordinate_system;
     let s = 1.0 - t;
     Step {
         t: s * y_start.t + t * y_end.t,
         step: y_start.step,
-        x: Point::new(
-            s * y_start.x[0] + t * y_end.x[0],
-            s * y_start.x[1] + t * y_end.x[1],
-            s * y_start.x[2] + t * y_end.x[2],
-            s * y_start.x[3] + t * y_end.x[3],
-            cs,
-        ),
+        x: intersection_point,
         p: FourVector::new(
             s * y_start.p[0] + t * y_end.p[0],
             s * y_start.p[1] + t * y_end.p[1],
@@ -82,7 +77,12 @@ impl<'a, G: Geometry> Objects<'a, G> {
                 let distance = (intersection_point - y_start_cartesian).norm();
                 if distance < shortest_distance {
                     shortest_distance = distance;
-                    let intersection_step = lerp_step(y_start, y_end, intersection_data.t);
+                    let intersection_step = step_at_intersection(
+                        y_start,
+                        y_end,
+                        intersection_data.intersection_point,
+                        intersection_data.t,
+                    );
                     let emitter_energy =
                         hittable.energy_of_emitter(self.geometry, &intersection_step)?;
                     let redshift = redshift_computer
