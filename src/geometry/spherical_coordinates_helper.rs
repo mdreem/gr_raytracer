@@ -38,6 +38,28 @@ pub fn spherical_to_cartesian(spherical: &Point) -> Point {
     Point::new(t, x, y, z, CoordinateSystem::Cartesian)
 }
 
+/// Convert a Cartesian point to Boyer-Lindquist (t, r, θ, φ) coordinates for
+/// spin parameter `a`, using the Kerr-Schild embedding documented on
+/// `CoordinateSystem::BoyerLindquist`.
+pub fn cartesian_to_boyer_lindquist(a: f64, cartesian: &Point) -> Point {
+    let t = cartesian[0];
+    let x = cartesian[1];
+    let y = cartesian[2];
+    let z = cartesian[3];
+
+    let rho_sqr = x * x + y * y + z * z;
+    let r_sqr = 0.5 * (rho_sqr - a * a + ((rho_sqr - a * a).powi(2) + 4.0 * a * a * z * z).sqrt());
+    let r = r_sqr.sqrt();
+    let theta = if r == 0.0 {
+        0.0
+    } else {
+        (z / r).clamp(-1.0, 1.0).acos()
+    };
+    let phi = (r * y - a * x).atan2(r * x + a * y);
+
+    Point::new(t, r, theta, phi, CoordinateSystem::BoyerLindquist { a })
+}
+
 #[cfg(test)]
 mod tests {
     use crate::geometry::point::{CoordinateSystem, Point};
