@@ -8,6 +8,32 @@ use crate::rendering::redshift::RedshiftComputer;
 use crate::rendering::texture::TemperatureData;
 use crate::scene_objects::hittable::{ColorComputationData, Hittable};
 
+/// Build the integration `Step` at the exact object intersection: the position
+/// is the already-solved intersection point (exact, not interpolated), and the
+/// momentum is linearly interpolated between `y_start` (t = 0) and `y_end`
+/// (t = 1). The momentum has no closed-form solve at the intersection, so
+/// linear interpolation in the integrator's native coordinate system is the
+/// best available estimate; using the exact intersection point for position
+/// avoids the mismatch that comes from interpolating curvilinear coordinates
+/// (r, theta, phi) along what is really a straight line in Cartesian space.
+fn step_at_intersection(y_start: &Step, y_end: &Step, intersection_point: Point, t: f64) -> Step {
+    debug_assert_eq!(y_start.p.coordinate_system, y_end.p.coordinate_system);
+    let cs = y_start.p.coordinate_system;
+    let s = 1.0 - t;
+    Step {
+        t: s * y_start.t + t * y_end.t,
+        step: y_start.step,
+        x: intersection_point,
+        p: FourVector::new(
+            s * y_start.p[0] + t * y_end.p[0],
+            s * y_start.p[1] + t * y_end.p[1],
+            s * y_start.p[2] + t * y_end.p[2],
+            s * y_start.p[3] + t * y_end.p[3],
+            cs,
+        ),
+    }
+}
+
 pub trait SceneObject: Hittable {}
 
 pub struct Objects<'a, G: Geometry> {
@@ -53,7 +79,12 @@ impl<'a, G: Geometry> Objects<'a, G> {
                 let distance = (intersection_point - y_start_cartesian).norm();
                 if distance < shortest_distance {
                     shortest_distance = distance;
-                    let emitter_step = interpolate_step(y_start, y_end, intersection_data.t);
+                    let emitter_step = step_at_intersection(
+                        y_start,
+                        y_end,
+                        intersection_data.intersection_point,
+                        intersection_data.t,
+                    );
                     let emitter_energy =
                         hittable.energy_of_emitter(self.geometry, &emitter_step)?;
                     let redshift = redshift_computer
@@ -81,31 +112,6 @@ impl<'a, G: Geometry> Objects<'a, G> {
     }
 }
 
-/// Linearly interpolate an integration `Step` to the parameter `t` in [0, 1]
-/// between `y_start` (t = 0) and `y_end` (t = 1).
-fn interpolate_step(y_start: &Step, y_end: &Step, t: f64) -> Step {
-    debug_assert_eq!(y_start.x.coordinate_system, y_end.x.coordinate_system);
-    debug_assert_eq!(y_start.p.coordinate_system, y_end.p.coordinate_system);
-
-    let t = t.clamp(0.0, 1.0);
-
-    let x_vector = y_start.x.vector + t * (y_end.x.vector - y_start.x.vector);
-    let p_vector = y_start.p.vector + t * (y_end.p.vector - y_start.p.vector);
-
-    Step {
-        x: Point::new_from_vector(x_vector, y_start.x.coordinate_system),
-        p: FourVector::new(
-            p_vector[0],
-            p_vector[1],
-            p_vector[2],
-            p_vector[3],
-            y_start.p.coordinate_system,
-        ),
-        t: y_start.t + t * (y_end.t - y_start.t),
-        step: y_start.step,
-    }
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -119,7 +125,7 @@ mod tests {
     use std::sync::Arc;
 
     #[test]
-    fn test_interpolate_step_midpoint() {
+    fn test_step_at_intersection_uses_exact_position_and_interpolated_momentum() {
         let y_start = Step {
             t: 2.0,
             step: 10,
@@ -134,12 +140,13 @@ mod tests {
             p: FourVector::new_cartesian(5.0, 6.0, 7.0, 8.0),
         };
 
-        let mid = interpolate_step(&y_start, &y_end, 0.5);
+        let intersection_point = Point::new_cartesian(0.0, 20.0, 30.0, 40.0);
+        let mid = step_at_intersection(&y_start, &y_end, intersection_point, 0.5);
         assert_abs_diff_eq!(mid.t, 4.0);
-        assert_abs_diff_eq!(mid.x[0], 2.0);
-        assert_abs_diff_eq!(mid.x[1], 4.0);
-        assert_abs_diff_eq!(mid.x[2], 6.0);
-        assert_abs_diff_eq!(mid.x[3], 8.0);
+        assert_abs_diff_eq!(mid.x[0], 0.0);
+        assert_abs_diff_eq!(mid.x[1], 20.0);
+        assert_abs_diff_eq!(mid.x[2], 30.0);
+        assert_abs_diff_eq!(mid.x[3], 40.0);
         assert_abs_diff_eq!(mid.p[0], 3.0);
         assert_abs_diff_eq!(mid.p[1], 4.0);
         assert_abs_diff_eq!(mid.p[2], 5.0);
