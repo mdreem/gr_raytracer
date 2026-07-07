@@ -80,7 +80,7 @@ pub enum TextureConfig {
 impl Default for TextureConfig {
     fn default() -> Self {
         TextureConfig::BlackBody {
-            beaming_exponent: 3.0,
+            beaming_exponent: 0.0,
         }
     }
 }
