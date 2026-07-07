@@ -9,7 +9,10 @@ pub struct GlobalOpts {
     pub height: i64,
     #[arg(long, default_value = "0.01")]
     pub step_size: f64,
-    #[arg(long, default_value = "15000")]
+    // Needs enough headroom over max_radius for the H_MAX-capped adaptive
+    // integrator to actually reach the celestial sphere for background rays;
+    // see the H_MAX doc comment in rendering/runge_kutta.rs.
+    #[arg(long, default_value = "20000")]
     pub max_steps: usize,
     #[arg(long, default_value = "15000")]
     pub max_radius: f64,

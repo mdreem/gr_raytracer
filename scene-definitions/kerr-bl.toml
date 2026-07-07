@@ -19,5 +19,5 @@ outer_radius = 15.0
 temperature = 2000.0
 
 [objects.Disc.texture.BlackBody]
-beaming_exponent = 3.0
+beaming_exponent = 0.0
 color_normalization = "EqualLuminance"

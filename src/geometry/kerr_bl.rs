@@ -9,15 +9,17 @@ use nalgebra::{Const, Matrix4, OVector};
 use crate::geometry::four_vector::FourVector;
 use crate::geometry::geometry::{
     ConstantsOfMotion, GeodesicSolver, Geometry, HasCoordinateSystem, InnerProduct, Signature,
-    SupportQuantities,
+    SupportQuantities, TRAPPED_ORBIT_RADIUS_FACTOR,
 };
 use crate::geometry::point::{CoordinateSystem, Point};
+use crate::geometry::spherical_coordinates_helper::cartesian_to_boyer_lindquist;
 use crate::geometry::tetrad::Tetrad;
 use crate::rendering::ray::Ray;
 use crate::rendering::raytracer::RaytracerError;
 use crate::rendering::runge_kutta::OdeFunction;
 use crate::rendering::scene::EquationOfMotionState;
 use crate::rendering::temperature::{KerrTemperatureComputer, TemperatureComputer};
+use log::warn;
 
 /// Floor for sin²θ used when computing L_z²/sin²θ in the Carter constant Q.
 /// Prevents division by zero for rays exactly on the rotation axis (θ=0 or π),
@@ -295,6 +297,16 @@ pub struct KerrBL {
 
 impl KerrBL {
     pub fn new(radius: f64, a: f64, horizon_epsilon: f64) -> Self {
+        if a.abs() > radius / 2.0 {
+            warn!(
+                "KerrBL constructed with a = {} and |a| > M = {} (naked singularity, \
+                 over-extremal for either spin sign). No event horizon exists; the \
+                 horizon-stop in `inside_horizon` is disabled and the BL Δ = r² − 2Mr + a² \
+                 has no real roots, so rays may approach r = 0.",
+                a,
+                radius / 2.0
+            );
+        }
         KerrBL {
             radius,
             a,
@@ -303,24 +315,7 @@ impl KerrBL {
     }
 
     pub fn cartesian_to_bl(&self, position: &Point) -> Point {
-        let x = position[1];
-        let y = position[2];
-        let z = position[3];
-        let r_sqr = compute_r_sqr(self.a, x, y, z);
-        let r = r_sqr.sqrt();
-        let theta = if r == 0.0 {
-            0.0
-        } else {
-            (z / r).clamp(-1.0, 1.0).acos()
-        };
-        let phi = (r * y - self.a * x).atan2(r * x + self.a * y);
-        Point::new(
-            position[0],
-            r,
-            theta,
-            phi,
-            CoordinateSystem::BoyerLindquist { a: self.a },
-        )
+        cartesian_to_boyer_lindquist(self.a, position)
     }
 }
 
@@ -464,19 +459,24 @@ impl Geometry for KerrBL {
     fn inside_horizon(&self, position: &Point) -> bool {
         // r_plus = M + sqrt(M^2 - a^2) where M = radius/2 (since radius = r_s = 2M)
         let m = self.radius / 2.0;
-        if self.a > m {
+        if self.a.abs() > m {
             return false;
         }
-        let r_plus = m + (m * m - self.a * self.a).sqrt();
+        // Guard against FP rounding at extremal Kerr (a == M).
+        let disc = (m * m - self.a * self.a).max(0.0);
+        let r_plus = m + disc.sqrt();
         position[1] <= r_plus + self.horizon_epsilon
     }
 
     fn closed_orbit(&self, position: &Point, step_index: usize, max_steps: usize) -> bool {
+        // See `Kerr::closed_orbit` for the rationale: catch trapped photons
+        // by treating any ray that exhausts the step budget while still in
+        // the strong-field region (r < 5·r_s) as bound. The previous
+        // condition `r <= self.radius` only matched rays inside the
+        // horizon, which the dedicated `inside_horizon` stop already
+        // handles.
         let r = position[1];
-        if step_index == max_steps - 1 && r <= self.radius {
-            return true;
-        }
-        false
+        step_index == max_steps - 1 && r < TRAPPED_ORBIT_RADIUS_FACTOR * self.radius
     }
 
     fn get_geodesic_solver(&self, ray: &Ray) -> Box<dyn GeodesicSolver> {
@@ -728,6 +728,19 @@ mod tests {
         );
         assert!(kerr.inside_horizon(&inside));
         assert!(!kerr.inside_horizon(&outside));
+    }
+
+    #[test]
+    fn test_inside_horizon_over_extremal_negative_spin_has_no_horizon() {
+        // a = -2*M is over-extremal (|a| > M) with a negative spin; there is
+        // no event horizon regardless of spin sign, so nothing should ever
+        // register as "inside" it.
+        let m = 0.5_f64;
+        let a = -2.0 * m;
+        let kerr = KerrBL::new(1.0, a, 1e-4);
+
+        let near_origin = Point::new(0.0, m, 1.0, 0.0, CoordinateSystem::BoyerLindquist { a });
+        assert!(!kerr.inside_horizon(&near_origin));
     }
 
     #[test]

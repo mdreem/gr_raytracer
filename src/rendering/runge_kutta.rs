@@ -58,6 +58,30 @@ const BETA: f64 = 0.9;
 const CONVERGENCY_ORDER: f64 = 5.0;
 const ERROR_RATIO_SMALL_ERROR: f64 = 1e-5;
 const MAX_RETRY_STEP: i32 = 100;
+/// Hard cap on a single step. Prevents the controller from proposing huge
+/// jumps when the local truncation error is near zero (which made `h_new`
+/// blow up to +inf in the previous code path).
+///
+/// Do not raise this to fix celestial-sphere reachability at large
+/// max_radius/max_steps ratios (see IntegrationConfiguration) — it was tried
+/// and reverted. The adaptive controller only slows down for *curvature*,
+/// not for scene objects, so in flat or weakly-curved regions (e.g. anywhere
+/// in `EuclideanSpace`, or far from the black hole) nothing stops the step
+/// size from reaching H_MAX almost immediately; a large H_MAX then makes it
+/// trivial to tunnel straight through small nearby objects (confirmed: with
+/// H_MAX = 1000 or even 10, `test_color_of_ray_hits_sphere*` start missing a
+/// radius-2 sphere at r = 10). If the celestial sphere is unreachable within
+/// budget for a given scene, raise `max_steps` (or `IntegrationConfiguration`
+/// generally) instead of this constant.
+const H_MAX: f64 = 1.0;
+/// Lower bound on a single step. If the controller demands a smaller step,
+/// we accept whatever solution is at hand rather than spinning to
+/// MAX_RETRY_STEP and aborting the entire ray.
+const H_MIN: f64 = 1e-12;
+/// Multiplicative cap when growing h between successful steps. Prevents
+/// runaway expansion when the error drops to zero on a particularly easy
+/// region of the trajectory.
+const H_GROWTH_CAP: f64 = 4.0;
 
 fn rkf45_step<D: Dim>(
     y: &OVector<f64, D>,
@@ -100,31 +124,56 @@ where
     (y_new, truncation_error)
 }
 
+/// Advance the ODE by one adaptive RKF45 step.
+///
+/// Returns `(y_new, h_taken, h_next)`:
+/// * `y_new`    — the state advanced by `h_taken`,
+/// * `h_taken`  — the step size actually used to produce `y_new` (use this to
+///   advance the affine parameter, i.e. `t += h_taken`),
+/// * `h_next`   — the suggested step size for the following call.
+///
+/// Keeping `h_taken` and `h_next` separate matters: the controller's proposed
+/// next step can differ from the step just taken, so advancing `t` by the
+/// proposal would desynchronise the recorded parameterisation from the state.
 pub fn rkf45<D: Dim>(
     y: &OVector<f64, D>,
     t: f64,
     h: f64,
     epsilon: f64,
     f: &dyn OdeFunction<D>,
-) -> Result<(OVector<f64, D>, f64), RaytracerError>
+) -> Result<(OVector<f64, D>, f64, f64), RaytracerError>
 where
     DefaultAllocator: Allocator<D>,
 {
-    let mut h_cur = h;
+    let mut h_cur = h.clamp(H_MIN, H_MAX);
     for _i in 0..MAX_RETRY_STEP {
         let (y_new, truncation_error) = rkf45_step(y, t, h_cur, f);
 
-        let h_new = BETA * h_cur * (epsilon / truncation_error).powf(1.0 / CONVERGENCY_ORDER);
+        // Compute the proposed next step. Guard against truncation_error == 0
+        // (which would otherwise make h_new = +inf) and clamp the proposal so
+        // the controller cannot grow the step without bound on easy regions.
+        let h_proposed = if truncation_error > 0.0 {
+            BETA * h_cur * (epsilon / truncation_error).powf(1.0 / CONVERGENCY_ORDER)
+        } else {
+            h_cur * H_GROWTH_CAP
+        };
+        let h_proposed = h_proposed.min(h_cur * H_GROWTH_CAP).clamp(H_MIN, H_MAX);
 
         if truncation_error > epsilon {
-            h_cur = h_new / 2.0; // Halve the step size and retry.
+            // Halve the step size and retry — but if we have already hit the
+            // minimum step, accept what we have rather than aborting the ray.
+            if h_cur <= H_MIN {
+                return Ok((y_new, h_cur, h_cur));
+            }
+            h_cur = (h_proposed / 2.0).clamp(H_MIN, H_MAX);
         } else {
             // step is accepted
-            return if truncation_error / epsilon < ERROR_RATIO_SMALL_ERROR {
-                Ok((y_new, 2.0 * h_cur))
+            let h_next = if truncation_error / epsilon < ERROR_RATIO_SMALL_ERROR {
+                (h_cur * H_GROWTH_CAP).clamp(H_MIN, H_MAX)
             } else {
-                Ok((y_new, h_cur))
+                h_proposed
             };
+            return Ok((y_new, h_cur, h_next));
         }
     }
     Err(RaytracerError::IntegrationError(
@@ -171,15 +220,21 @@ mod tests {
         let mut t = 0.0;
         let mut h = step_size;
         while t <= 25.0 {
-            (y, h) = rkf45(&y, t, h, 1e-10, &simple_equation).unwrap();
-            t += h;
+            let (y_new, h_taken, h_next) = rkf45(&y, t, h, 1e-10, &simple_equation).unwrap();
+            y = y_new;
+            t += h_taken;
+            h = h_next;
         }
-        assert_abs_diff_eq!(y, solution_simple_equation(t - h), epsilon = 1e-5);
+        // `t` now advances by the step actually taken, so the state stays in
+        // sync with the affine parameter and we can assert against solution(t).
+        assert_abs_diff_eq!(y, solution_simple_equation(t), epsilon = 1e-5);
 
         while t <= 50.0 {
-            (y, h) = rkf45(&y, t, h, 1e-10, &simple_equation).unwrap();
-            t += h;
+            let (y_new, h_taken, h_next) = rkf45(&y, t, h, 1e-10, &simple_equation).unwrap();
+            y = y_new;
+            t += h_taken;
+            h = h_next;
         }
-        assert_abs_diff_eq!(y, solution_simple_equation(t - h), epsilon = 1e-5);
+        assert_abs_diff_eq!(y, solution_simple_equation(t), epsilon = 1e-5);
     }
 }
