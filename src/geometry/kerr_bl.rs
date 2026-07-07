@@ -297,11 +297,12 @@ pub struct KerrBL {
 
 impl KerrBL {
     pub fn new(radius: f64, a: f64, horizon_epsilon: f64) -> Self {
-        if a > radius / 2.0 {
+        if a.abs() > radius / 2.0 {
             warn!(
-                "KerrBL constructed with a = {} > M = {} (naked singularity). \
-                 No event horizon exists; the horizon-stop in `inside_horizon` is disabled \
-                 and the BL Δ = r² − 2Mr + a² has no real roots, so rays may approach r = 0.",
+                "KerrBL constructed with a = {} and |a| > M = {} (naked singularity, \
+                 over-extremal for either spin sign). No event horizon exists; the \
+                 horizon-stop in `inside_horizon` is disabled and the BL Δ = r² − 2Mr + a² \
+                 has no real roots, so rays may approach r = 0.",
                 a,
                 radius / 2.0
             );
@@ -458,7 +459,7 @@ impl Geometry for KerrBL {
     fn inside_horizon(&self, position: &Point) -> bool {
         // r_plus = M + sqrt(M^2 - a^2) where M = radius/2 (since radius = r_s = 2M)
         let m = self.radius / 2.0;
-        if self.a > m {
+        if self.a.abs() > m {
             return false;
         }
         // Guard against FP rounding at extremal Kerr (a == M).
@@ -727,6 +728,19 @@ mod tests {
         );
         assert!(kerr.inside_horizon(&inside));
         assert!(!kerr.inside_horizon(&outside));
+    }
+
+    #[test]
+    fn test_inside_horizon_over_extremal_negative_spin_has_no_horizon() {
+        // a = -2*M is over-extremal (|a| > M) with a negative spin; there is
+        // no event horizon regardless of spin sign, so nothing should ever
+        // register as "inside" it.
+        let m = 0.5_f64;
+        let a = -2.0 * m;
+        let kerr = KerrBL::new(1.0, a, 1e-4);
+
+        let near_origin = Point::new(0.0, m, 1.0, 0.0, CoordinateSystem::BoyerLindquist { a });
+        assert!(!kerr.inside_horizon(&near_origin));
     }
 
     #[test]

@@ -110,11 +110,12 @@ fn metric_contravariant(radius: f64, a: f64, x: f64, y: f64, z: f64) -> Matrix4<
 
 impl Kerr {
     pub fn new(radius: f64, a: f64, horizon_epsilon: f64) -> Self {
-        if a > radius / 2.0 {
+        if a.abs() > radius / 2.0 {
             warn!(
-                "Kerr constructed with a = {} > M = {} (naked singularity). \
-                 No event horizon exists; the horizon-stop in `inside_horizon` is disabled \
-                 and rays may spiral arbitrarily close to r = 0.",
+                "Kerr constructed with a = {} and |a| > M = {} (naked singularity, \
+                 over-extremal for either spin sign). No event horizon exists; the \
+                 horizon-stop in `inside_horizon` is disabled and rays may spiral \
+                 arbitrarily close to r = 0.",
                 a,
                 radius / 2.0
             );
@@ -466,7 +467,7 @@ impl Geometry for Kerr {
     }
 
     fn inside_horizon(&self, position: &Point) -> bool {
-        if self.a > self.radius / 2.0 {
+        if self.a.abs() > self.radius / 2.0 {
             return false;
         }
         let (x, y, z) = (position[1], position[2], position[3]);
@@ -611,6 +612,20 @@ mod tests {
                 }
             }
         }
+    }
+
+    #[test]
+    fn test_inside_horizon_over_extremal_negative_spin_has_no_horizon() {
+        // a = -2*M is over-extremal (|a| > M) with a negative spin; there is
+        // no event horizon regardless of spin sign, so nothing should ever
+        // register as "inside" it.
+        let radius = 1.0;
+        let m = radius / 2.0;
+        let a = -2.0 * m;
+        let geometry = Kerr::new(radius, a, 1e-4);
+
+        let near_origin = Point::new_cartesian(0.0, m * 0.5, 0.0, 0.0);
+        assert!(!geometry.inside_horizon(&near_origin));
     }
 
     #[test]
