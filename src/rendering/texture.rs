@@ -103,6 +103,12 @@ impl TextureMap for TextureMapper {
 
 #[derive(Clone)]
 pub struct BlackBodyMapper {
+    /// Kept for `TextureConfig::BlackBody` schema/API compatibility. Not
+    /// applied in `color_at_uv`: `blackbody_xyz` already returns the exact
+    /// physical relativistic intensity boost (z^5, see its doc comment), so
+    /// multiplying by an additional `redshift^beaming_exponent` there would
+    /// double-count that boost.
+    #[allow(dead_code)]
     beaming_exponent: f64,
     /// Precomputed blackbody colors indexed by log10(temperature).
     color_profile: Vec<(f64, CIETristimulus)>,
@@ -196,9 +202,10 @@ impl TextureMap for BlackBodyMapper {
         _uv: &UVCoordinates,
         temperature_data: &TemperatureData,
     ) -> CIETristimulus {
-        let redshift = temperature_data.redshift;
-        self.blackbody_xyz(temperature_data.temperature, redshift)
-            .apply_beaming(redshift, self.beaming_exponent)
+        // No `apply_beaming` here: `blackbody_xyz` already returns the exact,
+        // physically-boosted observer-frame intensity (see its doc comment).
+        // Applying `apply_beaming` on top would double-count that boost.
+        self.blackbody_xyz(temperature_data.temperature, temperature_data.redshift)
     }
 }
 
@@ -292,7 +299,9 @@ impl TextureMapperFactory {
 mod tests {
     use crate::rendering::black_body_radiation::get_cie_xyz_of_black_body_redshifted;
     use crate::rendering::color::CIETristimulus;
-    use crate::rendering::texture::{BlackBodyMapper, TemperatureData, TextureMap, TextureMapper};
+    use crate::rendering::texture::{
+        BlackBodyMapper, TemperatureData, TextureMap, TextureMapper, UVCoordinates,
+    };
     use approx::assert_relative_eq;
 
     fn get_red() -> CIETristimulus {
@@ -417,6 +426,29 @@ mod tests {
         assert!(boosted.x > baseline.x);
         assert!(boosted.y > baseline.y);
         assert!(boosted.z > baseline.z);
+    }
+
+    #[test]
+    fn test_blackbody_color_at_uv_does_not_double_apply_beaming() {
+        // color_at_uv must not multiply blackbody_xyz's already-physical z^5
+        // boost by an additional redshift^beaming_exponent factor. Use a
+        // non-zero, production-realistic beaming_exponent (3.0, the config
+        // default) and a redshift != 1 so the bug (an extra z^3 factor)
+        // would actually show up as a mismatch.
+        let mapper = BlackBodyMapper::new(3.0);
+        let temperature_data = TemperatureData {
+            temperature: 6_000.0,
+            redshift: 1.5,
+        };
+        let uv = UVCoordinates { u: 0.0, v: 0.0 };
+
+        let rendered = mapper.color_at_uv(&uv, &temperature_data);
+        let expected =
+            mapper.blackbody_xyz(temperature_data.temperature, temperature_data.redshift);
+
+        assert_relative_eq!(rendered.x, expected.x, max_relative = 1e-12);
+        assert_relative_eq!(rendered.y, expected.y, max_relative = 1e-12);
+        assert_relative_eq!(rendered.z, expected.z, max_relative = 1e-12);
     }
 
     #[test]
