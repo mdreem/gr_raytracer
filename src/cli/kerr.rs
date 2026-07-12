@@ -1,5 +1,5 @@
 use crate::cli::cli::GlobalOpts;
-use crate::cli::shared::{assert_future_directed, create_scene, integrate_and_save_ray, render};
+use crate::cli::shared::{assert_future_directed, create_scene, integrate_and_save_ray, render, resolve_camera_velocity};
 use crate::configuration::RenderConfig;
 use crate::geometry::four_vector::FourVector;
 use crate::geometry::geometry::{Geometry, InnerProduct, RenderableGeometry};
@@ -12,27 +12,13 @@ use crate::rendering::scene::Scene;
 use log::info;
 use std::io::Write;
 
-fn compute_f(geometry: &Kerr, camera_position: &Point) -> f64 {
-    let a = geometry.a;
-    let radius = geometry.radius;
-    let x = camera_position[1];
-    let y = camera_position[2];
-    let z = camera_position[3];
-    let rho_sqr = x * x + y * y + z * z;
-    let term = ((rho_sqr - a * a).powi(2) + 4.0 * a * a * z * z).sqrt();
-    let r_sqr = 0.5 * (rho_sqr - a * a + term);
-    let r = r_sqr.sqrt();
-    (r * r * r * radius) / (r * r * r * r + a * a * z * z)
-}
-
 fn create_scene_internal<'a>(
     geometry: &'a Kerr,
     opts: GlobalOpts,
     config: &RenderConfig,
     camera_position: Point,
 ) -> Result<Scene<'a, Kerr>, RaytracerError> {
-    let f = compute_f(geometry, &camera_position);
-    let momentum = FourVector::new_cartesian(1.0 / (1.0 - f).sqrt(), 0.0, 0.0, 0.0);
+    let momentum = resolve_camera_velocity(geometry, &camera_position, &config.camera_velocity);
     assert_future_directed(
         "Kerr camera four-velocity",
         geometry,

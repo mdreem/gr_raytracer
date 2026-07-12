@@ -171,6 +171,11 @@ impl SupportQuantities for EuclideanSpaceSpherical {
         FourVector::new_spherical(1.0, 0.0, 0.0, 0.0)
     }
 
+        fn get_zamo_velocity_at(&self, position: &Point) -> FourVector {
+        // No frame dragging: the ZAMO is the static observer.
+        self.get_stationary_velocity_at(position)
+    }
+
     fn get_circular_orbit_velocity_at(
         &self,
         _position: &Point,
