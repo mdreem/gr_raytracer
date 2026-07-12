@@ -234,8 +234,13 @@ impl Camera {
     pub fn get_ray_for(&self, row: i64, column: i64) -> Ray {
         let direction = self.get_direction_for(row, column);
         trace!("direction ({}|{}): {:?}", row, column, direction);
-        // Build a future-directed null ray in the local tetrad frame.
-        let momentum = direction + self.tetrad.t;
+        // Trace the physical photon that arrives at the camera from
+        // `direction`: its traced momentum N - e_t is past-directed, so the
+        // integration marches backwards in time, from the camera out towards
+        // the emitter. The future-directed outbound ray (N + e_t) is not the
+        // same geodesic: it flips the Doppler term of the redshift for moving
+        // emitters and follows a path with reversed frame dragging in Kerr.
+        let momentum = direction + (-self.tetrad.t);
         Ray::new(row, column, self.position, momentum)
     }
 }
@@ -414,8 +419,11 @@ mod tests {
         }
     }
 
+    // The camera traces the physical photon that arrives at it, so the ray
+    // momentum must be past-directed: the physical energy measured by the
+    // camera observer, signature[0] * <u, p>, is negative.
     #[test]
-    fn test_camera_ray_is_future_directed_for_plus_minus_minus_minus_signature() {
+    fn test_camera_ray_is_past_directed_for_plus_minus_minus_minus_signature() {
         let position = cartesian_to_spherical(&Point::new_cartesian(0.0, 10.0, 0.0, 0.0));
         let geometry = Schwarzschild::new(0.0, 0.0);
         let velocity = FourVector::new_spherical(1.0, 0.0, 0.0, 0.0);
@@ -435,11 +443,11 @@ mod tests {
         let ray = camera.get_ray_for(5, 5);
         let orientation = geometry.signature()[0]
             * geometry.inner_product(&ray.position, &camera.velocity, &ray.momentum);
-        assert!(orientation > 0.0);
+        assert!(orientation < 0.0);
     }
 
     #[test]
-    fn test_camera_ray_is_future_directed_for_minus_plus_plus_plus_signature() {
+    fn test_camera_ray_is_past_directed_for_minus_plus_plus_plus_signature() {
         let position = Point::new_cartesian(0.0, 10.0, 0.0, 0.0);
         let geometry = Kerr::new(0.0, 0.0, 0.0);
         let velocity = FourVector::new_cartesian(1.0, 0.0, 0.0, 0.0);
@@ -459,6 +467,6 @@ mod tests {
         let ray = camera.get_ray_for(5, 5);
         let orientation = geometry.signature()[0]
             * geometry.inner_product(&ray.position, &camera.velocity, &ray.momentum);
-        assert!(orientation > 0.0);
+        assert!(orientation < 0.0);
     }
 }

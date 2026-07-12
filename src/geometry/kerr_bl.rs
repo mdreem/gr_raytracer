@@ -34,16 +34,25 @@ fn compute_r_sqr(a: f64, x: f64, y: f64, z: f64) -> f64 {
 
 /// Jacobian ∂(x^Cartesian)/∂(x^BL) as a 4×4 matrix.
 /// Row μ, column ν = ∂x^μ_Cart / ∂x^ν_BL
-fn jacobian_bl_to_cartesian(a: f64, r: f64, theta: f64, phi: f64) -> Matrix4<f64> {
+fn jacobian_bl_to_cartesian(r_s: f64, a: f64, r: f64, theta: f64, phi: f64) -> Matrix4<f64> {
     let (st, ct) = (theta.sin(), theta.cos());
     let (sp, cp) = (phi.sin(), phi.cos());
+    let del = delta(r, r_s, a);
+
+    // The (ingoing) Kerr-Schild chart's time and azimuth are twisted against
+    // Boyer-Lindquist by dt_KS = dt_BL + (r_s r / Δ) dr and
+    // dφ_KS = dφ_BL + (a / Δ) dr, so the r column carries the corresponding
+    // twist terms; with them J^T g_KS J = g_BL holds to machine precision
+    // (see test_bl_jacobian_transforms_metric_exactly).
+    let dx_dphi = (-r * sp - a * cp) * st;
+    let dy_dphi = (r * cp - a * sp) * st;
 
     #[rustfmt::skip]
     let data = [
-        1.0, 0.0,        0.0,                  0.0,
-        0.0, st * cp,    (r * cp - a * sp) * ct, (-r * sp - a * cp) * st,
-        0.0, st * sp,    (r * sp + a * cp) * ct, ( r * cp - a * sp) * st,
-        0.0, ct,         -r * st,                0.0,
+        1.0, r_s * r / del,                    0.0,                    0.0,
+        0.0, st * cp + (a / del) * dx_dphi,    (r * cp - a * sp) * ct, dx_dphi,
+        0.0, st * sp + (a / del) * dy_dphi,    (r * sp + a * cp) * ct, dy_dphi,
+        0.0, ct,                               -r * st,                0.0,
     ];
 
     Matrix4::from_row_slice(&data)
@@ -197,7 +206,7 @@ impl GeodesicSolver for KerrBLSolver {
                 let phi_bl = (r * y - self.a * x).atan2(r * x + self.a * y);
                 let t = ray.position[0];
                 // Use the BL Jacobian ∂(Cart)/∂(BL) to convert p^Cart → p^BL (contravariant).
-                let j_bl = jacobian_bl_to_cartesian(self.a, r, theta, phi_bl);
+                let j_bl = jacobian_bl_to_cartesian(self.radius, self.a, r, theta, phi_bl);
                 let j_bl_inv = j_bl
                     .try_inverse()
                     .expect("BL Jacobian should be invertible");
@@ -523,7 +532,7 @@ impl Geometry for KerrBL {
             _ => {
                 // Cartesian (KS) ray: convert p^Cart → p^BL using the BL Jacobian
                 // ∂(Cart)/∂(BL) evaluated at (r, θ, φ_BL).  Then lower with BL metric.
-                let j_bl = jacobian_bl_to_cartesian(self.a, r, theta, phi_bl);
+                let j_bl = jacobian_bl_to_cartesian(self.radius, self.a, r, theta, phi_bl);
                 let j_bl_inv = j_bl
                     .try_inverse()
                     .expect("BL Jacobian should be invertible");
@@ -606,6 +615,40 @@ impl Geometry for KerrBL {
 mod tests {
     use super::*;
     use approx::assert_abs_diff_eq;
+
+    #[test]
+    fn test_bl_jacobian_transforms_metric_exactly() {
+        // The BL->KS-Cartesian Jacobian must be the exact chart
+        // transformation: J^T g_KS J = g_BL. This pins the time and azimuth
+        // twist terms (dt_KS/dr = r_s r / Δ, dφ_KS/dr = a / Δ); without them
+        // the error is O(1).
+        use crate::geometry::kerr::test_helpers::metric_cartesian;
+
+        let r_s = 1.0_f64;
+        let a = 0.5_f64;
+        let test_points = [(5.0_f64, 1.2_f64, 0.7_f64), (8.0, 2.1, -1.3), (2.5, 0.4, 2.9)];
+
+        for &(r, theta, phi) in &test_points {
+            let (st, ct) = (theta.sin(), theta.cos());
+            let (sp, cp) = (phi.sin(), phi.cos());
+
+            // Spatial embedding used throughout: x = st(r cp - a sp),
+            // y = st(r sp + a cp), z = r ct.
+            let x = st * (r * cp - a * sp);
+            let y = st * (r * sp + a * cp);
+            let z = r * ct;
+
+            let j = jacobian_bl_to_cartesian(r_s, a, r, theta, phi);
+            let g_ks = metric_cartesian(r_s, a, x, y, z);
+            let g_bl = metric_bl(r_s, a, r, theta);
+            let transformed = j.transpose() * g_ks * j;
+            for i in 0..4 {
+                for k in 0..4 {
+                    assert_abs_diff_eq!(transformed[(i, k)], g_bl[(i, k)], epsilon = 1e-12);
+                }
+            }
+        }
+    }
 
     #[test]
     fn test_bl_metric_inverse() {
@@ -862,12 +905,10 @@ mod tests {
     }
 
     /// Verify that E and L_z are internally self-consistent for both Cartesian (KS) and BL
-    /// input rays.  KS and BL use different time coordinates (off-diagonal g_{tx} in KS adds
-    /// ~7% to E_KS at r=10), so we do NOT assert E_KS ≈ E_BL to high precision.  Instead we
-    /// check that:
-    ///   1. The BL E extracted from a Cartesian (KS) ray is physically reasonable (O(1), positive).
-    ///   2. The BL E extracted from a BL ray is physically reasonable.
-    ///   3. Both values are in the same ballpark (within 50% of each other).
+    /// input rays. E = -p·∂_t is chart-invariant (KS and BL share the same time Killing
+    /// vector) and the BL Jacobian is the exact chart transformation, so the E extracted
+    /// from a KS ray must match the BL value exactly. Camera rays are past-directed (they
+    /// trace the physical photon backwards out of the camera), so E is negative.
     #[test]
     fn test_e_lz_consistency_between_ks_and_bl() {
         use crate::geometry::geometry::{Geometry, SupportQuantities};
@@ -909,9 +950,10 @@ mod tests {
         );
         let constants_cart = kerr_bl.get_constants_of_motion(&pos_cart_bl, &p_cart);
         let e_cart = constants_cart.as_slice()[0].1;
-        // The solver's E is physically reasonable (positive, O(1) value).
+        // The solver's E is physically reasonable (negative for a past-directed
+        // camera ray, O(1) magnitude).
         assert!(
-            e_cart > 0.5 && e_cart < 2.0,
+            e_cart < -0.5 && e_cart > -2.0,
             "BL E from Cartesian ray = {e_cart} out of expected range"
         );
 
@@ -949,7 +991,7 @@ mod tests {
         // reproduce the same E and L_z that the solver uses throughout integration.
         // This ensures the solver is seeded correctly from both input coordinate systems.
         assert!(
-            e_bl > 0.5 && e_bl < 2.0,
+            e_bl < -0.5 && e_bl > -2.0,
             "BL E from BL ray = {e_bl} out of expected range"
         );
 
@@ -958,26 +1000,19 @@ mod tests {
             lz_bl.is_finite(),
             "BL L_z from BL ray must be finite, got {lz_bl}"
         );
-        assert!(e_cart > 0.5, "Cartesian-ray BL E is positive");
-        assert!(e_bl > 0.5, "BL-ray BL E is positive");
 
-        // Both E values should be in the same ballpark (O(1)) since they represent
-        // the same geodesic at large r. They will differ at O(r_s/r) ~ 10% because
-        // KS and BL use different time coordinates.
-        let e_relative_diff = (e_cart - e_bl).abs() / e_bl.abs();
-        assert!(
-            e_relative_diff < 0.5,
-            "BL E from Cart ({e_cart}) and BL ({e_bl}) differ by {:.1}% > 50%",
-            e_relative_diff * 100.0
-        );
+        // E is the same conserved quantity whichever chart the ray came in
+        // through, so the two extractions must agree exactly.
+        assert_abs_diff_eq!(e_cart, e_bl, epsilon = 1e-10);
 
-        // Sanity-check: BL E and KS E should agree at large r (r=10, asymptotically flat).
-        // L_z is NOT compared across coordinates: KS L_z = -y·p_x + x·p_y (Cartesian angular
-        // momentum) while BL L_z = p_φ (covariant BL component) — these differ significantly
-        // for the same geodesic because the coordinate conventions are different.
+        // The KS-chart E and L_z are built from the same Killing vectors
+        // (∂_t and x∂_y - y∂_x = ∂_φ), so both must agree exactly with the
+        // BL-chart values.
         let kerr_constants = kerr.get_constants_of_motion(&ray_cart.position, &ray_cart.momentum);
         let kerr_e = kerr_constants.as_slice()[0].1;
-        assert_abs_diff_eq!(kerr_e, e_cart, epsilon = 0.1);
+        let kerr_lz = kerr_constants.as_slice()[1].1;
+        assert_abs_diff_eq!(kerr_e, e_cart, epsilon = 1e-10);
+        assert_abs_diff_eq!(kerr_lz, lz_bl, epsilon = 1e-10);
     }
 
     #[test]

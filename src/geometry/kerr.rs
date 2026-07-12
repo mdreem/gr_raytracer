@@ -108,6 +108,14 @@ fn metric_contravariant(radius: f64, a: f64, x: f64, y: f64, z: f64) -> Matrix4<
     metric
 }
 
+#[cfg(test)]
+pub mod test_helpers {
+    /// Exposes the Kerr-Schild Cartesian metric for cross-chart tests.
+    pub fn metric_cartesian(radius: f64, a: f64, x: f64, y: f64, z: f64) -> nalgebra::Matrix4<f64> {
+        super::metric(radius, a, x, y, z)
+    }
+}
+
 impl Kerr {
     pub fn new(radius: f64, a: f64, horizon_epsilon: f64) -> Self {
         if a.abs() > radius / 2.0 {
