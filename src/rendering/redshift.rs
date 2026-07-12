@@ -3,6 +3,22 @@ use crate::geometry::geometry::Geometry;
 use crate::rendering::integrator::Step;
 use crate::rendering::ray::Ray;
 
+/// Per-ray frequency data: the observer energy plus the photon's conserved
+/// covariant components along the Killing vectors. All three are
+/// chart-independent scalars, computed once per ray at the camera (where the
+/// exact, un-interpolated momentum is available) and valid anywhere along the
+/// geodesic by conservation. Together with a local emitter's Killing
+/// coefficients they give the redshift at any sample point without parallel
+/// transport:
+///
+///     g = observer_energy / (u^t * p_t + u^phi * p_phi)
+#[derive(Debug, Clone, Copy)]
+pub struct RayFrequencyData {
+    pub observer_energy: f64,
+    pub p_t: f64,
+    pub p_phi: f64,
+}
+
 pub struct RedshiftComputer<'a, G: Geometry> {
     geometry: &'a G,
 }
@@ -24,6 +40,23 @@ impl<'a, G: Geometry> RedshiftComputer<'a, G> {
     pub fn get_observer_energy(&self, ray: &Ray, velocity: &FourVector) -> f64 {
         self.geometry
             .inner_product(&ray.position, velocity, &ray.momentum)
+    }
+
+    pub fn get_ray_frequency_data(&self, ray: &Ray, velocity: &FourVector) -> RayFrequencyData {
+        let observer_energy = self.get_observer_energy(ray, velocity);
+        let e_t = FourVector::new(1.0, 0.0, 0.0, 0.0, ray.momentum.coordinate_system);
+        let p_t = self
+            .geometry
+            .inner_product(&ray.position, &e_t, &ray.momentum);
+        let axial = self.geometry.axial_killing_vector(&ray.position);
+        let p_phi = self
+            .geometry
+            .inner_product(&ray.position, &axial, &ray.momentum);
+        RayFrequencyData {
+            observer_energy,
+            p_t,
+            p_phi,
+        }
     }
 
     fn energy_of_stationary_emitter(&self, step: &Step) -> f64 {
@@ -143,8 +176,6 @@ mod tests {
     /// same inner products `Disc::energy_of_emitter` uses.
     #[test]
     fn test_disc_redshift_matches_luminet_closed_form() {
-        use crate::geometry::geometry::Geometry;
-
         let geometry = Schwarzschild::new(1.0, 1e-4);
         let m = 0.5; // r_s = 1
 

@@ -1,3 +1,4 @@
+use crate::geometry::circular_orbit::OrbitKillingDecomposition;
 use crate::geometry::four_vector::FourVector;
 use crate::geometry::geometry::{
     GeodesicSolver, Geometry, HasCoordinateSystem, InnerProduct, Signature, SupportQuantities,
@@ -192,6 +193,22 @@ impl SupportQuantities for EuclideanSpace {
     ) -> Result<FourVector, RaytracerError> {
         Ok(FourVector::new_cartesian(1.0, 0.0, 0.0, 0.0))
         // TODO: implement proper circular orbit velocity in Euclidean space.
+    }
+
+    fn axial_killing_vector(&self, position: &Point) -> FourVector {
+        FourVector::new_cartesian(0.0, -position[2], position[1], 0.0)
+    }
+
+    fn circular_orbit_killing_coefficients(
+        &self,
+        _position: &Point,
+    ) -> Result<OrbitKillingDecomposition, RaytracerError> {
+        // Emitters are at rest in flat space (matches
+        // get_circular_orbit_velocity_at above).
+        Ok(OrbitKillingDecomposition {
+            u_t: 1.0,
+            u_phi: 0.0,
+        })
     }
 
     fn get_temperature_computer(

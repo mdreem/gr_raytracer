@@ -6,6 +6,7 @@
 
 use nalgebra::{Const, Matrix4, OVector};
 
+use crate::geometry::circular_orbit::{self, OrbitKillingDecomposition};
 use crate::geometry::four_vector::FourVector;
 use crate::geometry::geometry::{
     ConstantsOfMotion, GeodesicSolver, Geometry, HasCoordinateSystem, InnerProduct, Signature,
@@ -374,25 +375,28 @@ impl SupportQuantities for KerrBL {
         &self,
         position: &Point,
     ) -> Result<FourVector, RaytracerError> {
-        let r = position[1];
-        let m = 0.5 * self.radius;
-        let omega = m.sqrt() / (r.powf(1.5) + self.a * m.sqrt());
+        let c = self.circular_orbit_killing_coefficients(position)?;
+        Ok(FourVector::new_boyer_lindquist(
+            self.a, c.u_t, 0.0, 0.0, c.u_phi,
+        ))
+    }
 
-        let theta = position[2];
-        let sig = sigma(r, self.a, theta);
-        let sin2 = theta.sin().powi(2);
-        let g_tt = -(1.0 - self.radius * r / sig);
-        let g_tph = -self.a * self.radius * r * sin2 / sig;
-        let g_phph =
-            (r * r + self.a * self.a + self.a * self.a * self.radius * r * sin2 / sig) * sin2;
+    fn axial_killing_vector(&self, _position: &Point) -> FourVector {
+        FourVector::new_boyer_lindquist(self.a, 0.0, 0.0, 0.0, 1.0)
+    }
 
-        let ut_pre = g_tt + 2.0 * omega * g_tph + omega * omega * g_phph;
-        if ut_pre >= 0.0 {
-            return Err(RaytracerError::NoCircularOrbitPossible);
-        }
-        let ut = (-ut_pre).sqrt().recip();
-        let uphi = omega * ut;
-        Ok(FourVector::new_boyer_lindquist(self.a, ut, 0.0, 0.0, uphi))
+    fn circular_orbit_killing_coefficients(
+        &self,
+        position: &Point,
+    ) -> Result<OrbitKillingDecomposition, RaytracerError> {
+        // Equatorial values, used as the standard near-equatorial
+        // approximation off the plane (matching the Kerr-Schild chart's
+        // behavior).
+        circular_orbit::killing_coefficients(
+            self.radius,
+            self.a,
+            self.get_radial_coordinate(position),
+        )
     }
 
     fn get_temperature_computer(
