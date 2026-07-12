@@ -6,10 +6,10 @@ import glob
 import dataclasses
 import numpy as np
 
-NUM_STEPS = 200
+NUM_STEPS = 10
 RUN_TIME = 0.4
 
-X_AXIS_IN_CSV = "z"
+X_AXIS_IN_CSV = "y"
 Y_AXIS_IN_CSV = "x"
 
 
@@ -37,7 +37,6 @@ class AnimateRays(Scene):
         for i, file_path in enumerate(csv_files):
             print(f"Reading {file_path}...")
             df = pd.read_csv(file_path)
-
             scale = 1.0 / 2.0
             df["x"] *= scale
             df["y"] *= scale
@@ -112,8 +111,8 @@ class AnimateRays(Scene):
     def create_interpolation_functions(self, trajectories):
 
         # Find global time range across all rays
-        all_start_times = [df["t"].min() for df, _ in trajectories]
-        all_end_times = [df["t"].max() for df, _ in trajectories]
+        all_start_times = [df["tau"].min() for df, _ in trajectories]
+        all_end_times = [df["tau"].max() for df, _ in trajectories]
 
         global_start_time = min(all_start_times)
         global_end_time = max(all_end_times)
@@ -127,7 +126,7 @@ class AnimateRays(Scene):
         # Create interpolators for each trajectory
         interpolators = []
         for df, _ in trajectories:
-            t_points = df["t"].values
+            t_points = df["tau"].values
             x_interp = interp1d(
                 t_points,
                 df[X_AXIS_IN_CSV].values,
