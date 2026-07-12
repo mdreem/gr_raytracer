@@ -581,7 +581,11 @@ mod tests {
             let e_r = get_energy_from_r(&position, &ray.momentum, &geometry);
             let e_t = get_energy_from_t(&position, &ray.momentum, &geometry);
 
-            assert_abs_diff_eq!(e_r, e_t);
+            // Camera rays are past-directed (they trace the physical photon
+            // backwards from the camera), so e_t < 0, while the radial
+            // reconstruction only determines |E|.
+            assert!(e_t < 0.0);
+            assert_abs_diff_eq!(e_r, -e_t);
         }
     }
 
