@@ -134,6 +134,71 @@ mod tests {
         assert_abs_diff_eq!(g, g_negated, epsilon = 1e-15);
     }
 
+    /// The code's disc redshift must reproduce Luminet (1979), eq. for 1+z of
+    /// a circular-orbit emitter in Schwarzschild seen from infinity:
+    ///   1 + z = (1 - 3M/r)^{-1/2} (1 + Omega * L/E)
+    /// where E = a p^t and L = -r^2 p^phi are the photon's conserved energy
+    /// and angular momentum (signature +---). This holds for *any* null
+    /// momentum at the emitter, so no integration is needed: it checks the
+    /// same inner products `Disc::energy_of_emitter` uses.
+    #[test]
+    fn test_disc_redshift_matches_luminet_closed_form() {
+        use crate::geometry::geometry::Geometry;
+
+        let geometry = Schwarzschild::new(1.0, 1e-4);
+        let m = 0.5; // r_s = 1
+
+        for r in [2.0_f64, 3.0, 5.0, 10.0] {
+            let a = 1.0 - 1.0 / r;
+            let omega = (m / (r * r * r)).sqrt();
+            let u_t = (1.0 - 3.0 * m / r).sqrt().recip();
+
+            for phi in [0.3_f64, 2.0, 4.5] {
+                let position = Point::new_spherical(0.0, r, PI / 2.0, phi);
+                let u_emitter = geometry.get_circular_orbit_velocity_at(&position).unwrap();
+
+                // A few null momenta with different directions, including
+                // prograde and retrograde azimuthal components. Past-directed
+                // (p^t < 0), matching the camera convention.
+                for (p_r, p_phi_hat) in [(-0.7_f64, 0.4_f64), (-0.2, -0.9), (0.5, 0.6), (0.0, 1.0)]
+                {
+                    let p_phi = p_phi_hat / r; // scale to comparable magnitude
+                    let spatial = p_r * p_r / a + r * r * p_phi * p_phi;
+                    let p_t = -(spatial / a).sqrt();
+                    let momentum = FourVector::new_spherical(p_t, p_r, 0.0, p_phi);
+                    assert_abs_diff_eq!(
+                        geometry.inner_product(&position, &momentum, &momentum),
+                        0.0,
+                        epsilon = 1e-12
+                    );
+
+                    // Conserved quantities of the photon.
+                    let e_conserved = a * p_t;
+                    let l_conserved = -r * r * p_phi;
+
+                    // Code path: the emitter energy exactly as
+                    // Disc::energy_of_emitter computes it.
+                    let emitter_energy =
+                        geometry.inner_product(&position, &u_emitter, &momentum);
+
+                    // Closed form for the same contraction.
+                    assert_abs_diff_eq!(
+                        emitter_energy,
+                        u_t * (e_conserved + omega * l_conserved),
+                        epsilon = 1e-10
+                    );
+
+                    // Luminet's 1+z against the code's g = nu_obs/nu_em for an
+                    // observer at infinity (u_obs . p = E_conserved there).
+                    let g_code = e_conserved / emitter_energy;
+                    let g_luminet = (1.0 - 3.0 * m / r).sqrt()
+                        / (1.0 + omega * l_conserved / e_conserved);
+                    assert_abs_diff_eq!(g_code, g_luminet, epsilon = 1e-10);
+                }
+            }
+        }
+    }
+
     /// Gravitational redshift without any integration: for a radial null
     /// geodesic in Schwarzschild, p_t is conserved, so the momentum at any
     /// radius is (p_t / a, p_t, 0, 0) up to the radial sign. A stationary
