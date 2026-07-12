@@ -1,3 +1,4 @@
+pub mod circular_orbit;
 pub mod euclidean;
 pub mod euclidean_spherical;
 pub mod four_vector;

@@ -1,5 +1,6 @@
 use crate::cli::cli::GlobalOpts;
 use crate::configuration::RenderConfig;
+use crate::geometry::circular_orbit::OrbitKillingDecomposition;
 use crate::geometry::four_vector::FourVector;
 use crate::geometry::point::{CoordinateSystem, Point};
 use crate::geometry::tetrad::Tetrad;
@@ -51,6 +52,18 @@ pub trait SupportQuantities {
         &self,
         position: &Point,
     ) -> Result<FourVector, RaytracerError>;
+    /// The axial Killing vector d_phi (generator of rotations about the spin
+    /// axis) expressed in this geometry's chart: (0,0,0,1) in spherical/BL
+    /// charts, (0, -y, x, 0) in Cartesian charts. Contracting the ray momentum
+    /// with it yields the conserved p_phi.
+    fn axial_killing_vector(&self, position: &Point) -> FourVector;
+    /// Killing coefficients (u^t, u^phi) of the equatorial circular orbit at
+    /// the position's radius. Chart-independent scalars; see
+    /// `OrbitKillingDecomposition` for how they pair with conserved (p_t, p_phi).
+    fn circular_orbit_killing_coefficients(
+        &self,
+        position: &Point,
+    ) -> Result<OrbitKillingDecomposition, RaytracerError>;
     fn get_temperature_computer(
         &self,
         temperature: f64,

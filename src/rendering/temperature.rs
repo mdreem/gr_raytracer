@@ -1,3 +1,4 @@
+use crate::geometry::circular_orbit;
 use crate::rendering::raytracer::RaytracerError;
 use log::{error, info};
 use std::f64::consts::PI;
@@ -36,19 +37,6 @@ pub struct KerrTemperatureComputer {
     radial_temperature_profile: Vec<(f64, f64)>,
 }
 
-fn compute_r_isco(a: f64, radius: f64) -> f64 {
-    let a_s = 2.0 * a / radius;
-
-    let z1 = 1.0
-        + (1.0 - a_s * a_s).powf(1.0 / 3.0)
-            * ((1.0 + a_s).powf(1.0 / 3.0) + (1.0 - a_s).powf(1.0 / 3.0));
-    let z2 = (3.0 * a_s * a_s + z1 * z1).sqrt();
-
-    // prograde ISCO radius
-
-    (3.0 + z2 - ((3.0 - z1) * (3.0 + z1 + 2.0 * z2)).sqrt()) * radius / 2.0
-}
-
 const NUM_LUT_STEPS: usize = 1000;
 const NUM_INTEGRATION_STEPS: i32 = 1000;
 const NUM_STEPS_FIND_MAXIMUM: i32 = 10;
@@ -61,7 +49,7 @@ impl KerrTemperatureComputer {
         radius: f64,
     ) -> Result<Self, RaytracerError> {
         let a_abs = a.abs(); // Ensure a co-rotating disc. TODO: generalize later.
-        let r_isco = compute_r_isco(a_abs, radius);
+        let r_isco = circular_orbit::r_isco(radius, a_abs);
         let effective_outer_radius = if outer_radius <= r_isco {
             let adjusted = r_isco + 1e-6_f64.max(r_isco.abs() * 1e-9);
             info!(
@@ -129,69 +117,16 @@ impl KerrTemperatureComputer {
         Ok(tmp_computer)
     }
 
-    /// Computes the contravariant time component of the four-velocity for a circular orbit.
-    ///
-    /// Constraints:
-    /// - Assumes a Boyer-Lindquist coordinate system.
-    /// - Assumes a circular orbit in the equatorial plane (theta = PI/2).
-    /// - For off-equatorial positions, this is a physical approximation.
-    // TODO: Deduplicate against Kerr geometry methods.
-    fn ut_contra(&self, r: f64) -> Result<f64, RaytracerError> {
-        let a = self.a;
-        let r_s = self.radius;
-        let omega = self.angular_velocity(r);
-
-        let g_tt = -(1.0 - r_s / r);
-        let g_tphi = -a * r_s / r;
-        let g_phiphi = r * r + a * a + a * a * r_s / r;
-
-        let ut_pre = g_tt + 2.0 * omega * g_tphi + omega * omega * g_phiphi;
-
-        if ut_pre >= 0.0 {
-            error!(
-                "No timelike circular orbit at r = {} (ut_pre = {})",
-                r, ut_pre
-            );
-            return Err(RaytracerError::NoCircularOrbitPossible);
-        }
-
-        Ok((-ut_pre).sqrt().recip())
-    }
-
     fn conserved_energy(&self, r: f64) -> Result<f64, RaytracerError> {
-        let a = self.a;
-        let r0 = self.radius;
-
-        let g_tt = -1.0 + r0 / r;
-        let g_tphi = -(r0 * a) / r;
-        let omega = self.angular_velocity(r);
-
-        let ut = self.ut_contra(r)?;
-
-        Ok(-(g_tt + g_tphi * omega) * ut)
+        circular_orbit::conserved_energy(self.radius, self.a, r)
     }
 
     fn conserved_angular_momentum(&self, r: f64) -> Result<f64, RaytracerError> {
-        let a = self.a;
-        let r0 = self.radius;
-
-        let g_tphi = -(r0 * a) / r;
-        let g_phiphi = r * r + a * a + (r0 * a * a) / r;
-        let omega = self.angular_velocity(r);
-        let ut = self.ut_contra(r)?;
-
-        Ok((g_tphi + g_phiphi * omega) * ut)
+        circular_orbit::conserved_angular_momentum(self.radius, self.a, r)
     }
 
-    // TODO: Deduplicate against Kerr geometry methods.
-    // https://arxiv.org/abs/1104.5499 equation (36)
     fn angular_velocity(&self, r: f64) -> f64 {
-        let a = self.a;
-        let r_s = self.radius;
-        let m = 0.5 * r_s;
-        let sqrt_m = m.sqrt();
-
-        sqrt_m / (r.powf(1.5) + a * sqrt_m)
+        circular_orbit::angular_velocity(self.radius, self.a, r)
     }
 
     fn d_l_dr(&self, r: f64) -> Result<f64, RaytracerError> {
