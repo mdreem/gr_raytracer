@@ -20,10 +20,21 @@ pub struct GlobalOpts {
     pub epsilon: f64,
     #[arg(long, value_delimiter = ',', default_value = "18.0,0.0,0.8")]
     pub camera_position: Vec<f64>,
+    /// Camera pre-roll (radians): rotates the image-plane axes about the
+    /// initial view axis, applied before --theta. Rotations are relative to
+    /// the geometry's own tetrad, whose default facing differs per geometry
+    /// (Euclidean: toward the origin; Schwarzschild/Kerr/KerrBL: away from
+    /// the hole or along the spin axis), so angle values are not transferable
+    /// between geometries.
     #[arg(long, default_value = "0.0")]
     pub phi: f64,
+    /// Camera tilt (radians): rotates the view axis toward the (pre-rolled)
+    /// horizontal image axis. E.g. Schwarzschild needs --theta ~ pi to face
+    /// the black hole from a radial position.
     #[arg(long, default_value = "0.0")]
     pub theta: f64,
+    /// Camera roll (radians) about the final view axis, applied after
+    /// --theta.
     #[arg(long, default_value = "0.0")]
     pub psi: f64,
     #[arg(long, default_value = "reinhard")]
