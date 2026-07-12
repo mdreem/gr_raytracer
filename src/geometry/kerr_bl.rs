@@ -70,14 +70,8 @@ fn delta(r: f64, r_s: f64, a: f64) -> f64 {
 /// Compute ZAMO angular velocity ω and u^t normalization factor.
 /// ZAMO = Zero Angular Momentum Observer / locally non-rotating frame.
 fn zamo_params(r_s: f64, a: f64, r: f64, theta: f64) -> (f64, f64) {
-    let sig = sigma(r, a, theta);
-    let sin2 = theta.sin().powi(2);
-    let g_tph = -a * r_s * r * sin2 / sig;
-    let g_phph = (r * r + a * a + a * a * r_s * r * sin2 / sig) * sin2;
-    let g_tt = -(1.0 - r_s * r / sig);
-    let omega = -g_tph / g_phph;
-    let ut = (-1.0 / (g_tt + 2.0 * g_tph * omega + g_phph * omega * omega)).sqrt();
-    (omega, ut)
+    let c = circular_orbit::zamo_killing_coefficients(r_s, a, r, theta);
+    (c.u_phi / c.u_t, c.u_t)
 }
 
 /// R(r) = [(r² + a²)E - aL_z]² - Δ[(L_z - aE)² + Q]
@@ -366,9 +360,25 @@ impl InnerProduct for KerrBL {
 
 impl SupportQuantities for KerrBL {
     fn get_stationary_velocity_at(&self, position: &Point) -> FourVector {
-        // ZAMO (zero angular momentum observer) velocity
-        let (omega, ut) = zamo_params(self.radius, self.a, position[1], position[2]);
-        FourVector::new_boyer_lindquist(self.a, ut, 0.0, 0.0, ut * omega)
+        // Static (Killing) observer, aligned with the other geometries'
+        // convention. Does not exist inside the ergosphere (g_tt >= 0 there;
+        // components become non-finite); use get_zamo_velocity_at for a frame
+        // that exists everywhere outside the horizon.
+        let (r, theta) = (position[1], position[2]);
+        let sig = sigma(r, self.a, theta);
+        let ut = (1.0 - self.radius * r / sig).sqrt().recip();
+        FourVector::new_boyer_lindquist(self.a, ut, 0.0, 0.0, 0.0)
+    }
+
+    fn get_zamo_velocity_at(&self, position: &Point) -> FourVector {
+        // ZAMO (zero angular momentum observer) velocity.
+        let c = circular_orbit::zamo_killing_coefficients(
+            self.radius,
+            self.a,
+            position[1],
+            position[2],
+        );
+        FourVector::new_boyer_lindquist(self.a, c.u_t, 0.0, 0.0, c.u_phi)
     }
 
     fn get_circular_orbit_velocity_at(
@@ -1080,13 +1090,33 @@ mod tests {
     }
 
     #[test]
-    fn test_zamo_velocity_normalized() {
+    fn test_observer_velocities_normalized() {
         let a = 0.5;
         let kerr_bl = KerrBL::new(1.0, a, 1e-4);
         let position = Point::new(0.0, 5.0, 1.2, 0.0, CoordinateSystem::BoyerLindquist { a });
-        let v = kerr_bl.get_stationary_velocity_at(&position);
-        let norm = kerr_bl.inner_product(&position, &v, &v);
-        assert_abs_diff_eq!(norm, -1.0, epsilon = 1e-10);
+
+        // Static (Killing) observer: normalized, purely along d_t.
+        let stat = kerr_bl.get_stationary_velocity_at(&position);
+        assert_abs_diff_eq!(
+            kerr_bl.inner_product(&position, &stat, &stat),
+            -1.0,
+            epsilon = 1e-10
+        );
+        assert_abs_diff_eq!(stat[3], 0.0);
+
+        // ZAMO: normalized and zero angular momentum (u . d_phi = 0).
+        let zamo = kerr_bl.get_zamo_velocity_at(&position);
+        assert_abs_diff_eq!(
+            kerr_bl.inner_product(&position, &zamo, &zamo),
+            -1.0,
+            epsilon = 1e-10
+        );
+        let axial = kerr_bl.axial_killing_vector(&position);
+        assert_abs_diff_eq!(
+            kerr_bl.inner_product(&position, &zamo, &axial),
+            0.0,
+            epsilon = 1e-10
+        );
     }
 
     #[test]

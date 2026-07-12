@@ -47,7 +47,15 @@ pub trait Signature {
 /// This includes things like computing various velocities at a given position or ways to
 /// compute temperatures.
 pub trait SupportQuantities {
+    /// The static (Killing) observer: at rest relative to infinity, purely
+    /// along d_t. Does not exist inside the ergosphere of a spinning hole
+    /// (components become non-finite there).
     fn get_stationary_velocity_at(&self, position: &Point) -> FourVector;
+    /// The ZAMO (zero angular momentum observer / locally non-rotating
+    /// frame): co-rotates with frame dragging, u . d_phi = 0. Coincides with
+    /// the static observer wherever there is no rotation; exists everywhere
+    /// outside the horizon, including inside the ergosphere.
+    fn get_zamo_velocity_at(&self, position: &Point) -> FourVector;
     fn get_circular_orbit_velocity_at(
         &self,
         position: &Point,

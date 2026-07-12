@@ -1,5 +1,5 @@
 use crate::cli::cli::GlobalOpts;
-use crate::cli::shared::{assert_future_directed, create_scene, integrate_and_save_ray, render};
+use crate::cli::shared::{assert_future_directed, create_scene, integrate_and_save_ray, render, resolve_camera_velocity};
 use crate::configuration::RenderConfig;
 use crate::geometry::euclidean_spherical::EuclideanSpaceSpherical;
 use crate::geometry::four_vector::FourVector;
@@ -25,7 +25,8 @@ impl RenderableGeometry for EuclideanSpaceSpherical {
         to_col: Option<u32>,
     ) -> Result<(), RaytracerError> {
         let camera_position = cartesian_to_spherical(&camera_position);
-        let momentum = FourVector::new_spherical(1.0, 0.0, 0.0, 0.0);
+        let momentum =
+            resolve_camera_velocity(self, &camera_position, &config.camera_velocity);
         assert_future_directed(
             "Euclidean-spherical camera four-velocity",
             self,
@@ -56,7 +57,8 @@ impl RenderableGeometry for EuclideanSpaceSpherical {
         write: &mut dyn Write,
     ) -> Result<(), RaytracerError> {
         let camera_position = cartesian_to_spherical(&camera_position);
-        let momentum = FourVector::new_spherical(1.0, 0.0, 0.0, 0.0);
+        let momentum =
+            resolve_camera_velocity(self, &camera_position, &config.camera_velocity);
         assert_future_directed(
             "Euclidean-spherical camera four-velocity",
             self,

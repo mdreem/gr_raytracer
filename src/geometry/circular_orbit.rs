@@ -35,12 +35,35 @@ pub struct OrbitKillingDecomposition {
     pub u_phi: f64,
 }
 
+/// BL metric components (g_tt, g_tphi, g_phiphi) at (r, theta).
+fn metric_components_at(r_s: f64, a: f64, r: f64, theta: f64) -> (f64, f64, f64) {
+    let sig = r * r + a * a * theta.cos().powi(2);
+    let sin2 = theta.sin().powi(2);
+    let g_tt = -(1.0 - r_s * r / sig);
+    let g_tphi = -a * r_s * r * sin2 / sig;
+    let g_phiphi = (r * r + a * a + a * a * r_s * r * sin2 / sig) * sin2;
+    (g_tt, g_tphi, g_phiphi)
+}
+
 /// Equatorial BL metric components (theta = pi/2).
 fn metric_components(r_s: f64, a: f64, r: f64) -> (f64, f64, f64) {
-    let g_tt = -(1.0 - r_s / r);
-    let g_tphi = -a * r_s / r;
-    let g_phiphi = r * r + a * a + a * a * r_s / r;
-    (g_tt, g_tphi, g_phiphi)
+    metric_components_at(r_s, a, r, std::f64::consts::FRAC_PI_2)
+}
+
+/// Killing coefficients (u^t, u^phi) of the ZAMO (zero angular momentum
+/// observer / locally non-rotating frame) at (r, theta). Like the circular
+/// orbit, the ZAMO is a pure Killing combination u = u^t d_t + u^phi d_phi
+/// with u^phi = omega_zamo * u^t and omega_zamo = -g_tphi / g_phiphi, so the
+/// same chart-independent pairing with conserved (p_t, p_phi) applies.
+/// Exists everywhere outside the horizon, including inside the ergosphere.
+pub fn zamo_killing_coefficients(r_s: f64, a: f64, r: f64, theta: f64) -> OrbitKillingDecomposition {
+    let (g_tt, g_tphi, g_phiphi) = metric_components_at(r_s, a, r, theta);
+    let omega = -g_tphi / g_phiphi;
+    let u_t = (-1.0 / (g_tt + 2.0 * g_tphi * omega + g_phiphi * omega * omega)).sqrt();
+    OrbitKillingDecomposition {
+        u_t,
+        u_phi: omega * u_t,
+    }
 }
 
 /// Coordinate angular velocity Omega = dphi/dt of a prograde circular orbit.
@@ -109,7 +132,7 @@ pub fn r_isco(r_s: f64, a: f64) -> f64 {
 mod tests {
     use super::*;
     use crate::geometry::four_vector::FourVector;
-    use crate::geometry::geometry::Geometry;
+    use crate::geometry::geometry::{Geometry, InnerProduct, SupportQuantities};
     use crate::geometry::kerr::Kerr;
     use crate::geometry::kerr_bl::KerrBL;
     use crate::geometry::point::{CoordinateSystem, Point};
@@ -148,6 +171,56 @@ mod tests {
         // Schwarzschild photon sphere at 1.5 r_s: no timelike circular orbit at/below.
         assert!(killing_coefficients(1.0, 0.0, 1.4).is_err());
         assert!(killing_coefficients(1.0, 0.0, 1.6).is_ok());
+    }
+
+    /// ZAMO properties in both Kerr charts: normalized, zero angular
+    /// momentum (the defining property), identical Killing coefficients
+    /// across charts, and reduction to the static observer at a = 0.
+    #[test]
+    fn test_zamo_properties_across_charts() {
+        let (r_s, a) = (1.0, 0.499);
+        let kerr = Kerr::new(r_s, a, 1e-4);
+        let kerr_bl = KerrBL::new(r_s, a, 1e-4);
+
+        // Same physical point: equatorial, BL r = 5, phi = 0
+        // (x = st(r cp - a sp) etc. with theta = pi/2).
+        let pos_bl = Point::new(0.0, 5.0, PI / 2.0, 0.0, CoordinateSystem::BoyerLindquist { a });
+        let pos_ks = Point::new_cartesian(0.0, 5.0, a, 0.0);
+
+        for (zamo, axial, pos, geom_ip) in [
+            (
+                kerr.get_zamo_velocity_at(&pos_ks),
+                kerr.axial_killing_vector(&pos_ks),
+                &pos_ks,
+                &kerr as &dyn Geometry,
+            ),
+            (
+                kerr_bl.get_zamo_velocity_at(&pos_bl),
+                kerr_bl.axial_killing_vector(&pos_bl),
+                &pos_bl,
+                &kerr_bl as &dyn Geometry,
+            ),
+        ] {
+            assert_abs_diff_eq!(geom_ip.inner_product(pos, &zamo, &zamo), -1.0, epsilon = 1e-9);
+            assert_abs_diff_eq!(geom_ip.inner_product(pos, &zamo, &axial), 0.0, epsilon = 1e-9);
+        }
+
+        // Chart-invariant coefficients.
+        let c = zamo_killing_coefficients(r_s, a, 5.0, PI / 2.0);
+        let zamo_bl = kerr_bl.get_zamo_velocity_at(&pos_bl);
+        assert_abs_diff_eq!(zamo_bl[0], c.u_t, epsilon = 1e-12);
+        assert_abs_diff_eq!(zamo_bl[3], c.u_phi, epsilon = 1e-12);
+
+        // a = 0: ZAMO reduces to the static observer.
+        let c0 = zamo_killing_coefficients(1.0, 0.0, 5.0, 1.1);
+        assert_abs_diff_eq!(c0.u_phi, 0.0, epsilon = 1e-15);
+        let schwarzschild = Schwarzschild::new(1.0, 1e-4);
+        let pos_s = Point::new_spherical(0.0, 5.0, 1.1, 0.3);
+        let zamo_s = schwarzschild.get_zamo_velocity_at(&pos_s);
+        let stat_s = schwarzschild.get_stationary_velocity_at(&pos_s);
+        for i in 0..4 {
+            assert_abs_diff_eq!(zamo_s[i], stat_s[i], epsilon = 1e-15);
+        }
     }
 
     /// The assembled coordinate four-velocity must equal

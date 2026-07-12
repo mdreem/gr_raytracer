@@ -455,6 +455,19 @@ impl SupportQuantities for Kerr {
         FourVector::new_cartesian((1.0 - f).sqrt().recip(), 0.0, 0.0, 0.0)
     }
 
+    fn get_zamo_velocity_at(&self, position: &Point) -> FourVector {
+        let (x, y, z) = (position[1], position[2], position[3]);
+        let r = compute_r_sqr(self.a, x, y, z).sqrt();
+        let theta = if r == 0.0 {
+            0.0
+        } else {
+            (z / r).clamp(-1.0, 1.0).acos()
+        };
+        let c = circular_orbit::zamo_killing_coefficients(self.radius, self.a, r, theta);
+        c.u_t * FourVector::new_cartesian(1.0, 0.0, 0.0, 0.0)
+            + c.u_phi * self.axial_killing_vector(position)
+    }
+
     // See https://arxiv.org/abs/1104.5499.
     // This is only valid for circular orbits in the equatorial plane, but should be a good
     // approximation for near-circular orbits not too close to the black hole.

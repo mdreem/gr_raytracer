@@ -40,6 +40,27 @@ fn assert_directed<G: Geometry>(
     Ok(())
 }
 
+/// Resolve the camera four-velocity from the scene configuration.
+pub fn resolve_camera_velocity<G: Geometry>(
+    geometry: &G,
+    position: &Point,
+    config: &configuration::CameraVelocityConfig,
+) -> FourVector {
+    match config {
+        configuration::CameraVelocityConfig::StaticObserver => {
+            geometry.get_stationary_velocity_at(position)
+        }
+        configuration::CameraVelocityConfig::Zamo => geometry.get_zamo_velocity_at(position),
+        configuration::CameraVelocityConfig::Explicit { components } => FourVector::new(
+            components[0],
+            components[1],
+            components[2],
+            components[3],
+            geometry.coordinate_system(),
+        ),
+    }
+}
+
 pub fn assert_future_directed<G: Geometry>(
     context: &str,
     geometry: &G,
