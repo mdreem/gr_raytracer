@@ -86,10 +86,8 @@ pub fn killing_coefficients(
 
     let ut_pre = g_tt + 2.0 * omega * g_tphi + omega * omega * g_phiphi;
     if ut_pre >= 0.0 {
-        // Called per raymarch sample by the volumetric disc; radii inside the
-        // photon orbit are expected here. Return the error and let callers that
-        // treat this as fatal do the escalating. Logging at error! floods the
-        // render and slows the hot loop.
+        // debug! not error!: called per raymarch sample, and radii inside the
+        // photon orbit legitimately have no timelike orbit.
         debug!(
             "No timelike circular orbit at r = {} (ut_pre = {})",
             r, ut_pre
