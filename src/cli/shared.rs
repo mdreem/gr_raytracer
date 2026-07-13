@@ -42,10 +42,9 @@ fn assert_directed<G: Geometry>(
 
 /// Resolve the camera four-velocity from the scene configuration.
 ///
-/// The `StaticObserver`/`Zamo` frames are normalized by construction. An
-/// `Explicit` four-velocity is validated against `u.u == signature()[0]` here so
-/// a mis-specified vector fails with a clear configuration error rather than a
-/// downstream tetrad-orthonormality failure.
+/// `Explicit` is normalization-checked here so a bad vector fails as a clear
+/// config error rather than an opaque downstream tetrad failure;
+/// `StaticObserver`/`Zamo` are normalized by construction.
 pub fn resolve_camera_velocity<G: Geometry>(
     geometry: &G,
     position: &Point,
