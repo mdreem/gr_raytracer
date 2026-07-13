@@ -1,7 +1,7 @@
 use crate::geometry::geometry::Geometry;
 use crate::rendering::camera::CameraError;
 use crate::rendering::color::{
-    CIETristimulus, ToneMappingMethod, linear_srgb_to_srgb_buffer, xyz_to_linear_srgb_buffer,
+    linear_srgb_to_srgb_buffer, xyz_to_linear_srgb_buffer, CIETristimulus, ToneMappingMethod,
 };
 use crate::rendering::integrator::{IntegrationError, StopReason};
 use crate::rendering::ray::IntegratedRay;
@@ -67,8 +67,8 @@ impl<'a, G: Geometry> Raytracer<'a, G> {
     pub fn render_ray_at(&self, row: i64, col: i64) {
         let ray = self.scene.camera.get_ray_for(row, col);
         debug!("ray: {:?}", ray);
-        let color = self.scene.color_of_ray(&ray);
-        debug!("color: {:?}", color);
+        let sample = self.scene.color_of_ray(&ray);
+        debug!("sample: {:?}", sample);
     }
 
     fn render_section_to_cie_buffer(
@@ -102,7 +102,7 @@ impl<'a, G: Geometry> Raytracer<'a, G> {
                 .get_ray_for((y + from_row) as i64, (x + from_col) as i64);
 
             match self.scene.color_of_ray(&ray) {
-                Ok(cie_tristimulus) => *p = cie_tristimulus,
+                Ok(sample) => *p = sample.color,
                 Err(err) => {
                     error!(
                         "Unable to compute color for ray at pixel ({}, {}): {:?}",
