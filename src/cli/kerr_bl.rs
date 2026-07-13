@@ -19,7 +19,7 @@ fn create_scene_internal<'a>(
     camera_position: Point,
 ) -> Result<Scene<'a, KerrBL>, RaytracerError> {
     let bl_position = geometry.cartesian_to_bl(&camera_position);
-    let momentum = resolve_camera_velocity(geometry, &bl_position, &config.camera_velocity);
+    let momentum = resolve_camera_velocity(geometry, &bl_position, &config.camera_velocity)?;
     assert_future_directed(
         "KerrBL camera four-velocity",
         geometry,

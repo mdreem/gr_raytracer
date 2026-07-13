@@ -12,7 +12,7 @@
 //! approximation, matching the previous per-geometry implementations.
 
 use crate::rendering::raytracer::RaytracerError;
-use log::error;
+use log::debug;
 
 /// A circular-orbit four-velocity decomposed on the Killing basis:
 /// u = u_t * d_t + u_phi * d_phi.
@@ -86,7 +86,11 @@ pub fn killing_coefficients(
 
     let ut_pre = g_tt + 2.0 * omega * g_tphi + omega * omega * g_phiphi;
     if ut_pre >= 0.0 {
-        error!(
+        // Called per raymarch sample by the volumetric disc; radii inside the
+        // photon orbit are expected here. Return the error and let callers that
+        // treat this as fatal do the escalating. Logging at error! floods the
+        // render and slows the hot loop.
+        debug!(
             "No timelike circular orbit at r = {} (ut_pre = {})",
             r, ut_pre
         );
