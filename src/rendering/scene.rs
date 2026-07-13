@@ -104,7 +104,7 @@ impl<'a, G: Geometry> Scene<'a, G> {
         }
 
         let velocity = self.camera.velocity;
-        let observer_energy = self.redshift_computer.get_observer_energy(ray, &velocity);
+        let frequency = self.redshift_computer.get_ray_frequency_data(ray, &velocity);
 
         let mut intersections = Vec::new();
         for step_window in steps.steps.windows(2) {
@@ -112,7 +112,7 @@ impl<'a, G: Geometry> Scene<'a, G> {
             let step = &step_window[1];
 
             if let Some(intersection_color) =
-                self.objects.intersects(last_step, step, observer_energy)?
+                self.objects.intersects(last_step, step, &frequency)?
             {
                 intersections.push(intersection_color);
             }
@@ -130,7 +130,7 @@ impl<'a, G: Geometry> Scene<'a, G> {
                     let uv = self.get_uv_coordinates(last_step);
                     let redshift = self
                         .redshift_computer
-                        .compute_redshift(last_step, observer_energy);
+                        .compute_redshift(last_step, frequency.observer_energy);
                     intersections.push(self.texture_data.celestial_map.color_at_uv(
                         &uv,
                         &TemperatureData {
@@ -540,7 +540,11 @@ mod tests {
         let ray = scene.camera.get_ray_for(0, 0);
         let color = scene.color_of_ray(&ray).unwrap();
 
-        assert_approx_eq_cie_tristimulus!(color, CELESTIAL_SPHERE_COLOR_1, 1e-6);
+        // The camera is freely falling, so the aberration of the traced
+        // (past-directed, physically arriving) photon differs from the old
+        // outbound convention and the corner ray lands on the neighbouring
+        // celestial checker cell.
+        assert_approx_eq_cie_tristimulus!(color, CELESTIAL_SPHERE_COLOR_2, 1e-6);
     }
 
     #[test]

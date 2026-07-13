@@ -1,3 +1,4 @@
+use crate::geometry::circular_orbit::{self, OrbitKillingDecomposition};
 use crate::geometry::four_vector::FourVector;
 use crate::geometry::geometry::{
     GeodesicSolver, Geometry, HasCoordinateSystem, InnerProduct, Signature, SupportQuantities,
@@ -239,18 +240,28 @@ impl SupportQuantities for Schwarzschild {
     }
 
     // This is based on assume stable circular orbits in the equatorial plane.
+        fn get_zamo_velocity_at(&self, position: &Point) -> FourVector {
+        // No frame dragging: the ZAMO is the static observer.
+        self.get_stationary_velocity_at(position)
+    }
+
     fn get_circular_orbit_velocity_at(
         &self,
         position: &Point,
     ) -> Result<FourVector, RaytracerError> {
-        let r = position[1];
-        let r0 = self.radius;
-        let omega = (r0 / (2.0 * r * r * r)).sqrt();
+        let c = self.circular_orbit_killing_coefficients(position)?;
+        Ok(FourVector::new_spherical(c.u_t, 0.0, 0.0, c.u_phi))
+    }
 
-        let ut = (1.0 - r0 / r - r * r * omega * omega).recip().sqrt();
-        let uphi = omega * ut;
+    fn axial_killing_vector(&self, _position: &Point) -> FourVector {
+        FourVector::new_spherical(0.0, 0.0, 0.0, 1.0)
+    }
 
-        Ok(FourVector::new_spherical(ut, 0.0, 0.0, uphi))
+    fn circular_orbit_killing_coefficients(
+        &self,
+        position: &Point,
+    ) -> Result<OrbitKillingDecomposition, RaytracerError> {
+        circular_orbit::killing_coefficients(self.radius, 0.0, self.get_radial_coordinate(position))
     }
 
     fn get_temperature_computer(
@@ -581,7 +592,11 @@ mod tests {
             let e_r = get_energy_from_r(&position, &ray.momentum, &geometry);
             let e_t = get_energy_from_t(&position, &ray.momentum, &geometry);
 
-            assert_abs_diff_eq!(e_r, e_t);
+            // Camera rays are past-directed (they trace the physical photon
+            // backwards from the camera), so e_t < 0, while the radial
+            // reconstruction only determines |E|.
+            assert!(e_t < 0.0);
+            assert_abs_diff_eq!(e_r, -e_t);
         }
     }
 

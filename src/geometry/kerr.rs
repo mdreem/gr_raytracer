@@ -1,3 +1,4 @@
+use crate::geometry::circular_orbit::{self, OrbitKillingDecomposition};
 use crate::geometry::four_vector::FourVector;
 use crate::geometry::geometry::{
     GeodesicSolver, Geometry, HasCoordinateSystem, InnerProduct, Signature, SupportQuantities,
@@ -12,7 +13,7 @@ use crate::rendering::raytracer::RaytracerError;
 use crate::rendering::runge_kutta::OdeFunction;
 use crate::rendering::scene::EquationOfMotionState;
 use crate::rendering::temperature::{KerrTemperatureComputer, TemperatureComputer};
-use log::{debug, error, trace, warn};
+use log::{debug, trace, warn};
 use nalgebra::{Const, Matrix4, OVector, Vector3, Vector4};
 
 #[derive(Clone, Debug)]
@@ -108,6 +109,14 @@ fn metric_contravariant(radius: f64, a: f64, x: f64, y: f64, z: f64) -> Matrix4<
     metric
 }
 
+#[cfg(test)]
+pub mod test_helpers {
+    /// Exposes the Kerr-Schild Cartesian metric for cross-chart tests.
+    pub fn metric_cartesian(radius: f64, a: f64, x: f64, y: f64, z: f64) -> nalgebra::Matrix4<f64> {
+        super::metric(radius, a, x, y, z)
+    }
+}
+
 impl Kerr {
     pub fn new(radius: f64, a: f64, horizon_epsilon: f64) -> Self {
         if a.abs() > radius / 2.0 {
@@ -127,101 +136,6 @@ impl Kerr {
         }
     }
 
-    fn convert_cartesian_to_spherical(&self, position: &Point) -> Point {
-        assert_eq!(position.coordinate_system, Cartesian);
-        let x = position[1];
-        let y = position[2];
-        let z = position[3];
-
-        let r_sqr = compute_r_sqr(self.a, x, y, z);
-        let r = r_sqr.sqrt();
-        let theta = if r == 0.0 {
-            // At the origin, the polar angle is undefined; choose a conventional value.
-            0.0
-        } else {
-            let cos_theta = (z / r).max(-1.0).min(1.0);
-            cos_theta.acos()
-        };
-        let phi = (r * y - self.a * x).atan2(r * x + self.a * y);
-
-        Point::new_spherical(position[0], r, theta, phi)
-    }
-
-    fn jacobian_spherical_to_cartesian(&self, position: &Point) -> Matrix4<f64> {
-        assert_eq!(position.coordinate_system, Cartesian);
-        let spherical = self.convert_cartesian_to_spherical(position);
-
-        let r = self.get_radial_coordinate(position);
-        let theta = spherical[2];
-        let phi = spherical[3];
-
-        let (st, ct) = (theta.sin(), theta.cos());
-        let (sp, cp) = (phi.sin(), phi.cos());
-
-        let data = vec![
-            // row 0: t = t
-            1.0,
-            0.0,
-            0.0,
-            0.0,
-            // row 1: x(r,theta,phi)
-            0.0,
-            st * cp,
-            (r * cp - self.a * sp) * ct,
-            (-r * sp - self.a * cp) * st,
-            // row 2: y(r,theta,phi)
-            0.0,
-            st * sp,
-            (r * sp + self.a * cp) * ct,
-            (r * cp - self.a * sp) * st,
-            // row 3: z(r,theta,phi)
-            0.0,
-            ct,
-            -r * st,
-            0.0,
-        ];
-
-        Matrix4::from_row_slice(&data)
-    }
-
-    /// Computes the contravariant time component of the four-velocity for a circular orbit.
-    ///
-    /// Constraints:
-    /// - Assumes a Boyer-Lindquist coordinate system.
-    /// - Assumes a circular orbit in the equatorial plane (theta = PI/2).
-    /// - For off-equatorial positions, this is a physical approximation.
-    fn ut_contra(&self, position: &Point) -> Result<f64, RaytracerError> {
-        let r = self.get_radial_coordinate(position);
-        let a = self.a;
-        let r_s = self.radius;
-        let omega = self.angular_velocity(r);
-
-        let g_tt = -(1.0 - r_s / r);
-        let g_tphi = -a * r_s / r;
-        let g_phiphi = r * r + a * a + a * a * r_s / r;
-
-        let ut_pre = g_tt + 2.0 * omega * g_tphi + omega * omega * g_phiphi;
-
-        if ut_pre >= 0.0 {
-            error!(
-                "No timelike circular orbit at r = {} (ut_pre = {})",
-                r, ut_pre
-            );
-            return Err(RaytracerError::NoCircularOrbitPossible);
-        }
-
-        Ok((-ut_pre).sqrt().recip())
-    }
-
-    // https://arxiv.org/abs/1104.5499 equation (36)
-    fn angular_velocity(&self, r: f64) -> f64 {
-        let a = self.a;
-        let r_s = self.radius;
-        let m = 0.5 * r_s;
-        let sqrt_m = m.sqrt();
-
-        sqrt_m / (r.powf(1.5) + a * sqrt_m)
-    }
 }
 
 impl OdeFunction<Const<8>> for KerrSolver {
@@ -541,6 +455,19 @@ impl SupportQuantities for Kerr {
         FourVector::new_cartesian((1.0 - f).sqrt().recip(), 0.0, 0.0, 0.0)
     }
 
+    fn get_zamo_velocity_at(&self, position: &Point) -> FourVector {
+        let (x, y, z) = (position[1], position[2], position[3]);
+        let r = compute_r_sqr(self.a, x, y, z).sqrt();
+        let theta = if r == 0.0 {
+            0.0
+        } else {
+            (z / r).clamp(-1.0, 1.0).acos()
+        };
+        let c = circular_orbit::zamo_killing_coefficients(self.radius, self.a, r, theta);
+        c.u_t * FourVector::new_cartesian(1.0, 0.0, 0.0, 0.0)
+            + c.u_phi * self.axial_killing_vector(position)
+    }
+
     // See https://arxiv.org/abs/1104.5499.
     // This is only valid for circular orbits in the equatorial plane, but should be a good
     // approximation for near-circular orbits not too close to the black hole.
@@ -548,22 +475,25 @@ impl SupportQuantities for Kerr {
         &self,
         position: &Point,
     ) -> Result<FourVector, RaytracerError> {
-        let r = compute_r_sqr(self.a, position[1], position[2], position[3]).sqrt();
-        let omega = self.angular_velocity(r);
-        let ut = self.ut_contra(position)?;
-        let uphi = omega * ut;
+        let c = self.circular_orbit_killing_coefficients(position)?;
+        Ok(c.u_t * FourVector::new_cartesian(1.0, 0.0, 0.0, 0.0)
+            + c.u_phi * self.axial_killing_vector(position))
+    }
 
-        let velocity_spherical = FourVector::new_spherical(ut, 0.0, 0.0, uphi);
+    fn axial_killing_vector(&self, position: &Point) -> FourVector {
+        // d_phi = x d_y - y d_x in the Kerr-Schild Cartesian chart.
+        FourVector::new_cartesian(0.0, -position[2], position[1], 0.0)
+    }
 
-        let jacobian = self.jacobian_spherical_to_cartesian(position);
-        let velocity_cartesian = jacobian * velocity_spherical.vector;
-
-        Ok(FourVector::new_cartesian(
-            velocity_cartesian[0],
-            velocity_cartesian[1],
-            velocity_cartesian[2],
-            velocity_cartesian[3],
-        ))
+    fn circular_orbit_killing_coefficients(
+        &self,
+        position: &Point,
+    ) -> Result<OrbitKillingDecomposition, RaytracerError> {
+        circular_orbit::killing_coefficients(
+            self.radius,
+            self.a,
+            self.get_radial_coordinate(position),
+        )
     }
 
     fn get_temperature_computer(

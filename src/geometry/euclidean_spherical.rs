@@ -1,3 +1,4 @@
+use crate::geometry::circular_orbit::OrbitKillingDecomposition;
 use crate::geometry::four_vector::FourVector;
 use crate::geometry::geometry::{
     GeodesicSolver, Geometry, HasCoordinateSystem, InnerProduct, Signature, SupportQuantities,
@@ -170,12 +171,33 @@ impl SupportQuantities for EuclideanSpaceSpherical {
         FourVector::new_spherical(1.0, 0.0, 0.0, 0.0)
     }
 
+        fn get_zamo_velocity_at(&self, position: &Point) -> FourVector {
+        // No frame dragging: the ZAMO is the static observer.
+        self.get_stationary_velocity_at(position)
+    }
+
     fn get_circular_orbit_velocity_at(
         &self,
         _position: &Point,
     ) -> Result<FourVector, RaytracerError> {
         Ok(FourVector::new_spherical(1.0, 0.0, 0.0, 0.0))
         // TODO: implement proper circular orbit velocity in Euclidean space.
+    }
+
+    fn axial_killing_vector(&self, _position: &Point) -> FourVector {
+        FourVector::new_spherical(0.0, 0.0, 0.0, 1.0)
+    }
+
+    fn circular_orbit_killing_coefficients(
+        &self,
+        _position: &Point,
+    ) -> Result<OrbitKillingDecomposition, RaytracerError> {
+        // Emitters are at rest in flat space (matches
+        // get_circular_orbit_velocity_at above).
+        Ok(OrbitKillingDecomposition {
+            u_t: 1.0,
+            u_phi: 0.0,
+        })
     }
 
     fn get_temperature_computer(
