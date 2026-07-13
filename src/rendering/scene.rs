@@ -15,6 +15,11 @@ use nalgebra::{Const, OVector};
 use std::f64::consts::PI;
 use std::fs::File;
 
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub struct RaySample {
+    pub color: CIETristimulus,
+}
+
 pub struct Scene<'a, G: Geometry> {
     pub integrator: Integrator<'a, G>,
     objects: Objects<'a, G>,
@@ -83,7 +88,7 @@ impl<'a, G: Geometry> Scene<'a, G> {
         self.integrator.integrate(ray)
     }
 
-    pub fn color_of_ray(&self, ray: &Ray) -> Result<CIETristimulus, RaytracerError> {
+    pub fn color_of_ray(&self, ray: &Ray) -> Result<RaySample, RaytracerError> {
         trace!("Tracing ray at ({}|{})", ray.row, ray.col);
         let m_s = self
             .geometry
@@ -104,7 +109,9 @@ impl<'a, G: Geometry> Scene<'a, G> {
         }
 
         let velocity = self.camera.velocity;
-        let frequency = self.redshift_computer.get_ray_frequency_data(ray, &velocity);
+        let frequency = self
+            .redshift_computer
+            .get_ray_frequency_data(ray, &velocity);
 
         let mut intersections = Vec::new();
         for step_window in steps.steps.windows(2) {
@@ -164,7 +171,7 @@ impl<'a, G: Geometry> Scene<'a, G> {
             result = result.blend(color)
         }
 
-        Ok(result)
+        Ok(RaySample { color: result })
     }
 
     fn get_uv_coordinates(&self, step_far: &Step) -> UVCoordinates {
@@ -185,7 +192,7 @@ pub mod test_scene {
     use crate::geometry::geometry::Geometry;
     use crate::geometry::point::Point;
     use crate::rendering::camera::Camera;
-    use crate::rendering::color::{Color, srgb_to_xyz};
+    use crate::rendering::color::{srgb_to_xyz, Color};
     use crate::rendering::raytracer::RaytracerError;
     use crate::rendering::scene::{IntegrationConfiguration, Scene, TextureData};
     use crate::rendering::texture::CheckerMapper;
@@ -327,8 +334,8 @@ mod tests {
     use crate::geometry::spherical_coordinates_helper::cartesian_to_spherical;
     use crate::rendering::camera::Camera;
     use crate::rendering::color::CIETristimulus;
-    use crate::rendering::scene::Scene;
     use crate::rendering::scene::test_scene::create_scene_with_camera;
+    use crate::rendering::scene::Scene;
     use std::f64::consts::PI;
 
     const CELESTIAL_SPHERE_COLOR_1: CIETristimulus = CIETristimulus {
@@ -379,7 +386,7 @@ mod tests {
         let scene = create_scene_with_camera(2.0, 0.2, 0.3, &space, camera, 1e-12).unwrap();
 
         let ray = scene.camera.get_ray_for(5, 5);
-        let color = scene.color_of_ray(&ray).unwrap();
+        let color = scene.color_of_ray(&ray).unwrap().color;
 
         assert_approx_eq_cie_tristimulus!(color, SPHERE_COLOR_2, 1e-6);
     }
@@ -409,7 +416,7 @@ mod tests {
         let scene = create_scene_with_camera(2.0, 0.2, 0.3, &space, camera, 1e-12).unwrap();
 
         let ray = scene.camera.get_ray_for(5, 5);
-        let color = scene.color_of_ray(&ray).unwrap();
+        let color = scene.color_of_ray(&ray).unwrap().color;
 
         assert_approx_eq_cie_tristimulus!(
             color,
@@ -448,7 +455,7 @@ mod tests {
         let scene = create_scene_with_camera(2.0, 3.0, 4.0, &geometry, camera, 1e-12).unwrap();
 
         let ray = scene.camera.get_ray_for(5, 5);
-        let color = scene.color_of_ray(&ray).unwrap();
+        let color = scene.color_of_ray(&ray).unwrap().color;
 
         assert_approx_eq_cie_tristimulus!(color, SPHERE_COLOR_2, 1e-6);
     }
@@ -480,7 +487,7 @@ mod tests {
             create_scene_with_camera(sphere_radius, 3.0, 4.0, &geometry, camera, 1e-12).unwrap();
 
         let ray = scene.camera.get_ray_for(5, 5);
-        let color = scene.color_of_ray(&ray).unwrap();
+        let color = scene.color_of_ray(&ray).unwrap().color;
         assert_approx_eq_cie_tristimulus!(color, SPHERE_COLOR_2, 1e-6);
     }
 
@@ -503,7 +510,7 @@ mod tests {
             create_scene_with_camera(2.0, 0.2, 0.3, &space, camera, 1e-12).unwrap();
 
         let ray = scene.camera.get_ray_for(0, 0);
-        let color = scene.color_of_ray(&ray).unwrap();
+        let color = scene.color_of_ray(&ray).unwrap().color;
 
         assert_approx_eq_cie_tristimulus!(color, CELESTIAL_SPHERE_COLOR_2, 1e-6);
     }
@@ -538,7 +545,7 @@ mod tests {
         let scene = create_scene_with_camera(2.0, 3.0, 4.0, &space, camera, 1e-12).unwrap();
 
         let ray = scene.camera.get_ray_for(0, 0);
-        let color = scene.color_of_ray(&ray).unwrap();
+        let color = scene.color_of_ray(&ray).unwrap().color;
 
         // The camera is freely falling, so the aberration of the traced
         // (past-directed, physically arriving) photon differs from the old
@@ -572,7 +579,7 @@ mod tests {
         let scene = create_scene_with_camera(0.5, 3.0, 4.0, &space, camera, 1e-12).unwrap();
 
         let ray = scene.camera.get_ray_for(5, 5);
-        let color = scene.color_of_ray(&ray).unwrap();
+        let color = scene.color_of_ray(&ray).unwrap().color;
 
         assert_eq!(color, CIETristimulus::new(0.0, 0.0, 0.0, 1.0));
     }
@@ -596,7 +603,7 @@ mod tests {
             create_scene_with_camera(1.0, 2.0, 7.0, &space, camera, 1e-12).unwrap();
 
         let ray = scene.camera.get_ray_for(0, 51);
-        let color = scene.color_of_ray(&ray).unwrap();
+        let color = scene.color_of_ray(&ray).unwrap().color;
 
         assert_approx_eq_cie_tristimulus!(
             color,
