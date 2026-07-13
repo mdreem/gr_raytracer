@@ -24,7 +24,7 @@ impl RenderableGeometry for EuclideanSpace {
         to_col: Option<u32>,
     ) -> Result<(), RaytracerError> {
         let momentum =
-            resolve_camera_velocity(self, &camera_position, &config.camera_velocity);
+            resolve_camera_velocity(self, &camera_position, &config.camera_velocity)?;
         assert_future_directed(
             "Euclidean camera four-velocity",
             self,
@@ -55,7 +55,7 @@ impl RenderableGeometry for EuclideanSpace {
         write: &mut dyn Write,
     ) -> Result<(), RaytracerError> {
         let momentum =
-            resolve_camera_velocity(self, &camera_position, &config.camera_velocity);
+            resolve_camera_velocity(self, &camera_position, &config.camera_velocity)?;
         assert_future_directed(
             "Euclidean camera four-velocity",
             self,

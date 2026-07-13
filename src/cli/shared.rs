@@ -41,23 +41,39 @@ fn assert_directed<G: Geometry>(
 }
 
 /// Resolve the camera four-velocity from the scene configuration.
+///
+/// The `StaticObserver`/`Zamo` frames are normalized by construction. An
+/// `Explicit` four-velocity is validated against `u.u == signature()[0]` here so
+/// a mis-specified vector fails with a clear configuration error rather than a
+/// downstream tetrad-orthonormality failure.
 pub fn resolve_camera_velocity<G: Geometry>(
     geometry: &G,
     position: &Point,
     config: &configuration::CameraVelocityConfig,
-) -> FourVector {
+) -> Result<FourVector, RaytracerError> {
     match config {
         configuration::CameraVelocityConfig::StaticObserver => {
-            geometry.get_stationary_velocity_at(position)
+            Ok(geometry.get_stationary_velocity_at(position))
         }
-        configuration::CameraVelocityConfig::Zamo => geometry.get_zamo_velocity_at(position),
-        configuration::CameraVelocityConfig::Explicit { components } => FourVector::new(
-            components[0],
-            components[1],
-            components[2],
-            components[3],
-            geometry.coordinate_system(),
-        ),
+        configuration::CameraVelocityConfig::Zamo => Ok(geometry.get_zamo_velocity_at(position)),
+        configuration::CameraVelocityConfig::Explicit { components } => {
+            let velocity = FourVector::new(
+                components[0],
+                components[1],
+                components[2],
+                components[3],
+                geometry.coordinate_system(),
+            );
+            let norm = geometry.inner_product(position, &velocity, &velocity);
+            let expected = geometry.signature()[0];
+            if (norm - expected).abs() > 1e-6 {
+                return Err(RaytracerError::InvalidConfiguration(format!(
+                    "Explicit camera_velocity {:?} is not normalized: u.u = {} (expected {}).",
+                    components, norm, expected
+                )));
+            }
+            Ok(velocity)
+        }
     }
 }
 

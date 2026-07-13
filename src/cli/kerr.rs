@@ -18,7 +18,7 @@ fn create_scene_internal<'a>(
     config: &RenderConfig,
     camera_position: Point,
 ) -> Result<Scene<'a, Kerr>, RaytracerError> {
-    let momentum = resolve_camera_velocity(geometry, &camera_position, &config.camera_velocity);
+    let momentum = resolve_camera_velocity(geometry, &camera_position, &config.camera_velocity)?;
     assert_future_directed(
         "Kerr camera four-velocity",
         geometry,

@@ -26,7 +26,7 @@ impl RenderableGeometry for EuclideanSpaceSpherical {
     ) -> Result<(), RaytracerError> {
         let camera_position = cartesian_to_spherical(&camera_position);
         let momentum =
-            resolve_camera_velocity(self, &camera_position, &config.camera_velocity);
+            resolve_camera_velocity(self, &camera_position, &config.camera_velocity)?;
         assert_future_directed(
             "Euclidean-spherical camera four-velocity",
             self,
@@ -58,7 +58,7 @@ impl RenderableGeometry for EuclideanSpaceSpherical {
     ) -> Result<(), RaytracerError> {
         let camera_position = cartesian_to_spherical(&camera_position);
         let momentum =
-            resolve_camera_velocity(self, &camera_position, &config.camera_velocity);
+            resolve_camera_velocity(self, &camera_position, &config.camera_velocity)?;
         assert_future_directed(
             "Euclidean-spherical camera four-velocity",
             self,

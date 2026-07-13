@@ -26,7 +26,7 @@ fn create_scene_internal<'a>(
         geometry,
         &camera_position_spherical,
         &config.camera_velocity,
-    );
+    )?;
     assert_future_directed(
         "Schwarzschild camera four-velocity",
         geometry,
