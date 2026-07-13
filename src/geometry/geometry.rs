@@ -1,5 +1,6 @@
 use crate::cli::cli::GlobalOpts;
 use crate::configuration::RenderConfig;
+use crate::geometry::circular_orbit::OrbitKillingDecomposition;
 use crate::geometry::four_vector::FourVector;
 use crate::geometry::point::{CoordinateSystem, Point};
 use crate::geometry::tetrad::Tetrad;
@@ -46,11 +47,31 @@ pub trait Signature {
 /// This includes things like computing various velocities at a given position or ways to
 /// compute temperatures.
 pub trait SupportQuantities {
+    /// The static (Killing) observer: at rest relative to infinity, purely
+    /// along d_t. Does not exist inside the ergosphere of a spinning hole
+    /// (components become non-finite there).
     fn get_stationary_velocity_at(&self, position: &Point) -> FourVector;
+    /// The ZAMO (zero angular momentum observer / locally non-rotating
+    /// frame): co-rotates with frame dragging, u . d_phi = 0. Coincides with
+    /// the static observer wherever there is no rotation; exists everywhere
+    /// outside the horizon, including inside the ergosphere.
+    fn get_zamo_velocity_at(&self, position: &Point) -> FourVector;
     fn get_circular_orbit_velocity_at(
         &self,
         position: &Point,
     ) -> Result<FourVector, RaytracerError>;
+    /// The axial Killing vector d_phi (generator of rotations about the spin
+    /// axis) expressed in this geometry's chart: (0,0,0,1) in spherical/BL
+    /// charts, (0, -y, x, 0) in Cartesian charts. Contracting the ray momentum
+    /// with it yields the conserved p_phi.
+    fn axial_killing_vector(&self, position: &Point) -> FourVector;
+    /// Killing coefficients (u^t, u^phi) of the equatorial circular orbit at
+    /// the position's radius. Chart-independent scalars; see
+    /// `OrbitKillingDecomposition` for how they pair with conserved (p_t, p_phi).
+    fn circular_orbit_killing_coefficients(
+        &self,
+        position: &Point,
+    ) -> Result<OrbitKillingDecomposition, RaytracerError>;
     fn get_temperature_computer(
         &self,
         temperature: f64,

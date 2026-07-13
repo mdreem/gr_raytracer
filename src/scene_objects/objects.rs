@@ -4,7 +4,7 @@ use crate::geometry::point::Point;
 use crate::rendering::color::CIETristimulus;
 use crate::rendering::integrator::Step;
 use crate::rendering::raytracer::RaytracerError;
-use crate::rendering::redshift::RedshiftComputer;
+use crate::rendering::redshift::{RayFrequencyData, RedshiftComputer};
 use crate::rendering::texture::TemperatureData;
 use crate::scene_objects::hittable::{ColorComputationData, Hittable};
 
@@ -66,7 +66,7 @@ impl<'a, G: Geometry> Objects<'a, G> {
         &self,
         y_start: &Step,
         y_end: &Step,
-        observer_energy: f64,
+        frequency: &RayFrequencyData,
     ) -> Result<Option<CIETristimulus>, RaytracerError> {
         let redshift_computer = RedshiftComputer::new(self.geometry);
         let mut resulting_color = None;
@@ -95,7 +95,7 @@ impl<'a, G: Geometry> Objects<'a, G> {
                     let emitter_energy =
                         hittable.energy_of_emitter(self.geometry, &intersection_step)?;
                     let redshift = redshift_computer
-                        .compute_redshift_from_energies(emitter_energy, observer_energy);
+                        .compute_redshift_from_energies(emitter_energy, frequency.observer_energy);
                     let temperature = hittable.temperature_of_emitter(
                         &intersection_data.intersection_point,
                         self.geometry,
@@ -109,8 +109,10 @@ impl<'a, G: Geometry> Objects<'a, G> {
                         },
                         intersection_point: intersection_data.intersection_point,
                         direction: intersection_data.direction,
+                        frequency: *frequency,
                     };
-                    resulting_color = Some(hittable.color_at_uv(&color_computation_data));
+                    resulting_color =
+                        Some(hittable.color_at_uv(&color_computation_data, self.geometry));
                 }
             }
         }
@@ -129,6 +131,16 @@ mod tests {
     use crate::scene_objects::sphere::Sphere;
     use approx::assert_abs_diff_eq;
     use std::sync::Arc;
+
+    /// Flat-space stand-in for the per-ray conserved quantities: an emitter
+    /// at rest sees g = observer_energy / p_t = 1.
+    fn unit_frequency() -> RayFrequencyData {
+        RayFrequencyData {
+            observer_energy: 1.0,
+            p_t: 1.0,
+            p_phi: 0.0,
+        }
+    }
 
     fn create_sphere_at(x: f64, y: f64, z: f64, radius: f64, color: u8) -> Box<dyn SceneObject> {
         Box::new(Sphere::new(
@@ -168,7 +180,7 @@ mod tests {
             p: FourVector::new_cartesian(1.0, 0.0, 0.0, 0.0),
         };
 
-        let result = objects.intersects(&step_start, &step_end, 1.0).unwrap();
+        let result = objects.intersects(&step_start, &step_end, &unit_frequency()).unwrap();
         assert!(result.is_some());
     }
 
@@ -196,7 +208,7 @@ mod tests {
         objects_setup_1.add_object(closer_sphere);
 
         let result_1 = objects_setup_1
-            .intersects(&step_start, &step_end, 1.0)
+            .intersects(&step_start, &step_end, &unit_frequency())
             .unwrap();
         assert!(result_1.is_some());
         assert_abs_diff_eq!(result_1.unwrap().x, 0.121, epsilon = 1e-2);
@@ -208,7 +220,7 @@ mod tests {
         objects_setup_2.add_object(farther_sphere);
 
         let result_2 = objects_setup_2
-            .intersects(&step_start, &step_end, 1.0)
+            .intersects(&step_start, &step_end, &unit_frequency())
             .unwrap();
         assert!(result_2.is_some());
         assert_abs_diff_eq!(result_2.unwrap().x, 0.121, epsilon = 1e-2);
@@ -255,7 +267,7 @@ mod tests {
             p: FourVector::new_spherical(1.0, 0.0, 0.1, 0.0),
         };
 
-        let result = objects.intersects(&step_start, &step_end, 1.0).unwrap();
+        let result = objects.intersects(&step_start, &step_end, &unit_frequency()).unwrap();
         assert!(result.is_some());
     }
 }

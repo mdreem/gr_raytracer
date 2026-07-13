@@ -6,6 +6,27 @@ pub struct RenderConfig {
     pub objects: Vec<ObjectsConfig>,
     pub celestial_texture: TextureConfig,
     pub celestial_temperature: f64,
+    /// Which observer the camera is boosted to. Defaults to the static
+    /// (Killing) observer so all geometries behave identically; use `Zamo`
+    /// for close-in or ergosphere cameras (static observers do not exist
+    /// there), or `Explicit` to pin a four-velocity in the geometry's native
+    /// chart coordinates.
+    #[serde(default)]
+    pub camera_velocity: CameraVelocityConfig,
+}
+
+#[derive(Deserialize, Serialize, Default, Debug, PartialEq, Clone)]
+pub enum CameraVelocityConfig {
+    /// Static (Killing) observer: at rest relative to infinity. Not defined
+    /// inside the ergosphere of a spinning hole.
+    #[default]
+    StaticObserver,
+    /// Zero angular momentum observer (locally non-rotating frame):
+    /// co-rotates with frame dragging, exists everywhere outside the horizon.
+    Zamo,
+    /// Explicit four-velocity components in the geometry's native chart.
+    /// Must be future-directed and normalized (u.u = +/-1 per signature).
+    Explicit { components: [f64; 4] },
 }
 
 #[derive(Deserialize, Serialize, Default, Debug, PartialEq, Clone)]
@@ -146,6 +167,7 @@ mod tests {
                 radius: 2.0,
                 horizon_epsilon: 1e-4,
             },
+            camera_velocity: Default::default(),
             objects: vec![
                 ObjectsConfig::Sphere {
                     radius: 1.0,

@@ -1,5 +1,7 @@
 use crate::cli::cli::GlobalOpts;
-use crate::cli::shared::{assert_future_directed, create_scene, integrate_and_save_ray, render};
+use crate::cli::shared::{
+    assert_future_directed, create_scene, integrate_and_save_ray, render, resolve_camera_velocity,
+};
 use crate::configuration::RenderConfig;
 use crate::geometry::four_vector::FourVector;
 use crate::geometry::geometry::{Geometry, RenderableGeometry};
@@ -20,9 +22,11 @@ fn create_scene_internal<'a>(
     camera_position: Point,
 ) -> Result<Scene<'a, Schwarzschild>, RaytracerError> {
     let camera_position_spherical = cartesian_to_spherical(&camera_position);
-    let r = camera_position_spherical[1];
-    let a = 1.0 - geometry.radius / r;
-    let momentum = FourVector::new_spherical(1.0 / a.sqrt(), 0.0, 0.0, 0.0);
+    let momentum = resolve_camera_velocity(
+        geometry,
+        &camera_position_spherical,
+        &config.camera_velocity,
+    )?;
     assert_future_directed(
         "Schwarzschild camera four-velocity",
         geometry,

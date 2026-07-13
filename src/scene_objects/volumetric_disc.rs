@@ -4,6 +4,7 @@ use crate::geometry::point::Point;
 use crate::rendering::color::CIETristimulus;
 use crate::rendering::integrator::Step;
 use crate::rendering::raytracer::RaytracerError;
+use crate::rendering::redshift::RayFrequencyData;
 use crate::rendering::temperature::TemperatureComputer;
 use crate::rendering::texture::{TextureMapHandle, UVCoordinates};
 use crate::scene_objects::hittable::{ColorComputationData, Hittable, Intersection};
@@ -199,16 +200,18 @@ impl VolumetricDisc {
         &self,
         ro: &Vector3<f64>,
         rd: &Vector3<f64>,
-        redshift: f64,
+        geometry: &dyn Geometry,
+        frequency: &RayFrequencyData,
     ) -> Result<CIETristimulus, RaytracerError> {
-        self.raymarch_constant_step_internal(ro, rd, redshift, true)
+        self.raymarch_constant_step_internal(ro, rd, geometry, frequency, true)
     }
 
     fn raymarch_constant_step_internal(
         &self,
         ro: &Vector3<f64>,
         rd: &Vector3<f64>,
-        redshift: f64,
+        geometry: &dyn Geometry,
+        frequency: &RayFrequencyData,
         use_cached_exit: bool,
     ) -> Result<CIETristimulus, RaytracerError> {
         let sigma_a = self.absorption;
@@ -236,39 +239,62 @@ impl VolumetricDisc {
             let density = self.compute_density(&p);
 
             if density > 0.0 {
-                let r_dist = p.cross(&self.axis).norm();
-                let temperature = self.temperature_computer.compute_temperature(r_dist)?;
-                let uv = self.get_uv(&p);
-                let light_color = self.texture_mapper.color_at_uv(
-                    &uv,
-                    &crate::rendering::texture::TemperatureData {
-                        temperature,
-                        redshift,
-                    },
-                );
-
                 let sample_attenuation = (-d_s * density * (sigma_a + sigma_s)).exp();
                 transparency *= sample_attenuation;
 
-                let travel_density = d_s; // Ignore the light ray here for now.
-                let light_attenuation = (-density * travel_density * (sigma_a + sigma_s)).exp();
+                // Per-sample redshift from the ray's conserved (p_t, p_phi)
+                // and the local circular-orbit Killing coefficients:
+                // u.p = u^t p_t + u^phi p_phi, exact at every sample with no
+                // parallel transport (see docs/plan-01-per-sample-redshift.md).
+                // Where no timelike circular orbit exists the gas is
+                // unphysical anyway: it still attenuates (above) but emits
+                // nothing.
+                let sample_position = Point::new_cartesian(0.0, p[0], p[1], p[2]);
+                if let Ok(coefficients) =
+                    geometry.circular_orbit_killing_coefficients(&sample_position)
+                {
+                    let emitter_energy =
+                        coefficients.u_t * frequency.p_t + coefficients.u_phi * frequency.p_phi;
+                    let redshift = frequency.observer_energy / emitter_energy;
 
-                // Stefan-Boltzmann law: emission intensity scales with T^4.
-                // Use a reference temperature for normalization to boost brightness.
-                let intensity_factor =
-                    (temperature / self.brightness_reference_temperature).powi(4);
+                    let r_dist = p.cross(&self.axis).norm();
+                    let temperature = self.temperature_computer.compute_temperature(r_dist)?;
+                    let uv = self.get_uv(&p);
+                    let light_color = self.texture_mapper.color_at_uv(
+                        &uv,
+                        &crate::rendering::texture::TemperatureData {
+                            temperature,
+                            redshift,
+                        },
+                    );
 
-                let emission_weight = transparency * light_attenuation * sigma_s * density * d_s;
-                let step_emission = light_color.mul_color_part(emission_weight * intensity_factor);
+                    let travel_density = d_s; // Ignore the light ray here for now.
+                    let light_attenuation =
+                        (-density * travel_density * (sigma_a + sigma_s)).exp();
 
-                // Keep texture alpha influence separate from per-step emission accumulation.
-                let alpha_sample_weight = density * d_s;
-                alpha_weighted_sum += light_color.alpha.clamp(0.0, 1.0) * alpha_sample_weight;
-                alpha_weight_total += alpha_sample_weight;
+                    // Stefan-Boltzmann law: emission intensity scales with T^4.
+                    // Use a reference temperature for normalization to boost brightness.
+                    let intensity_factor =
+                        (temperature / self.brightness_reference_temperature).powi(4);
 
-                accum_color.x += step_emission.x;
-                accum_color.y += step_emission.y;
-                accum_color.z += step_emission.z;
+                    let emission_weight =
+                        transparency * light_attenuation * sigma_s * density * d_s;
+                    let step_emission =
+                        light_color.mul_color_part(emission_weight * intensity_factor);
+
+                    // Keep texture alpha influence separate from per-step emission accumulation.
+                    let alpha_sample_weight = density * d_s;
+                    alpha_weighted_sum += light_color.alpha.clamp(0.0, 1.0) * alpha_sample_weight;
+                    alpha_weight_total += alpha_sample_weight;
+
+                    accum_color.x += step_emission.x;
+                    accum_color.y += step_emission.y;
+                    accum_color.z += step_emission.z;
+                } else {
+                    // No timelike circular orbit here: unphysical gas; it
+                    // attenuates (above) but emits nothing.
+                    trace!("  no timelike circular orbit at {:?}; emission skipped", p);
+                }
             }
 
             // Use precomputed exit distance when available (fast path), fallback to legacy check.
@@ -552,7 +578,11 @@ impl Hittable for VolumetricDisc {
         })
     }
 
-    fn color_at_uv(&self, color_computation_data: &ColorComputationData) -> CIETristimulus {
+    fn color_at_uv(
+        &self,
+        color_computation_data: &ColorComputationData,
+        geometry: &dyn Geometry,
+    ) -> CIETristimulus {
         let ro = color_computation_data
             .intersection_point
             .get_spatial_vector_cartesian();
@@ -564,7 +594,7 @@ impl Hittable for VolumetricDisc {
         )
         .normalize();
 
-        self.raymarch_constant_step(&ro, &rd, color_computation_data.temperature_data.redshift)
+        self.raymarch_constant_step(&ro, &rd, geometry, &color_computation_data.frequency)
             .unwrap_or_else(|e| {
                 log::warn!("Raymarching failed: {}", e);
                 CIETristimulus::new(0.0, 0.0, 0.0, 0.0)
@@ -598,10 +628,19 @@ impl SceneObject for VolumetricDisc {}
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::geometry::euclidean::EuclideanSpace;
     use crate::rendering::color::Color;
     use crate::rendering::texture::{CheckerMapper, TemperatureData, TextureMap};
     use approx::assert_abs_diff_eq;
     use std::sync::Arc;
+
+    fn unit_frequency() -> RayFrequencyData {
+        RayFrequencyData {
+            observer_energy: 1.0,
+            p_t: 1.0,
+            p_phi: 0.0,
+        }
+    }
 
     struct DummyTemperatureComputer;
 
@@ -690,7 +729,7 @@ mod tests {
         let rd = Vector3::new(1.0, 0.0, 0.0);
 
         let color = disc
-            .raymarch_constant_step(&ro, &rd, 1.0)
+            .raymarch_constant_step(&ro, &rd, &EuclideanSpace::new(), &unit_frequency())
             .expect("raymarch should succeed");
 
         assert!(color.alpha > 0.0);
@@ -723,10 +762,10 @@ mod tests {
         let rd = Vector3::new(1.0, 0.0, 0.0);
 
         let cached = disc
-            .raymarch_constant_step_internal(&ro, &rd, 1.0, true)
+            .raymarch_constant_step_internal(&ro, &rd, &EuclideanSpace::new(), &unit_frequency(), true)
             .expect("raymarch should succeed");
         let legacy = disc
-            .raymarch_constant_step_internal(&ro, &rd, 1.0, false)
+            .raymarch_constant_step_internal(&ro, &rd, &EuclideanSpace::new(), &unit_frequency(), false)
             .expect("raymarch should succeed");
 
         assert_abs_diff_eq!(cached.x, legacy.x, epsilon = 1e-10);

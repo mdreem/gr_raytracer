@@ -1,8 +1,8 @@
 use crate::cli::cli::GlobalOpts;
-use crate::cli::shared::{assert_future_directed, create_scene, integrate_and_save_ray, render};
+use crate::cli::shared::{assert_future_directed, create_scene, integrate_and_save_ray, render, resolve_camera_velocity};
 use crate::configuration::RenderConfig;
 use crate::geometry::four_vector::FourVector;
-use crate::geometry::geometry::{Geometry, InnerProduct, RenderableGeometry, SupportQuantities};
+use crate::geometry::geometry::{Geometry, InnerProduct, RenderableGeometry};
 use crate::geometry::kerr_bl::KerrBL;
 use crate::geometry::point::Point;
 use crate::rendering::color::ToneMappingMethod;
@@ -19,7 +19,7 @@ fn create_scene_internal<'a>(
     camera_position: Point,
 ) -> Result<Scene<'a, KerrBL>, RaytracerError> {
     let bl_position = geometry.cartesian_to_bl(&camera_position);
-    let momentum = geometry.get_stationary_velocity_at(&bl_position);
+    let momentum = resolve_camera_velocity(geometry, &bl_position, &config.camera_velocity)?;
     assert_future_directed(
         "KerrBL camera four-velocity",
         geometry,

@@ -40,6 +40,42 @@ fn assert_directed<G: Geometry>(
     Ok(())
 }
 
+/// Resolve the camera four-velocity from the scene configuration.
+///
+/// `Explicit` is normalization-checked here so a bad vector fails as a clear
+/// config error rather than an opaque downstream tetrad failure;
+/// `StaticObserver`/`Zamo` are normalized by construction.
+pub fn resolve_camera_velocity<G: Geometry>(
+    geometry: &G,
+    position: &Point,
+    config: &configuration::CameraVelocityConfig,
+) -> Result<FourVector, RaytracerError> {
+    match config {
+        configuration::CameraVelocityConfig::StaticObserver => {
+            Ok(geometry.get_stationary_velocity_at(position))
+        }
+        configuration::CameraVelocityConfig::Zamo => Ok(geometry.get_zamo_velocity_at(position)),
+        configuration::CameraVelocityConfig::Explicit { components } => {
+            let velocity = FourVector::new(
+                components[0],
+                components[1],
+                components[2],
+                components[3],
+                geometry.coordinate_system(),
+            );
+            let norm = geometry.inner_product(position, &velocity, &velocity);
+            let expected = geometry.signature()[0];
+            if (norm - expected).abs() > 1e-6 {
+                return Err(RaytracerError::InvalidConfiguration(format!(
+                    "Explicit camera_velocity {:?} is not normalized: u.u = {} (expected {}).",
+                    components, norm, expected
+                )));
+            }
+            Ok(velocity)
+        }
+    }
+}
+
 pub fn assert_future_directed<G: Geometry>(
     context: &str,
     geometry: &G,
