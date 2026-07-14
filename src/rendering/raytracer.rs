@@ -166,7 +166,7 @@ impl<'a, G: Geometry> Raytracer<'a, G> {
             vec![CIETristimulus::new(0.0, 0.0, 0.0, 1.0); buffer.len()];
 
         let debug_color_mask = false;
-        let n_samples = 2;
+        let n_samples = 4;
 
         let mut pixels_to_sample: Vec<PixelToSample> = Vec::new();
 
@@ -212,6 +212,7 @@ impl<'a, G: Geometry> Raytracer<'a, G> {
                                 col,
                                 result: None,
                             });
+                            break; // one differing neighbor is enough to flag this pixel
                         }
                     }
                 }
@@ -219,7 +220,6 @@ impl<'a, G: Geometry> Raytracer<'a, G> {
         }
 
         output_buffer = buffer.into_iter().map(|s| s.color).collect();
-        pixels_to_sample.dedup();
 
         if debug_color_mask {
             for pixel in &pixels_to_sample {
@@ -249,17 +249,21 @@ impl<'a, G: Geometry> Raytracer<'a, G> {
                     pb.set_position(count.load(Ordering::Relaxed) as u64);
 
                     let mut sample_color = CIETristimulus::new(0.0, 0.0, 0.0, 0.0);
+                    let mut valid_samples = 0u32;
                     for s_row in 0..n_samples {
                         for s_col in 0..n_samples {
+                            // Sample the centre of each stratum: (s + 0.5) / n.
+                            // The 0.5 is where the per-pixel hash jitter will go later.
                             let ray = self.scene.camera.get_ray_for_offset(
                                 pixel.row as i64,
                                 pixel.col as i64,
-                                (s_row as f64) / n_samples as f64,
-                                (s_col as f64) / n_samples as f64,
+                                (s_row as f64 + 0.5) / n_samples as f64,
+                                (s_col as f64 + 0.5) / n_samples as f64,
                             );
                             match self.scene.color_of_ray(&ray) {
                                 Ok(sample) => {
                                     sample_color = sample_color + sample.color;
+                                    valid_samples += 1;
                                 }
                                 Err(err) => {
                                     error!(
@@ -270,11 +274,17 @@ impl<'a, G: Geometry> Raytracer<'a, G> {
                             }
                         }
                     }
-                    sample_color.x /= (n_samples * n_samples) as f64;
-                    sample_color.y /= (n_samples * n_samples) as f64;
-                    sample_color.z /= (n_samples * n_samples) as f64;
-                    sample_color.alpha /= (n_samples * n_samples) as f64;
-                    pixel.result = Some(sample_color);
+                    // Divide by the number of rays that actually returned a colour, so
+                    // a failed sub-sample does not bias the pixel toward black. If all
+                    // failed, leave result = None and keep the base 1-spp colour.
+                    if valid_samples > 0 {
+                        let inv = 1.0 / valid_samples as f64;
+                        sample_color.x *= inv;
+                        sample_color.y *= inv;
+                        sample_color.z *= inv;
+                        sample_color.alpha *= inv;
+                        pixel.result = Some(sample_color);
+                    }
                 });
         }
 
