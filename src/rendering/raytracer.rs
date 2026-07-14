@@ -9,7 +9,7 @@ use crate::rendering::scene::{RayClass, RaySample, Scene};
 use crate::rendering::texture::TextureError;
 use image::{ImageBuffer, ImageError, ImageFormat, Rgb};
 use indicatif::style::TemplateError;
-use log::{debug, error, info, trace};
+use log::{debug, error, info};
 use rayon::iter::IndexedParallelIterator;
 use rayon::iter::IntoParallelRefMutIterator;
 use rayon::iter::ParallelIterator;
@@ -53,6 +53,13 @@ pub enum RaytracerError {
 pub struct Raytracer<'a, G: Geometry> {
     pub scene: Scene<'a, G>,
     tone_mapping: ToneMappingMethod,
+}
+
+#[derive(PartialEq)]
+struct PixelToSample {
+    pub row: u32,
+    pub col: u32,
+    pub result: Option<CIETristimulus>,
 }
 
 impl<'a, G: Geometry> Raytracer<'a, G> {
@@ -150,16 +157,22 @@ impl<'a, G: Geometry> Raytracer<'a, G> {
         to_row: u32,
         to_col: u32,
     ) -> Result<Vec<CIETristimulus>, RaytracerError> {
+        info!(
+            "Rendering section from ({}, {}) to ({}, {}) with supersampling",
+            from_row, from_col, to_row, to_col
+        );
         let buffer = self.render_section_to_cie_buffer_raw(from_row, from_col, to_row, to_col)?;
         let mut output_buffer: Vec<CIETristimulus> =
             vec![CIETristimulus::new(0.0, 0.0, 0.0, 1.0); buffer.len()];
 
-        let debug_color_mask = true;
+        let debug_color_mask = false;
+        let n_samples = 2;
+
+        let mut pixels_to_sample: Vec<PixelToSample> = Vec::new();
 
         // Fetch candidate pixels for supersampling
-
         for row in from_row..to_row {
-            'inner: for col in from_col..to_col {
+            for col in from_col..to_col {
                 let pixel_index =
                     self.get_pixel_index(row, col, to_col - from_col, from_row, from_col);
                 for (row_shift, col_shift) in [
@@ -194,23 +207,94 @@ impl<'a, G: Geometry> Raytracer<'a, G> {
                         (buffer.get(pixel_index), buffer.get(neighbor_index))
                     {
                         if pixel.ray_class != neighbor.ray_class {
-                            if debug_color_mask {
-                                trace!(
-                                    "Supersampling pixel at ({}, {}) due to neighbor at ({}, {})",
-                                    col, row, neighbor_col, neighbor_row
-                                );
-                                output_buffer[pixel_index] =
-                                    CIETristimulus::new(1.0, 0.0, 1.0, 1.0);
-                                continue 'inner;
-                            }
+                            pixels_to_sample.push(PixelToSample {
+                                row,
+                                col,
+                                result: None,
+                            });
                         }
                     }
                 }
-                // TODO: Supersampling starts here.
-                output_buffer[pixel_index] = buffer[pixel_index].color;
             }
         }
 
+        output_buffer = buffer.into_iter().map(|s| s.color).collect();
+        pixels_to_sample.dedup();
+
+        if debug_color_mask {
+            for pixel in &pixels_to_sample {
+                let pixel_index = self.get_pixel_index(
+                    pixel.row,
+                    pixel.col,
+                    to_col - from_col,
+                    from_row,
+                    from_col,
+                );
+                output_buffer[pixel_index] = CIETristimulus::new(1.0, 0.0, 1.0, 1.0);
+            }
+        } else {
+            info!("Supersampling {} pixels", pixels_to_sample.len());
+
+            let count = AtomicUsize::new(0);
+            use indicatif::{ProgressBar, ProgressStyle};
+            let pb = ProgressBar::new(pixels_to_sample.len() as u64);
+            pb.set_style(ProgressStyle::with_template("🎨 {spinner:.green} [{elapsed_precise}] [{wide_bar:.blue}] {pos}/{len} ({percent_precise}%, {eta})")
+                .map_err(RaytracerError::ProgressBarTemplateError)?
+                .progress_chars("█▇▆▅▄▃▂▁  "));
+
+            pixels_to_sample
+                .par_iter_mut()
+                .for_each(|pixel| {
+                    count.fetch_add(1, Ordering::SeqCst);
+                    pb.set_position(count.load(Ordering::Relaxed) as u64);
+
+                    let mut sample_color = CIETristimulus::new(0.0, 0.0, 0.0, 0.0);
+                    for s_row in 0..n_samples {
+                        for s_col in 0..n_samples {
+                            let ray = self.scene.camera.get_ray_for_offset(
+                                pixel.row as i64,
+                                pixel.col as i64,
+                                (s_row as f64) / n_samples as f64,
+                                (s_col as f64) / n_samples as f64,
+                            );
+                            match self.scene.color_of_ray(&ray) {
+                                Ok(sample) => {
+                                    sample_color = sample_color + sample.color;
+                                }
+                                Err(err) => {
+                                    error!(
+                                        "Unable to compute color for ray at pixel ({}, {}): {:?}",
+                                        pixel.col, pixel.row, err
+                                    );
+                                }
+                            }
+                        }
+                    }
+                    sample_color.x /= (n_samples * n_samples) as f64;
+                    sample_color.y /= (n_samples * n_samples) as f64;
+                    sample_color.z /= (n_samples * n_samples) as f64;
+                    sample_color.alpha /= (n_samples * n_samples) as f64;
+                    pixel.result = Some(sample_color);
+                });
+        }
+
+        for pixel in pixels_to_sample {
+            if let Some(sample_color) = pixel.result {
+                let pixel_index = self.get_pixel_index(
+                    pixel.row,
+                    pixel.col,
+                    to_col - from_col,
+                    from_row,
+                    from_col,
+                );
+                output_buffer[pixel_index] = sample_color;
+            }
+        }
+
+        info!(
+            "Finished rendering section from ({}, {}) to ({}, {})",
+            from_row, from_col, to_row, to_col
+        );
         Ok(output_buffer)
     }
 
