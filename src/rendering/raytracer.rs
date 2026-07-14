@@ -1,7 +1,7 @@
 use crate::geometry::geometry::Geometry;
 use crate::rendering::camera::CameraError;
 use crate::rendering::color::{
-    linear_srgb_to_srgb_buffer, xyz_to_linear_srgb_buffer, CIETristimulus, ToneMappingMethod,
+    CIETristimulus, ToneMappingMethod, linear_srgb_to_srgb_buffer, xyz_to_linear_srgb_buffer,
 };
 use crate::rendering::integrator::{IntegrationError, StopReason};
 use crate::rendering::ray::IntegratedRay;

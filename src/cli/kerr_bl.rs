@@ -1,5 +1,7 @@
 use crate::cli::cli::GlobalOpts;
-use crate::cli::shared::{assert_future_directed, create_scene, integrate_and_save_ray, render, resolve_camera_velocity};
+use crate::cli::shared::{
+    assert_future_directed, create_scene, integrate_and_save_ray, render, resolve_camera_velocity,
+};
 use crate::configuration::RenderConfig;
 use crate::geometry::four_vector::FourVector;
 use crate::geometry::geometry::{Geometry, InnerProduct, RenderableGeometry};

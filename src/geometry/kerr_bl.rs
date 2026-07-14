@@ -640,7 +640,11 @@ mod tests {
 
         let r_s = 1.0_f64;
         let a = 0.5_f64;
-        let test_points = [(5.0_f64, 1.2_f64, 0.7_f64), (8.0, 2.1, -1.3), (2.5, 0.4, 2.9)];
+        let test_points = [
+            (5.0_f64, 1.2_f64, 0.7_f64),
+            (8.0, 2.1, -1.3),
+            (2.5, 0.4, 2.9),
+        ];
 
         for &(r, theta, phi) in &test_points {
             let (st, ct) = (theta.sin(), theta.cos());
