@@ -5,11 +5,11 @@ use crate::rendering::color::{
 };
 use crate::rendering::integrator::{IntegrationError, StopReason};
 use crate::rendering::ray::IntegratedRay;
-use crate::rendering::scene::Scene;
+use crate::rendering::scene::{RayClass, RaySample, Scene};
 use crate::rendering::texture::TextureError;
 use image::{ImageBuffer, ImageError, ImageFormat, Rgb};
 use indicatif::style::TemplateError;
-use log::{debug, error, info};
+use log::{debug, error, info, trace};
 use rayon::iter::IndexedParallelIterator;
 use rayon::iter::IntoParallelRefMutIterator;
 use rayon::iter::ParallelIterator;
@@ -78,10 +78,25 @@ impl<'a, G: Geometry> Raytracer<'a, G> {
         to_row: u32,
         to_col: u32,
     ) -> Result<Vec<CIETristimulus>, RaytracerError> {
+        self.render_section_to_cie_buffer_supersampled(from_row, from_col, to_row, to_col)
+    }
+
+    fn render_section_to_cie_buffer_raw(
+        &self,
+        from_row: u32,
+        from_col: u32,
+        to_row: u32,
+        to_col: u32,
+    ) -> Result<Vec<RaySample>, RaytracerError> {
         let count = AtomicUsize::new(0);
         let max_count = (to_row - from_row) * (to_col - from_col);
-        let mut buffer: Vec<CIETristimulus> =
-            vec![CIETristimulus::new(0.0, 0.0, 0.0, 1.0); max_count as usize];
+        let mut buffer: Vec<RaySample> = vec![
+            RaySample {
+                color: CIETristimulus::new(0.0, 0.0, 0.0, 1.0),
+                ray_class: RayClass::Escaped
+            };
+            max_count as usize
+        ];
 
         use indicatif::{ProgressBar, ProgressStyle};
         let pb = ProgressBar::new(max_count as u64);
@@ -102,7 +117,7 @@ impl<'a, G: Geometry> Raytracer<'a, G> {
                 .get_ray_for((y + from_row) as i64, (x + from_col) as i64);
 
             match self.scene.color_of_ray(&ray) {
-                Ok(sample) => *p = sample.color,
+                Ok(sample) => *p = sample,
                 Err(err) => {
                     error!(
                         "Unable to compute color for ray at pixel ({}, {}): {:?}",
@@ -115,6 +130,88 @@ impl<'a, G: Geometry> Raytracer<'a, G> {
         });
         pb.finish();
         Ok(buffer)
+    }
+
+    fn get_pixel_index(
+        &self,
+        row: u32,
+        col: u32,
+        width: u32,
+        offset_row: u32,
+        offset_col: u32,
+    ) -> usize {
+        ((row - offset_row) * width + (col - offset_col)) as usize
+    }
+
+    fn render_section_to_cie_buffer_supersampled(
+        &self,
+        from_row: u32,
+        from_col: u32,
+        to_row: u32,
+        to_col: u32,
+    ) -> Result<Vec<CIETristimulus>, RaytracerError> {
+        let buffer = self.render_section_to_cie_buffer_raw(from_row, from_col, to_row, to_col)?;
+        let mut output_buffer: Vec<CIETristimulus> =
+            vec![CIETristimulus::new(0.0, 0.0, 0.0, 1.0); buffer.len()];
+
+        let debug_color_mask = true;
+
+        // Fetch candidate pixels for supersampling
+
+        for row in from_row..to_row {
+            'inner: for col in from_col..to_col {
+                let pixel_index =
+                    self.get_pixel_index(row, col, to_col - from_col, from_row, from_col);
+                for (row_shift, col_shift) in [
+                    (-1, -1),
+                    (-1, 0),
+                    (-1, 1),
+                    (0, -1),
+                    (0, 1),
+                    (1, -1),
+                    (1, 0),
+                    (1, 1),
+                ] {
+                    let neighbor_row = row as i32 + row_shift;
+                    let neighbor_col = col as i32 + col_shift;
+
+                    if neighbor_row < from_row as i32
+                        || neighbor_row >= to_row as i32
+                        || neighbor_col < from_col as i32
+                        || neighbor_col >= to_col as i32
+                    {
+                        continue;
+                    }
+                    let neighbor_index = self.get_pixel_index(
+                        neighbor_row as u32,
+                        neighbor_col as u32,
+                        to_col - from_col,
+                        from_row,
+                        from_col,
+                    );
+
+                    if let (Some(pixel), Some(neighbor)) =
+                        (buffer.get(pixel_index), buffer.get(neighbor_index))
+                    {
+                        if pixel.ray_class != neighbor.ray_class {
+                            if debug_color_mask {
+                                trace!(
+                                    "Supersampling pixel at ({}, {}) due to neighbor at ({}, {})",
+                                    col, row, neighbor_col, neighbor_row
+                                );
+                                output_buffer[pixel_index] =
+                                    CIETristimulus::new(1.0, 0.0, 1.0, 1.0);
+                                continue 'inner;
+                            }
+                        }
+                    }
+                }
+                // TODO: Supersampling starts here.
+                output_buffer[pixel_index] = buffer[pixel_index].color;
+            }
+        }
+
+        Ok(output_buffer)
     }
 
     pub fn render_section(

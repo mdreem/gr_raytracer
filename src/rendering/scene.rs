@@ -18,6 +18,14 @@ use std::fs::File;
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub struct RaySample {
     pub color: CIETristimulus,
+    pub ray_class: RayClass,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub enum RayClass {
+    Escaped,
+    Captured,
+    Hit,
 }
 
 pub struct Scene<'a, G: Geometry> {
@@ -113,6 +121,7 @@ impl<'a, G: Geometry> Scene<'a, G> {
             .redshift_computer
             .get_ray_frequency_data(ray, &velocity);
 
+        let mut object_opacity = 0.0;
         let mut intersections = Vec::new();
         for step_window in steps.steps.windows(2) {
             let last_step = &step_window[0];
@@ -122,16 +131,20 @@ impl<'a, G: Geometry> Scene<'a, G> {
                 self.objects.intersects(last_step, step, &frequency)?
             {
                 intersections.push(intersection_color);
+                let alpha = intersection_color.alpha.clamp(0.0, 1.0);
+                object_opacity = alpha + object_opacity * (1.0 - alpha);
             }
         }
         let last_step = steps.steps.last().ok_or(RaytracerError::IntegrationError(
             crate::rendering::integrator::IntegrationError::NoStepsProduced,
         ))?;
 
+        let mut ray_class = RayClass::Hit;
         if let Some(reason) = stop_reason {
             match reason {
                 HorizonReached => {
                     intersections.push(CIETristimulus::new(0.0, 0.0, 0.0, 1.0));
+                    ray_class = RayClass::Captured;
                 }
                 CelestialSphereReached => {
                     let uv = self.get_uv_coordinates(last_step);
@@ -145,6 +158,7 @@ impl<'a, G: Geometry> Scene<'a, G> {
                             temperature: self.celestial_temperature,
                         },
                     ));
+                    ray_class = RayClass::Escaped;
                 }
                 StopReason::CoordinateIsNan => {
                     error!(
@@ -155,6 +169,7 @@ impl<'a, G: Geometry> Scene<'a, G> {
                 }
                 StopReason::ClosedOrbitDetected => {
                     intersections.push(CIETristimulus::new(0.0, 0.0, 0.0, 1.0));
+                    ray_class = RayClass::Captured;
                 }
             };
         } else {
@@ -171,7 +186,14 @@ impl<'a, G: Geometry> Scene<'a, G> {
             result = result.blend(color)
         }
 
-        Ok(RaySample { color: result })
+        if object_opacity > 0.4 {
+            ray_class = RayClass::Hit;
+        }
+
+        Ok(RaySample {
+            color: result,
+            ray_class,
+        })
     }
 
     fn get_uv_coordinates(&self, step_far: &Step) -> UVCoordinates {
