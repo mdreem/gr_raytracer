@@ -211,9 +211,9 @@ impl Camera {
     ///
     /// row, column range from 1..R, 1..C in https://arxiv.org/abs/1511.06025, but here we work
     /// with 0-based indices. This needs to be accounted for below.
-    fn get_direction_for(&self, row: i64, column: i64) -> FourVector {
-        let shifted_column = (column + 1) as f64; // Convert to 1-based index.
-        let shifted_row = (row + 1) as f64; // Convert to 1-based index.
+    fn get_direction_for(&self, row: f64, column: f64) -> FourVector {
+        let shifted_column = column + 1.0; // Convert to 1-based index.
+        let shifted_row = row + 1.0; // Convert to 1-based index.
         let tan_half_alpha = f64::tan(self.alpha / 2.0);
         // To ensure square pixels, we use the same angular scale for both directions.
         // alpha is treated as the vertical field of view (FOV).
@@ -232,7 +232,7 @@ impl Camera {
     }
 
     pub fn get_ray_for(&self, row: i64, column: i64) -> Ray {
-        let direction = self.get_direction_for(row, column);
+        let direction = self.get_direction_for(row as f64, column as f64);
         trace!("direction ({}|{}): {:?}", row, column, direction);
         // Trace the physical photon that arrives at the camera from
         // `direction`: its traced momentum N - e_t is past-directed, so the
@@ -240,6 +240,15 @@ impl Camera {
         // the emitter. The future-directed outbound ray (N + e_t) is not the
         // same geodesic: it flips the Doppler term of the redshift for moving
         // emitters and follows a path with reversed frame dragging in Kerr.
+        let momentum = direction + (-self.tetrad.t);
+        Ray::new(row, column, self.position, momentum)
+    }
+
+    pub fn get_ray_for_offset(&self, row: i64, column: i64, dx: f64, dy: f64) -> Ray {
+        // The original pixel is in the middle of the sweeping interval from 0.0...1.0, so we need to subtract 0.5 to get the correct offset.
+        let direction =
+            self.get_direction_for((row as f64) + (dy - 0.5), (column as f64) + (dx - 0.5));
+        trace!("direction ({}|{}): {:?}", row, column, direction);
         let momentum = direction + (-self.tetrad.t);
         Ray::new(row, column, self.position, momentum)
     }
@@ -278,11 +287,11 @@ mod tests {
         .unwrap();
         let geometry = EuclideanSpace::new();
 
-        let top_left_corner = camera.get_direction_for(0, 0);
-        let top_right_corner = camera.get_direction_for(0, 10);
-        let middle = camera.get_direction_for(5, 5);
-        let bottom_left_corner = camera.get_direction_for(10, 0);
-        let bottom_right_corner = camera.get_direction_for(10, 10);
+        let top_left_corner = camera.get_direction_for(0.0, 0.0);
+        let top_right_corner = camera.get_direction_for(0.0, 10.0);
+        let middle = camera.get_direction_for(5.0, 5.0);
+        let bottom_left_corner = camera.get_direction_for(10.0, 0.0);
+        let bottom_right_corner = camera.get_direction_for(10.0, 10.0);
 
         let corner = -0.6853582554517135;
         let corner_z = 0.24610591900311507;
