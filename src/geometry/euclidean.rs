@@ -187,7 +187,7 @@ impl SupportQuantities for EuclideanSpace {
         FourVector::new_cartesian(1.0, 0.0, 0.0, 0.0)
     }
 
-        fn get_zamo_velocity_at(&self, position: &Point) -> FourVector {
+    fn get_zamo_velocity_at(&self, position: &Point) -> FourVector {
         // No frame dragging: the ZAMO is the static observer.
         self.get_stationary_velocity_at(position)
     }

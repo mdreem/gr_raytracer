@@ -209,8 +209,7 @@ mod tests {
 
                     // Code path: the emitter energy exactly as
                     // Disc::energy_of_emitter computes it.
-                    let emitter_energy =
-                        geometry.inner_product(&position, &u_emitter, &momentum);
+                    let emitter_energy = geometry.inner_product(&position, &u_emitter, &momentum);
 
                     // Closed form for the same contraction.
                     assert_abs_diff_eq!(
@@ -222,8 +221,8 @@ mod tests {
                     // Luminet's 1+z against the code's g = nu_obs/nu_em for an
                     // observer at infinity (u_obs . p = E_conserved there).
                     let g_code = e_conserved / emitter_energy;
-                    let g_luminet = (1.0 - 3.0 * m / r).sqrt()
-                        / (1.0 + omega * l_conserved / e_conserved);
+                    let g_luminet =
+                        (1.0 - 3.0 * m / r).sqrt() / (1.0 + omega * l_conserved / e_conserved);
                     assert_abs_diff_eq!(g_code, g_luminet, epsilon = 1e-10);
                 }
             }
@@ -391,11 +390,7 @@ mod tests {
             }
             let a_emitter = 1.0 - 1.0 / r;
             let redshift = computer.compute_redshift(step, observer_energy);
-            assert_abs_diff_eq!(
-                redshift,
-                (a_emitter / a_camera).sqrt(),
-                epsilon = 1e-6
-            );
+            assert_abs_diff_eq!(redshift, (a_emitter / a_camera).sqrt(), epsilon = 1e-6);
             checked += 1;
         }
         assert!(checked > 0, "no steps were checked");

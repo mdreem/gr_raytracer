@@ -56,7 +56,12 @@ fn metric_components(r_s: f64, a: f64, r: f64) -> (f64, f64, f64) {
 /// with u^phi = omega_zamo * u^t and omega_zamo = -g_tphi / g_phiphi, so the
 /// same chart-independent pairing with conserved (p_t, p_phi) applies.
 /// Exists everywhere outside the horizon, including inside the ergosphere.
-pub fn zamo_killing_coefficients(r_s: f64, a: f64, r: f64, theta: f64) -> OrbitKillingDecomposition {
+pub fn zamo_killing_coefficients(
+    r_s: f64,
+    a: f64,
+    r: f64,
+    theta: f64,
+) -> OrbitKillingDecomposition {
     let (g_tt, g_tphi, g_phiphi) = metric_components_at(r_s, a, r, theta);
     let omega = -g_tphi / g_phiphi;
     let u_t = (-1.0 / (g_tt + 2.0 * g_tphi * omega + g_phiphi * omega * omega)).sqrt();
@@ -161,11 +166,7 @@ mod tests {
             epsilon = 1e-14
         );
         let c = killing_coefficients(r_s, 0.0, r).unwrap();
-        assert_abs_diff_eq!(
-            c.u_t,
-            (1.0 - 3.0 * m / r).sqrt().recip(),
-            epsilon = 1e-14
-        );
+        assert_abs_diff_eq!(c.u_t, (1.0 - 3.0 * m / r).sqrt().recip(), epsilon = 1e-14);
     }
 
     #[test]
@@ -186,7 +187,13 @@ mod tests {
 
         // Same physical point: equatorial, BL r = 5, phi = 0
         // (x = st(r cp - a sp) etc. with theta = pi/2).
-        let pos_bl = Point::new(0.0, 5.0, PI / 2.0, 0.0, CoordinateSystem::BoyerLindquist { a });
+        let pos_bl = Point::new(
+            0.0,
+            5.0,
+            PI / 2.0,
+            0.0,
+            CoordinateSystem::BoyerLindquist { a },
+        );
         let pos_ks = Point::new_cartesian(0.0, 5.0, a, 0.0);
 
         for (zamo, axial, pos, geom_ip) in [
@@ -203,8 +210,16 @@ mod tests {
                 &kerr_bl as &dyn Geometry,
             ),
         ] {
-            assert_abs_diff_eq!(geom_ip.inner_product(pos, &zamo, &zamo), -1.0, epsilon = 1e-9);
-            assert_abs_diff_eq!(geom_ip.inner_product(pos, &zamo, &axial), 0.0, epsilon = 1e-9);
+            assert_abs_diff_eq!(
+                geom_ip.inner_product(pos, &zamo, &zamo),
+                -1.0,
+                epsilon = 1e-9
+            );
+            assert_abs_diff_eq!(
+                geom_ip.inner_product(pos, &zamo, &axial),
+                0.0,
+                epsilon = 1e-9
+            );
         }
 
         // Chart-invariant coefficients.
@@ -239,7 +254,9 @@ mod tests {
             time_sign: f64, // signature()[0]: u.u == time_sign
         ) {
             let u_vec = geometry.get_circular_orbit_velocity_at(position).unwrap();
-            let c = geometry.circular_orbit_killing_coefficients(position).unwrap();
+            let c = geometry
+                .circular_orbit_killing_coefficients(position)
+                .unwrap();
             let cs = u_vec.coordinate_system;
             let e_t = FourVector::new(1.0, 0.0, 0.0, 0.0, cs);
             let axial = geometry.axial_killing_vector(position);

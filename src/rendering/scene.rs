@@ -214,7 +214,7 @@ pub mod test_scene {
     use crate::geometry::geometry::Geometry;
     use crate::geometry::point::Point;
     use crate::rendering::camera::Camera;
-    use crate::rendering::color::{srgb_to_xyz, Color};
+    use crate::rendering::color::{Color, srgb_to_xyz};
     use crate::rendering::raytracer::RaytracerError;
     use crate::rendering::scene::{IntegrationConfiguration, Scene, TextureData};
     use crate::rendering::texture::CheckerMapper;
@@ -356,8 +356,8 @@ mod tests {
     use crate::geometry::spherical_coordinates_helper::cartesian_to_spherical;
     use crate::rendering::camera::Camera;
     use crate::rendering::color::CIETristimulus;
-    use crate::rendering::scene::test_scene::create_scene_with_camera;
     use crate::rendering::scene::Scene;
+    use crate::rendering::scene::test_scene::create_scene_with_camera;
     use std::f64::consts::PI;
 
     const CELESTIAL_SPHERE_COLOR_1: CIETristimulus = CIETristimulus {
