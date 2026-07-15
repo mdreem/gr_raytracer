@@ -1,4 +1,3 @@
-color_normalization = "NoNormalization"
 celestial_temperature = 0.0
 
 [celestial_texture.Bitmap]
@@ -28,4 +27,4 @@ noise_scale = [25.0, 15.0, 40.0]
 noise_offset = -0.2
 
 [objects.VolumetricDisc.texture.BlackBody]
-beaming_exponent = 4.0
+beaming_exponent = 0.0
