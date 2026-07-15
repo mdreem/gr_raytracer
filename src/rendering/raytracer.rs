@@ -1,3 +1,4 @@
+use crate::configuration::AdaptiveSamplingConfig;
 use crate::geometry::geometry::Geometry;
 use crate::rendering::camera::CameraError;
 use crate::rendering::color::{
@@ -85,6 +86,24 @@ fn opacity_contrast(p: &CIETristimulus, q: &CIETristimulus) -> f64 {
 /// silhouettes and the shadow rim are unaffected.
 fn visible(p: &CIETristimulus, q: &CIETristimulus, minimum_luminance: f64) -> bool {
     p.y.max(q.y) > minimum_luminance
+}
+
+fn should_supersample_pair(
+    pixel: &RaySample,
+    neighbor: &RaySample,
+    config: &AdaptiveSamplingConfig,
+) -> bool {
+    if pixel.ray_class != neighbor.ray_class {
+        return true;
+    }
+
+    if pixel.ray_class == RayClass::Escaped {
+        return false;
+    }
+
+    visible(&pixel.color, &neighbor.color, config.minimum_luminance)
+        && (luminance_contrast(&pixel.color, &neighbor.color) > config.luminance_contrast_threshold
+            || opacity_contrast(&pixel.color, &neighbor.color) > config.opacity_contrast_threshold)
 }
 
 // https://rosettacode.org/wiki/Pseudo-random_numbers/Splitmix64
@@ -376,31 +395,14 @@ impl<'a, G: Geometry> Raytracer<'a, G> {
 
                     if let (Some(pixel), Some(neighbor)) =
                         (buffer.get(pixel_index), buffer.get(neighbor_index))
+                        && should_supersample_pair(pixel, neighbor, &self.scene.adaptive_sampling)
                     {
-                        let is_visible = visible(
-                            &pixel.color,
-                            &neighbor.color,
-                            self.scene.adaptive_sampling.minimum_luminance,
-                        );
-                        let both_background = pixel.ray_class == RayClass::Escaped
-                            && neighbor.ray_class == RayClass::Escaped;
-                        if pixel.ray_class != neighbor.ray_class
-                            || (!both_background
-                                && (luminance_contrast(&pixel.color, &neighbor.color)
-                                    > self.scene.adaptive_sampling.luminance_contrast_threshold)
-                                && is_visible)
-                            || (!both_background
-                                && (opacity_contrast(&pixel.color, &neighbor.color)
-                                    > self.scene.adaptive_sampling.opacity_contrast_threshold
-                                    && is_visible))
-                        {
-                            pixels_to_sample.push(PixelToSample {
-                                row,
-                                col,
-                                result: None,
-                            });
-                            break;
-                        }
+                        pixels_to_sample.push(PixelToSample {
+                            row,
+                            col,
+                            result: None,
+                        });
+                        break;
                     }
                 }
             }
@@ -461,8 +463,20 @@ impl<'a, G: Geometry> Raytracer<'a, G> {
 
 #[cfg(test)]
 mod tests {
-    use super::{MICHELSON_DENOMINATOR_EPSILON, luminance_contrast, stratified_sample_offset};
+    use super::{
+        MICHELSON_DENOMINATOR_EPSILON, luminance_contrast, should_supersample_pair,
+        stratified_sample_offset,
+    };
+    use crate::configuration::AdaptiveSamplingConfig;
     use crate::rendering::color::CIETristimulus;
+    use crate::rendering::scene::{RayClass, RaySample};
+
+    fn sample(y: f64, alpha: f64, ray_class: RayClass) -> RaySample {
+        RaySample {
+            color: CIETristimulus::new(0.0, y, 0.0, alpha),
+            ray_class,
+        }
+    }
 
     #[test]
     fn stratified_offsets_stay_in_their_cells() {
@@ -494,5 +508,69 @@ mod tests {
         let faint = CIETristimulus::new(0.0, MICHELSON_DENOMINATOR_EPSILON, 0.0, 1.0);
         assert_eq!(luminance_contrast(&black, &black), 0.0);
         assert_eq!(luminance_contrast(&black, &faint), 0.5);
+    }
+
+    #[test]
+    fn class_boundaries_are_always_supersampled() {
+        let config = AdaptiveSamplingConfig {
+            minimum_luminance: 100.0,
+            ..Default::default()
+        };
+        let escaped = sample(0.0, 1.0, RayClass::Escaped);
+        let captured = sample(0.0, 1.0, RayClass::Captured);
+
+        assert!(should_supersample_pair(&escaped, &captured, &config));
+        assert!(should_supersample_pair(&captured, &escaped, &config));
+    }
+
+    #[test]
+    fn background_contrast_does_not_trigger_supersampling() {
+        let config = AdaptiveSamplingConfig {
+            minimum_luminance: 0.0,
+            luminance_contrast_threshold: 0.0,
+            opacity_contrast_threshold: 0.0,
+            ..Default::default()
+        };
+        let dark = sample(1.0, 0.0, RayClass::Escaped);
+        let bright = sample(100.0, 1.0, RayClass::Escaped);
+
+        assert!(!should_supersample_pair(&dark, &bright, &config));
+    }
+
+    #[test]
+    fn visible_object_contrast_triggers_supersampling() {
+        let config = AdaptiveSamplingConfig {
+            minimum_luminance: 1.0,
+            luminance_contrast_threshold: 0.2,
+            opacity_contrast_threshold: 0.2,
+            ..Default::default()
+        };
+
+        assert!(should_supersample_pair(
+            &sample(2.0, 1.0, RayClass::Hit),
+            &sample(1.0, 1.0, RayClass::Hit),
+            &config,
+        ));
+        assert!(should_supersample_pair(
+            &sample(2.0, 0.6, RayClass::Hit),
+            &sample(2.0, 0.9, RayClass::Hit),
+            &config,
+        ));
+    }
+
+    #[test]
+    fn faint_object_contrast_does_not_trigger_supersampling() {
+        let config = AdaptiveSamplingConfig {
+            minimum_luminance: 1.0,
+            luminance_contrast_threshold: 0.0,
+            opacity_contrast_threshold: 0.0,
+            ..Default::default()
+        };
+
+        assert!(!should_supersample_pair(
+            &sample(1.0, 0.0, RayClass::Hit),
+            &sample(0.0, 1.0, RayClass::Hit),
+            &config,
+        ));
     }
 }
