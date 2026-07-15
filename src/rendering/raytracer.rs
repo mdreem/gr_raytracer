@@ -62,6 +62,22 @@ struct PixelToSample {
     pub result: Option<CIETristimulus>,
 }
 
+fn luminance_contrast(p: &CIETristimulus, q: &CIETristimulus) -> f64 {
+    let eps = 1e-4;
+    let l_p = p.y;
+    let l_q = q.y;
+    (l_p - l_q).abs() / (l_p + l_q + eps)
+}
+
+fn opacity_contrast(p: &CIETristimulus, q: &CIETristimulus) -> f64 {
+    (p.alpha - q.alpha).abs()
+}
+
+fn visible(p: &CIETristimulus, q: &CIETristimulus) -> bool {
+    let faint_floor = 1e-4;
+    p.y.max(q.y) > faint_floor
+}
+
 impl<'a, G: Geometry> Raytracer<'a, G> {
     pub fn new(scene: Scene<'a, G>, tone_mapping: ToneMappingMethod) -> Self {
         Self {
@@ -206,13 +222,17 @@ impl<'a, G: Geometry> Raytracer<'a, G> {
                     if let (Some(pixel), Some(neighbor)) =
                         (buffer.get(pixel_index), buffer.get(neighbor_index))
                     {
-                        if pixel.ray_class != neighbor.ray_class {
+                        let visible = visible(&pixel.color, &neighbor.color);
+                        if pixel.ray_class != neighbor.ray_class
+                            || (luminance_contrast(&pixel.color, &neighbor.color) > 0.15 && visible)
+                            || (opacity_contrast(&pixel.color, &neighbor.color) > 0.1 && visible)
+                        {
                             pixels_to_sample.push(PixelToSample {
                                 row,
                                 col,
                                 result: None,
                             });
-                            break; // one differing neighbor is enough to flag this pixel
+                            break;
                         }
                     }
                 }
@@ -242,50 +262,48 @@ impl<'a, G: Geometry> Raytracer<'a, G> {
                 .map_err(RaytracerError::ProgressBarTemplateError)?
                 .progress_chars("█▇▆▅▄▃▂▁  "));
 
-            pixels_to_sample
-                .par_iter_mut()
-                .for_each(|pixel| {
-                    count.fetch_add(1, Ordering::SeqCst);
-                    pb.set_position(count.load(Ordering::Relaxed) as u64);
+            pixels_to_sample.par_iter_mut().for_each(|pixel| {
+                count.fetch_add(1, Ordering::SeqCst);
+                pb.set_position(count.load(Ordering::Relaxed) as u64);
 
-                    let mut sample_color = CIETristimulus::new(0.0, 0.0, 0.0, 0.0);
-                    let mut valid_samples = 0u32;
-                    for s_row in 0..n_samples {
-                        for s_col in 0..n_samples {
-                            // Sample the centre of each stratum: (s + 0.5) / n.
-                            // The 0.5 is where the per-pixel hash jitter will go later.
-                            let ray = self.scene.camera.get_ray_for_offset(
-                                pixel.row as i64,
-                                pixel.col as i64,
-                                (s_row as f64 + 0.5) / n_samples as f64,
-                                (s_col as f64 + 0.5) / n_samples as f64,
-                            );
-                            match self.scene.color_of_ray(&ray) {
-                                Ok(sample) => {
-                                    sample_color = sample_color + sample.color;
-                                    valid_samples += 1;
-                                }
-                                Err(err) => {
-                                    error!(
-                                        "Unable to compute color for ray at pixel ({}, {}): {:?}",
-                                        pixel.col, pixel.row, err
-                                    );
-                                }
+                let mut sample_color = CIETristimulus::new(0.0, 0.0, 0.0, 0.0);
+                let mut valid_samples = 0u32;
+                for s_row in 0..n_samples {
+                    for s_col in 0..n_samples {
+                        // Sample the centre of each stratum: (s + 0.5) / n.
+                        // The 0.5 is where the per-pixel hash jitter will go later.
+                        let ray = self.scene.camera.get_ray_for_offset(
+                            pixel.row as i64,
+                            pixel.col as i64,
+                            (s_row as f64 + 0.5) / n_samples as f64,
+                            (s_col as f64 + 0.5) / n_samples as f64,
+                        );
+                        match self.scene.color_of_ray(&ray) {
+                            Ok(sample) => {
+                                sample_color = sample_color + sample.color;
+                                valid_samples += 1;
+                            }
+                            Err(err) => {
+                                error!(
+                                    "Unable to compute color for ray at pixel ({}, {}): {:?}",
+                                    pixel.col, pixel.row, err
+                                );
                             }
                         }
                     }
-                    // Divide by the number of rays that actually returned a colour, so
-                    // a failed sub-sample does not bias the pixel toward black. If all
-                    // failed, leave result = None and keep the base 1-spp colour.
-                    if valid_samples > 0 {
-                        let inv = 1.0 / valid_samples as f64;
-                        sample_color.x *= inv;
-                        sample_color.y *= inv;
-                        sample_color.z *= inv;
-                        sample_color.alpha *= inv;
-                        pixel.result = Some(sample_color);
-                    }
-                });
+                }
+                // Divide by the number of rays that actually returned a colour, so
+                // a failed sub-sample does not bias the pixel toward black. If all
+                // failed, leave result = None and keep the base 1-spp colour.
+                if valid_samples > 0 {
+                    let inv = 1.0 / valid_samples as f64;
+                    sample_color.x *= inv;
+                    sample_color.y *= inv;
+                    sample_color.z *= inv;
+                    sample_color.alpha *= inv;
+                    pixel.result = Some(sample_color);
+                }
+            });
         }
 
         for pixel in pixels_to_sample {

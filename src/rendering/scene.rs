@@ -139,7 +139,7 @@ impl<'a, G: Geometry> Scene<'a, G> {
             crate::rendering::integrator::IntegrationError::NoStepsProduced,
         ))?;
 
-        let mut ray_class = RayClass::Hit;
+        let mut ray_class;
         if let Some(reason) = stop_reason {
             match reason {
                 HorizonReached => {
@@ -166,6 +166,9 @@ impl<'a, G: Geometry> Scene<'a, G> {
                         ray,
                         steps.len()
                     );
+                    // Degenerate ray, renders black; class it as shadow so it
+                    // does not seed spurious mask edges against its neighbours.
+                    ray_class = RayClass::Captured;
                 }
                 StopReason::ClosedOrbitDetected => {
                     intersections.push(CIETristimulus::new(0.0, 0.0, 0.0, 1.0));
@@ -179,6 +182,8 @@ impl<'a, G: Geometry> Scene<'a, G> {
                 steps.iter().last(),
                 steps.len()
             );
+            // No terminal event, renders black; class as shadow (see above).
+            ray_class = RayClass::Captured;
         }
         let mut result = CIETristimulus::new(0.0, 0.0, 0.0, 1.0);
 
@@ -186,7 +191,7 @@ impl<'a, G: Geometry> Scene<'a, G> {
             result = result.blend(color)
         }
 
-        if object_opacity > 0.4 {
+        if object_opacity > 0.5 {
             ray_class = RayClass::Hit;
         }
 

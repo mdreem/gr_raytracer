@@ -139,7 +139,7 @@ pub fn r_isco(r_s: f64, a: f64) -> f64 {
 mod tests {
     use super::*;
     use crate::geometry::four_vector::FourVector;
-    use crate::geometry::geometry::{Geometry, InnerProduct, SupportQuantities};
+    use crate::geometry::geometry::{Geometry, SupportQuantities};
     use crate::geometry::kerr::Kerr;
     use crate::geometry::kerr_bl::KerrBL;
     use crate::geometry::point::{CoordinateSystem, Point};
