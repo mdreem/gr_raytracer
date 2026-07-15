@@ -13,6 +13,84 @@ pub struct RenderConfig {
     /// chart coordinates.
     #[serde(default)]
     pub camera_velocity: CameraVelocityConfig,
+    /// Adaptive supersampling quality and edge-detection controls.
+    #[serde(default)]
+    pub adaptive_sampling: AdaptiveSamplingConfig,
+}
+
+#[derive(Deserialize, Serialize, Clone, Debug, PartialEq)]
+#[serde(default)]
+pub struct AdaptiveSamplingConfig {
+    pub enabled: bool,
+    /// Number of strata along each pixel axis. The number of additional rays
+    /// for a selected pixel is `samples_per_axis.pow(2)`.
+    pub samples_per_axis: usize,
+    pub luminance_contrast_threshold: f64,
+    pub opacity_contrast_threshold: f64,
+    /// Linear CIE Y floor below which contrast alone does not trigger sampling.
+    /// `None` (the default) derives it per frame as a small fraction of the
+    /// 99th-percentile luminance, so it tracks the disc brightness without a
+    /// scene-specific constant. The derived value is section-relative, so a
+    /// cropped section render is not byte-identical to the full frame there;
+    /// set an explicit value for fully deterministic crops.
+    pub minimum_luminance: Option<f64>,
+    /// Accumulated object opacity required to classify a ray as an object hit.
+    pub object_hit_opacity_threshold: f64,
+    /// When true (default), pairs of `Escaped` (background / see-through) rays
+    /// are never supersampled on contrast alone. This skips the high-frequency
+    /// star field. Set false to also anti-alias a bright semi-transparent disc,
+    /// at the cost of supersampling bright background stars too.
+    pub exclude_background_contrast: bool,
+}
+
+impl Default for AdaptiveSamplingConfig {
+    fn default() -> Self {
+        Self {
+            enabled: true,
+            samples_per_axis: 4,
+            luminance_contrast_threshold: 0.15,
+            opacity_contrast_threshold: 0.1,
+            minimum_luminance: None,
+            object_hit_opacity_threshold: 0.5,
+            exclude_background_contrast: true,
+        }
+    }
+}
+
+impl AdaptiveSamplingConfig {
+    pub fn validate(&self) -> Result<(), String> {
+        if self.samples_per_axis == 0 {
+            return Err("adaptive_sampling.samples_per_axis must be greater than zero".to_string());
+        }
+        for (name, value) in [
+            (
+                "luminance_contrast_threshold",
+                self.luminance_contrast_threshold,
+            ),
+            (
+                "opacity_contrast_threshold",
+                self.opacity_contrast_threshold,
+            ),
+            (
+                "object_hit_opacity_threshold",
+                self.object_hit_opacity_threshold,
+            ),
+        ] {
+            if !value.is_finite() || !(0.0..=1.0).contains(&value) {
+                return Err(format!(
+                    "adaptive_sampling.{name} must be finite and between 0 and 1 (got {value})"
+                ));
+            }
+        }
+        if let Some(value) = self.minimum_luminance
+            && (!value.is_finite() || value < 0.0)
+        {
+            return Err(format!(
+                "adaptive_sampling.minimum_luminance must be finite and non-negative (got {value})"
+            ));
+        }
+        Ok(())
+    }
 }
 
 #[derive(Deserialize, Serialize, Default, Debug, PartialEq, Clone)]
@@ -153,7 +231,73 @@ impl Default for ObjectsConfig {
 
 #[cfg(test)]
 mod tests {
-    use crate::configuration::{GeometryType, ObjectsConfig, RenderConfig, TextureConfig};
+    use crate::configuration::{
+        AdaptiveSamplingConfig, GeometryType, ObjectsConfig, RenderConfig, TextureConfig,
+    };
+
+    #[test]
+    fn adaptive_sampling_partial_config_uses_defaults() {
+        let config: AdaptiveSamplingConfig = toml::from_str("samples_per_axis = 2").unwrap();
+        assert_eq!(
+            config,
+            AdaptiveSamplingConfig {
+                samples_per_axis: 2,
+                ..Default::default()
+            }
+        );
+        config.validate().unwrap();
+    }
+
+    #[test]
+    fn adaptive_sampling_accepts_boundary_values() {
+        AdaptiveSamplingConfig {
+            luminance_contrast_threshold: 0.0,
+            opacity_contrast_threshold: 1.0,
+            minimum_luminance: Some(0.0),
+            object_hit_opacity_threshold: 1.0,
+            ..Default::default()
+        }
+        .validate()
+        .unwrap();
+    }
+
+    #[test]
+    fn adaptive_sampling_rejects_invalid_values() {
+        let invalid_configs = [
+            AdaptiveSamplingConfig {
+                samples_per_axis: 0,
+                ..Default::default()
+            },
+            AdaptiveSamplingConfig {
+                luminance_contrast_threshold: -0.1,
+                ..Default::default()
+            },
+            AdaptiveSamplingConfig {
+                luminance_contrast_threshold: f64::NAN,
+                ..Default::default()
+            },
+            AdaptiveSamplingConfig {
+                opacity_contrast_threshold: 1.1,
+                ..Default::default()
+            },
+            AdaptiveSamplingConfig {
+                object_hit_opacity_threshold: f64::INFINITY,
+                ..Default::default()
+            },
+            AdaptiveSamplingConfig {
+                minimum_luminance: Some(-0.1),
+                ..Default::default()
+            },
+            AdaptiveSamplingConfig {
+                minimum_luminance: Some(f64::INFINITY),
+                ..Default::default()
+            },
+        ];
+
+        for config in invalid_configs {
+            assert!(config.validate().is_err(), "accepted {config:?}");
+        }
+    }
 
     #[test]
     fn test_serialize() {
@@ -168,6 +312,7 @@ mod tests {
                 horizon_epsilon: 1e-4,
             },
             camera_velocity: Default::default(),
+            adaptive_sampling: Default::default(),
             objects: vec![
                 ObjectsConfig::Sphere {
                     radius: 1.0,

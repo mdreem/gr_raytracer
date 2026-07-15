@@ -1,5 +1,7 @@
 use crate::cli::cli::GlobalOpts;
-use crate::cli::shared::{assert_future_directed, create_scene, integrate_and_save_ray, render, resolve_camera_velocity};
+use crate::cli::shared::{
+    assert_future_directed, create_scene, integrate_and_save_ray, render, resolve_camera_velocity,
+};
 use crate::configuration::RenderConfig;
 use crate::geometry::four_vector::FourVector;
 use crate::geometry::geometry::{Geometry, InnerProduct, RenderableGeometry};
@@ -127,6 +129,8 @@ mod tests {
             psi: PI / 2.0,
             camera_position: vec![],
             tone_mapping: ToneMappingMethod::Reinhard,
+            show_sampling_mask: false,
+            sampling_mask_color: crate::rendering::color::Color::new(255, 0, 255, 255),
         };
         let geometry = Kerr::new(radius, a, horizon_epsilon);
         let mut output_buffer = BufWriter::new(Vec::new());

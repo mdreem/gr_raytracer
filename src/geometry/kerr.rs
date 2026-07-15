@@ -135,7 +135,6 @@ impl Kerr {
             horizon_epsilon,
         }
     }
-
 }
 
 impl OdeFunction<Const<8>> for KerrSolver {

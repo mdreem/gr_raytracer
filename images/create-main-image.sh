@@ -44,7 +44,7 @@ celestial_temperature = 0.0
 beaming_exponent = 3.0
 path = "resources/tmp/Messier_object_025.jpg"
 
-[geometry_type.Kerr]
+[geometry_type.KerrBL]
 radius = 1.0
 a = 0.499
 horizon_epsilon = 1e-4
@@ -60,21 +60,21 @@ max_steps = 50000
 step_size = 0.0002
 thickness = 0.03
 density_multiplier = 500.0
-brightness_reference_temperature = 6000.0
+brightness_reference_temperature = 7000.0
 absorption = 0.3
 scattering = 0.4
 noise_scale = [60.0, 4.0, 45.0]
-noise_offset = -0.45
+noise_offset = 0.0
 
 [objects.VolumetricDisc.texture.BlackBody]
-beaming_exponent = 4.0
+beaming_exponent = 0.0
 EOF
 
 cargo build --release
 
 ./target/release/gr_raytracer \
     --width="$WIDTH" --height="$HEIGHT" \
-    --camera-position=-18,0,0.8 --theta=1.52 --psi=-1.57 --phi=0 \
+    --camera-position=-17,0,1.5 --theta=-3.14159 --psi=0.0 --phi=0 \
     --config-file "$SCENE" \
     render --filename="$OUTPUT"
 
