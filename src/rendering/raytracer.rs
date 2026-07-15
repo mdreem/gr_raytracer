@@ -62,6 +62,7 @@ struct PixelToSample {
     pub result: Option<CIETristimulus>,
 }
 
+/// Michelson (relative) luminance contrast; relative because HDR radiance is unbounded.
 fn luminance_contrast(p: &CIETristimulus, q: &CIETristimulus) -> f64 {
     let eps = 1e-4;
     let l_p = p.y;
@@ -69,10 +70,12 @@ fn luminance_contrast(p: &CIETristimulus, q: &CIETristimulus) -> f64 {
     (l_p - l_q).abs() / (l_p + l_q + eps)
 }
 
+/// Absolute opacity difference; absolute because alpha is already normalized to [0, 1].
 fn opacity_contrast(p: &CIETristimulus, q: &CIETristimulus) -> f64 {
     (p.alpha - q.alpha).abs()
 }
 
+/// Faintness gate: true if the brighter of the pair clears the floor (max keeps it symmetric).
 fn visible(p: &CIETristimulus, q: &CIETristimulus) -> bool {
     let faint_floor = 1e-4;
     p.y.max(q.y) > faint_floor
@@ -222,10 +225,11 @@ impl<'a, G: Geometry> Raytracer<'a, G> {
                     if let (Some(pixel), Some(neighbor)) =
                         (buffer.get(pixel_index), buffer.get(neighbor_index))
                     {
-                        let visible = visible(&pixel.color, &neighbor.color);
+                        let is_visible = visible(&pixel.color, &neighbor.color);
                         if pixel.ray_class != neighbor.ray_class
-                            || (luminance_contrast(&pixel.color, &neighbor.color) > 0.15 && visible)
-                            || (opacity_contrast(&pixel.color, &neighbor.color) > 0.1 && visible)
+                            || (luminance_contrast(&pixel.color, &neighbor.color) > 0.15
+                                && is_visible)
+                            || (opacity_contrast(&pixel.color, &neighbor.color) > 0.1 && is_visible)
                         {
                             pixels_to_sample.push(PixelToSample {
                                 row,
