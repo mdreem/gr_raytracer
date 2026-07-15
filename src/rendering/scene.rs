@@ -1,3 +1,4 @@
+use crate::configuration::AdaptiveSamplingConfig;
 use crate::geometry::geometry::Geometry;
 use crate::geometry::point::{CoordinateSystem, Point};
 use crate::geometry::spherical_coordinates_helper::spherical_to_cartesian;
@@ -37,6 +38,8 @@ pub struct Scene<'a, G: Geometry> {
     save_ray_data: bool,
     redshift_computer: RedshiftComputer<'a, G>,
     celestial_temperature: f64,
+    pub adaptive_sampling: AdaptiveSamplingConfig,
+    pub sampling_mask_color: Option<CIETristimulus>,
 }
 
 pub type EquationOfMotionState = OVector<f64, Const<8>>;
@@ -86,7 +89,19 @@ impl<'a, G: Geometry> Scene<'a, G> {
             save_ray_data,
             redshift_computer: RedshiftComputer::new(geometry),
             celestial_temperature,
+            adaptive_sampling: Default::default(),
+            sampling_mask_color: None,
         }
+    }
+
+    pub fn with_sampling_options(
+        mut self,
+        adaptive_sampling: AdaptiveSamplingConfig,
+        sampling_mask_color: Option<CIETristimulus>,
+    ) -> Self {
+        self.adaptive_sampling = adaptive_sampling;
+        self.sampling_mask_color = sampling_mask_color;
+        self
     }
 
     pub fn integrate_ray(
@@ -191,7 +206,7 @@ impl<'a, G: Geometry> Scene<'a, G> {
             result = result.blend(color)
         }
 
-        if object_opacity > 0.5 {
+        if object_opacity > self.adaptive_sampling.object_hit_opacity_threshold {
             ray_class = RayClass::Hit;
         }
 

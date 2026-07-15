@@ -55,6 +55,8 @@ pub struct Raytracer<'a, G: Geometry> {
     tone_mapping: ToneMappingMethod,
 }
 
+const MICHELSON_DENOMINATOR_EPSILON: f64 = 1e-4;
+
 #[derive(PartialEq)]
 struct PixelToSample {
     pub row: u32,
@@ -64,10 +66,9 @@ struct PixelToSample {
 
 /// Michelson (relative) luminance contrast; relative because HDR radiance is unbounded.
 fn luminance_contrast(p: &CIETristimulus, q: &CIETristimulus) -> f64 {
-    let eps = 1e-4;
     let l_p = p.y;
     let l_q = q.y;
-    (l_p - l_q).abs() / (l_p + l_q + eps)
+    (l_p - l_q).abs() / (l_p + l_q + MICHELSON_DENOMINATOR_EPSILON)
 }
 
 /// Absolute opacity difference; absolute because alpha is already normalized to [0, 1].
@@ -82,9 +83,8 @@ fn opacity_contrast(p: &CIETristimulus, q: &CIETristimulus) -> f64 {
 /// but stops the high-frequency background from flooding the contrast trigger
 /// (it would otherwise flag ~all pixels). Class-change edges are not gated, so
 /// silhouettes and the shadow rim are unaffected.
-fn visible(p: &CIETristimulus, q: &CIETristimulus) -> bool {
-    let faint_floor = 1.0;
-    p.y.max(q.y) > faint_floor
+fn visible(p: &CIETristimulus, q: &CIETristimulus, minimum_luminance: f64) -> bool {
+    p.y.max(q.y) > minimum_luminance
 }
 
 // https://rosettacode.org/wiki/Pseudo-random_numbers/Splitmix64
@@ -99,6 +99,22 @@ fn hash_pixel_samples(row: i64, col: i64, k: usize) -> f64 {
 
     // Convert to a floating-point number in the range [0, 1)
     (z >> 11) as f64 * (1.0 / (1u64 << 53) as f64)
+}
+
+fn stratified_sample_offset(
+    row: i64,
+    col: i64,
+    stratum_row: usize,
+    stratum_col: usize,
+    samples_per_axis: usize,
+) -> (f64, f64) {
+    debug_assert!(samples_per_axis > 0);
+    let sample_index = stratum_row * samples_per_axis + stratum_col;
+    let dx = (stratum_col as f64 + hash_pixel_samples(row, col, 2 * sample_index))
+        / samples_per_axis as f64;
+    let dy = (stratum_row as f64 + hash_pixel_samples(row, col, 2 * sample_index + 1))
+        / samples_per_axis as f64;
+    (dx, dy)
 }
 
 impl<'a, G: Geometry> Raytracer<'a, G> {
@@ -124,7 +140,15 @@ impl<'a, G: Geometry> Raytracer<'a, G> {
         to_row: u32,
         to_col: u32,
     ) -> Result<Vec<CIETristimulus>, RaytracerError> {
-        self.render_section_to_cie_buffer_supersampled(from_row, from_col, to_row, to_col)
+        if self.scene.adaptive_sampling.enabled || self.scene.sampling_mask_color.is_some() {
+            self.render_section_to_cie_buffer_supersampled(from_row, from_col, to_row, to_col)
+        } else {
+            Ok(self
+                .render_section_to_cie_buffer_raw(from_row, from_col, to_row, to_col)?
+                .into_iter()
+                .map(|sample| sample.color)
+                .collect())
+        }
     }
 
     fn render_section_to_cie_buffer_raw(
@@ -201,18 +225,15 @@ impl<'a, G: Geometry> Raytracer<'a, G> {
             from_row, from_col, to_row, to_col
         );
         let buffer = self.render_section_to_cie_buffer_raw(from_row, from_col, to_row, to_col)?;
-        let mut output_buffer: Vec<CIETristimulus> =
-            vec![CIETristimulus::new(0.0, 0.0, 0.0, 1.0); buffer.len()];
-
-        let debug_color_mask = false;
-        let n_samples = 4;
+        let samples_per_axis = self.scene.adaptive_sampling.samples_per_axis;
 
         let mut pixels_to_sample =
             self.collect_pixels_to_supersample(from_row, from_col, to_row, to_col, &buffer);
 
-        output_buffer = buffer.into_iter().map(|s| s.color).collect();
+        let mut output_buffer: Vec<CIETristimulus> =
+            buffer.into_iter().map(|sample| sample.color).collect();
 
-        if debug_color_mask {
+        if let Some(mask_color) = self.scene.sampling_mask_color {
             for pixel in &pixels_to_sample {
                 let pixel_index = self.get_pixel_index(
                     pixel.row,
@@ -221,10 +242,10 @@ impl<'a, G: Geometry> Raytracer<'a, G> {
                     from_row,
                     from_col,
                 );
-                output_buffer[pixel_index] = CIETristimulus::new(1.0, 0.0, 1.0, 1.0);
+                output_buffer[pixel_index] = mask_color;
             }
         } else {
-            self.supersample(n_samples, &mut pixels_to_sample)?;
+            self.supersample(samples_per_axis, &mut pixels_to_sample)?;
         }
 
         for pixel in pixels_to_sample {
@@ -249,7 +270,7 @@ impl<'a, G: Geometry> Raytracer<'a, G> {
 
     fn supersample(
         &self,
-        n_samples: usize,
+        samples_per_axis: usize,
         pixels_to_sample: &mut Vec<PixelToSample>,
     ) -> Result<(), RaytracerError> {
         info!("Supersampling {} pixels", pixels_to_sample.len());
@@ -267,16 +288,20 @@ impl<'a, G: Geometry> Raytracer<'a, G> {
 
             let mut sample_color = CIETristimulus::new(0.0, 0.0, 0.0, 0.0);
             let mut valid_samples = 0u32;
-            for s_row in 0..n_samples {
-                for s_col in 0..n_samples {
-                    let idx = s_row * n_samples + s_col;
+            for stratum_row in 0..samples_per_axis {
+                for stratum_col in 0..samples_per_axis {
+                    let (dx, dy) = stratified_sample_offset(
+                        pixel.row as i64,
+                        pixel.col as i64,
+                        stratum_row,
+                        stratum_col,
+                        samples_per_axis,
+                    );
                     let ray = self.scene.camera.get_ray_for_offset(
                         pixel.row as i64,
                         pixel.col as i64,
-                        hash_pixel_samples(pixel.row as i64, pixel.col as i64, 2 * idx)
-                            / n_samples as f64,
-                        hash_pixel_samples(pixel.row as i64, pixel.col as i64, 2 * idx + 1)
-                            / n_samples as f64,
+                        dx,
+                        dy,
                     );
                     match self.scene.color_of_ray(&ray) {
                         Ok(sample) => {
@@ -314,7 +339,7 @@ impl<'a, G: Geometry> Raytracer<'a, G> {
         from_col: u32,
         to_row: u32,
         to_col: u32,
-        buffer: &Vec<RaySample>,
+        buffer: &[RaySample],
     ) -> Vec<PixelToSample> {
         let mut pixels_to_sample: Vec<PixelToSample> = Vec::new();
         for row in from_row..to_row {
@@ -352,15 +377,21 @@ impl<'a, G: Geometry> Raytracer<'a, G> {
                     if let (Some(pixel), Some(neighbor)) =
                         (buffer.get(pixel_index), buffer.get(neighbor_index))
                     {
-                        let is_visible = visible(&pixel.color, &neighbor.color);
+                        let is_visible = visible(
+                            &pixel.color,
+                            &neighbor.color,
+                            self.scene.adaptive_sampling.minimum_luminance,
+                        );
                         let both_background = pixel.ray_class == RayClass::Escaped
                             && neighbor.ray_class == RayClass::Escaped;
                         if pixel.ray_class != neighbor.ray_class
                             || (!both_background
-                                && (luminance_contrast(&pixel.color, &neighbor.color) > 0.15)
+                                && (luminance_contrast(&pixel.color, &neighbor.color)
+                                    > self.scene.adaptive_sampling.luminance_contrast_threshold)
                                 && is_visible)
                             || (!both_background
-                                && (opacity_contrast(&pixel.color, &neighbor.color) > 0.1
+                                && (opacity_contrast(&pixel.color, &neighbor.color)
+                                    > self.scene.adaptive_sampling.opacity_contrast_threshold
                                     && is_visible))
                         {
                             pixels_to_sample.push(PixelToSample {
@@ -425,5 +456,43 @@ impl<'a, G: Geometry> Raytracer<'a, G> {
         let ray = self.scene.camera.get_ray_for(row, col);
         info!("ray for {}-{} is: {:?}", row, col, ray);
         self.scene.integrate_ray(&ray)
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::{MICHELSON_DENOMINATOR_EPSILON, luminance_contrast, stratified_sample_offset};
+    use crate::rendering::color::CIETristimulus;
+
+    #[test]
+    fn stratified_offsets_stay_in_their_cells() {
+        let samples_per_axis = 4;
+        for stratum_row in 0..samples_per_axis {
+            for stratum_col in 0..samples_per_axis {
+                let (dx, dy) =
+                    stratified_sample_offset(17, 23, stratum_row, stratum_col, samples_per_axis);
+                let cell_size = 1.0 / samples_per_axis as f64;
+                assert!(
+                    (stratum_col as f64 * cell_size..(stratum_col + 1) as f64 * cell_size)
+                        .contains(&dx)
+                );
+                assert!(
+                    (stratum_row as f64 * cell_size..(stratum_row + 1) as f64 * cell_size)
+                        .contains(&dy)
+                );
+                assert_eq!(
+                    (dx, dy),
+                    stratified_sample_offset(17, 23, stratum_row, stratum_col, samples_per_axis,)
+                );
+            }
+        }
+    }
+
+    #[test]
+    fn michelson_contrast_uses_the_named_epsilon() {
+        let black = CIETristimulus::new(0.0, 0.0, 0.0, 1.0);
+        let faint = CIETristimulus::new(0.0, MICHELSON_DENOMINATOR_EPSILON, 0.0, 1.0);
+        assert_eq!(luminance_contrast(&black, &black), 0.0);
+        assert_eq!(luminance_contrast(&black, &faint), 0.5);
     }
 }
