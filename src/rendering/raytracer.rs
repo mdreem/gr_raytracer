@@ -380,12 +380,14 @@ impl<'a, G: Geometry> Raytracer<'a, G> {
                     let neighbor_col = col as i32 + col_shift;
 
                     // Neighbours outside this section are skipped. For a full
-                    // render that is only the true image border. For a tiled
-                    // section render (--from/--to bounds) it also skips seam
-                    // neighbours, so an edge crossing a tile boundary can stay
-                    // at 1 spp and show a seam once stitched. Making tiled
-                    // renders seam-free needs a one-pixel trace halo around the
-                    // section used for selection only (TODO).
+                    // render that is only the true image border, and for a
+                    // standalone section crop (previewing a region) it just
+                    // leaves the crop's 1px border compared within the crop,
+                    // which is cosmetically negligible. It would only matter if
+                    // separately-rendered sections were stitched into one image,
+                    // where an edge crossing a seam could stay at 1 spp and show
+                    // a line; making that seam-free would need a 1px selection
+                    // halo around the section. Not needed for crop previews.
                     if neighbor_row < from_row as i32
                         || neighbor_row >= to_row as i32
                         || neighbor_col < from_col as i32
