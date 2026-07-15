@@ -3,6 +3,7 @@ use image::Rgba;
 use nalgebra::{Matrix3, Vector3};
 use serde::{Deserialize, Serialize};
 use std::ops::{Add, Mul};
+use std::str::FromStr;
 
 #[derive(Debug, PartialEq, Copy, Clone)]
 pub struct Color {
@@ -144,6 +145,27 @@ impl Color {
     }
     pub fn new(r: u8, g: u8, b: u8, alpha: u8) -> Color {
         Color { r, g, b, alpha }
+    }
+}
+
+impl FromStr for Color {
+    type Err = String;
+
+    fn from_str(value: &str) -> Result<Self, Self::Err> {
+        let components = value
+            .split(',')
+            .map(|component| {
+                component.trim().parse::<u8>().map_err(|_| {
+                    format!("invalid RGB color '{value}'; expected three values from 0 to 255")
+                })
+            })
+            .collect::<Result<Vec<_>, _>>()?;
+        let [r, g, b] = components.as_slice() else {
+            return Err(format!(
+                "invalid RGB color '{value}'; expected R,G,B (for example 255,0,255)"
+            ));
+        };
+        Ok(Color::new(*r, *g, *b, 255))
     }
 }
 

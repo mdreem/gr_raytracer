@@ -1,4 +1,4 @@
-use crate::rendering::color::ToneMappingMethod;
+use crate::rendering::color::{Color, ToneMappingMethod};
 use clap::{Args, Parser, Subcommand};
 
 #[derive(Debug, Args, Clone)]
@@ -39,6 +39,12 @@ pub struct GlobalOpts {
     pub psi: f64,
     #[arg(long, default_value = "reinhard")]
     pub tone_mapping: ToneMappingMethod,
+    /// Render the adaptive-sampling selection mask instead of supersampling.
+    #[arg(long)]
+    pub show_sampling_mask: bool,
+    /// Sampling-mask color as comma-separated 8-bit sRGB values.
+    #[arg(long, default_value = "255,0,255", value_name = "R,G,B")]
+    pub sampling_mask_color: Color,
 }
 
 #[derive(Parser)]
@@ -104,4 +110,31 @@ pub enum Action {
         #[arg(short, long, default_value = "blackbody_spectrum.png")]
         filename: String,
     },
+}
+
+#[cfg(test)]
+mod tests {
+    use super::App;
+    use crate::rendering::color::Color;
+    use clap::Parser;
+
+    #[test]
+    fn parses_sampling_mask_options() {
+        let app = App::try_parse_from([
+            "gr_raytracer",
+            "--show-sampling-mask",
+            "--sampling-mask-color",
+            "12,34,56",
+            "--config-file",
+            "scene.toml",
+            "render",
+        ])
+        .unwrap();
+
+        assert!(app.global_opts.show_sampling_mask);
+        assert_eq!(
+            app.global_opts.sampling_mask_color,
+            Color::new(12, 34, 56, 255)
+        );
+    }
 }

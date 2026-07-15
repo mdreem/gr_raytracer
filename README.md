@@ -73,6 +73,24 @@ cargo run --release -- --width=1500 --height=1500 --camera-position=-16.0,0.0,3.
 Predefined scenes live in [`scene-definitions`](./scene-definitions) as TOML files.  
 You can swap geometry, textures, and objects by choosing or editing a scene file.
 
+Adaptive supersampling is configured per scene. All fields are optional and use
+the defaults shown here:
+
+```toml
+[adaptive_sampling]
+enabled = true
+samples_per_axis = 4
+luminance_contrast_threshold = 0.15
+opacity_contrast_threshold = 0.1
+minimum_luminance = 1.0
+object_hit_opacity_threshold = 0.5
+```
+
+`samples_per_axis = 4` traces a jittered 4×4 grid for each selected pixel. To
+inspect which pixels the adaptive pass selects, add
+`--show-sampling-mask`. The default mask color is magenta and can be changed
+with an 8-bit sRGB value such as `--sampling-mask-color=255,128,0`.
+
 ## Scripts
 
 This repository includes helper scripts for rendering workflows, ray export, plotting, and animation.

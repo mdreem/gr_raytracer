@@ -129,6 +129,8 @@ mod tests {
             psi: PI / 2.0,
             camera_position: vec![],
             tone_mapping: ToneMappingMethod::Reinhard,
+            show_sampling_mask: false,
+            sampling_mask_color: crate::rendering::color::Color::new(255, 0, 255, 255),
         };
         let geometry = Kerr::new(radius, a, horizon_epsilon);
         let mut output_buffer = BufWriter::new(Vec::new());

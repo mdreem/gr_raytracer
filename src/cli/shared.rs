@@ -4,7 +4,7 @@ use crate::geometry::four_vector::FourVector;
 use crate::geometry::geometry::Geometry;
 use crate::geometry::point::Point;
 use crate::rendering::camera::Camera;
-use crate::rendering::color::{Color, ToneMappingMethod};
+use crate::rendering::color::{CIETristimulus, Color, ToneMappingMethod};
 use crate::rendering::integrator::IntegrationConfiguration;
 use crate::rendering::raytracer;
 use crate::rendering::raytracer::RaytracerError;
@@ -135,6 +135,15 @@ pub fn create_scene<G: Geometry>(
     opts: GlobalOpts,
     config: RenderConfig,
 ) -> Result<Scene<'_, G>, RaytracerError> {
+    config
+        .adaptive_sampling
+        .validate()
+        .map_err(RaytracerError::InvalidConfiguration)?;
+    let adaptive_sampling = config.adaptive_sampling.clone();
+    let sampling_mask_color = opts
+        .show_sampling_mask
+        .then(|| CIETristimulus::from_color(&opts.sampling_mask_color));
+
     let integration_configuration = IntegrationConfiguration::new(
         opts.max_steps,
         opts.max_radius,
@@ -306,7 +315,8 @@ pub fn create_scene<G: Geometry>(
         camera,
         false,
         config.celestial_temperature,
-    );
+    )
+    .with_sampling_options(adaptive_sampling, sampling_mask_color);
     Ok(scene)
 }
 
