@@ -376,8 +376,8 @@ mod tests {
     use crate::geometry::spherical_coordinates_helper::cartesian_to_spherical;
     use crate::rendering::camera::Camera;
     use crate::rendering::color::CIETristimulus;
-    use crate::rendering::scene::Scene;
     use crate::rendering::scene::test_scene::create_scene_with_camera;
+    use crate::rendering::scene::{RayClass, Scene};
     use std::f64::consts::PI;
 
     const CELESTIAL_SPHERE_COLOR_1: CIETristimulus = CIETristimulus {
@@ -428,9 +428,10 @@ mod tests {
         let scene = create_scene_with_camera(2.0, 0.2, 0.3, &space, camera, 1e-12).unwrap();
 
         let ray = scene.camera.get_ray_for(5, 5);
-        let color = scene.color_of_ray(&ray).unwrap().color;
+        let sample = scene.color_of_ray(&ray).unwrap();
 
-        assert_approx_eq_cie_tristimulus!(color, SPHERE_COLOR_2, 1e-6);
+        assert_eq!(sample.ray_class, RayClass::Hit);
+        assert_approx_eq_cie_tristimulus!(sample.color, SPHERE_COLOR_2, 1e-6);
     }
 
     #[test]
@@ -552,9 +553,10 @@ mod tests {
             create_scene_with_camera(2.0, 0.2, 0.3, &space, camera, 1e-12).unwrap();
 
         let ray = scene.camera.get_ray_for(0, 0);
-        let color = scene.color_of_ray(&ray).unwrap().color;
+        let sample = scene.color_of_ray(&ray).unwrap();
 
-        assert_approx_eq_cie_tristimulus!(color, CELESTIAL_SPHERE_COLOR_2, 1e-6);
+        assert_eq!(sample.ray_class, RayClass::Escaped);
+        assert_approx_eq_cie_tristimulus!(sample.color, CELESTIAL_SPHERE_COLOR_2, 1e-6);
     }
 
     #[test]
@@ -621,9 +623,10 @@ mod tests {
         let scene = create_scene_with_camera(0.5, 3.0, 4.0, &space, camera, 1e-12).unwrap();
 
         let ray = scene.camera.get_ray_for(5, 5);
-        let color = scene.color_of_ray(&ray).unwrap().color;
+        let sample = scene.color_of_ray(&ray).unwrap();
 
-        assert_eq!(color, CIETristimulus::new(0.0, 0.0, 0.0, 1.0));
+        assert_eq!(sample.ray_class, RayClass::Captured);
+        assert_eq!(sample.color, CIETristimulus::new(0.0, 0.0, 0.0, 1.0));
     }
 
     #[test]

@@ -336,6 +336,34 @@ mod tests {
     }
 
     #[test]
+    fn centered_offset_produces_the_base_pixel_ray() {
+        let geometry = EuclideanSpace::new();
+        let camera = Camera::new(
+            Point::new_cartesian(0.0, 1.0, 0.0, 0.0),
+            FourVector::new_cartesian(1.0, 0.0, 0.0, 0.0),
+            PI / 2.0,
+            11,
+            11,
+            0.0,
+            0.0,
+            0.0,
+            &geometry,
+        )
+        .unwrap();
+
+        let base = camera.get_ray_for(3, 7);
+        let centered = camera.get_ray_for_offset(3, 7, 0.5, 0.5);
+
+        assert_eq!(centered.row, base.row);
+        assert_eq!(centered.col, base.col);
+        assert_abs_diff_eq!(centered.position.vector, base.position.vector);
+        assert_abs_diff_eq!(
+            centered.momentum.get_as_vector(),
+            base.momentum.get_as_vector()
+        );
+    }
+
+    #[test]
     fn test_get_ray_for_different_geometries_euclidean() {
         let position = Point::new_cartesian(0.0, 0.0, 1.0, 0.0);
         let velocity = FourVector::new_cartesian(1.0, 0.0, 0.0, 0.0);

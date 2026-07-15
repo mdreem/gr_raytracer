@@ -237,18 +237,54 @@ mod tests {
     }
 
     #[test]
-    fn adaptive_sampling_rejects_invalid_values() {
-        let config = AdaptiveSamplingConfig {
-            samples_per_axis: 0,
+    fn adaptive_sampling_accepts_boundary_values() {
+        AdaptiveSamplingConfig {
+            luminance_contrast_threshold: 0.0,
+            opacity_contrast_threshold: 1.0,
+            minimum_luminance: 0.0,
+            object_hit_opacity_threshold: 1.0,
             ..Default::default()
-        };
-        assert!(config.validate().is_err());
+        }
+        .validate()
+        .unwrap();
+    }
 
-        let config = AdaptiveSamplingConfig {
-            opacity_contrast_threshold: 1.1,
-            ..Default::default()
-        };
-        assert!(config.validate().is_err());
+    #[test]
+    fn adaptive_sampling_rejects_invalid_values() {
+        let invalid_configs = [
+            AdaptiveSamplingConfig {
+                samples_per_axis: 0,
+                ..Default::default()
+            },
+            AdaptiveSamplingConfig {
+                luminance_contrast_threshold: -0.1,
+                ..Default::default()
+            },
+            AdaptiveSamplingConfig {
+                luminance_contrast_threshold: f64::NAN,
+                ..Default::default()
+            },
+            AdaptiveSamplingConfig {
+                opacity_contrast_threshold: 1.1,
+                ..Default::default()
+            },
+            AdaptiveSamplingConfig {
+                object_hit_opacity_threshold: f64::INFINITY,
+                ..Default::default()
+            },
+            AdaptiveSamplingConfig {
+                minimum_luminance: -0.1,
+                ..Default::default()
+            },
+            AdaptiveSamplingConfig {
+                minimum_luminance: f64::INFINITY,
+                ..Default::default()
+            },
+        ];
+
+        for config in invalid_configs {
+            assert!(config.validate().is_err(), "accepted {config:?}");
+        }
     }
 
     #[test]

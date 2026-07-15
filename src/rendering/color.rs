@@ -350,6 +350,24 @@ pub mod tests {
     }
 
     #[test]
+    fn parses_rgb_color_with_optional_whitespace() {
+        assert_eq!(
+            " 12, 34 ,56 ".parse::<Color>().unwrap(),
+            Color::new(12, 34, 56, 255)
+        );
+    }
+
+    #[test]
+    fn rejects_malformed_rgb_colors() {
+        for value in ["12,34", "12,34,56,78", "12,blue,56", "12,34,256"] {
+            assert!(
+                value.parse::<Color>().is_err(),
+                "{value} should be rejected"
+            );
+        }
+    }
+
+    #[test]
     fn cie_blend_retains_background_when_foreground_transparent() {
         let background = CIETristimulus::new(0.2, 0.4, 0.6, 1.0);
         let foreground = CIETristimulus::new(0.8, 0.1, 0.3, 0.0);
