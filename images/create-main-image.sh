@@ -63,8 +63,8 @@ density_multiplier = 500.0
 brightness_reference_temperature = 7000.0
 absorption = 0.3
 scattering = 0.4
-noise_scale = [120.0, 8.0, 90.0]
-noise_offset = 0.1
+noise_scale = [60.0, 4.0, 45.0]
+noise_offset = 0.0
 
 [objects.VolumetricDisc.texture.BlackBody]
 beaming_exponent = 0.0
