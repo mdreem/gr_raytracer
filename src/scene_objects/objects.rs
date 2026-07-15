@@ -180,7 +180,9 @@ mod tests {
             p: FourVector::new_cartesian(1.0, 0.0, 0.0, 0.0),
         };
 
-        let result = objects.intersects(&step_start, &step_end, &unit_frequency()).unwrap();
+        let result = objects
+            .intersects(&step_start, &step_end, &unit_frequency())
+            .unwrap();
         assert!(result.is_some());
     }
 
@@ -267,7 +269,9 @@ mod tests {
             p: FourVector::new_spherical(1.0, 0.0, 0.1, 0.0),
         };
 
-        let result = objects.intersects(&step_start, &step_end, &unit_frequency()).unwrap();
+        let result = objects
+            .intersects(&step_start, &step_end, &unit_frequency())
+            .unwrap();
         assert!(result.is_some());
     }
 }

@@ -1,3 +1,4 @@
+use crate::configuration::AdaptiveSamplingConfig;
 use crate::geometry::geometry::Geometry;
 use crate::geometry::point::{CoordinateSystem, Point};
 use crate::geometry::spherical_coordinates_helper::spherical_to_cartesian;
@@ -15,6 +16,19 @@ use nalgebra::{Const, OVector};
 use std::f64::consts::PI;
 use std::fs::File;
 
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub struct RaySample {
+    pub color: CIETristimulus,
+    pub ray_class: RayClass,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub enum RayClass {
+    Escaped,
+    Captured,
+    Hit,
+}
+
 pub struct Scene<'a, G: Geometry> {
     pub integrator: Integrator<'a, G>,
     objects: Objects<'a, G>,
@@ -24,6 +38,8 @@ pub struct Scene<'a, G: Geometry> {
     save_ray_data: bool,
     redshift_computer: RedshiftComputer<'a, G>,
     celestial_temperature: f64,
+    pub adaptive_sampling: AdaptiveSamplingConfig,
+    pub sampling_mask_color: Option<CIETristimulus>,
 }
 
 pub type EquationOfMotionState = OVector<f64, Const<8>>;
@@ -73,7 +89,19 @@ impl<'a, G: Geometry> Scene<'a, G> {
             save_ray_data,
             redshift_computer: RedshiftComputer::new(geometry),
             celestial_temperature,
+            adaptive_sampling: Default::default(),
+            sampling_mask_color: None,
         }
+    }
+
+    pub fn with_sampling_options(
+        mut self,
+        adaptive_sampling: AdaptiveSamplingConfig,
+        sampling_mask_color: Option<CIETristimulus>,
+    ) -> Self {
+        self.adaptive_sampling = adaptive_sampling;
+        self.sampling_mask_color = sampling_mask_color;
+        self
     }
 
     pub fn integrate_ray(
@@ -83,7 +111,7 @@ impl<'a, G: Geometry> Scene<'a, G> {
         self.integrator.integrate(ray)
     }
 
-    pub fn color_of_ray(&self, ray: &Ray) -> Result<CIETristimulus, RaytracerError> {
+    pub fn color_of_ray(&self, ray: &Ray) -> Result<RaySample, RaytracerError> {
         trace!("Tracing ray at ({}|{})", ray.row, ray.col);
         let m_s = self
             .geometry
@@ -104,8 +132,11 @@ impl<'a, G: Geometry> Scene<'a, G> {
         }
 
         let velocity = self.camera.velocity;
-        let frequency = self.redshift_computer.get_ray_frequency_data(ray, &velocity);
+        let frequency = self
+            .redshift_computer
+            .get_ray_frequency_data(ray, &velocity);
 
+        let mut object_opacity = 0.0;
         let mut intersections = Vec::new();
         for step_window in steps.steps.windows(2) {
             let last_step = &step_window[0];
@@ -115,16 +146,20 @@ impl<'a, G: Geometry> Scene<'a, G> {
                 self.objects.intersects(last_step, step, &frequency)?
             {
                 intersections.push(intersection_color);
+                let alpha = intersection_color.alpha.clamp(0.0, 1.0);
+                object_opacity = alpha + object_opacity * (1.0 - alpha);
             }
         }
         let last_step = steps.steps.last().ok_or(RaytracerError::IntegrationError(
             crate::rendering::integrator::IntegrationError::NoStepsProduced,
         ))?;
 
+        let mut ray_class;
         if let Some(reason) = stop_reason {
             match reason {
                 HorizonReached => {
                     intersections.push(CIETristimulus::new(0.0, 0.0, 0.0, 1.0));
+                    ray_class = RayClass::Captured;
                 }
                 CelestialSphereReached => {
                     let uv = self.get_uv_coordinates(last_step);
@@ -138,6 +173,7 @@ impl<'a, G: Geometry> Scene<'a, G> {
                             temperature: self.celestial_temperature,
                         },
                     ));
+                    ray_class = RayClass::Escaped;
                 }
                 StopReason::CoordinateIsNan => {
                     error!(
@@ -145,9 +181,16 @@ impl<'a, G: Geometry> Scene<'a, G> {
                         ray,
                         steps.len()
                     );
+                    // Degenerate ray: default to Captured so a no-hit NaN reads
+                    // as shadow (avoids spurious mask edges). Any emission
+                    // accumulated before the NaN is still blended over black
+                    // below, as in the horizon case, and the opacity override
+                    // reclassifies it to Hit if it did hit the disc.
+                    ray_class = RayClass::Captured;
                 }
                 StopReason::ClosedOrbitDetected => {
                     intersections.push(CIETristimulus::new(0.0, 0.0, 0.0, 1.0));
+                    ray_class = RayClass::Captured;
                 }
             };
         } else {
@@ -157,6 +200,8 @@ impl<'a, G: Geometry> Scene<'a, G> {
                 steps.iter().last(),
                 steps.len()
             );
+            // No terminal event: default to Captured (see the NaN case above).
+            ray_class = RayClass::Captured;
         }
         let mut result = CIETristimulus::new(0.0, 0.0, 0.0, 1.0);
 
@@ -164,7 +209,14 @@ impl<'a, G: Geometry> Scene<'a, G> {
             result = result.blend(color)
         }
 
-        Ok(result)
+        if object_opacity >= self.adaptive_sampling.object_hit_opacity_threshold {
+            ray_class = RayClass::Hit;
+        }
+
+        Ok(RaySample {
+            color: result,
+            ray_class,
+        })
     }
 
     fn get_uv_coordinates(&self, step_far: &Step) -> UVCoordinates {
@@ -327,8 +379,8 @@ mod tests {
     use crate::geometry::spherical_coordinates_helper::cartesian_to_spherical;
     use crate::rendering::camera::Camera;
     use crate::rendering::color::CIETristimulus;
-    use crate::rendering::scene::Scene;
     use crate::rendering::scene::test_scene::create_scene_with_camera;
+    use crate::rendering::scene::{RayClass, Scene};
     use std::f64::consts::PI;
 
     const CELESTIAL_SPHERE_COLOR_1: CIETristimulus = CIETristimulus {
@@ -379,9 +431,10 @@ mod tests {
         let scene = create_scene_with_camera(2.0, 0.2, 0.3, &space, camera, 1e-12).unwrap();
 
         let ray = scene.camera.get_ray_for(5, 5);
-        let color = scene.color_of_ray(&ray).unwrap();
+        let sample = scene.color_of_ray(&ray).unwrap();
 
-        assert_approx_eq_cie_tristimulus!(color, SPHERE_COLOR_2, 1e-6);
+        assert_eq!(sample.ray_class, RayClass::Hit);
+        assert_approx_eq_cie_tristimulus!(sample.color, SPHERE_COLOR_2, 1e-6);
     }
 
     #[test]
@@ -409,7 +462,7 @@ mod tests {
         let scene = create_scene_with_camera(2.0, 0.2, 0.3, &space, camera, 1e-12).unwrap();
 
         let ray = scene.camera.get_ray_for(5, 5);
-        let color = scene.color_of_ray(&ray).unwrap();
+        let color = scene.color_of_ray(&ray).unwrap().color;
 
         assert_approx_eq_cie_tristimulus!(
             color,
@@ -448,7 +501,7 @@ mod tests {
         let scene = create_scene_with_camera(2.0, 3.0, 4.0, &geometry, camera, 1e-12).unwrap();
 
         let ray = scene.camera.get_ray_for(5, 5);
-        let color = scene.color_of_ray(&ray).unwrap();
+        let color = scene.color_of_ray(&ray).unwrap().color;
 
         assert_approx_eq_cie_tristimulus!(color, SPHERE_COLOR_2, 1e-6);
     }
@@ -480,7 +533,7 @@ mod tests {
             create_scene_with_camera(sphere_radius, 3.0, 4.0, &geometry, camera, 1e-12).unwrap();
 
         let ray = scene.camera.get_ray_for(5, 5);
-        let color = scene.color_of_ray(&ray).unwrap();
+        let color = scene.color_of_ray(&ray).unwrap().color;
         assert_approx_eq_cie_tristimulus!(color, SPHERE_COLOR_2, 1e-6);
     }
 
@@ -503,9 +556,10 @@ mod tests {
             create_scene_with_camera(2.0, 0.2, 0.3, &space, camera, 1e-12).unwrap();
 
         let ray = scene.camera.get_ray_for(0, 0);
-        let color = scene.color_of_ray(&ray).unwrap();
+        let sample = scene.color_of_ray(&ray).unwrap();
 
-        assert_approx_eq_cie_tristimulus!(color, CELESTIAL_SPHERE_COLOR_2, 1e-6);
+        assert_eq!(sample.ray_class, RayClass::Escaped);
+        assert_approx_eq_cie_tristimulus!(sample.color, CELESTIAL_SPHERE_COLOR_2, 1e-6);
     }
 
     #[test]
@@ -538,7 +592,7 @@ mod tests {
         let scene = create_scene_with_camera(2.0, 3.0, 4.0, &space, camera, 1e-12).unwrap();
 
         let ray = scene.camera.get_ray_for(0, 0);
-        let color = scene.color_of_ray(&ray).unwrap();
+        let color = scene.color_of_ray(&ray).unwrap().color;
 
         // The camera is freely falling, so the aberration of the traced
         // (past-directed, physically arriving) photon differs from the old
@@ -572,9 +626,10 @@ mod tests {
         let scene = create_scene_with_camera(0.5, 3.0, 4.0, &space, camera, 1e-12).unwrap();
 
         let ray = scene.camera.get_ray_for(5, 5);
-        let color = scene.color_of_ray(&ray).unwrap();
+        let sample = scene.color_of_ray(&ray).unwrap();
 
-        assert_eq!(color, CIETristimulus::new(0.0, 0.0, 0.0, 1.0));
+        assert_eq!(sample.ray_class, RayClass::Captured);
+        assert_eq!(sample.color, CIETristimulus::new(0.0, 0.0, 0.0, 1.0));
     }
 
     #[test]
@@ -596,7 +651,7 @@ mod tests {
             create_scene_with_camera(1.0, 2.0, 7.0, &space, camera, 1e-12).unwrap();
 
         let ray = scene.camera.get_ray_for(0, 51);
-        let color = scene.color_of_ray(&ray).unwrap();
+        let color = scene.color_of_ray(&ray).unwrap().color;
 
         assert_approx_eq_cie_tristimulus!(
             color,

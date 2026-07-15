@@ -269,8 +269,7 @@ impl VolumetricDisc {
                     );
 
                     let travel_density = d_s; // Ignore the light ray here for now.
-                    let light_attenuation =
-                        (-density * travel_density * (sigma_a + sigma_s)).exp();
+                    let light_attenuation = (-density * travel_density * (sigma_a + sigma_s)).exp();
 
                     // Stefan-Boltzmann law: emission intensity scales with T^4.
                     // Use a reference temperature for normalization to boost brightness.
@@ -762,10 +761,22 @@ mod tests {
         let rd = Vector3::new(1.0, 0.0, 0.0);
 
         let cached = disc
-            .raymarch_constant_step_internal(&ro, &rd, &EuclideanSpace::new(), &unit_frequency(), true)
+            .raymarch_constant_step_internal(
+                &ro,
+                &rd,
+                &EuclideanSpace::new(),
+                &unit_frequency(),
+                true,
+            )
             .expect("raymarch should succeed");
         let legacy = disc
-            .raymarch_constant_step_internal(&ro, &rd, &EuclideanSpace::new(), &unit_frequency(), false)
+            .raymarch_constant_step_internal(
+                &ro,
+                &rd,
+                &EuclideanSpace::new(),
+                &unit_frequency(),
+                false,
+            )
             .expect("raymarch should succeed");
 
         assert_abs_diff_eq!(cached.x, legacy.x, epsilon = 1e-10);
