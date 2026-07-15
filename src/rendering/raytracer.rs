@@ -75,9 +75,15 @@ fn opacity_contrast(p: &CIETristimulus, q: &CIETristimulus) -> f64 {
     (p.alpha - q.alpha).abs()
 }
 
-/// Faintness gate: true if the brighter of the pair clears the floor (max keeps it symmetric).
+/// Faintness gate for the contrast triggers: true if the brighter of the pair
+/// clears the floor (max keeps it symmetric). The floor is in linear CIE Y.
+/// Scenes park the emissive disc far above unit luminance (Y > 1e4), while the
+/// star-field background sits below ~1, so a floor of 1.0 keeps the disc fully
+/// but stops the high-frequency background from flooding the contrast trigger
+/// (it would otherwise flag ~all pixels). Class-change edges are not gated, so
+/// silhouettes and the shadow rim are unaffected.
 fn visible(p: &CIETristimulus, q: &CIETristimulus) -> bool {
-    let faint_floor = 1e-4;
+    let faint_floor = 1.0;
     p.y.max(q.y) > faint_floor
 }
 
@@ -226,10 +232,15 @@ impl<'a, G: Geometry> Raytracer<'a, G> {
                         (buffer.get(pixel_index), buffer.get(neighbor_index))
                     {
                         let is_visible = visible(&pixel.color, &neighbor.color);
+                        let both_background = pixel.ray_class == RayClass::Escaped
+                            && neighbor.ray_class == RayClass::Escaped;
                         if pixel.ray_class != neighbor.ray_class
-                            || (luminance_contrast(&pixel.color, &neighbor.color) > 0.15
+                            || (!both_background
+                                && (luminance_contrast(&pixel.color, &neighbor.color) > 0.15)
                                 && is_visible)
-                            || (opacity_contrast(&pixel.color, &neighbor.color) > 0.1 && is_visible)
+                            || (!both_background
+                                && (opacity_contrast(&pixel.color, &neighbor.color) > 0.1
+                                    && is_visible))
                         {
                             pixels_to_sample.push(PixelToSample {
                                 row,
