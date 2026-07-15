@@ -22,6 +22,7 @@ path = "resources/disk.png"
 [objects.Sphere]
 radius = 3.0
 position = [0.0, 0.0, 0.0]
+temperature = 1.0
 
 [objects.Sphere.texture.Bitmap]
 beaming_exponent = 3.0

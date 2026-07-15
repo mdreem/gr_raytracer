@@ -67,7 +67,7 @@ noise_scale = [60.0, 4.0, 45.0]
 noise_offset = -0.45
 
 [objects.VolumetricDisc.texture.BlackBody]
-beaming_exponent = 4.0
+beaming_exponent = 0.0
 EOF
 
 cargo build --release
