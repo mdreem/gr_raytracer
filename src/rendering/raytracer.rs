@@ -348,6 +348,7 @@ impl<'a, G: Geometry> Raytracer<'a, G> {
                 pixel.result = Some(sample_color);
             }
         });
+        pb.finish();
 
         Ok(())
     }
@@ -378,6 +379,13 @@ impl<'a, G: Geometry> Raytracer<'a, G> {
                     let neighbor_row = row as i32 + row_shift;
                     let neighbor_col = col as i32 + col_shift;
 
+                    // Neighbours outside this section are skipped. For a full
+                    // render that is only the true image border. For a tiled
+                    // section render (--from/--to bounds) it also skips seam
+                    // neighbours, so an edge crossing a tile boundary can stay
+                    // at 1 spp and show a seam once stitched. Making tiled
+                    // renders seam-free needs a one-pixel trace halo around the
+                    // section used for selection only (TODO).
                     if neighbor_row < from_row as i32
                         || neighbor_row >= to_row as i32
                         || neighbor_col < from_col as i32

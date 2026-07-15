@@ -181,8 +181,11 @@ impl<'a, G: Geometry> Scene<'a, G> {
                         ray,
                         steps.len()
                     );
-                    // Degenerate ray, renders black; class it as shadow so it
-                    // does not seed spurious mask edges against its neighbours.
+                    // Degenerate ray: default to Captured so a no-hit NaN reads
+                    // as shadow (avoids spurious mask edges). Any emission
+                    // accumulated before the NaN is still blended over black
+                    // below, as in the horizon case, and the opacity override
+                    // reclassifies it to Hit if it did hit the disc.
                     ray_class = RayClass::Captured;
                 }
                 StopReason::ClosedOrbitDetected => {
@@ -197,7 +200,7 @@ impl<'a, G: Geometry> Scene<'a, G> {
                 steps.iter().last(),
                 steps.len()
             );
-            // No terminal event, renders black; class as shadow (see above).
+            // No terminal event: default to Captured (see the NaN case above).
             ray_class = RayClass::Captured;
         }
         let mut result = CIETristimulus::new(0.0, 0.0, 0.0, 1.0);
@@ -206,7 +209,7 @@ impl<'a, G: Geometry> Scene<'a, G> {
             result = result.blend(color)
         }
 
-        if object_opacity > self.adaptive_sampling.object_hit_opacity_threshold {
+        if object_opacity >= self.adaptive_sampling.object_hit_opacity_threshold {
             ray_class = RayClass::Hit;
         }
 
