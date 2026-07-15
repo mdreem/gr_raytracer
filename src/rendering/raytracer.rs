@@ -92,18 +92,40 @@ fn should_supersample_pair(
     pixel: &RaySample,
     neighbor: &RaySample,
     config: &AdaptiveSamplingConfig,
+    minimum_luminance: f64,
 ) -> bool {
     if pixel.ray_class != neighbor.ray_class {
         return true;
     }
 
-    if pixel.ray_class == RayClass::Escaped {
+    if config.exclude_background_contrast && pixel.ray_class == RayClass::Escaped {
         return false;
     }
 
-    visible(&pixel.color, &neighbor.color, config.minimum_luminance)
+    visible(&pixel.color, &neighbor.color, minimum_luminance)
         && (luminance_contrast(&pixel.color, &neighbor.color) > config.luminance_contrast_threshold
             || opacity_contrast(&pixel.color, &neighbor.color) > config.opacity_contrast_threshold)
+}
+
+/// Fraction of the frame's 99th-percentile luminance used as the contrast
+/// faintness floor when `minimum_luminance` is not set explicitly.
+const RELATIVE_MINIMUM_LUMINANCE_FRACTION: f64 = 1e-3;
+
+/// Resolve the contrast faintness floor: the configured absolute value, or a
+/// scene-relative one. The relative floor is a small fraction of the
+/// 99th-percentile luminance, which tracks the disc brightness while ignoring
+/// firefly outliers (using `max` would be dominated by them).
+fn resolve_minimum_luminance(config: &AdaptiveSamplingConfig, buffer: &[RaySample]) -> f64 {
+    if let Some(value) = config.minimum_luminance {
+        return value;
+    }
+    if buffer.is_empty() {
+        return 0.0;
+    }
+    let mut luminances: Vec<f64> = buffer.iter().map(|sample| sample.color.y).collect();
+    let index = (((luminances.len() - 1) as f64) * 0.99) as usize;
+    luminances.select_nth_unstable_by(index, f64::total_cmp);
+    RELATIVE_MINIMUM_LUMINANCE_FRACTION * luminances[index]
 }
 
 // https://rosettacode.org/wiki/Pseudo-random_numbers/Splitmix64
@@ -245,9 +267,17 @@ impl<'a, G: Geometry> Raytracer<'a, G> {
         );
         let buffer = self.render_section_to_cie_buffer_raw(from_row, from_col, to_row, to_col)?;
         let samples_per_axis = self.scene.adaptive_sampling.samples_per_axis;
+        let minimum_luminance =
+            resolve_minimum_luminance(&self.scene.adaptive_sampling, &buffer);
 
-        let mut pixels_to_sample =
-            self.collect_pixels_to_supersample(from_row, from_col, to_row, to_col, &buffer);
+        let mut pixels_to_sample = self.collect_pixels_to_supersample(
+            from_row,
+            from_col,
+            to_row,
+            to_col,
+            &buffer,
+            minimum_luminance,
+        );
 
         let mut output_buffer: Vec<CIETristimulus> =
             buffer.into_iter().map(|sample| sample.color).collect();
@@ -360,6 +390,7 @@ impl<'a, G: Geometry> Raytracer<'a, G> {
         to_row: u32,
         to_col: u32,
         buffer: &[RaySample],
+        minimum_luminance: f64,
     ) -> Vec<PixelToSample> {
         let mut pixels_to_sample: Vec<PixelToSample> = Vec::new();
         for row in from_row..to_row {
@@ -405,7 +436,12 @@ impl<'a, G: Geometry> Raytracer<'a, G> {
 
                     if let (Some(pixel), Some(neighbor)) =
                         (buffer.get(pixel_index), buffer.get(neighbor_index))
-                        && should_supersample_pair(pixel, neighbor, &self.scene.adaptive_sampling)
+                        && should_supersample_pair(
+                            pixel,
+                            neighbor,
+                            &self.scene.adaptive_sampling,
+                            minimum_luminance,
+                        )
                     {
                         pixels_to_sample.push(PixelToSample {
                             row,
@@ -522,21 +558,17 @@ mod tests {
 
     #[test]
     fn class_boundaries_are_always_supersampled() {
-        let config = AdaptiveSamplingConfig {
-            minimum_luminance: 100.0,
-            ..Default::default()
-        };
+        let config = AdaptiveSamplingConfig::default();
         let escaped = sample(0.0, 1.0, RayClass::Escaped);
         let captured = sample(0.0, 1.0, RayClass::Captured);
 
-        assert!(should_supersample_pair(&escaped, &captured, &config));
-        assert!(should_supersample_pair(&captured, &escaped, &config));
+        assert!(should_supersample_pair(&escaped, &captured, &config, 100.0));
+        assert!(should_supersample_pair(&captured, &escaped, &config, 100.0));
     }
 
     #[test]
     fn background_contrast_does_not_trigger_supersampling() {
         let config = AdaptiveSamplingConfig {
-            minimum_luminance: 0.0,
             luminance_contrast_threshold: 0.0,
             opacity_contrast_threshold: 0.0,
             ..Default::default()
@@ -544,13 +576,12 @@ mod tests {
         let dark = sample(1.0, 0.0, RayClass::Escaped);
         let bright = sample(100.0, 1.0, RayClass::Escaped);
 
-        assert!(!should_supersample_pair(&dark, &bright, &config));
+        assert!(!should_supersample_pair(&dark, &bright, &config, 0.0));
     }
 
     #[test]
     fn visible_object_contrast_triggers_supersampling() {
         let config = AdaptiveSamplingConfig {
-            minimum_luminance: 1.0,
             luminance_contrast_threshold: 0.2,
             opacity_contrast_threshold: 0.2,
             ..Default::default()
@@ -560,18 +591,19 @@ mod tests {
             &sample(2.0, 1.0, RayClass::Hit),
             &sample(1.0, 1.0, RayClass::Hit),
             &config,
+            1.0,
         ));
         assert!(should_supersample_pair(
             &sample(2.0, 0.6, RayClass::Hit),
             &sample(2.0, 0.9, RayClass::Hit),
             &config,
+            1.0,
         ));
     }
 
     #[test]
     fn faint_object_contrast_does_not_trigger_supersampling() {
         let config = AdaptiveSamplingConfig {
-            minimum_luminance: 1.0,
             luminance_contrast_threshold: 0.0,
             opacity_contrast_threshold: 0.0,
             ..Default::default()
@@ -581,6 +613,7 @@ mod tests {
             &sample(1.0, 0.0, RayClass::Hit),
             &sample(0.0, 1.0, RayClass::Hit),
             &config,
+            1.0,
         ));
     }
 }

@@ -28,9 +28,19 @@ pub struct AdaptiveSamplingConfig {
     pub luminance_contrast_threshold: f64,
     pub opacity_contrast_threshold: f64,
     /// Linear CIE Y floor below which contrast alone does not trigger sampling.
-    pub minimum_luminance: f64,
+    /// `None` (the default) derives it per frame as a small fraction of the
+    /// 99th-percentile luminance, so it tracks the disc brightness without a
+    /// scene-specific constant. The derived value is section-relative, so a
+    /// cropped section render is not byte-identical to the full frame there;
+    /// set an explicit value for fully deterministic crops.
+    pub minimum_luminance: Option<f64>,
     /// Accumulated object opacity required to classify a ray as an object hit.
     pub object_hit_opacity_threshold: f64,
+    /// When true (default), pairs of `Escaped` (background / see-through) rays
+    /// are never supersampled on contrast alone. This skips the high-frequency
+    /// star field. Set false to also anti-alias a bright semi-transparent disc,
+    /// at the cost of supersampling bright background stars too.
+    pub exclude_background_contrast: bool,
 }
 
 impl Default for AdaptiveSamplingConfig {
@@ -40,8 +50,9 @@ impl Default for AdaptiveSamplingConfig {
             samples_per_axis: 4,
             luminance_contrast_threshold: 0.15,
             opacity_contrast_threshold: 0.1,
-            minimum_luminance: 1.0,
+            minimum_luminance: None,
             object_hit_opacity_threshold: 0.5,
+            exclude_background_contrast: true,
         }
     }
 }
@@ -71,10 +82,11 @@ impl AdaptiveSamplingConfig {
                 ));
             }
         }
-        if !self.minimum_luminance.is_finite() || self.minimum_luminance < 0.0 {
+        if let Some(value) = self.minimum_luminance
+            && (!value.is_finite() || value < 0.0)
+        {
             return Err(format!(
-                "adaptive_sampling.minimum_luminance must be finite and non-negative (got {})",
-                self.minimum_luminance
+                "adaptive_sampling.minimum_luminance must be finite and non-negative (got {value})"
             ));
         }
         Ok(())
@@ -241,7 +253,7 @@ mod tests {
         AdaptiveSamplingConfig {
             luminance_contrast_threshold: 0.0,
             opacity_contrast_threshold: 1.0,
-            minimum_luminance: 0.0,
+            minimum_luminance: Some(0.0),
             object_hit_opacity_threshold: 1.0,
             ..Default::default()
         }
@@ -273,11 +285,11 @@ mod tests {
                 ..Default::default()
             },
             AdaptiveSamplingConfig {
-                minimum_luminance: -0.1,
+                minimum_luminance: Some(-0.1),
                 ..Default::default()
             },
             AdaptiveSamplingConfig {
-                minimum_luminance: f64::INFINITY,
+                minimum_luminance: Some(f64::INFINITY),
                 ..Default::default()
             },
         ];
