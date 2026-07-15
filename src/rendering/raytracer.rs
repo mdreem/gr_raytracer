@@ -193,9 +193,115 @@ impl<'a, G: Geometry> Raytracer<'a, G> {
         let debug_color_mask = false;
         let n_samples = 4;
 
-        let mut pixels_to_sample: Vec<PixelToSample> = Vec::new();
+        let mut pixels_to_sample =
+            self.collect_pixels_to_supersample(from_row, from_col, to_row, to_col, &buffer);
 
-        // Fetch candidate pixels for supersampling
+        output_buffer = buffer.into_iter().map(|s| s.color).collect();
+
+        if debug_color_mask {
+            for pixel in &pixels_to_sample {
+                let pixel_index = self.get_pixel_index(
+                    pixel.row,
+                    pixel.col,
+                    to_col - from_col,
+                    from_row,
+                    from_col,
+                );
+                output_buffer[pixel_index] = CIETristimulus::new(1.0, 0.0, 1.0, 1.0);
+            }
+        } else {
+            self.supersample(n_samples, &mut pixels_to_sample)?;
+        }
+
+        for pixel in pixels_to_sample {
+            if let Some(sample_color) = pixel.result {
+                let pixel_index = self.get_pixel_index(
+                    pixel.row,
+                    pixel.col,
+                    to_col - from_col,
+                    from_row,
+                    from_col,
+                );
+                output_buffer[pixel_index] = sample_color;
+            }
+        }
+
+        info!(
+            "Finished rendering section from ({}, {}) to ({}, {})",
+            from_row, from_col, to_row, to_col
+        );
+        Ok(output_buffer)
+    }
+
+    fn supersample(
+        &self,
+        n_samples: usize,
+        pixels_to_sample: &mut Vec<PixelToSample>,
+    ) -> Result<(), RaytracerError> {
+        info!("Supersampling {} pixels", pixels_to_sample.len());
+
+        let count = AtomicUsize::new(0);
+        use indicatif::{ProgressBar, ProgressStyle};
+        let pb = ProgressBar::new(pixels_to_sample.len() as u64);
+        pb.set_style(ProgressStyle::with_template("🎨 {spinner:.green} [{elapsed_precise}] [{wide_bar:.blue}] {pos}/{len} ({percent_precise}%, {eta})")
+            .map_err(RaytracerError::ProgressBarTemplateError)?
+            .progress_chars("█▇▆▅▄▃▂▁  "));
+
+        pixels_to_sample.par_iter_mut().for_each(|pixel| {
+            count.fetch_add(1, Ordering::SeqCst);
+            pb.set_position(count.load(Ordering::Relaxed) as u64);
+
+            let mut sample_color = CIETristimulus::new(0.0, 0.0, 0.0, 0.0);
+            let mut valid_samples = 0u32;
+            for s_row in 0..n_samples {
+                for s_col in 0..n_samples {
+                    // Sample the centre of each stratum: (s + 0.5) / n.
+                    // The 0.5 is where the per-pixel hash jitter will go later.
+                    let ray = self.scene.camera.get_ray_for_offset(
+                        pixel.row as i64,
+                        pixel.col as i64,
+                        (s_row as f64 + 0.5) / n_samples as f64,
+                        (s_col as f64 + 0.5) / n_samples as f64,
+                    );
+                    match self.scene.color_of_ray(&ray) {
+                        Ok(sample) => {
+                            sample_color = sample_color + sample.color;
+                            valid_samples += 1;
+                        }
+                        Err(err) => {
+                            error!(
+                                "Unable to compute color for ray at pixel ({}, {}): {:?}",
+                                pixel.col, pixel.row, err
+                            );
+                        }
+                    }
+                }
+            }
+            // Divide by the number of rays that actually returned a colour, so
+            // a failed sub-sample does not bias the pixel toward black. If all
+            // failed, leave result = None and keep the base 1-spp colour.
+            if valid_samples > 0 {
+                let inv = 1.0 / valid_samples as f64;
+                sample_color.x *= inv;
+                sample_color.y *= inv;
+                sample_color.z *= inv;
+                sample_color.alpha *= inv;
+                pixel.result = Some(sample_color);
+            }
+        });
+
+        Ok(())
+    }
+
+    fn collect_pixels_to_supersample(
+        &self,
+        from_row: u32,
+        from_col: u32,
+        to_row: u32,
+        to_col: u32,
+        buffer: &Vec<RaySample>,
+    ) -> Vec<PixelToSample> {
+        let mut pixels_to_sample: Vec<PixelToSample> = Vec::new();
         for row in from_row..to_row {
             for col in from_col..to_col {
                 let pixel_index =
@@ -254,91 +360,7 @@ impl<'a, G: Geometry> Raytracer<'a, G> {
             }
         }
 
-        output_buffer = buffer.into_iter().map(|s| s.color).collect();
-
-        if debug_color_mask {
-            for pixel in &pixels_to_sample {
-                let pixel_index = self.get_pixel_index(
-                    pixel.row,
-                    pixel.col,
-                    to_col - from_col,
-                    from_row,
-                    from_col,
-                );
-                output_buffer[pixel_index] = CIETristimulus::new(1.0, 0.0, 1.0, 1.0);
-            }
-        } else {
-            info!("Supersampling {} pixels", pixels_to_sample.len());
-
-            let count = AtomicUsize::new(0);
-            use indicatif::{ProgressBar, ProgressStyle};
-            let pb = ProgressBar::new(pixels_to_sample.len() as u64);
-            pb.set_style(ProgressStyle::with_template("🎨 {spinner:.green} [{elapsed_precise}] [{wide_bar:.blue}] {pos}/{len} ({percent_precise}%, {eta})")
-                .map_err(RaytracerError::ProgressBarTemplateError)?
-                .progress_chars("█▇▆▅▄▃▂▁  "));
-
-            pixels_to_sample.par_iter_mut().for_each(|pixel| {
-                count.fetch_add(1, Ordering::SeqCst);
-                pb.set_position(count.load(Ordering::Relaxed) as u64);
-
-                let mut sample_color = CIETristimulus::new(0.0, 0.0, 0.0, 0.0);
-                let mut valid_samples = 0u32;
-                for s_row in 0..n_samples {
-                    for s_col in 0..n_samples {
-                        // Sample the centre of each stratum: (s + 0.5) / n.
-                        // The 0.5 is where the per-pixel hash jitter will go later.
-                        let ray = self.scene.camera.get_ray_for_offset(
-                            pixel.row as i64,
-                            pixel.col as i64,
-                            (s_row as f64 + 0.5) / n_samples as f64,
-                            (s_col as f64 + 0.5) / n_samples as f64,
-                        );
-                        match self.scene.color_of_ray(&ray) {
-                            Ok(sample) => {
-                                sample_color = sample_color + sample.color;
-                                valid_samples += 1;
-                            }
-                            Err(err) => {
-                                error!(
-                                    "Unable to compute color for ray at pixel ({}, {}): {:?}",
-                                    pixel.col, pixel.row, err
-                                );
-                            }
-                        }
-                    }
-                }
-                // Divide by the number of rays that actually returned a colour, so
-                // a failed sub-sample does not bias the pixel toward black. If all
-                // failed, leave result = None and keep the base 1-spp colour.
-                if valid_samples > 0 {
-                    let inv = 1.0 / valid_samples as f64;
-                    sample_color.x *= inv;
-                    sample_color.y *= inv;
-                    sample_color.z *= inv;
-                    sample_color.alpha *= inv;
-                    pixel.result = Some(sample_color);
-                }
-            });
-        }
-
-        for pixel in pixels_to_sample {
-            if let Some(sample_color) = pixel.result {
-                let pixel_index = self.get_pixel_index(
-                    pixel.row,
-                    pixel.col,
-                    to_col - from_col,
-                    from_row,
-                    from_col,
-                );
-                output_buffer[pixel_index] = sample_color;
-            }
-        }
-
-        info!(
-            "Finished rendering section from ({}, {}) to ({}, {})",
-            from_row, from_col, to_row, to_col
-        );
-        Ok(output_buffer)
+        pixels_to_sample
     }
 
     pub fn render_section(
