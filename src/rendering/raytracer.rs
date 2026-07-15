@@ -87,6 +87,20 @@ fn visible(p: &CIETristimulus, q: &CIETristimulus) -> bool {
     p.y.max(q.y) > faint_floor
 }
 
+// https://rosettacode.org/wiki/Pseudo-random_numbers/Splitmix64
+fn mix64(mut z: u64) -> u64 {
+    z = (z ^ (z >> 30)).wrapping_mul(0xBF58476D1CE4E5B9);
+    z = (z ^ (z >> 27)).wrapping_mul(0x94D049BB133111EB);
+    z ^ (z >> 31)
+}
+
+fn hash_pixel_samples(row: i64, col: i64, k: usize) -> f64 {
+    let z = mix64((row as u64).wrapping_add(mix64((col as u64).wrapping_add(mix64(k as u64)))));
+
+    // Convert to a floating-point number in the range [0, 1)
+    (z >> 11) as f64 * (1.0 / (1u64 << 53) as f64)
+}
+
 impl<'a, G: Geometry> Raytracer<'a, G> {
     pub fn new(scene: Scene<'a, G>, tone_mapping: ToneMappingMethod) -> Self {
         Self {
@@ -255,13 +269,14 @@ impl<'a, G: Geometry> Raytracer<'a, G> {
             let mut valid_samples = 0u32;
             for s_row in 0..n_samples {
                 for s_col in 0..n_samples {
-                    // Sample the centre of each stratum: (s + 0.5) / n.
-                    // The 0.5 is where the per-pixel hash jitter will go later.
+                    let idx = s_row * n_samples + s_col;
                     let ray = self.scene.camera.get_ray_for_offset(
                         pixel.row as i64,
                         pixel.col as i64,
-                        (s_row as f64 + 0.5) / n_samples as f64,
-                        (s_col as f64 + 0.5) / n_samples as f64,
+                        hash_pixel_samples(pixel.row as i64, pixel.col as i64, 2 * idx)
+                            / n_samples as f64,
+                        hash_pixel_samples(pixel.row as i64, pixel.col as i64, 2 * idx + 1)
+                            / n_samples as f64,
                     );
                     match self.scene.color_of_ray(&ray) {
                         Ok(sample) => {
