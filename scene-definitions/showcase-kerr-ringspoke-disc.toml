@@ -12,7 +12,7 @@ horizon_epsilon = 1e-4
 [[objects]]
 
 [objects.Disc]
-inner_radius = 0.795
+inner_radius = 0.62
 outer_radius = 8.0
 temperature = 2000.0
 

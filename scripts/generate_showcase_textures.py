@@ -23,7 +23,7 @@ SPOKE_HALF_WIDTH_RAD = 0.02
 
 # Global band grid in absolute disc radius (units of r_s): shared by all
 # scenes so colors align across renders.
-R_MIN = 0.795
+R_MIN = 0.62
 R_MAX = 8.0
 N_BANDS = 8
 BAND_WIDTH = (R_MAX - R_MIN) / N_BANDS
@@ -31,7 +31,7 @@ RING_GAP_FRACTION = 0.12  # dark separator inside each band
 
 # (filename, scene annulus inner, outer)
 VARIANTS = [
-    ("resources/ringspoke.png", 0.795, 8.0),
+    ("resources/ringspoke.png", 0.62, 8.0),
     ("resources/ringspoke_a0.png", 3.05, 8.0),
 ]
 
