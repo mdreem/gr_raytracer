@@ -38,7 +38,12 @@ impl Hittable for Disc {
     // here. See with current test setup. Intersection should be at t=7.63. With z=-2.442748091.
     // The intersection should be with an interval crossing y=0. But it seems to happen near 0 with
     // both coordinates.
-    fn intersects(&self, y_start: &Point, y_end: &Point) -> Option<Intersection> {
+    fn intersects(
+        &self,
+        y_start: &Point,
+        y_end: &Point,
+        geometry: &dyn Geometry,
+    ) -> Option<Intersection> {
         // z x y
         let normal = Vector3::new(0.0, 0.0, 1.0);
         let center = Vector3::new(0.0, 0.0, 0.0);
@@ -57,28 +62,32 @@ impl Hittable for Disc {
         }
 
         let intersection_point = y_start_spatial + t * direction;
-        let rr = intersection_point.norm_squared();
+        let intersection_point_p = Point::new_cartesian(
+            0.0,
+            intersection_point[0],
+            intersection_point[1],
+            intersection_point[2],
+        );
+        // The disc's inner/outer radius are metric radial coordinates (the
+        // convention the ISCO, orbit velocities, and temperature profile use).
+        // In Kerr charts the equatorial Cartesian radius obeys
+        // x^2 + y^2 = r^2 + a^2, so the Cartesian norm must not be compared
+        // against them directly.
+        let r = geometry.get_radial_coordinate(&intersection_point_p);
 
-        if rr >= self.center_disk_inner_radius * self.center_disk_inner_radius
-            && rr <= self.center_disk_outer_radius * self.center_disk_outer_radius
-        {
+        if r >= self.center_disk_inner_radius && r <= self.center_disk_outer_radius {
             let vector_in_plane = intersection_point - center;
 
             let phi = vector_in_plane[1].atan2(vector_in_plane[0]); // phi in x-y plane.
-            let r = (rr.sqrt() - self.center_disk_inner_radius)
+            let r_normalized = (r - self.center_disk_inner_radius)
                 / (self.center_disk_outer_radius - self.center_disk_inner_radius);
 
-            let u = 0.5 + 0.5 * r * phi.cos();
-            let v = 0.5 + 0.5 * r * phi.sin();
+            let u = 0.5 + 0.5 * r_normalized * phi.cos();
+            let v = 0.5 + 0.5 * r_normalized * phi.sin();
 
             Some(Intersection {
                 uv: UVCoordinates { u, v },
-                intersection_point: Point::new_cartesian(
-                    0.0,
-                    intersection_point[0],
-                    intersection_point[1],
-                    intersection_point[2],
-                ),
+                intersection_point: intersection_point_p,
                 t,
                 direction: FourVector::new_cartesian(0.0, direction[0], direction[1], direction[2]),
             })
@@ -121,3 +130,92 @@ impl Hittable for Disc {
 }
 
 impl SceneObject for Disc {}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::geometry::euclidean::EuclideanSpace;
+    use crate::geometry::kerr::Kerr;
+    use crate::rendering::color::Color;
+    use crate::rendering::temperature::ConstantTemperatureComputer;
+    use crate::rendering::texture::CheckerMapper;
+    use std::sync::Arc;
+
+    fn create_disc(inner: f64, outer: f64) -> Disc {
+        Disc::new(
+            inner,
+            outer,
+            Arc::new(CheckerMapper::new(
+                0.0,
+                5.0,
+                5.0,
+                Color::new(100, 0, 0, 255),
+                Color::new(0, 100, 0, 255),
+            )),
+            Box::new(ConstantTemperatureComputer::new(1000.0)),
+        )
+    }
+
+    fn crossing_at(x: f64) -> (Point, Point) {
+        (
+            Point::new_cartesian(0.0, x, 0.0, 0.1),
+            Point::new_cartesian(0.0, x, 0.0, -0.1),
+        )
+    }
+
+    #[test]
+    fn test_disc_boundary_uses_metric_radial_coordinate_in_kerr() {
+        // Kerr equatorial relation: x^2 + y^2 = r^2 + a^2. A plane crossing
+        // at Cartesian radius R corresponds to Boyer-Lindquist
+        // r = sqrt(R^2 - a^2), so points slightly outside the inner edge in
+        // Cartesian norm can lie INSIDE it in the metric radial coordinate.
+        let geometry = Kerr::new(1.0, 0.499, 1e-4);
+        let disc = create_disc(0.795, 8.0);
+
+        // Cartesian R = 0.8 -> BL r = sqrt(0.64 - 0.499^2) ~ 0.625 < 0.795:
+        // no gas there.
+        let (start, end) = crossing_at(0.8);
+        assert!(disc.intersects(&start, &end, &geometry).is_none());
+
+        // Cartesian R = 0.95 -> BL r ~ 0.808 > 0.795: inside the disc.
+        let (start, end) = crossing_at(0.95);
+        assert!(disc.intersects(&start, &end, &geometry).is_some());
+
+        // Outer edge: Cartesian R = 8.01 -> BL r ~ 7.994 < 8.0: still gas.
+        let (start, end) = crossing_at(8.01);
+        assert!(disc.intersects(&start, &end, &geometry).is_some());
+    }
+
+    #[test]
+    fn test_disc_boundary_unchanged_in_flat_space() {
+        let geometry = EuclideanSpace::new();
+        let disc = create_disc(3.05, 8.0);
+
+        let (start, end) = crossing_at(3.0);
+        assert!(disc.intersects(&start, &end, &geometry).is_none());
+        let (start, end) = crossing_at(3.1);
+        assert!(disc.intersects(&start, &end, &geometry).is_some());
+        let (start, end) = crossing_at(8.1);
+        assert!(disc.intersects(&start, &end, &geometry).is_none());
+    }
+
+    #[test]
+    fn test_disc_uv_normalization_uses_metric_radius() {
+        // At the disc's inner edge the normalized UV radius must be ~0
+        // (texture inner boundary), evaluated in the metric radial
+        // coordinate, not the Cartesian norm.
+        let geometry = Kerr::new(1.0, 0.499, 1e-4);
+        let disc = create_disc(0.795, 8.0);
+
+        // Cartesian R such that BL r == inner edge: R = sqrt(r^2 + a^2).
+        let r_inner_cartesian = (0.795f64 * 0.795 + 0.499 * 0.499).sqrt();
+        let (start, end) = crossing_at(r_inner_cartesian + 1e-6);
+        let intersection = disc
+            .intersects(&start, &end, &geometry)
+            .expect("should hit the inner edge");
+        // u = 0.5 + 0.5 * r_normalized * cos(phi); at phi = 0 and
+        // r_normalized ~ 0 this is ~0.5.
+        assert!((intersection.uv.u - 0.5).abs() < 1e-3);
+        assert!((intersection.uv.v - 0.5).abs() < 1e-3);
+    }
+}

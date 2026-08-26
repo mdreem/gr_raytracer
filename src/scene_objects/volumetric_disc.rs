@@ -155,7 +155,7 @@ impl VolumetricDisc {
         let point_from = Point::new_cartesian(0.0, p[0], p[1], p[2]);
         let point_to =
             Point::new_cartesian(0.0, p[0] + rd[0] * t, p[1] + rd[1] * t, p[2] + rd[2] * t);
-        if let Some(intersection) = self.intersects(&point_from, &point_to) {
+        if let Some(intersection) = self.intersects_internal(&point_from, &point_to) {
             let exit = intersection.t > MIN_INTERSECTION_T;
             if exit {
                 trace!(
@@ -502,8 +502,10 @@ pub enum CylinderIntersection {
     TwoIntersections(f64, f64),
 }
 
-impl Hittable for VolumetricDisc {
-    fn intersects(&self, y_start: &Point, y_end: &Point) -> Option<Intersection> {
+impl VolumetricDisc {
+    // The volume boundary is deliberately a Cartesian cylinder (the disc is a
+    // stylized visual model); it does not need the metric radial coordinate.
+    fn intersects_internal(&self, y_start: &Point, y_end: &Point) -> Option<Intersection> {
         let y_start_spatial = y_start.get_spatial_vector_cartesian();
         let y_end_spatial = y_end.get_spatial_vector_cartesian();
 
@@ -575,6 +577,17 @@ impl Hittable for VolumetricDisc {
             t,
             direction: FourVector::new_cartesian(0.0, direction[0], direction[1], direction[2]),
         })
+    }
+}
+
+impl Hittable for VolumetricDisc {
+    fn intersects(
+        &self,
+        y_start: &Point,
+        y_end: &Point,
+        _geometry: &dyn Geometry,
+    ) -> Option<Intersection> {
+        self.intersects_internal(y_start, y_end)
     }
 
     fn color_at_uv(
@@ -696,7 +709,7 @@ mod tests {
         let y_start = Point::new_cartesian(0.0, 0.5, 0.0, 0.0);
         let y_end = Point::new_cartesian(0.0, 1.5, 0.0, 0.0);
 
-        assert!(disc.intersects(&y_start, &y_end).is_some());
+        assert!(disc.intersects_internal(&y_start, &y_end).is_some());
     }
 
     #[test]
@@ -705,7 +718,7 @@ mod tests {
         let y_start = Point::new_cartesian(0.0, 1.5, 0.0, 2.0);
         let y_end = Point::new_cartesian(0.0, 2.5, 0.0, 2.0);
 
-        assert!(disc.intersects(&y_start, &y_end).is_none());
+        assert!(disc.intersects_internal(&y_start, &y_end).is_none());
     }
 
     #[test]
