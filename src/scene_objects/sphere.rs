@@ -59,7 +59,12 @@ fn solve_for_t(y_start_spatial: Vector3<f64>, direction: Vector3<f64>, r: f64) -
 
 impl Hittable for Sphere {
     // y_start and y_end have to be Cartesian.
-    fn intersects(&self, y_start: &Point, y_end: &Point) -> Option<Intersection> {
+    fn intersects(
+        &self,
+        y_start: &Point,
+        y_end: &Point,
+        _geometry: &dyn Geometry,
+    ) -> Option<Intersection> {
         debug_assert_eq!(self.position.coordinate_system, CoordinateSystem::Cartesian);
 
         let y_start_cartesian = y_start.to_cartesian();
@@ -163,6 +168,7 @@ impl SceneObject for Sphere {}
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::geometry::euclidean::EuclideanSpace;
     use crate::geometry::point::Point;
     use crate::rendering::color::Color;
     use crate::rendering::texture::CheckerMapper;
@@ -191,7 +197,11 @@ mod tests {
         let y_start = Point::new_cartesian(0.0, 1.1, 0.0, 0.0);
         let y_end = Point::new_cartesian(0.0, 0.9, 0.0, 0.0);
 
-        assert!(sphere.intersects(&y_start, &y_end).is_some());
+        assert!(
+            sphere
+                .intersects(&y_start, &y_end, &EuclideanSpace::new())
+                .is_some()
+        );
     }
 
     #[test]
@@ -200,7 +210,11 @@ mod tests {
         let y_start = Point::new_cartesian(0.0, 1.1, 0.0, 0.0);
         let y_end = Point::new_cartesian(0.0, 1.01, 0.0, 0.0);
 
-        assert!(sphere.intersects(&y_start, &y_end).is_none());
+        assert!(
+            sphere
+                .intersects(&y_start, &y_end, &EuclideanSpace::new())
+                .is_none()
+        );
     }
 
     #[test]
@@ -209,7 +223,11 @@ mod tests {
         let y_start = Point::new_cartesian(0.0, 6.1, 0.0, 0.0);
         let y_end = Point::new_cartesian(0.0, 5.9, 0.0, 0.0);
 
-        assert!(sphere.intersects(&y_start, &y_end).is_some());
+        assert!(
+            sphere
+                .intersects(&y_start, &y_end, &EuclideanSpace::new())
+                .is_some()
+        );
     }
 
     #[test]
@@ -218,7 +236,11 @@ mod tests {
         let y_start = Point::new_cartesian(0.0, 6.1, 0.0, 0.0);
         let y_end = Point::new_cartesian(0.0, 6.01, 0.0, 0.0);
 
-        assert!(sphere.intersects(&y_start, &y_end).is_none());
+        assert!(
+            sphere
+                .intersects(&y_start, &y_end, &EuclideanSpace::new())
+                .is_none()
+        );
     }
 
     #[test]
@@ -233,7 +255,7 @@ mod tests {
         let y_end = Point::new_cartesian(0.0, 0.0, 0.0, 19.5);
 
         let intersection = sphere
-            .intersects(&y_start, &y_end)
+            .intersects(&y_start, &y_end, &EuclideanSpace::new())
             .expect("ray should hit sphere");
         let hit = intersection
             .intersection_point
