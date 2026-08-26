@@ -18,4 +18,4 @@ temperature = 2000.0
 
 [objects.Disc.texture.Bitmap]
 beaming_exponent = 0.0
-path = "resources/ringspoke.png"
+path = "resources/ringspoke_a0.png"
