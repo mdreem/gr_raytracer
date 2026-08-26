@@ -202,16 +202,14 @@ impl TemperatureComputer for KerrTemperatureComputer {
         }
 
         if radius < self.r_isco {
-            let min_cartesian_inner_radius = (self.r_isco * self.r_isco + self.a * self.a).sqrt();
             error!(
                 concat!(
-                    "Radius {} is below r_isco {}. In Kerr, this is the ",
-                    "Boyer-Lindquist-type radial coordinate used for temperature, ",
-                    "while Disc intersection uses cartesian distance. ",
-                    "For Disc config, use inner_radius >= {} ",
-                    "(sqrt(r_isco^2 + a^2), a={})."
+                    "Radius {} is below r_isco {}. Disc boundaries and the ",
+                    "temperature profile both use the Boyer-Lindquist-type ",
+                    "radial coordinate; for Disc config, use ",
+                    "inner_radius >= r_isco (a={})."
                 ),
-                radius, self.r_isco, min_cartesian_inner_radius, self.a
+                radius, self.r_isco, self.a
             );
             return Err(RaytracerError::BelowRISCO);
         }
