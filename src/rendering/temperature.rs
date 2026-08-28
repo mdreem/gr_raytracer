@@ -163,7 +163,7 @@ impl KerrTemperatureComputer {
         let e = self.conserved_energy(r)?;
         let l = self.conserved_angular_momentum(r)?;
         let omega = self.angular_velocity(r);
-        let root_of_det_minus_g = r * r;
+        let root_of_det_minus_g = r;
 
         let denominator = root_of_det_minus_g * (e - omega * l).powi(2);
         if denominator.abs() < 1e-20 {
