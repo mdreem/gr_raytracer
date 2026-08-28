@@ -1,0 +1,14 @@
+celestial_temperature = 0.0
+objects = []
+
+[celestial_texture.Checker]
+beaming_exponent = 0.0
+width = 36.0
+height = 18.0
+color1 = [230, 225, 210]
+color2 = [40, 45, 70]
+
+[geometry_type.Kerr]
+radius = 1.0
+a = 0.499
+horizon_epsilon = 1e-4
