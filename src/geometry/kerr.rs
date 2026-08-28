@@ -163,7 +163,11 @@ impl KerrSolver {
         if index == 0 {
             return Matrix4::zeros();
         }
-        let base = 1e-10; // epsilon = 1e-12
+        // Central differences on f64: total error ~ h^2*|g'''|/6 + eps*|g|/h
+        // is minimized near relative h ~ cbrt(eps) ~ 6e-6. The previous
+        // 1e-10 sat far on the roundoff side, injecting ~1e-6 noise into
+        // every Christoffel symbol, at the integrator's tolerance level.
+        let base = 1e-6;
         let h = base
             * match index {
                 1 => x.abs().max(1.0),
