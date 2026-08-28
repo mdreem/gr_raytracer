@@ -2,7 +2,8 @@ use crate::configuration::AdaptiveSamplingConfig;
 use crate::geometry::geometry::Geometry;
 use crate::rendering::camera::CameraError;
 use crate::rendering::color::{
-    CIETristimulus, ToneMappingMethod, linear_srgb_to_srgb_buffer, xyz_to_linear_srgb_buffer,
+    CIETristimulus, ToneMappingMethod, linear_srgb_to_srgb_buffer, xyz_to_linear_srgb,
+    xyz_to_linear_srgb_buffer,
 };
 use crate::rendering::integrator::{IntegrationError, StopReason};
 use crate::rendering::ray::IntegratedRay;
@@ -267,8 +268,7 @@ impl<'a, G: Geometry> Raytracer<'a, G> {
         );
         let buffer = self.render_section_to_cie_buffer_raw(from_row, from_col, to_row, to_col)?;
         let samples_per_axis = self.scene.adaptive_sampling.samples_per_axis;
-        let minimum_luminance =
-            resolve_minimum_luminance(&self.scene.adaptive_sampling, &buffer);
+        let minimum_luminance = resolve_minimum_luminance(&self.scene.adaptive_sampling, &buffer);
 
         let mut pixels_to_sample = self.collect_pixels_to_supersample(
             from_row,
@@ -470,7 +470,14 @@ impl<'a, G: Geometry> Raytracer<'a, G> {
             let raw_cie = self.render_section_to_cie_buffer(from_row, from_col, to_row, to_col)?;
             let buffer: Vec<f32> = raw_cie
                 .into_iter()
-                .flat_map(|c| [c.x as f32, c.y as f32, c.z as f32])
+                .map(|c| xyz_to_linear_srgb(&c))
+                .flat_map(|c| {
+                    [
+                        c.x.max(0.0) as f32,
+                        c.y.max(0.0) as f32,
+                        c.z.max(0.0) as f32,
+                    ]
+                })
                 .collect();
             let imgbuf_hdr: ImageBuffer<Rgb<f32>, Vec<f32>> =
                 image::ImageBuffer::from_vec(to_col - from_col, to_row - from_row, buffer)
