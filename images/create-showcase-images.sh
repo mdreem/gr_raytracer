@@ -88,10 +88,10 @@ for set in "${SETS[@]}"; do
             --filename images/showcase_kerr_framedrag_zoom_a0.png
         ;;
     ringspoke)
-        # Slightly-inclined view of the ring-and-spoke disc; theta = 1.47
+        # Slightly-inclined view of the ring-and-spoke disc; theta = 1.56
         # centers the composition.
         CAM=(--width="$SIZE" --height="$SIZE" \
-             --camera-position=-18.0,0.0,2.5 --theta=1.47 --psi=-1.5708 --phi=0.0)
+             --camera-position=-18.0,0.0,2.5 --theta=1.56 --psi=-1.5708 --phi=0.0)
         render showcase-kerr-ringspoke-disc.toml    showcase_kerr_ringspoke_spin.png "${CAM[@]}"
         render showcase-kerr-ringspoke-disc-a0.toml showcase_kerr_ringspoke_a0.png   "${CAM[@]}"
         ;;
