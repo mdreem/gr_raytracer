@@ -1,0 +1,66 @@
+name: Publish gallery to GitHub Pages
+
+# Publishes ONLY the image gallery (images/*.md + the referenced bitmaps)
+# to https://dreevich.dev/gr_raytracer/ - the rest of the repository is not
+# part of the site. The staged markdown is built with GitHub's stock Jekyll
+# action, so relative .md links are rewritten to .html exactly like classic
+# Pages builds.
+
+on:
+  push:
+    branches: [master]
+    paths:
+      - "images/**"
+      - ".github/workflows/pages.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: pages
+  cancel-in-progress: true
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Stage gallery subset
+        run: |
+          mkdir -p _staging
+          cp images/*.png images/*.gif _staging/
+          for f in images/*.md; do
+            cp "$f" "_staging/$(basename "$f")"
+          done
+          # The gallery index becomes the site root.
+          mv _staging/images.md _staging/index.md
+          # Rewrite back-links accordingly.
+          sed -i 's/(images\.md)/(index.md)/g' _staging/*.md
+          # jekyll-relative-links only rewrites Markdown links; raw HTML
+          # anchors (the index thumbnails) must point at the built .html.
+          sed -i -E 's/href="([A-Za-z0-9_-]+)\.md"/href="\1.html"/g' _staging/*.md
+          # Minimal Jekyll config: a bundled theme plus a site title.
+          # jekyll-default-layout (part of the github-pages gem) applies the
+          # theme layout to pages without front matter.
+          cat > _staging/_config.yml <<'EOF'
+          title: gr_raytracer image gallery
+          theme: jekyll-theme-primer
+          EOF
+      - uses: actions/jekyll-build-pages@v1
+        with:
+          source: ./_staging
+          destination: ./_site
+      - uses: actions/upload-pages-artifact@v3
+
+  deploy:
+    needs: build
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - id: deployment
+        uses: actions/deploy-pages@v4
