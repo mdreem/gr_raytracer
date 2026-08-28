@@ -48,8 +48,7 @@ impl KerrTemperatureComputer {
         a: f64,
         radius: f64,
     ) -> Result<Self, RaytracerError> {
-        let a_abs = a.abs(); // Ensure a co-rotating disc. TODO: generalize later.
-        let r_isco = circular_orbit::r_isco(radius, a_abs);
+        let r_isco = circular_orbit::r_isco(radius, a);
         let effective_outer_radius = if outer_radius <= r_isco {
             let adjusted = r_isco + 1e-6_f64.max(r_isco.abs() * 1e-9);
             info!(
@@ -62,12 +61,12 @@ impl KerrTemperatureComputer {
         };
         info!(
             "Computed r_isco: {} from a: {} and radius: {}",
-            r_isco, a_abs, radius
+            r_isco, a, radius
         );
         let r0 = radius;
 
         let mut tmp_computer = Self {
-            a: a_abs,
+            a,
             radius,
             r_isco,
             m_dot: 1.0,
@@ -163,7 +162,7 @@ impl KerrTemperatureComputer {
         let e = self.conserved_energy(r)?;
         let l = self.conserved_angular_momentum(r)?;
         let omega = self.angular_velocity(r);
-        let root_of_det_minus_g = r * r;
+        let root_of_det_minus_g = r;
 
         let denominator = root_of_det_minus_g * (e - omega * l).powi(2);
         if denominator.abs() < 1e-20 {

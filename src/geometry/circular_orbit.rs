@@ -123,7 +123,7 @@ pub fn conserved_angular_momentum(r_s: f64, a: f64, r: f64) -> Result<f64, Raytr
     Ok((g_tphi + g_phiphi * omega) * c.u_t)
 }
 
-/// Prograde ISCO radius (innermost stable circular orbit).
+/// ISCO radius (innermost stable circular orbit).
 pub fn r_isco(r_s: f64, a: f64) -> f64 {
     let a_s = 2.0 * a / r_s;
 
@@ -132,7 +132,13 @@ pub fn r_isco(r_s: f64, a: f64) -> f64 {
             * ((1.0 + a_s).powf(1.0 / 3.0) + (1.0 - a_s).powf(1.0 / 3.0));
     let z2 = (3.0 * a_s * a_s + z1 * z1).sqrt();
 
-    (3.0 + z2 - ((3.0 - z1) * (3.0 + z1 + 2.0 * z2)).sqrt()) * r_s / 2.0
+    let sq = ((3.0 - z1) * (3.0 + z1 + 2.0 * z2)).sqrt();
+    let term = if a >= 0.0 {
+        3.0 + z2 - sq
+    } else {
+        3.0 + z2 + sq
+    };
+    term * r_s / 2.0
 }
 
 #[cfg(test)]
