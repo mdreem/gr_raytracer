@@ -249,3 +249,42 @@ impl TemperatureComputer for KerrTemperatureComputer {
         Ok(temperature)
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    /// Far-field check of the Novikov-Thorne profile at a = 0: the flux must
+    /// approach F ~ (1 - sqrt(r_isco/r)) / r^3, i.e. the Shakura-Sunyaev
+    /// T ~ r^(-3/4) law times the inner-boundary correction. This pins the
+    /// sqrt(-g) = r factor in compute_prefactor: with the former r^2 the
+    /// temperature falls as r^(-1) and the ratio below comes out a factor
+    /// 2^(1/4) (~19%) too large.
+    #[test]
+    fn test_far_field_temperature_slope_matches_shakura_sunyaev() {
+        let computer = KerrTemperatureComputer::new(2000.0, 400.0, 0.0, 1.0).unwrap();
+        let r_isco = 3.0;
+        let t = |r: f64| computer.compute_temperature(r).unwrap();
+        let expected = |r: f64| ((1.0 - (r_isco / r).sqrt()) / r.powi(3)).powf(0.25);
+
+        let ratio = t(100.0) / t(200.0);
+        let expected_ratio = expected(100.0) / expected(200.0);
+        assert!(
+            (ratio / expected_ratio - 1.0).abs() < 0.01,
+            "T(100)/T(200) = {} but Shakura-Sunyaev far field expects {}",
+            ratio,
+            expected_ratio
+        );
+    }
+
+    /// The retrograde disc's temperature profile must start at the
+    /// retrograde ISCO, not the prograde one.
+    #[test]
+    fn test_retrograde_profile_starts_at_retrograde_isco() {
+        let computer = KerrTemperatureComputer::new(2000.0, 15.0, -0.499, 1.0).unwrap();
+        // Prograde ISCO for |a| = 0.499 is ~0.62; retrograde ~4.5. A radius
+        // between the two must be rejected as below the ISCO.
+        assert!(computer.compute_temperature(2.0).is_err());
+        assert!(computer.compute_temperature(5.0).is_ok());
+    }
+}
