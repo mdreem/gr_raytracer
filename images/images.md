@@ -1,113 +1,21 @@
 # Image Gallery
 
-## Schwarzschild Black Hole
+The gallery is split into one page per topic:
 
-### Checkerboard Accretion Disk
+## [Schwarzschild Black Hole](schwarzschild.md)
 <div align="center">
-  <img src="render_schwarzschild_checker_texture.png" alt="Schwarzschild black hole with a checkerboard accretion disk showing gravitational lensing effects">
-  <p>Schwarzschild black hole with a checkerboard accretion disk showing gravitational lensing effects</p>
+  <a href="schwarzschild.md"><img src="render_schwarzschild_checker_texture.png" width="400" alt="Schwarzschild black hole with a checkerboard accretion disk"></a>
+  <p>Lensing and volumetric renders of the non-rotating black hole.</p>
 </div>
 
-### Volumetric Rendering
+## [Kerr Black Hole](kerr.md)
 <div align="center">
-  <img src="render_schwarzschild_volumetric.png" alt="Schwarzschild black hole visualization with volumetric light disc effects">
-  <p>Schwarzschild black hole visualization with volumetric disc (background image: <a href="https://commons.wikimedia.org/wiki/File:NGC6355_-_HST_-_Potw2301a.jpg">NGC 6355</a>)</p>
+  <a href="kerr.md"><img src="kerr_blackbody_disk_1.png" width="400" alt="Kerr black hole with a blackbody accretion disk"></a>
+  <p>Checkerboard, blackbody, and volumetric discs; animations; ray trajectories.</p>
 </div>
 
-## Kerr Black Hole
-
-### Checkerboard Accretion Disk
+## [Showcase](showcase.md)
 <div align="center">
-  <img src="render_kerr_large_a_checker_texture.png" alt="Kerr black hole with high spin parameter and a checkerboard accretion disk">
-  <p>Kerr black hole with high spin parameter and a checkerboard accretion disk</p>
-</div>
-
-<div align="center">
-  <img src="render_kerr_checker_texture.png" alt="Kerr black hole with a checkerboard accretion disk showing frame dragging and lensing">
-  <p>Kerr black hole with a checkerboard accretion disk showing frame dragging and lensing</p>
-</div>
-
-### Blackbody Radiation
-<div align="center">
-  <img src="kerr_blackbody_disk_1.png" alt="Kerr black hole with an accretion disk rendered using blackbody radiation spectrum (view 1)">
-  <p>Kerr black hole with an accretion disk rendered using blackbody radiation spectrum (view 1) (background image: <a href="https://commons.wikimedia.org/wiki/File:Messier_object_025.jpg">M25</a>)</p>
-</div>
-
-<div align="center">
-  <img src="kerr_blackbody_disk_2.png" alt="Kerr black hole with an accretion disk rendered using blackbody radiation spectrum (view 2)">
-  <p>Kerr black hole with an accretion disk rendered using blackbody radiation spectrum (view 2) (background image: <a href="https://commons.wikimedia.org/wiki/File:Messier_object_025.jpg">M25</a>)</p>
-</div>
-
-<div align="center">
-  <img src="kerr_blackbody_disk_a_0_5__1.png" alt="Kerr black hole with spin parameter a=0.5 and a blackbody accretion disk (view 1)">
-  <p>Kerr black hole with spin parameter a=0.5 and a blackbody accretion disk (view 1) (background image: <a href="https://commons.wikimedia.org/wiki/File:Messier_object_025.jpg">M25</a>)</p>
-</div>
-
-<div align="center">
-  <img src="kerr_blackbody_disk_a_0_5__2.png" alt="Kerr black hole with spin parameter a=0.5 and a blackbody accretion disk (view 2)">
-  <p>Kerr black hole with spin parameter a=0.5 and a blackbody accretion disk (view 2) (background image: <a href="https://commons.wikimedia.org/wiki/File:Messier_object_025.jpg">M25</a>)</p>
-</div>
-
-### Volumetric Rendering
-<div align="center">
-  <img src="render_kerr_checker_texture_volumetric.png" alt="Kerr black hole with a checkerboard disk and volumetric rendering of the surrounding medium">
-  <p>Kerr black hole with a checkerboard disk and volumetric rendering of the surrounding medium</p>
-</div>
-
-<div align="center">
-  <img src="render_kerr_stars_volumetric.png" alt="Kerr black hole visualization with background stars and volumetric disc">
-  <p>Kerr black hole visualization with background stars and volumetric disc (background image: <a href="https://commons.wikimedia.org/wiki/File:NGC6355_-_HST_-_Potw2301a.jpg">NGC 6355</a>)</p>
-</div>
-
-### Animations
-<div align="center">
-  <img src="kerr_animation.gif" alt="Animation of a spinning Kerr black hole with a rotating accretion disk">
-  <p>Animation of a spinning Kerr black hole with a rotating accretion disk</p>
-</div>
-
-<div align="center">
-  <img src="kerr_animation_stars_and_disk.gif" alt="Animation of a Kerr black hole with background stars and a rotating accretion disk">
-  <p>Animation of a Kerr black hole with background stars and a rotating accretion disk (background image: <a href="https://commons.wikimedia.org/wiki/File:Messier_object_025.jpg">M25</a>)</p>
-</div>
-
-### Trajectories
-<div align="center">
-  <img src="kerr_trajectory_near_horizon.png" alt="Visualization of a ray trajectory approaching the event horizon of a Kerr black hole">
-  <p>Visualization of a ray trajectory approaching the event horizon of a Kerr black hole</p>
-</div>
-
-## Showcase: spin-vs-no-spin diagnostics
-
-Pairs of renders that isolate individual GR effects with synthetic
-textures. Each pair shares its camera exactly, so every difference between
-the two images is purely the spin (a = 0.499, i.e. a/M = 0.998, vs a = 0).
-Reproduce with `images/create-showcase-images.sh` (scene definitions in
-`scene-definitions/showcase-*.toml`, disc bitmaps generated by
-`scripts/generate_showcase_textures.py`).
-
-### Shadow shape (equatorial view)
-<div align="center">
-  <img src="showcase_kerr_shadow_spin.png" alt="Near-extremal Kerr shadow against a checker sky, flattened on the prograde side">
-  <img src="showcase_kerr_shadow_a0.png" alt="Schwarzschild shadow against a checker sky, a centered circle">
-  <p>Left, a = 0.499: the shadow flattens on the prograde side (the "D" shape) and shifts off-center. Right, a = 0: a centered circle.</p>
-</div>
-
-### Frame dragging (view down the spin axis)
-<div align="center">
-  <img src="showcase_kerr_framedrag_spin.png" alt="Pole-on Kerr view: checker sky spokes twisted by frame dragging">
-  <img src="showcase_kerr_framedrag_a0.png" alt="Pole-on Schwarzschild view: checker sky spokes ruler-straight">
-  <p>Left, a = 0.499: the sky's radial spokes wind around the shadow, dragged by the hole's rotation. Right, a = 0: the same spokes stay ruler-straight to the photon ring.</p>
-</div>
-
-<div align="center">
-  <img src="showcase_kerr_framedrag_zoom_spin.png" alt="3x zoom onto the Kerr shadow showing the frame-dragging twist">
-  <img src="showcase_kerr_framedrag_zoom_a0.png" alt="3x zoom onto the Schwarzschild shadow, spokes straight">
-  <p>3x zoom onto the shadow region, where the twist concentrates (it falls off roughly as 1/r^3, so the outer tiles are barely affected).</p>
-</div>
-
-### Lensing image orders (ring-and-spoke disc)
-<div align="center">
-  <img src="showcase_kerr_ringspoke_spin.png" alt="Kerr disc with rainbow radius-coded rings reaching the ISCO">
-  <img src="showcase_kerr_ringspoke_a0.png" alt="Schwarzschild disc with rainbow radius-coded rings and the ISCO gap">
-  <p>Rings are coded by absolute Boyer-Lindquist radius (same color = same r in both images); dark spokes reveal azimuthal shear between the direct image, the lensed far side over the shadow, and the underside image below it. Left, a = 0.499: gas reaches the prograde ISCO at r = 0.62 and hugs the shadow. Right, a = 0: the ISCO at r = 3 keeps the inner edge far out.</p>
+  <a href="showcase.md"><img src="showcase_kerr_ringspoke_spin.png" width="400" alt="Kerr disc with rainbow radius-coded rings reaching the ISCO"></a>
+  <p>Paired renders with synthetic textures isolating shadow shape, frame dragging, and lensing image orders; reproducible via <code>images/create-showcase-images.sh</code>.</p>
 </div>
