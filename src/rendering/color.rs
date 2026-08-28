@@ -70,7 +70,11 @@ impl CIETristimulus {
 
     /// Applies relativistic beaming effect based on redshift and beaming exponent.
     pub fn apply_beaming(&self, redshift: f64, beaming_exponent: f64) -> CIETristimulus {
-        let beaming_factor = redshift.powf(beaming_exponent);
+        // A negative redshift factor is unphysical (it can reach here from
+        // emitter velocities evaluated outside their validity region); powf
+        // on a negative base with a fractional exponent yields NaN, which
+        // would propagate into the pixel, so clamp to black instead.
+        let beaming_factor = redshift.max(0.0).powf(beaming_exponent);
         CIETristimulus {
             x: self.x * beaming_factor,
             y: self.y * beaming_factor,
@@ -335,6 +339,18 @@ pub fn srgb_to_xyz(color: &Color) -> CIETristimulus {
 pub mod tests {
     use super::*;
     use approx::assert_abs_diff_eq;
+
+    /// An unphysical negative redshift with a fractional exponent must clamp
+    /// to black, not propagate NaN into the pixel.
+    #[test]
+    fn test_apply_beaming_clamps_negative_redshift() {
+        let c = CIETristimulus::new(1.0, 1.0, 1.0, 1.0);
+        let beamed = c.apply_beaming(-0.5, 3.5);
+        assert_eq!(beamed.x, 0.0);
+        assert_eq!(beamed.y, 0.0);
+        assert_eq!(beamed.z, 0.0);
+        assert!(beamed.x.is_finite());
+    }
 
     #[test]
     fn test_srgb_to_xyz() {
