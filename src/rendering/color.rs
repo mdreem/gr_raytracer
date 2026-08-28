@@ -70,11 +70,20 @@ impl CIETristimulus {
 
     /// Applies relativistic beaming effect based on redshift and beaming exponent.
     pub fn apply_beaming(&self, redshift: f64, beaming_exponent: f64) -> CIETristimulus {
-        // A negative redshift factor is unphysical (it can reach here from
-        // emitter velocities evaluated outside their validity region); powf
-        // on a negative base with a fractional exponent yields NaN, which
-        // would propagate into the pixel, so clamp to black instead.
-        let beaming_factor = redshift.max(0.0).powf(beaming_exponent);
+        // A nonpositive redshift factor is unphysical (it can reach here
+        // from emitter velocities evaluated outside their validity region).
+        // Return black outright: powf would turn it into NaN (fractional
+        // exponent), 1.0 (exponent 0, the default - silently keeping the
+        // bogus color), or infinity (negative exponent).
+        if redshift <= 0.0 {
+            return CIETristimulus {
+                x: 0.0,
+                y: 0.0,
+                z: 0.0,
+                alpha: self.alpha,
+            };
+        }
+        let beaming_factor = redshift.powf(beaming_exponent);
         CIETristimulus {
             x: self.x * beaming_factor,
             y: self.y * beaming_factor,
@@ -340,16 +349,23 @@ pub mod tests {
     use super::*;
     use approx::assert_abs_diff_eq;
 
-    /// An unphysical negative redshift with a fractional exponent must clamp
-    /// to black, not propagate NaN into the pixel.
+    /// An unphysical nonpositive redshift must yield black for every
+    /// exponent regime: fractional (would be NaN via powf), zero (would be
+    /// 1.0, silently keeping the bogus color), and negative (would be
+    /// infinity).
     #[test]
-    fn test_apply_beaming_clamps_negative_redshift() {
+    fn test_apply_beaming_blacks_out_nonpositive_redshift() {
         let c = CIETristimulus::new(1.0, 1.0, 1.0, 1.0);
-        let beamed = c.apply_beaming(-0.5, 3.5);
-        assert_eq!(beamed.x, 0.0);
-        assert_eq!(beamed.y, 0.0);
-        assert_eq!(beamed.z, 0.0);
-        assert!(beamed.x.is_finite());
+        for exponent in [3.5, 0.0, -2.0] {
+            for redshift in [-0.5, 0.0] {
+                let beamed = c.apply_beaming(redshift, exponent);
+                assert_eq!(beamed.x, 0.0, "exp {} z {}", exponent, redshift);
+                assert_eq!(beamed.y, 0.0);
+                assert_eq!(beamed.z, 0.0);
+            }
+        }
+        // Physical redshift still beams normally.
+        assert!(c.apply_beaming(0.5, 3.0).x > 0.0);
     }
 
     #[test]

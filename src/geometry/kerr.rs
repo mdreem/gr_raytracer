@@ -168,12 +168,15 @@ impl KerrSolver {
         // 1e-10 sat far on the roundoff side, injecting ~1e-6 noise into
         // every Christoffel symbol, at the integrator's tolerance level.
         let base = 1e-6;
+        // Floor the step at the metric's own length scale (r_s), not an
+        // absolute coordinate value, so scenes with tiny or huge radii get a
+        // stencil proportionate to the geometry.
         let h = base
             * match index {
-                1 => x.abs().max(1.0),
-                2 => y.abs().max(1.0),
-                3 => z.abs().max(1.0),
-                _ => 1.0,
+                1 => x.abs().max(self.radius),
+                2 => y.abs().max(self.radius),
+                3 => z.abs().max(self.radius),
+                _ => self.radius,
             };
 
         let (dx, dy, dz) = match index {
