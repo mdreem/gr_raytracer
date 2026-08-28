@@ -39,6 +39,9 @@ jobs:
           mv _staging/images.md _staging/index.md
           # Rewrite back-links accordingly.
           sed -i 's/(images\.md)/(index.md)/g' _staging/*.md
+          # jekyll-relative-links only rewrites Markdown links; raw HTML
+          # anchors (the index thumbnails) must point at the built .html.
+          sed -i -E 's/href="([A-Za-z0-9_-]+)\.md"/href="\1.html"/g' _staging/*.md
           # Minimal Jekyll config: a bundled theme plus a site title.
           # jekyll-default-layout (part of the github-pages gem) applies the
           # theme layout to pages without front matter.
