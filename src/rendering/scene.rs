@@ -404,6 +404,16 @@ mod tests {
         alpha: 1.0,
     };
 
+    // The other checker cell (pure green in XYZ); the future-directed
+    // observers below mirror the camera frame relative to the old
+    // past-directed test setup, so their center ray lands one cell over.
+    const SPHERE_COLOR_1: CIETristimulus = CIETristimulus {
+        x: 0.3575761,
+        y: 0.7151522,
+        z: 0.1191920,
+        alpha: 1.0,
+    };
+
     macro_rules! assert_approx_eq_cie_tristimulus {
         ($x: expr_2021, $y: expr_2021, $e: expr_2021) => {
             approx::assert_abs_diff_eq!($x.x, $y.x, epsilon = $e);
@@ -482,7 +492,10 @@ mod tests {
         let radius = 1.0;
         let r = position[1];
         let a = 1.0 - radius / r;
-        let velocity = FourVector::new_spherical(-1.0 / a, -(radius / r).sqrt(), 0.0, 0.0); // we have a freely falling observer here.
+        // Future-directed freely falling observer (t component positive);
+        // the past-directed variant used before plan 8b made the emitter
+        // energy negative, which apply_beaming now correctly rejects.
+        let velocity = FourVector::new_spherical(1.0 / a, -(radius / r).sqrt(), 0.0, 0.0);
 
         let geometry = Schwarzschild::new(radius, 1e-4);
 
@@ -503,7 +516,7 @@ mod tests {
         let ray = scene.camera.get_ray_for(5, 5);
         let color = scene.color_of_ray(&ray).unwrap().color;
 
-        assert_approx_eq_cie_tristimulus!(color, SPHERE_COLOR_2, 1e-6);
+        assert_approx_eq_cie_tristimulus!(color, SPHERE_COLOR_1, 1e-6);
     }
 
     #[test]
@@ -513,7 +526,8 @@ mod tests {
         let sphere_radius = 2.0;
         let r = position[1];
         let a = 1.0 - radius / r;
-        let velocity = FourVector::new_spherical(-a.sqrt().recip(), 0.0, 0.0, 0.0); // we have a freely falling observer here.
+        // Future-directed stationary observer (see note in the test above).
+        let velocity = FourVector::new_spherical(a.sqrt().recip(), 0.0, 0.0, 0.0);
 
         let geometry = Schwarzschild::new(radius, 1e-4);
 
@@ -534,7 +548,7 @@ mod tests {
 
         let ray = scene.camera.get_ray_for(5, 5);
         let color = scene.color_of_ray(&ray).unwrap().color;
-        assert_approx_eq_cie_tristimulus!(color, SPHERE_COLOR_2, 1e-6);
+        assert_approx_eq_cie_tristimulus!(color, SPHERE_COLOR_1, 1e-6);
     }
 
     #[test]

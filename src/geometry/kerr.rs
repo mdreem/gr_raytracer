@@ -170,13 +170,16 @@ impl KerrSolver {
         let base = 1e-6;
         // Floor the step at the metric's own length scale (r_s), not an
         // absolute coordinate value, so scenes with tiny or huge radii get a
-        // stencil proportionate to the geometry.
+        // stencil proportionate to the geometry. r_s = 0 (flat-space limit,
+        // used in tests) has no length scale; fall back to 1.0 so the step
+        // never collapses to zero at coordinate zeros.
+        let len_scale = if self.radius > 0.0 { self.radius } else { 1.0 };
         let h = base
             * match index {
-                1 => x.abs().max(self.radius),
-                2 => y.abs().max(self.radius),
-                3 => z.abs().max(self.radius),
-                _ => self.radius,
+                1 => x.abs().max(len_scale),
+                2 => y.abs().max(len_scale),
+                3 => z.abs().max(len_scale),
+                _ => len_scale,
             };
 
         let (dx, dy, dz) = match index {
