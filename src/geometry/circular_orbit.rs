@@ -123,7 +123,10 @@ pub fn conserved_angular_momentum(r_s: f64, a: f64, r: f64) -> Result<f64, Raytr
     Ok((g_tphi + g_phiphi * omega) * c.u_t)
 }
 
-/// ISCO radius (innermost stable circular orbit).
+/// ISCO radius (innermost stable circular orbit). The disc is assumed to
+/// orbit in +phi: a >= 0 selects the prograde branch, a < 0 the retrograde
+/// branch (hole spinning against the disc), whose ISCO lies much farther
+/// out (9M vs 1M at extremal spin).
 pub fn r_isco(r_s: f64, a: f64) -> f64 {
     let a_s = 2.0 * a / r_s;
 
@@ -160,6 +163,26 @@ mod tests {
         // Near-extremal prograde: ISCO approaches M = 0.5 r_s.
         assert!(r_isco(1.0, 0.499) < 0.63);
         assert!(r_isco(1.0, 0.499) > 0.5);
+    }
+
+    #[test]
+    fn test_r_isco_retrograde_branch() {
+        // Extremal limits (a* = +-1): prograde ISCO -> M (0.5 r_s),
+        // retrograde -> 9M (4.5 r_s). Exact in the Bardeen-Press-Teukolsky
+        // formula (Z1 = 1, Z2 = 2 at |a*| = 1).
+        assert_abs_diff_eq!(r_isco(1.0, 0.5), 0.5, epsilon = 1e-9);
+        assert_abs_diff_eq!(r_isco(1.0, -0.5), 4.5, epsilon = 1e-9);
+        // Near-extremal retrograde (a* = 0.998): just under 9M.
+        assert!(r_isco(1.0, -0.499) > 4.4);
+        assert!(r_isco(1.0, -0.499) < 4.51);
+    }
+
+    #[test]
+    fn test_r_isco_continuous_through_zero_spin() {
+        // Both branches must meet at the Schwarzschild value; a tiny spin of
+        // either sign may not jump.
+        assert_abs_diff_eq!(r_isco(1.0, 1e-12), 3.0, epsilon = 1e-6);
+        assert_abs_diff_eq!(r_isco(1.0, -1e-12), 3.0, epsilon = 1e-6);
     }
 
     #[test]
