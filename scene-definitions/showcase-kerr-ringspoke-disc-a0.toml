@@ -1,0 +1,21 @@
+celestial_temperature = 0.0
+
+[celestial_texture.Bitmap]
+beaming_exponent = 0.0
+path = "resources/black.png"
+
+[geometry_type.Kerr]
+radius = 1.0
+a = 0.0
+horizon_epsilon = 1e-4
+
+[[objects]]
+
+[objects.Disc]
+inner_radius = 3.05
+outer_radius = 8.0
+temperature = 2000.0
+
+[objects.Disc.texture.Bitmap]
+beaming_exponent = 0.0
+path = "resources/ringspoke_a0.png"
