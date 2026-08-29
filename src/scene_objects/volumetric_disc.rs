@@ -267,7 +267,7 @@ impl VolumetricDisc {
                             temperature,
                             redshift,
                         },
-                    );
+                    )?;
 
                     // Stefan-Boltzmann law: emission intensity scales with T^4.
                     // Use a reference temperature for normalization to boost brightness.
@@ -606,7 +606,7 @@ impl Hittable for VolumetricDisc {
         &self,
         color_computation_data: &ColorComputationData,
         geometry: &dyn Geometry,
-    ) -> CIETristimulus {
+    ) -> Result<CIETristimulus, RaytracerError> {
         let ro = color_computation_data
             .intersection_point
             .get_spatial_vector_cartesian();
@@ -619,10 +619,6 @@ impl Hittable for VolumetricDisc {
         .normalize();
 
         self.raymarch_constant_step(&ro, &rd, geometry, &color_computation_data.frequency)
-            .unwrap_or_else(|e| {
-                log::warn!("Raymarching failed: {}", e);
-                CIETristimulus::new(0.0, 0.0, 0.0, 0.0)
-            })
     }
 
     fn energy_of_emitter(
@@ -683,8 +679,8 @@ mod tests {
             &self,
             _uv: &UVCoordinates,
             _temperature_data: &TemperatureData,
-        ) -> CIETristimulus {
-            self.color
+        ) -> Result<CIETristimulus, RaytracerError> {
+            Ok(self.color)
         }
     }
 

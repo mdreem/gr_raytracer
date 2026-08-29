@@ -30,6 +30,8 @@ pub enum RaytracerError {
     TomlError(#[from] toml::de::Error),
     #[error("Texture error: {0}")]
     TextureError(#[from] TextureError),
+    #[error("Unphysical nonpositive redshift factor {0} in beaming")]
+    UnphysicalRedshift(f64),
     #[error("Image error: {0}")]
     ImageError(#[from] ImageError),
     #[error("Image buffer creation failed")]
