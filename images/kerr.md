@@ -74,6 +74,11 @@ the (T/T_ref)^4 brightness difference so the frames stay comparable.
   <p>6x zoom onto the shadow's limb (12000 K scene): successive lensed images of the disc wind around the photon ring, each order ~23x thinner than the last (surface brightness is conserved, so each stays at full luminance until it falls below pixel scale; the grainy fringe is every deeper order averaging inside single pixels).</p>
 </div>
 
+<div align="center">
+  <img src="kerr_critical_curve_starfield.png" alt="The same crop with the disc removed: the bare critical curve against wound starlight">
+  <p>The control: the identical crop with the disc removed. The smooth boundary is the critical curve (its long straight stretch is the near-extremal "D-shape" flattening of the prograde limb at a/M = 0.998), and the faint concentric striations hugging it are the photon ring itself with only starlight as its source. Every winding in the image above slots into this scaffolding; same geometry, hot gas instead of faint stars as the paint.</p>
+</div>
+
 ### Animations
 <div align="center">
   <img src="kerr_animation.gif" alt="Animation of a spinning Kerr black hole with a rotating accretion disk">
