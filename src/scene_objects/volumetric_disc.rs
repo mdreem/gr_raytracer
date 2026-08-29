@@ -39,6 +39,16 @@ pub struct VolumetricDisc {
     noise_offset: f64,
 }
 
+struct SegmentState {
+    distance_accumulated: f64,
+    transparency: f64,
+}
+
+enum RaymarchResult {
+    Continue,
+    AlreadyOpaque,
+}
+
 impl VolumetricDisc {
     pub fn new(
         center_disk_inner_radius: f64,
@@ -217,8 +227,9 @@ impl VolumetricDisc {
         rd: &Vector3<f64>,
         geometry: &dyn Geometry,
         frequency: &RayFrequencyData,
+        remaining_steps: &[Step],
     ) -> Result<CIETristimulus, RaytracerError> {
-        self.raymarch_constant_step_internal(ro, rd, geometry, frequency, true)
+        self.raymarch_constant_step_internal(ro, rd, geometry, frequency, remaining_steps, true)
     }
 
     fn raymarch_constant_step_internal(
@@ -227,6 +238,7 @@ impl VolumetricDisc {
         rd: &Vector3<f64>,
         geometry: &dyn Geometry,
         frequency: &RayFrequencyData,
+        remaining_steps: &[Step],
         use_cached_exit: bool,
     ) -> Result<CIETristimulus, RaytracerError> {
         let sigma_a = self.absorption;
@@ -356,6 +368,42 @@ impl VolumetricDisc {
         );
         trace!("  resulting color: {:?}", accum_color);
         Ok(accum_color)
+    }
+
+    // We will use constant step raymarching for the volumetric disc. This means the step sizes
+    // will not perfectly align with the segment boundaries, so we will need to keep track of the
+    // distance accumulated across segments.
+    fn raymarch_segment(
+        &self,
+        from: &Vector3<f64>,
+        to: &Vector3<f64>,
+        geometry: &dyn Geometry,
+        frequency: &RayFrequencyData,
+        segment_state: &mut SegmentState,
+    ) -> Result<RaymarchResult, RaytracerError> {
+        let segment = to - from;
+        let segment_length = segment.norm();
+        let direction = segment / segment_length;
+
+        // Start the distance at the accumulated distance from the previous segment.
+        let mut dist = segment_state.distance_accumulated;
+
+        while dist < segment_length {
+            let p = from + direction * dist;
+
+            // TODO: Implement the actual raymarching logic here, similar to `raymarch_constant_step_internal`.
+
+            if segment_state.transparency <= 1e-3 {
+                return Ok(RaymarchResult::AlreadyOpaque);
+            }
+
+            dist += self.step_size;
+        }
+
+        // Store the remaining distance that was not processed in this segment for the next segment.
+        segment_state.distance_accumulated = dist - segment_length;
+
+        Ok(RaymarchResult::Continue)
     }
 
     fn fbm(&self, x: Vector3<f64>, h: f64) -> f64 {
@@ -637,7 +685,13 @@ impl Hittable for VolumetricDisc {
         )
         .normalize();
 
-        self.raymarch_constant_step(&ro, &rd, geometry, &color_computation_data.frequency)
+        self.raymarch_constant_step(
+            &ro,
+            &rd,
+            geometry,
+            &color_computation_data.frequency,
+            color_computation_data.remaining_steps,
+        )
     }
 
     fn energy_of_emitter(
