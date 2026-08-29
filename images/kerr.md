@@ -64,7 +64,7 @@ the (T/T_ref)^4 brightness difference so the frames stay comparable.
 
 <div align="center">
   <img src="kerr_disc_temperature_20000k.png" alt="Kerr volumetric disc at 20000 K peak temperature: cream white">
-  <p>20000 K (exposure 1): cream-white; maximal visibility, the temperature gradient washed toward uniform brightness.</p>
+  <p>20000 K (exposure 0.13): pale ivory with a blue-white core. At matched brightness the frame is only mildly hotter-looking than 12000 K, because the visible-band blackbody chromaticity converges toward blue-white above ~10000 K; most of what higher temperature buys here is radiance, not color.</p>
 </div>
 
 ### Photon-ring windings
