@@ -14,7 +14,7 @@ pub struct Intersection {
     pub t: f64,
 }
 
-pub struct ColorComputationData {
+pub struct ColorComputationData<'a> {
     pub uv: UVCoordinates,
     pub temperature_data: TemperatureData,
     pub intersection_point: Point,
@@ -23,6 +23,7 @@ pub struct ColorComputationData {
     /// a per-sample redshift instead of the single per-intersection value in
     /// `temperature_data.redshift`.
     pub frequency: RayFrequencyData,
+    pub remaining_steps: &'a [Step],
 }
 
 pub trait Hittable: Sync {

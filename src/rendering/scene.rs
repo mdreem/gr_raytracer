@@ -138,12 +138,14 @@ impl<'a, G: Geometry> Scene<'a, G> {
 
         let mut object_opacity = 0.0;
         let mut intersections = Vec::new();
-        for step_window in steps.steps.windows(2) {
+        for (window_index, step_window) in steps.steps.windows(2).enumerate() {
             let last_step = &step_window[0];
             let step = &step_window[1];
 
+            let remaining_steps = &steps.steps[window_index..];
             if let Some(intersection_color) =
-                self.objects.intersects(last_step, step, &frequency)?
+                self.objects
+                    .intersects(last_step, step, &frequency, remaining_steps)?
             {
                 intersections.push(intersection_color);
                 let alpha = intersection_color.alpha.clamp(0.0, 1.0);
