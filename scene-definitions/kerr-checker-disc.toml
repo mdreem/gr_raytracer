@@ -1,0 +1,25 @@
+# Gallery checker-disc scene: the classic labeled checkerboard DISC
+# (resources/disk.png, the A1-H8 grid) against the labeled checker sky -
+# both textures exist to make lensing distortions readable. The script
+# substitutes `a` and inner_radius per shot.
+celestial_temperature = 0.0
+
+[celestial_texture.Bitmap]
+beaming_exponent = 0.0
+path = "resources/celestial.png"
+
+[geometry_type.KerrBL]
+radius = 1.0
+a = 0.499
+horizon_epsilon = 1e-4
+
+[[objects]]
+
+[objects.Disc]
+inner_radius = 0.631
+outer_radius = 8.0
+temperature = 3500.0
+
+[objects.Disc.texture.Bitmap]
+beaming_exponent = 0.0
+path = "resources/disk.png"

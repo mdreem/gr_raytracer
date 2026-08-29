@@ -45,13 +45,11 @@ for set in "${SETS[@]}"; do
         # moderate and near-extremal spin.
         for a in 0.250 0.499; do
             scene="$TMPDIR_SCENES/checker_$a.toml"
-            # Compact annulus (outer 8) restores the original images'
-            # hole-centric ring proportions; inner tracks the ISCO.
+            # The checkerboard DISC (disk.png) is the subject, per the
+            # original images; inner edge tracks the ISCO.
             sed -e "s/^a = .*/a = $a/" \
                 -e "s/^inner_radius = .*/inner_radius = $(isco_inner "$a")/" \
-                -e "s/^outer_radius = .*/outer_radius = 8.0/" \
-                -e "s|resources/tmp/Messier_object_025.jpg|resources/celestial.png|" \
-                scene-definitions/kerr-animation.toml > "$scene"
+                scene-definitions/kerr-checker-disc.toml > "$scene"
             case "$a" in
                 0.250) out=images/render_kerr_checker_texture.png ;;
                 *)     out=images/render_kerr_large_a_checker_texture.png ;;
@@ -59,7 +57,7 @@ for set in "${SETS[@]}"; do
             echo "Rendering $out ..."
             "$BIN" --width=1000 --height=1000 --max-steps=1000000 \
                 --camera-position=-19,0,1.4 --theta=-3.14159 --psi=0 --phi=0 \
-                --exposure=2.5 --config-file "$scene" render --filename="$out"
+                --config-file "$scene" render --filename="$out"
         done
         ;;
     volumetric)
@@ -83,14 +81,18 @@ for set in "${SETS[@]}"; do
             sed -e "s|resources/celestial.png|$sky|" \
                 scene-definitions/kerr-bl-volumetric-streaky.toml > "$scene"
             echo "Rendering $out ..."
-            "$BIN" --width=800 --height=800 --max-steps=1000000 \
-                --camera-position=-20,0,0.6 --theta=-3.14159 --psi=0 --phi=0 \
+            "$BIN" --width=1500 --height=1500 --max-steps=1000000 \
+                --camera-position=-20,0,-0.6 --theta=-3.14159 --psi=0 --phi=0 \
                 --config-file "$scene" render --filename="$out"
         done
         ;;
     grid_gif)
         # Spin sweep with the coordinate-grid overlay.
+        # Cyan scene + black labels (matching the historical grid gif):
+        # the measurement grid reads cleanly on a flat background.
         rm -rf kerr_images
+        SWEEP_SCENE=scene-definitions/kerr-animation-cyan.toml \
+        SWEEP_EXPOSURE=6 SWEEP_CAMERA=-14,0,1.2 SWEEP_LABEL_COLOR=black \
         SWEEP_OUTPUT=images/kerr_animation_grid.gif \
             bash scripts/rendering/create_kerr_images.sh "$BIN" --grid --grid-size 50
         ;;
