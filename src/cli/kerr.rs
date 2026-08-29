@@ -43,12 +43,14 @@ impl RenderableGeometry for Kerr {
         to_col: Option<u32>,
     ) -> Result<(), RaytracerError> {
         let tone_mapping = opts.tone_mapping;
+        let exposure = opts.exposure;
         let scene = create_scene_internal(self, opts, &config, camera_position)?;
 
         render(
             scene,
             filename,
             tone_mapping,
+            exposure,
             from_row,
             from_col,
             to_row,
@@ -67,7 +69,7 @@ impl RenderableGeometry for Kerr {
     ) -> Result<(), RaytracerError> {
         let scene = create_scene_internal(self, opts, &config, camera_position)?;
 
-        let raytracer = raytracer::Raytracer::new(scene, ToneMappingMethod::default());
+        let raytracer = raytracer::Raytracer::new(scene, ToneMappingMethod::default(), 1.0);
         let (integrated_ray, stop_reason) = raytracer.integrate_ray_at_point(row, col)?;
         info!("Stop reason: {:?}", stop_reason);
         integrated_ray.save(write)?;
@@ -118,6 +120,7 @@ mod tests {
         let a = 0.5;
         let horizon_epsilon = 1e-5;
         let opts = GlobalOpts {
+            exposure: 1.0,
             width: 400,
             max_steps: 10,
             max_radius: 20.0,

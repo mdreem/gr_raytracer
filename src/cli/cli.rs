@@ -39,6 +39,11 @@ pub struct GlobalOpts {
     pub psi: f64,
     #[arg(long, default_value = "reinhard")]
     pub tone_mapping: ToneMappingMethod,
+    /// Linear exposure multiplier applied to scene radiance before tone
+    /// mapping (must be > 0). PNG output only: the HDR path stores raw
+    /// radiance, and GlobalLinear auto-normalizes, so both ignore it.
+    #[arg(long, default_value = "1.0")]
+    pub exposure: f64,
     /// Render the adaptive-sampling selection mask instead of supersampling.
     #[arg(long)]
     pub show_sampling_mask: bool,
