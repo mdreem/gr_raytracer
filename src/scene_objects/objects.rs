@@ -114,7 +114,7 @@ impl<'a, G: Geometry> Objects<'a, G> {
                         frequency: *frequency,
                     };
                     resulting_color =
-                        Some(hittable.color_at_uv(&color_computation_data, self.geometry));
+                        Some(hittable.color_at_uv(&color_computation_data, self.geometry)?);
                 }
             }
         }

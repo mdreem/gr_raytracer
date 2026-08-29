@@ -163,13 +163,23 @@ impl KerrSolver {
         if index == 0 {
             return Matrix4::zeros();
         }
-        let base = 1e-10; // epsilon = 1e-12
+        // Central differences on f64: total error ~ h^2*|g'''|/6 + eps*|g|/h
+        // is minimized near relative h ~ cbrt(eps) ~ 6e-6. The previous
+        // 1e-10 sat far on the roundoff side, injecting ~1e-6 noise into
+        // every Christoffel symbol, at the integrator's tolerance level.
+        let base = 1e-6;
+        // Floor the step at the metric's own length scale (r_s), not an
+        // absolute coordinate value, so scenes with tiny or huge radii get a
+        // stencil proportionate to the geometry. r_s = 0 (flat-space limit,
+        // used in tests) has no length scale; fall back to 1.0 so the step
+        // never collapses to zero at coordinate zeros.
+        let len_scale = if self.radius > 0.0 { self.radius } else { 1.0 };
         let h = base
             * match index {
-                1 => x.abs().max(1.0),
-                2 => y.abs().max(1.0),
-                3 => z.abs().max(1.0),
-                _ => 1.0,
+                1 => x.abs().max(len_scale),
+                2 => y.abs().max(len_scale),
+                3 => z.abs().max(len_scale),
+                _ => len_scale,
             };
 
         let (dx, dy, dz) = match index {

@@ -239,15 +239,16 @@ impl VolumetricDisc {
             let density = self.compute_density(&p);
 
             if density > 0.0 {
-                let sample_attenuation = (-d_s * density * (sigma_a + sigma_s)).exp();
-                transparency *= sample_attenuation;
+                let sigma_t = sigma_a + sigma_s;
+                let tau_cell = d_s * density * sigma_t;
+                let cell_transmittance = (-tau_cell).exp();
 
                 // Per-sample redshift from the ray's conserved (p_t, p_phi)
                 // and the local circular-orbit Killing coefficients:
                 // u.p = u^t p_t + u^phi p_phi, exact at every sample with no
                 // parallel transport (see docs/plan-01-per-sample-redshift.md).
                 // Where no timelike circular orbit exists the gas is
-                // unphysical anyway: it still attenuates (above) but emits
+                // unphysical anyway: it still attenuates (below) but emits
                 // nothing.
                 let sample_position = Point::new_cartesian(0.0, p[0], p[1], p[2]);
                 if let Ok(coefficients) =
@@ -266,18 +267,27 @@ impl VolumetricDisc {
                             temperature,
                             redshift,
                         },
-                    );
-
-                    let travel_density = d_s; // Ignore the light ray here for now.
-                    let light_attenuation = (-density * travel_density * (sigma_a + sigma_s)).exp();
+                    )?;
 
                     // Stefan-Boltzmann law: emission intensity scales with T^4.
                     // Use a reference temperature for normalization to boost brightness.
                     let intensity_factor =
                         (temperature / self.brightness_reference_temperature).powi(4);
 
-                    let emission_weight =
-                        transparency * light_attenuation * sigma_s * density * d_s;
+                    // Kirchhoff: thermal emissivity couples to absorption,
+                    // j = sigma_a * rho * B(T). With scattering present but
+                    // no external illumination the source function is the
+                    // albedo-weighted Planck function S = (sigma_a/sigma_t) B;
+                    // integrating a constant source across the cell gives the
+                    // exact per-cell weight transparency * (S/B) * (1 - e^-tau)
+                    // (~ sigma_a * rho * ds for thin cells), evaluated BEFORE
+                    // this cell's own transmittance is applied so the cell
+                    // does not absorb its own emission twice.
+                    let emission_weight = if sigma_t > 0.0 {
+                        transparency * (sigma_a / sigma_t) * (1.0 - cell_transmittance)
+                    } else {
+                        0.0
+                    };
                     let step_emission =
                         light_color.mul_color_part(emission_weight * intensity_factor);
 
@@ -291,9 +301,11 @@ impl VolumetricDisc {
                     accum_color.z += step_emission.z;
                 } else {
                     // No timelike circular orbit here: unphysical gas; it
-                    // attenuates (above) but emits nothing.
+                    // attenuates (below) but emits nothing.
                     trace!("  no timelike circular orbit at {:?}; emission skipped", p);
                 }
+
+                transparency *= cell_transmittance;
             }
 
             // Use precomputed exit distance when available (fast path), fallback to legacy check.
@@ -594,7 +606,7 @@ impl Hittable for VolumetricDisc {
         &self,
         color_computation_data: &ColorComputationData,
         geometry: &dyn Geometry,
-    ) -> CIETristimulus {
+    ) -> Result<CIETristimulus, RaytracerError> {
         let ro = color_computation_data
             .intersection_point
             .get_spatial_vector_cartesian();
@@ -607,10 +619,6 @@ impl Hittable for VolumetricDisc {
         .normalize();
 
         self.raymarch_constant_step(&ro, &rd, geometry, &color_computation_data.frequency)
-            .unwrap_or_else(|e| {
-                log::warn!("Raymarching failed: {}", e);
-                CIETristimulus::new(0.0, 0.0, 0.0, 0.0)
-            })
     }
 
     fn energy_of_emitter(
@@ -671,8 +679,8 @@ mod tests {
             &self,
             _uv: &UVCoordinates,
             _temperature_data: &TemperatureData,
-        ) -> CIETristimulus {
-            self.color
+        ) -> Result<CIETristimulus, RaytracerError> {
+            Ok(self.color)
         }
     }
 
@@ -746,6 +754,79 @@ mod tests {
 
         assert!(color.alpha > 0.0);
         assert!(color.alpha <= 1.0);
+    }
+
+    /// Kirchhoff's law: a purely scattering medium (sigma_a = 0) redirects
+    /// light but cannot create thermal photons; it must attenuate (alpha > 0)
+    /// while emitting nothing.
+    #[test]
+    fn test_pure_scattering_gas_attenuates_but_does_not_emit() {
+        let disc = VolumetricDisc::new(
+            1.0,
+            3.0,
+            Arc::new(FixedTextureMap {
+                color: CIETristimulus::new(2.0, 1.0, 0.5, 0.7),
+            }),
+            Box::new(DummyTemperatureComputer),
+            Vector3::new(0.0, 0.0, 1.0),
+            4,
+            42,
+            500,
+            0.01,
+            0.5,
+            10.0,
+            1000.0,
+            0.0, // absorption: none
+            0.4, // scattering only
+            Vector3::new(1.0, 1.0, 1.0),
+            1.0,
+        );
+        let ro = Vector3::new(2.0, 0.0, 0.0);
+        let rd = Vector3::new(1.0, 0.0, 0.0);
+
+        let color = disc
+            .raymarch_constant_step(&ro, &rd, &EuclideanSpace::new(), &unit_frequency())
+            .expect("raymarch should succeed");
+
+        assert_eq!(color.x, 0.0);
+        assert_eq!(color.y, 0.0);
+        assert_eq!(color.z, 0.0);
+        assert!(color.alpha > 0.0);
+    }
+
+    /// Fully transparent coefficients (sigma_a = sigma_s = 0) must yield no
+    /// interaction at all, not NaN from 0/0 in the source-function weight.
+    #[test]
+    fn test_zero_coefficients_yield_no_interaction() {
+        let disc = VolumetricDisc::new(
+            1.0,
+            3.0,
+            Arc::new(FixedTextureMap {
+                color: CIETristimulus::new(2.0, 1.0, 0.5, 0.7),
+            }),
+            Box::new(DummyTemperatureComputer),
+            Vector3::new(0.0, 0.0, 1.0),
+            4,
+            42,
+            500,
+            0.01,
+            0.5,
+            10.0,
+            1000.0,
+            0.0,
+            0.0,
+            Vector3::new(1.0, 1.0, 1.0),
+            1.0,
+        );
+        let ro = Vector3::new(2.0, 0.0, 0.0);
+        let rd = Vector3::new(1.0, 0.0, 0.0);
+
+        let color = disc
+            .raymarch_constant_step(&ro, &rd, &EuclideanSpace::new(), &unit_frequency())
+            .expect("raymarch should succeed");
+
+        assert!(color.x.is_finite() && color.x == 0.0);
+        assert_eq!(color.alpha, 0.0);
     }
 
     #[test]
