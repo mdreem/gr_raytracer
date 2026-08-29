@@ -45,6 +45,35 @@
   <p>Kerr black hole visualization with background stars and volumetric disc (background image: <a href="https://commons.wikimedia.org/wiki/File:NGC6355_-_HST_-_Potw2301a.jpg">NGC 6355</a>)</p>
 </div>
 
+### Accretion-disc temperature series
+
+The main-image scene (see `images/create-main-image.sh`) rendered at three
+peak disc temperatures. Lensing and camera are identical; only the
+Novikov-Thorne calibration target changes, with `--exposure` compensating
+the (T/T_ref)^4 brightness difference so the frames stay comparable.
+
+<div align="center">
+  <img src="kerr_disc_temperature_8000k.png" alt="Kerr volumetric disc at 8000 K peak temperature: deep amber, sparse outskirts">
+  <p>8000 K (exposure 5): deep amber; the cool outskirts thin toward transparency, stars showing through.</p>
+</div>
+
+<div align="center">
+  <img src="kerr_disc_temperature_12000k.png" alt="Kerr volumetric disc at 12000 K peak temperature: pale gold, fully luminous">
+  <p>12000 K (exposure 1): the previous main-image temperature; pale gold, fully luminous end to end.</p>
+</div>
+
+<div align="center">
+  <img src="kerr_disc_temperature_20000k.png" alt="Kerr volumetric disc at 20000 K peak temperature: cream white">
+  <p>20000 K (exposure 1): cream-white; maximal visibility, the temperature gradient washed toward uniform brightness.</p>
+</div>
+
+### Photon-ring windings
+
+<div align="center">
+  <img src="kerr_photon_ring_windings.png" alt="Nested higher-order images of the volumetric disc winding around the shadow's edge">
+  <p>6x zoom onto the shadow's limb (12000 K scene): successive lensed images of the disc wind around the photon ring, each order ~23x thinner than the last (surface brightness is conserved, so each stays at full luminance until it falls below pixel scale; the grainy fringe is every deeper order averaging inside single pixels).</p>
+</div>
+
 ### Animations
 <div align="center">
   <img src="kerr_animation.gif" alt="Animation of a spinning Kerr black hole with a rotating accretion disk">
