@@ -150,7 +150,7 @@ print(f'{1.02*r_isco:.3f}')")
   else
     $command --width="$render_width" --height="$render_height" --max-steps=1000000 --exposure="${SWEEP_EXPOSURE:-2.5}" --camera-position="${SWEEP_CAMERA:--22,0,1.8}" --theta=-3.14159 --psi=0 --phi=0 --config-file "kerr_images/kerr_a_${a_value}.toml" render --filename "$FILE"
   fi
-  magick "$FILE" -gravity Northwest -font "${ANNOTATE_FONT:-/System/Library/Fonts/Helvetica.ttc}" -fill white -pointsize 30 -annotate +20+20 "a = ${a_value}" "$FILE_ANNOTATED"
+  magick "$FILE" -gravity Northwest -font "${ANNOTATE_FONT:-/System/Library/Fonts/Helvetica.ttc}" -fill "${SWEEP_LABEL_COLOR:-white}" -pointsize 30 -annotate +20+20 "a = ${a_value}" "$FILE_ANNOTATED"
   if (( grid_enabled )) && (( ${#grid_draw_args[@]} > 0 )); then
     magick "$FILE_ANNOTATED" \
       \( -size "${render_width}x${render_height}" xc:none \
