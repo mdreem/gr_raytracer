@@ -30,13 +30,17 @@ fi
 SCENE="$(mktemp -t kerr-main-image-XXXXXX).toml"
 trap 'rm -f "$SCENE"' EXIT
 
-# Frozen recipe (2026-07-12): scene-definitions/kerr-volumetric-streaky.toml
+# Frozen recipe (2026-08-29): scene-definitions/kerr-volumetric-streaky.toml
 # with the inner edge pulled to just outside the prograde ISCO (0.618 r_s at
-# this spin), the temperature raised so the whole disc stays in the visible
-# range, the brightness reference chosen so the Reinhard tone mapping does not
-# clip away the Perlin texture, and the star-field background. The bright side
-# of the disc is the approaching (left) side; renders made before the
-# redshift-sign fix show it mirrored.
+# this spin), the star-field background, and the brightness reference chosen
+# so the Reinhard tone mapping does not clip away the Perlin texture. Peak
+# temperature 10000 K with --exposure 2: after the 2026-08 physics fixes
+# (Novikov-Thorne r^-3/4 profile, Kirchhoff emission, geodesic segment
+# marching) the whole disc stays visible at lower temperatures, and 10000 K
+# keeps a golden-orange palette instead of 12000 K's paler gold; the exposure
+# flag compensates the (T/T_ref)^4 brightness drop. The bright side of the
+# disc is the approaching (left) side; renders made before the redshift-sign
+# fix show it mirrored. See images/kerr.md for the temperature series.
 cat > "$SCENE" <<'EOF'
 celestial_temperature = 0.0
 
@@ -54,7 +58,7 @@ horizon_epsilon = 1e-4
 [objects.VolumetricDisc]
 inner_radius = 0.8
 outer_radius = 16.0
-temperature = 12000.0
+temperature = 10000.0
 num_octaves = 8
 max_steps = 50000
 step_size = 0.0002
@@ -74,6 +78,7 @@ cargo build --release
 
 ./target/release/gr_raytracer \
     --width="$WIDTH" --height="$HEIGHT" \
+    --exposure=2.0 \
     --camera-position=-17,0,1.5 --theta=-3.14159 --psi=0.0 --phi=0 \
     --config-file "$SCENE" \
     render --filename="$OUTPUT"
