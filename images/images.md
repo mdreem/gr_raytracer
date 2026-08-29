@@ -11,7 +11,7 @@ The gallery is split into one page per topic:
 
 ## [Kerr Black Hole](kerr.md)
 <div align="center">
-  <a href="kerr.md"><img src="kerr_blackbody_disk_1.png" width="400" alt="Kerr black hole with a blackbody accretion disk"></a>
+  <a href="kerr.md"><img src="kerr_disc_temperature_12000k.png" width="400" alt="Kerr black hole with a blackbody accretion disk"></a>
   <p>Checkerboard, blackbody, and volumetric discs; animations; ray trajectories.</p>
 </div>
 
