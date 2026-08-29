@@ -248,10 +248,7 @@ pub fn xyz_to_srgb(cie_tristimulus: &CIETristimulus, exposure: f64) -> Color {
 }
 
 pub fn xyz_to_linear_srgb_buffer(cie_tristimulus: &Vec<CIETristimulus>) -> Vec<Vector3<f64>> {
-    cie_tristimulus
-        .iter()
-        .map(|c| xyz_to_linear_srgb(c))
-        .collect()
+    cie_tristimulus.iter().map(xyz_to_linear_srgb).collect()
 }
 
 pub fn linear_srgb_to_srgb_buffer(
