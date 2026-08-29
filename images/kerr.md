@@ -18,6 +18,33 @@ All still images on this page are reproducible: `images/create-gallery-images.sh
   <p>Kerr black hole with a checkerboard accretion disk showing frame dragging and lensing</p>
 </div>
 
+### Blackbody Radiation
+
+Two vantages on a Novikov-Thorne blackbody disc: a distant view of the
+full system and a close-up where the shadow dominates and the disc wraps
+over the top. The pairs differ in disc temperature (8000 K vs 4000 K)
+and spin: the red pair sits at a = 0.4995, essentially extremal.
+
+<div align="center">
+  <img src="kerr_blackbody_disk_1.png" alt="Kerr black hole with a hot blackbody accretion disk, distant view">
+  <p>Hot (8000 K) blackbody disc at a = 0.499, distant view (background image: <a href="https://commons.wikimedia.org/wiki/File:Messier_object_025.jpg">M25</a>)</p>
+</div>
+
+<div align="center">
+  <img src="kerr_blackbody_disk_2.png" alt="Kerr black hole with a hot blackbody accretion disk, close-up on the shadow">
+  <p>The same disc up close: the shadow dominates, the disc wraps over the top, and the approaching side is visibly blueshifted</p>
+</div>
+
+<div align="center">
+  <img src="kerr_blackbody_disk_a_0_5__1.png" alt="Essentially extremal Kerr black hole with a cool red blackbody disk, distant view">
+  <p>Cool (4000 K) blackbody disc at a = 0.4995 (essentially extremal; exactly a = M is degenerate as the ISCO meets the photon orbit), distant view</p>
+</div>
+
+<div align="center">
+  <img src="kerr_blackbody_disk_a_0_5__2.png" alt="Essentially extremal Kerr black hole with a cool red blackbody disk, close-up on the shadow">
+  <p>The extremal-limit disc up close</p>
+</div>
+
 ### Volumetric Rendering
 <div align="center">
   <img src="render_kerr_checker_texture_volumetric.png" alt="Kerr black hole with a checkerboard disk and volumetric rendering of the surrounding medium">

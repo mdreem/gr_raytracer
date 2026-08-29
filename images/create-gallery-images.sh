@@ -6,7 +6,7 @@
 # scripts/rendering/create_kerr_images.sh.
 #
 # Usage:  images/create-gallery-images.sh [set ...]
-#   Sets: checker volumetric grid_gif   (default: all)
+#   Sets: checker volumetric blackbody grid_gif   (default: all)
 #   All scenes are derived from committed scene-definitions at run time;
 #   the flat-disc inner radius tracks 1.02 * r_isco(a).
 #
@@ -19,7 +19,7 @@ cd "$REPO_ROOT"
 
 BIN="target/release/gr_raytracer"
 SETS=("$@")
-[ ${#SETS[@]} -eq 0 ] && SETS=(checker volumetric grid_gif)
+[ ${#SETS[@]} -eq 0 ] && SETS=(checker volumetric blackbody grid_gif)
 
 if [ ! -x "$BIN" ]; then
     echo "Building release binary..."
@@ -92,6 +92,40 @@ for set in "${SETS[@]}"; do
                 --config-file "$scene" render --filename="$out"
         done
         ;;
+    blackbody)
+        # Novikov-Thorne blackbody disc, two vantages x two spins: a
+        # distant full-system view and a close-up where the shadow
+        # dominates and the disc wraps over the top. The pairs differ in
+        # temperature (hot golden 8000 K vs cool red 4000 K); the red
+        # pair sits at a = 0.4995, essentially extremal (exactly a = M
+        # is degenerate: the ISCO coincides with the photon orbit and the
+        # NT profile has no timelike orbit to start from). The close
+        # views collect far more light, hence the lower exposures.
+        M25="resources/tmp/Messier_object_025.jpg"
+        if [ ! -f "$M25" ]; then
+            echo "Downloading M25 star-field background from Wikimedia Commons..."
+            mkdir -p "$(dirname "$M25")"
+            curl -L --fail -o "$M25" \
+                "https://commons.wikimedia.org/wiki/Special:FilePath/Messier_object_025.jpg"
+        fi
+        gold="$TMPDIR_SCENES/blackbody_gold.toml"
+        red="$TMPDIR_SCENES/blackbody_red.toml"
+        cp scene-definitions/kerr-blackbody-disc.toml "$gold"
+        sed -e "s/^a = .*/a = 0.4995/" \
+            -e "s/^inner_radius = .*/inner_radius = $(isco_inner 0.4995)/" \
+            -e "s/^temperature = .*/temperature = 4000.0/" \
+            scene-definitions/kerr-blackbody-disc.toml > "$red"
+        render_bb() { # scene camera exposure out
+            echo "Rendering $4 ..."
+            "$BIN" --width=1000 --height=1000 --max-steps=1000000 \
+                --camera-position="$2" --theta=-3.14159 --psi=0 --phi=0 \
+                --exposure="$3" --config-file "$1" render --filename="$4"
+        }
+        render_bb "$gold" -22,0,0.9 3   images/kerr_blackbody_disk_1.png
+        render_bb "$gold" -6,0,0.45 0.8 images/kerr_blackbody_disk_2.png
+        render_bb "$red"  -22,0,0.9 8   images/kerr_blackbody_disk_a_0_5__1.png
+        render_bb "$red"  -6,0,0.45 4   images/kerr_blackbody_disk_a_0_5__2.png
+        ;;
     grid_gif)
         # Spin sweep with the coordinate-grid overlay.
         # Cyan scene + black labels (matching the historical grid gif):
@@ -103,7 +137,7 @@ for set in "${SETS[@]}"; do
             bash scripts/rendering/create_kerr_images.sh "$BIN" --grid --grid-size 50
         ;;
     *)
-        echo "Unknown set: $set (known: checker volumetric grid_gif)" >&2
+        echo "Unknown set: $set (known: checker volumetric blackbody grid_gif)" >&2
         exit 1
         ;;
     esac
