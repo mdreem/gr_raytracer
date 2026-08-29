@@ -287,6 +287,10 @@ impl<'a, G: Geometry> Raytracer<'a, G> {
             buffer.into_iter().map(|sample| sample.color).collect();
 
         if let Some(mask_color) = self.scene.sampling_mask_color {
+            // The mask is a fixed diagnostic color; pre-divide by the
+            // exposure so the later exposure multiply restores it exactly
+            // and the overlay looks identical at every --exposure.
+            let mask_color = mask_color.mul_color_part(1.0 / self.exposure);
             for pixel in &pixels_to_sample {
                 let pixel_index = self.get_pixel_index(
                     pixel.row,
