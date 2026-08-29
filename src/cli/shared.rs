@@ -89,12 +89,18 @@ pub fn render<G: Geometry>(
     scene: Scene<G>,
     filename: String,
     tone_mapping: ToneMappingMethod,
+    exposure: f64,
     from_row: Option<u32>,
     from_col: Option<u32>,
     to_row: Option<u32>,
     to_col: Option<u32>,
 ) -> Result<(), RaytracerError> {
-    let raytracer = raytracer::Raytracer::new(scene, tone_mapping);
+    if !(exposure.is_finite() && exposure > 0.0) {
+        return Err(RaytracerError::InvalidConfiguration(format!(
+            "exposure must be a positive finite number, got {exposure}"
+        )));
+    }
+    let raytracer = raytracer::Raytracer::new(scene, tone_mapping, exposure);
     raytracer.render_section(
         from_row.unwrap_or(0),
         from_col.unwrap_or(0),

@@ -259,22 +259,18 @@ pub fn linear_srgb_to_srgb_buffer(
     exposure: f64,
     tone_mapping_method: ToneMappingMethod,
 ) -> Vec<Color> {
+    // Per-method pre-scale of linear radiance. Reinhard: the user's
+    // exposure slides the scene along the L/(1+L) curve. GlobalLinear IS an
+    // auto-exposure (normalize the brightest component to white), so the
+    // exposure flag deliberately does not apply; multiplying it in would
+    // cancel against the normalization anyway.
     let scale = match tone_mapping_method {
-        ToneMappingMethod::Reinhard => 1.0,
+        ToneMappingMethod::Reinhard => exposure,
         ToneMappingMethod::GlobalLinear => {
-            let max_r = linear_rgb
+            let max_component = linear_rgb
                 .iter()
-                .map(|c| c.x * exposure)
+                .map(|c| c.x.max(c.y).max(c.z))
                 .fold(0.0, f64::max);
-            let max_g = linear_rgb
-                .iter()
-                .map(|c| c.y * exposure)
-                .fold(0.0, f64::max);
-            let max_b = linear_rgb
-                .iter()
-                .map(|c| c.z * exposure)
-                .fold(0.0, f64::max);
-            let max_component = max_r.max(max_g).max(max_b);
             if max_component > 0.0 {
                 1.0 / max_component
             } else {
@@ -285,7 +281,7 @@ pub fn linear_srgb_to_srgb_buffer(
 
     linear_rgb
         .iter()
-        .map(|c| c * exposure)
+        .map(|c| c * scale)
         .map(|c| match tone_mapping_method {
             ToneMappingMethod::Reinhard => {
                 let l_in = 0.2126 * c.x + 0.7152 * c.y + 0.0722 * c.z;
@@ -296,7 +292,7 @@ pub fn linear_srgb_to_srgb_buffer(
                     c
                 }
             }
-            ToneMappingMethod::GlobalLinear => scale * c,
+            ToneMappingMethod::GlobalLinear => c,
         })
         .map(|v_lin| {
             let r = (compand_srgb(v_lin.x.max(0.0)) * 255.0).round() as u8;
@@ -349,6 +345,23 @@ pub fn srgb_to_xyz(color: &Color) -> CIETristimulus {
 pub mod tests {
     use super::*;
     use approx::assert_abs_diff_eq;
+
+    /// Exposure scales linear radiance before the tone map: Reinhard
+    /// responds (dim pixels brighten ~linearly), while GlobalLinear's
+    /// auto-normalization cancels it exactly (it is an auto-exposure;
+    /// documented on the --exposure flag).
+    #[test]
+    fn test_exposure_scales_reinhard_but_cancels_in_global_linear() {
+        let buffer = vec![Vector3::new(0.02, 0.02, 0.02), Vector3::new(0.5, 0.5, 0.5)];
+
+        let reinhard_1x = linear_srgb_to_srgb_buffer(&buffer, 1.0, ToneMappingMethod::Reinhard);
+        let reinhard_4x = linear_srgb_to_srgb_buffer(&buffer, 4.0, ToneMappingMethod::Reinhard);
+        assert!(reinhard_4x[0].r > reinhard_1x[0].r);
+
+        let linear_1x = linear_srgb_to_srgb_buffer(&buffer, 1.0, ToneMappingMethod::GlobalLinear);
+        let linear_4x = linear_srgb_to_srgb_buffer(&buffer, 4.0, ToneMappingMethod::GlobalLinear);
+        assert_eq!(linear_1x, linear_4x);
+    }
 
     /// An unphysical nonpositive redshift must error for every exponent
     /// regime: fractional (would be NaN via powf), zero (would be 1.0,
