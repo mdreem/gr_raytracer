@@ -43,17 +43,23 @@ for set in "${SETS[@]}"; do
     checker)
         # Near-edge-on flat blackbody disc against the labeled checker sky,
         # moderate and near-extremal spin.
-        for a in 0.250 0.499; do
+        for a in 0.250 0.550; do
             scene="$TMPDIR_SCENES/checker_$a.toml"
             # The checkerboard DISC (disk.png) is the subject, per the
-            # original images; inner edge tracks the ISCO.
+            # original images. a = 0.550 exceeds extremality (a > M): a
+            # NAKED SINGULARITY with no horizon and no shadow, the
+            # historical large_a image. No ISCO exists there, so the inner
+            # edge is fixed; below extremality it tracks the ISCO.
+            if [ "$a" = "0.550" ]; then
+                inner=3.5
+                out=images/render_kerr_large_a_checker_texture.png
+            else
+                inner=$(isco_inner "$a")
+                out=images/render_kerr_checker_texture.png
+            fi
             sed -e "s/^a = .*/a = $a/" \
-                -e "s/^inner_radius = .*/inner_radius = $(isco_inner "$a")/" \
+                -e "s/^inner_radius = .*/inner_radius = $inner/" \
                 scene-definitions/kerr-checker-disc.toml > "$scene"
-            case "$a" in
-                0.250) out=images/render_kerr_checker_texture.png ;;
-                *)     out=images/render_kerr_large_a_checker_texture.png ;;
-            esac
             echo "Rendering $out ..."
             "$BIN" --width=1000 --height=1000 --max-steps=1000000 \
                 --camera-position=-19,0,1.4 --theta=-3.14159 --psi=0 --phi=0 \
