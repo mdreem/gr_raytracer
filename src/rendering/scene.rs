@@ -172,7 +172,7 @@ impl<'a, G: Geometry> Scene<'a, G> {
                             redshift,
                             temperature: self.celestial_temperature,
                         },
-                    ));
+                    )?);
                     ray_class = RayClass::Escaped;
                 }
                 StopReason::CoordinateIsNan => {
