@@ -181,50 +181,6 @@ impl VolumetricDisc {
         UVCoordinates { u, v }
     }
 
-    fn does_exit(&self, p: &Vector3<f64>, rd: &Vector3<f64>, t: f64) -> bool {
-        let point_from = Point::new_cartesian(0.0, p[0], p[1], p[2]);
-        let point_to =
-            Point::new_cartesian(0.0, p[0] + rd[0] * t, p[1] + rd[1] * t, p[2] + rd[2] * t);
-        if let Some(intersection) = self.intersects_internal(&point_from, &point_to) {
-            let exit = intersection.t > MIN_INTERSECTION_T;
-            if exit {
-                trace!(
-                    "  does_exit found intersection at t={} ( > {}), breaking.",
-                    intersection.t, MIN_INTERSECTION_T
-                );
-            }
-            exit
-        } else {
-            false
-        }
-    }
-
-    fn precompute_exit_distance(&self, ro: &Vector3<f64>, rd: &Vector3<f64>) -> Option<f64> {
-        let max_distance = self.step_size * self.max_steps as f64;
-        let to = ro + rd * max_distance;
-        let intersection = self.intersects_cylinder(
-            ro,
-            &to,
-            self.center_disk_inner_radius,
-            self.center_disk_outer_radius,
-            &self.axis,
-        );
-
-        match intersection {
-            NoIntersection | Parallel => None,
-            OneIntersection(t) => (t > MIN_INTERSECTION_T).then_some(t * max_distance),
-            TwoIntersections(t1, t2) => {
-                if t1 > MIN_INTERSECTION_T {
-                    Some(t1 * max_distance)
-                } else if t2 > MIN_INTERSECTION_T {
-                    Some(t2 * max_distance)
-                } else {
-                    None
-                }
-            }
-        }
-    }
-
     // https://www.scratchapixel.com/lessons/3d-basic-rendering/volume-rendering-for-developers/ray-marching-get-it-right.html
     fn raymarch(
         &self,
@@ -820,15 +776,25 @@ mod tests {
         assert_eq!(disc.compute_density(&outside_vertical), 0.0);
     }
 
+    /// Two-point straight step slice mimicking a fired entry window: starts
+    /// outside the bounding cylinder (inner hole) and crosses the gas.
+    fn straight_steps(from: Vector3<f64>, to: Vector3<f64>) -> Vec<Step> {
+        let mk = |v: &Vector3<f64>| Step {
+            x: Point::new_cartesian(0.0, v[0], v[1], v[2]),
+            p: FourVector::new_cartesian(1.0, 1.0, 0.0, 0.0),
+            t: 0.0,
+            step: 0,
+        };
+        vec![mk(&from), mk(&to)]
+    }
 
     #[test]
     fn test_volumetric_disc_raymarch_produces_opacity() {
         let disc = create_disc();
-        let ro = Vector3::new(2.0, 0.0, 0.0);
-        let rd = Vector3::new(1.0, 0.0, 0.0);
+        let steps = straight_steps(Vector3::new(0.2, 0.0, 0.0), Vector3::new(5.0, 0.0, 0.0));
 
         let color = disc
-            .raymarch(&ro, &rd, &EuclideanSpace::new(), &unit_frequency())
+            .raymarch(&EuclideanSpace::new(), &unit_frequency(), &steps)
             .expect("raymarch should succeed");
 
         assert!(color.alpha > 0.0);
@@ -860,11 +826,10 @@ mod tests {
             Vector3::new(1.0, 1.0, 1.0),
             1.0,
         );
-        let ro = Vector3::new(2.0, 0.0, 0.0);
-        let rd = Vector3::new(1.0, 0.0, 0.0);
+        let steps = straight_steps(Vector3::new(0.2, 0.0, 0.0), Vector3::new(5.0, 0.0, 0.0));
 
         let color = disc
-            .raymarch(&ro, &rd, &EuclideanSpace::new(), &unit_frequency())
+            .raymarch(&EuclideanSpace::new(), &unit_frequency(), &steps)
             .expect("raymarch should succeed");
 
         assert_eq!(color.x, 0.0);
@@ -897,19 +862,23 @@ mod tests {
             Vector3::new(1.0, 1.0, 1.0),
             1.0,
         );
-        let ro = Vector3::new(2.0, 0.0, 0.0);
-        let rd = Vector3::new(1.0, 0.0, 0.0);
+        let steps = straight_steps(Vector3::new(0.2, 0.0, 0.0), Vector3::new(5.0, 0.0, 0.0));
 
         let color = disc
-            .raymarch(&ro, &rd, &EuclideanSpace::new(), &unit_frequency())
+            .raymarch(&EuclideanSpace::new(), &unit_frequency(), &steps)
             .expect("raymarch should succeed");
 
         assert!(color.x.is_finite() && color.x == 0.0);
         assert_eq!(color.alpha, 0.0);
     }
 
+    /// Segmentation invariance: marching the same straight path as ONE
+    /// window must equal marching it split into MANY windows with
+    /// boundaries deliberately misaligned to the step size. This pins the
+    /// phase carry-over (distance_accumulated): if a segment boundary ever
+    /// reset or double-counted the sampling comb, the results diverge.
     #[test]
-    fn test_volumetric_disc_raymarch_cached_exit_matches_legacy() {
+    fn test_raymarch_segmentation_invariance() {
         let disc = VolumetricDisc::new(
             1.0,
             3.0,
@@ -930,31 +899,34 @@ mod tests {
             Vector3::new(1.0, 1.0, 1.0),
             1.0,
         );
-        let ro = Vector3::new(2.0, 0.0, 0.0);
-        let rd = Vector3::new(1.0, 0.0, 0.0);
 
-        let cached = disc
-            .raymarch_constant_step_internal(
-                &ro,
-                &rd,
-                &EuclideanSpace::new(),
-                &unit_frequency(),
-                true,
-            )
-            .expect("raymarch should succeed");
-        let legacy = disc
-            .raymarch_constant_step_internal(
-                &ro,
-                &rd,
-                &EuclideanSpace::new(),
-                &unit_frequency(),
-                false,
-            )
-            .expect("raymarch should succeed");
+        let one = straight_steps(Vector3::new(0.2, 0.0, 0.0), Vector3::new(5.0, 0.0, 0.0));
 
-        assert_abs_diff_eq!(cached.x, legacy.x, epsilon = 1e-10);
-        assert_abs_diff_eq!(cached.y, legacy.y, epsilon = 1e-10);
-        assert_abs_diff_eq!(cached.z, legacy.z, epsilon = 1e-10);
-        assert_abs_diff_eq!(cached.alpha, legacy.alpha, epsilon = 1e-10);
+        // Same path cut at odd places; the first window still contains the
+        // entry crossing (as a fired window would), later cuts fall inside
+        // the gas and one straddles the outer wall.
+        let xs = [0.2, 1.35, 2.1, 2.8005, 3.4, 5.0];
+        let many: Vec<Step> = xs
+            .iter()
+            .map(|x| Step {
+                x: Point::new_cartesian(0.0, *x, 0.0, 0.0),
+                p: FourVector::new_cartesian(1.0, 1.0, 0.0, 0.0),
+                t: 0.0,
+                step: 0,
+            })
+            .collect();
+
+        let geometry = EuclideanSpace::new();
+        let a = disc
+            .raymarch(&geometry, &unit_frequency(), &one)
+            .expect("single-window raymarch should succeed");
+        let b = disc
+            .raymarch(&geometry, &unit_frequency(), &many)
+            .expect("multi-window raymarch should succeed");
+
+        assert_abs_diff_eq!(a.x, b.x, epsilon = 1e-9);
+        assert_abs_diff_eq!(a.y, b.y, epsilon = 1e-9);
+        assert_abs_diff_eq!(a.z, b.z, epsilon = 1e-9);
+        assert_abs_diff_eq!(a.alpha, b.alpha, epsilon = 1e-9);
     }
 }
