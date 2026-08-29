@@ -17,6 +17,7 @@ use nalgebra::Vector3;
 use noise::{NoiseFn, Perlin};
 
 const MIN_INTERSECTION_T: f64 = 1e-9;
+const CAPTURE_HEIGHT_FACTOR: f64 = 3.0;
 
 pub struct VolumetricDisc {
     center_disk_inner_radius: f64,
@@ -42,8 +43,12 @@ pub struct VolumetricDisc {
 struct SegmentState {
     distance_accumulated: f64,
     transparency: f64,
+    alpha_weighted_sum: f64,
+    alpha_weight_total: f64,
+    color_accumulated: CIETristimulus,
 }
 
+#[derive(PartialEq)]
 enum RaymarchResult {
     Continue,
     AlreadyOpaque,
@@ -221,153 +226,150 @@ impl VolumetricDisc {
     }
 
     // https://www.scratchapixel.com/lessons/3d-basic-rendering/volume-rendering-for-developers/ray-marching-get-it-right.html
-    fn raymarch_constant_step(
+    fn raymarch(
         &self,
-        ro: &Vector3<f64>,
-        rd: &Vector3<f64>,
         geometry: &dyn Geometry,
         frequency: &RayFrequencyData,
         remaining_steps: &[Step],
     ) -> Result<CIETristimulus, RaytracerError> {
-        self.raymarch_constant_step_internal(ro, rd, geometry, frequency, remaining_steps, true)
-    }
-
-    fn raymarch_constant_step_internal(
-        &self,
-        ro: &Vector3<f64>,
-        rd: &Vector3<f64>,
-        geometry: &dyn Geometry,
-        frequency: &RayFrequencyData,
-        remaining_steps: &[Step],
-        use_cached_exit: bool,
-    ) -> Result<CIETristimulus, RaytracerError> {
-        let sigma_a = self.absorption;
-        let sigma_s = self.scattering;
-
-        let mut accum_color = CIETristimulus::new(0.0, 0.0, 0.0, 0.0);
-        let mut transparency = 1.0;
-        let mut alpha_weighted_sum = 0.0;
-        let mut alpha_weight_total = 0.0;
-
-        let d_s = self.step_size;
-        let mut step_count = 0;
-        let mut d_o = 0.0;
-        let cached_exit_distance = if use_cached_exit {
-            self.precompute_exit_distance(ro, rd)
-        } else {
-            None
+        trace!(
+            "Start raymarching at {:?} ",
+            remaining_steps.first().unwrap(),
+        );
+        let segment_state = &mut SegmentState {
+            distance_accumulated: 0.0,
+            transparency: 1.0,
+            alpha_weighted_sum: 0.0,
+            alpha_weight_total: 0.0,
+            color_accumulated: CIETristimulus::new(0.0, 0.0, 0.0, 0.0),
         };
 
-        for i in 0..self.max_steps {
-            let p = ro + rd * d_o;
-            d_o += d_s;
+        let first = &remaining_steps.first().unwrap();
+        // if the first point is outside if the disc it is an entering ray, otherwise it is an exiting ray
+        let is_entering =
+            !self.is_inside_bounding_cylinder(&first.x.get_spatial_vector_cartesian());
+        if !is_entering {
+            trace!("Ray is exiting the disc, skipping raymarching.");
+            return Ok(CIETristimulus::new(0.0, 0.0, 0.0, 0.0));
+        }
 
-            step_count += 1;
-            if !self.is_inside_disc(&p) {
-                trace!("  Ray outside disc at step {}, position {:?}", i, p);
-                continue;
-            }
-            let density = self.compute_density(&p);
+        for steps in remaining_steps.windows(2) {
+            let from = &steps[0].x.get_spatial_vector_cartesian();
+            let to = &steps[1].x.get_spatial_vector_cartesian();
 
-            if density > 0.0 {
-                let sigma_t = sigma_a + sigma_s;
-                let tau_cell = d_s * density * sigma_t;
-                let cell_transmittance = (-tau_cell).exp();
+            let overlaps = self.is_inside_bounding_cylinder(&from)
+                || self.intersects_internal(&steps[0].x, &steps[1].x).is_some();
 
-                // Per-sample redshift from the ray's conserved (p_t, p_phi)
-                // and the local circular-orbit Killing coefficients:
-                // u.p = u^t p_t + u^phi p_phi, exact at every sample with no
-                // parallel transport (see docs/plan-01-per-sample-redshift.md).
-                // Where no timelike circular orbit exists the gas is
-                // unphysical anyway: it still attenuates (below) but emits
-                // nothing.
-                let sample_position = Point::new_cartesian(0.0, p[0], p[1], p[2]);
-                if let Ok(coefficients) =
-                    geometry.circular_orbit_killing_coefficients(&sample_position)
-                {
-                    let emitter_energy =
-                        coefficients.u_t * frequency.p_t + coefficients.u_phi * frequency.p_phi;
-                    let redshift = frequency.observer_energy / emitter_energy;
-
-                    let r_dist = p.cross(&self.axis).norm();
-                    let temperature = self.temperature_computer.compute_temperature(r_dist)?;
-                    let uv = self.get_uv(&p);
-                    let light_color = self.texture_mapper.color_at_uv(
-                        &uv,
-                        &crate::rendering::texture::TemperatureData {
-                            temperature,
-                            redshift,
-                        },
-                    )?;
-
-                    // Stefan-Boltzmann law: emission intensity scales with T^4.
-                    // Use a reference temperature for normalization to boost brightness.
-                    let intensity_factor =
-                        (temperature / self.brightness_reference_temperature).powi(4);
-
-                    // Kirchhoff: thermal emissivity couples to absorption,
-                    // j = sigma_a * rho * B(T). With scattering present but
-                    // no external illumination the source function is the
-                    // albedo-weighted Planck function S = (sigma_a/sigma_t) B;
-                    // integrating a constant source across the cell gives the
-                    // exact per-cell weight transparency * (S/B) * (1 - e^-tau)
-                    // (~ sigma_a * rho * ds for thin cells), evaluated BEFORE
-                    // this cell's own transmittance is applied so the cell
-                    // does not absorb its own emission twice.
-                    let emission_weight = if sigma_t > 0.0 {
-                        transparency * (sigma_a / sigma_t) * (1.0 - cell_transmittance)
-                    } else {
-                        0.0
-                    };
-                    let step_emission =
-                        light_color.mul_color_part(emission_weight * intensity_factor);
-
-                    // Keep texture alpha influence separate from per-step emission accumulation.
-                    let alpha_sample_weight = density * d_s;
-                    alpha_weighted_sum += light_color.alpha.clamp(0.0, 1.0) * alpha_sample_weight;
-                    alpha_weight_total += alpha_sample_weight;
-
-                    accum_color.x += step_emission.x;
-                    accum_color.y += step_emission.y;
-                    accum_color.z += step_emission.z;
-                } else {
-                    // No timelike circular orbit here: unphysical gas; it
-                    // attenuates (below) but emits nothing.
-                    trace!("  no timelike circular orbit at {:?}; emission skipped", p);
-                }
-
-                transparency *= cell_transmittance;
+            // If the segment does not intersect the disc, we can skip it entirely.
+            if !overlaps {
+                break;
             }
 
-            // Use precomputed exit distance when available (fast path), fallback to legacy check.
-            let exited = if let Some(exit_distance) = cached_exit_distance {
-                d_o >= exit_distance
-            } else {
-                self.does_exit(&p, rd, d_s)
-            };
-            if exited {
-                trace!("  Ray exited disc at step {}, position {:?}", i, p,);
+            let result = self.raymarch_segment(from, to, geometry, frequency, segment_state)?;
+
+            if result == RaymarchResult::AlreadyOpaque {
                 break;
             }
         }
 
         // Final alpha combines physical opacity with texture alpha, applied once at the end.
-        let physical_opacity = 1.0 - transparency;
-        let texture_alpha = if alpha_weight_total > 0.0 {
-            alpha_weighted_sum / alpha_weight_total
+        let physical_opacity = 1.0 - segment_state.transparency;
+        let texture_alpha = if segment_state.alpha_weight_total > 0.0 {
+            segment_state.alpha_weighted_sum / segment_state.alpha_weight_total
         } else {
             1.0
         };
-        accum_color.alpha = physical_opacity * texture_alpha;
+        segment_state.color_accumulated.alpha = physical_opacity * texture_alpha;
 
-        trace!(
-            "  Computed from {:?} to {:?} with step_count={}",
-            ro,
-            ro + rd * d_o,
-            step_count
-        );
-        trace!("  resulting color: {:?}", accum_color);
-        Ok(accum_color)
+        trace!("  resulting color: {:?}", segment_state.color_accumulated);
+        Ok(segment_state.color_accumulated)
+    }
+
+    fn march_constant_step(
+        &self,
+        p: &Vector3<f64>,
+        sigma_a: f64,
+        sigma_s: f64,
+        step_size: f64,
+        geometry: &dyn Geometry,
+        frequency: &RayFrequencyData,
+        segment_state: &mut SegmentState,
+    ) -> Result<(), RaytracerError> {
+        if !self.is_inside_disc(&p) {
+            trace!("  Ray outside disc at position {:?}", p);
+            return Ok(());
+        }
+        let density = self.compute_density(&p);
+
+        if density > 0.0 {
+            let sigma_t = sigma_a + sigma_s;
+            let tau_cell = step_size * density * sigma_t;
+            let cell_transmittance = (-tau_cell).exp();
+
+            // Per-sample redshift from the ray's conserved (p_t, p_phi)
+            // and the local circular-orbit Killing coefficients:
+            // u.p = u^t p_t + u^phi p_phi, exact at every sample with no
+            // parallel transport (see docs/plan-01-per-sample-redshift.md).
+            // Where no timelike circular orbit exists the gas is
+            // unphysical anyway: it still attenuates (below) but emits
+            // nothing.
+            let sample_position = Point::new_cartesian(0.0, p[0], p[1], p[2]);
+            if let Ok(coefficients) = geometry.circular_orbit_killing_coefficients(&sample_position)
+            {
+                let emitter_energy =
+                    coefficients.u_t * frequency.p_t + coefficients.u_phi * frequency.p_phi;
+                let redshift = frequency.observer_energy / emitter_energy;
+
+                let r_dist = p.cross(&self.axis).norm();
+                let temperature = self.temperature_computer.compute_temperature(r_dist)?;
+                let uv = self.get_uv(&p);
+                let light_color = self.texture_mapper.color_at_uv(
+                    &uv,
+                    &crate::rendering::texture::TemperatureData {
+                        temperature,
+                        redshift,
+                    },
+                )?;
+
+                // Stefan-Boltzmann law: emission intensity scales with T^4.
+                // Use a reference temperature for normalization to boost brightness.
+                let intensity_factor =
+                    (temperature / self.brightness_reference_temperature).powi(4);
+
+                // Kirchhoff: thermal emissivity couples to absorption,
+                // j = sigma_a * rho * B(T). With scattering present but
+                // no external illumination the source function is the
+                // albedo-weighted Planck function S = (sigma_a/sigma_t) B;
+                // integrating a constant source across the cell gives the
+                // exact per-cell weight transparency * (S/B) * (1 - e^-tau)
+                // (~ sigma_a * rho * ds for thin cells), evaluated BEFORE
+                // this cell's own transmittance is applied so the cell
+                // does not absorb its own emission twice.
+                let emission_weight = if sigma_t > 0.0 {
+                    segment_state.transparency * (sigma_a / sigma_t) * (1.0 - cell_transmittance)
+                } else {
+                    0.0
+                };
+                let step_emission = light_color.mul_color_part(emission_weight * intensity_factor);
+
+                // Keep texture alpha influence separate from per-step emission accumulation.
+                let alpha_sample_weight = density * step_size;
+                segment_state.alpha_weighted_sum +=
+                    light_color.alpha.clamp(0.0, 1.0) * alpha_sample_weight;
+                segment_state.alpha_weight_total += alpha_sample_weight;
+
+                segment_state.color_accumulated.x += step_emission.x;
+                segment_state.color_accumulated.y += step_emission.y;
+                segment_state.color_accumulated.z += step_emission.z;
+            } else {
+                // No timelike circular orbit here: unphysical gas; it
+                // attenuates (below) but emits nothing.
+                trace!("  no timelike circular orbit at {:?}; emission skipped", p);
+            }
+
+            segment_state.transparency *= cell_transmittance;
+        }
+        Ok(())
     }
 
     // We will use constant step raymarching for the volumetric disc. This means the step sizes
@@ -391,7 +393,15 @@ impl VolumetricDisc {
         while dist < segment_length {
             let p = from + direction * dist;
 
-            // TODO: Implement the actual raymarching logic here, similar to `raymarch_constant_step_internal`.
+            self.march_constant_step(
+                &p,
+                self.absorption,
+                self.scattering,
+                self.step_size,
+                geometry,
+                frequency,
+                segment_state,
+            )?;
 
             if segment_state.transparency <= 1e-3 {
                 return Ok(RaymarchResult::AlreadyOpaque);
@@ -530,7 +540,7 @@ impl VolumetricDisc {
         let dir = to - from;
 
         // Use 3.0 * thickness to capture the Gaussian tail
-        let capture_height = self.thickness * 3.0;
+        let capture_height = self.thickness * CAPTURE_HEIGHT_FACTOR;
 
         // Check Outer Tube
         match self.intersects_clipped_cylinder(from, to, outer_radius, axis, capture_height) {
@@ -570,6 +580,14 @@ impl VolumetricDisc {
         } else {
             TwoIntersections(hits[0], hits[1])
         }
+    }
+
+    fn is_inside_bounding_cylinder(&self, p: &Vector3<f64>) -> bool {
+        let h = p.dot(&self.axis).abs();
+        let r = p.cross(&self.axis).norm();
+        h <= self.thickness * CAPTURE_HEIGHT_FACTOR
+            && r > self.center_disk_inner_radius
+            && r < self.center_disk_outer_radius
     }
 }
 
@@ -674,20 +692,7 @@ impl Hittable for VolumetricDisc {
         color_computation_data: &ColorComputationData,
         geometry: &dyn Geometry,
     ) -> Result<CIETristimulus, RaytracerError> {
-        let ro = color_computation_data
-            .intersection_point
-            .get_spatial_vector_cartesian();
-
-        let rd = Vector3::<f64>::new(
-            color_computation_data.direction[1],
-            color_computation_data.direction[2],
-            color_computation_data.direction[3],
-        )
-        .normalize();
-
-        self.raymarch_constant_step(
-            &ro,
-            &rd,
+        self.raymarch(
             geometry,
             &color_computation_data.frequency,
             color_computation_data.remaining_steps,
@@ -815,6 +820,7 @@ mod tests {
         assert_eq!(disc.compute_density(&outside_vertical), 0.0);
     }
 
+
     #[test]
     fn test_volumetric_disc_raymarch_produces_opacity() {
         let disc = create_disc();
@@ -822,7 +828,7 @@ mod tests {
         let rd = Vector3::new(1.0, 0.0, 0.0);
 
         let color = disc
-            .raymarch_constant_step(&ro, &rd, &EuclideanSpace::new(), &unit_frequency())
+            .raymarch(&ro, &rd, &EuclideanSpace::new(), &unit_frequency())
             .expect("raymarch should succeed");
 
         assert!(color.alpha > 0.0);
@@ -858,7 +864,7 @@ mod tests {
         let rd = Vector3::new(1.0, 0.0, 0.0);
 
         let color = disc
-            .raymarch_constant_step(&ro, &rd, &EuclideanSpace::new(), &unit_frequency())
+            .raymarch(&ro, &rd, &EuclideanSpace::new(), &unit_frequency())
             .expect("raymarch should succeed");
 
         assert_eq!(color.x, 0.0);
@@ -895,7 +901,7 @@ mod tests {
         let rd = Vector3::new(1.0, 0.0, 0.0);
 
         let color = disc
-            .raymarch_constant_step(&ro, &rd, &EuclideanSpace::new(), &unit_frequency())
+            .raymarch(&ro, &rd, &EuclideanSpace::new(), &unit_frequency())
             .expect("raymarch should succeed");
 
         assert!(color.x.is_finite() && color.x == 0.0);
