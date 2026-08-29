@@ -9,6 +9,7 @@ use crate::rendering::integrator::IntegrationConfiguration;
 use crate::rendering::raytracer;
 use crate::rendering::raytracer::RaytracerError;
 use crate::rendering::scene::Scene;
+use crate::rendering::temperature::{ConstantTemperatureComputer, TemperatureComputer};
 use crate::rendering::texture::{
     BlackBodyMapper, CheckerMapper, TextureData, TextureMapHandle, TextureMapperFactory,
 };
@@ -213,12 +214,22 @@ pub fn create_scene<G: Geometry>(
                     "Adding disc with inner radius: {}, outer radius: {}",
                     inner_radius, outer_radius
                 );
+                // Only a BlackBody-textured disc consumes the physical
+                // Novikov-Thorne temperature profile; bitmap/checker discs
+                // ignore temperature, and the NT calibration does not exist
+                // past extremal spin (naked-singularity scenes, a > M).
+                let physical_temperature = matches!(texture, TextureConfig::BlackBody { .. });
                 let texture_mapper_disc = get_texture_mapper(&mut texture_mapper_factory, texture)?;
+                let temperature_computer: Box<dyn TemperatureComputer> = if physical_temperature {
+                    geometry.get_temperature_computer(temperature, inner_radius, outer_radius)?
+                } else {
+                    Box::new(ConstantTemperatureComputer::new(temperature))
+                };
                 let disc = scene_objects::disc::Disc::new(
                     inner_radius,
                     outer_radius,
                     texture_mapper_disc,
-                    geometry.get_temperature_computer(temperature, inner_radius, outer_radius)?,
+                    temperature_computer,
                 );
                 objects.add_object(Box::new(disc));
             }
@@ -286,7 +297,13 @@ pub fn create_scene<G: Geometry>(
                     "Adding volumetric disc with inner radius: {}, outer radius: {}",
                     inner_radius, outer_radius
                 );
+                let physical_temperature = matches!(texture, TextureConfig::BlackBody { .. });
                 let texture_mapper_disc = get_texture_mapper(&mut texture_mapper_factory, texture)?;
+                let temperature_computer: Box<dyn TemperatureComputer> = if physical_temperature {
+                    geometry.get_temperature_computer(temperature, inner_radius, outer_radius)?
+                } else {
+                    Box::new(ConstantTemperatureComputer::new(temperature))
+                };
                 let axis = axis
                     .map(|(x, y, z)| Vector3::new(x, y, z))
                     .unwrap_or(Vector3::new(0.0, 0.0, 1.0));
@@ -294,7 +311,7 @@ pub fn create_scene<G: Geometry>(
                     inner_radius,
                     outer_radius,
                     texture_mapper_disc,
-                    geometry.get_temperature_computer(temperature, inner_radius, outer_radius)?,
+                    temperature_computer,
                     axis,
                     num_octaves,
                     perlin_seed.unwrap_or(1),
