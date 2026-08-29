@@ -1,0 +1,26 @@
+# Spin-sweep animation scene (scripts/rendering/create_kerr_images.sh):
+# KerrBL for speed, M25 star field, golden 6500 K blackbody disc rendered
+# with --exposure 2.5. The script substitutes `a` per frame and sets
+# inner_radius to 1.02 * r_isco(a) so the inner edge tracks the ISCO.
+# The star background is downloaded by the script if missing (same source
+# as images/create-main-image.sh).
+celestial_temperature = 0.0
+
+[celestial_texture.Bitmap]
+beaming_exponent = 3.0
+path = "resources/tmp/Messier_object_025.jpg"
+
+[geometry_type.KerrBL]
+radius = 1.0
+a = 0.499
+horizon_epsilon = 1e-4
+
+[[objects]]
+
+[objects.Disc]
+inner_radius = 0.631
+outer_radius = 15.0
+temperature = 6500.0
+
+[objects.Disc.texture.BlackBody]
+beaming_exponent = 0.0
