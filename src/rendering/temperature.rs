@@ -29,9 +29,12 @@ impl TemperatureComputer for ConstantTemperatureComputer {
 pub struct KerrTemperatureComputer {
     a: f64,
     radius: f64,
-    /// Innermost stable circular orbit (ISCO) radius computed for the given
-    /// `a` and `radius`.
-    r_isco: f64,
+    /// Inner boundary of the temperature profile: the torque-free radius
+    /// the Novikov-Thorne flux integral is anchored at. This is the ISCO
+    /// where one exists; past extremal spin (a > M, naked singularity) no
+    /// ISCO exists and the disc's own inner edge takes its place, i.e. a
+    /// truncated disc with a torque-free inner edge.
+    anchor: f64,
     /// Mass accretion rate in internal units.
     m_dot: f64,
     radial_temperature_profile: Vec<(f64, f64)>,
@@ -44,31 +47,41 @@ const NUM_STEPS_FIND_MAXIMUM: i32 = 10;
 impl KerrTemperatureComputer {
     pub fn new(
         temperature: f64,
+        inner_radius: f64,
         outer_radius: f64,
         a: f64,
         radius: f64,
     ) -> Result<Self, RaytracerError> {
         let r_isco = circular_orbit::r_isco(radius, a);
-        let effective_outer_radius = if outer_radius <= r_isco {
-            let adjusted = r_isco + 1e-6_f64.max(r_isco.abs() * 1e-9);
+        info!(
+            "Computed r_isco: {} from a: {} and radius: {}",
+            r_isco, a, radius
+        );
+        let anchor = if r_isco.is_finite() {
+            r_isco
+        } else {
             info!(
-                "outer_radius ({}) <= r_isco ({}); clamping to {} for stable LUT construction.",
-                outer_radius, r_isco, adjusted
+                "No ISCO exists for a = {} (past extremal spin); anchoring the temperature profile at the disc inner edge {}",
+                a, inner_radius
+            );
+            inner_radius
+        };
+        let effective_outer_radius = if outer_radius <= anchor {
+            let adjusted = anchor + 1e-6_f64.max(anchor.abs() * 1e-9);
+            info!(
+                "outer_radius ({}) <= profile anchor ({}); clamping to {} for stable LUT construction.",
+                outer_radius, anchor, adjusted
             );
             adjusted
         } else {
             outer_radius
         };
-        info!(
-            "Computed r_isco: {} from a: {} and radius: {}",
-            r_isco, a, radius
-        );
         let r0 = radius;
 
         let mut tmp_computer = Self {
             a,
             radius,
-            r_isco,
+            anchor,
             m_dot: 1.0,
             radial_temperature_profile: Vec::new(),
         };
@@ -76,9 +89,9 @@ impl KerrTemperatureComputer {
         let mut max_f = 0.0;
         let mut max_r = 0.0;
 
-        let dr = (effective_outer_radius - r_isco) / NUM_STEPS_FIND_MAXIMUM as f64;
+        let dr = (effective_outer_radius - anchor) / NUM_STEPS_FIND_MAXIMUM as f64;
         for i in 0..NUM_STEPS_FIND_MAXIMUM {
-            let r = r_isco + (i as f64 + 0.5) * dr;
+            let r = anchor + (i as f64 + 0.5) * dr;
             let f = tmp_computer.compute_f(r)?;
             if max_f < f {
                 max_f = f;
@@ -87,7 +100,7 @@ impl KerrTemperatureComputer {
         }
         info!("Max f: {} at radius: {}", max_f, max_r);
 
-        let integral = tmp_computer.compute_integral(max_r, r_isco)?;
+        let integral = tmp_computer.compute_integral(max_r, anchor)?;
         let pre_factor = tmp_computer.compute_prefactor(max_r)?;
         let coefficient = -1.0 / (PI * r0 * r0);
 
@@ -102,11 +115,15 @@ impl KerrTemperatureComputer {
 
         tmp_computer.m_dot = m_dot;
 
-        // Build radial temperature profile
+        // Build radial temperature profile. The first sample is nudged off
+        // the anchor: the flux vanishes there anyway, but at exactly a = M
+        // the ISCO coincides with the photon orbit and the orbit quantities
+        // are degenerate on the anchor itself.
         let mut profile = Vec::with_capacity(NUM_LUT_STEPS);
-        let radial_profile_step = (effective_outer_radius - r_isco) / (NUM_LUT_STEPS - 1) as f64;
+        let radial_profile_step = (effective_outer_radius - anchor) / (NUM_LUT_STEPS - 1) as f64;
         for i in 0..NUM_LUT_STEPS {
-            let r = r_isco + (i as f64) * radial_profile_step;
+            let r = (anchor + (i as f64) * radial_profile_step)
+                .max(anchor + radial_profile_step * 1e-3);
             let f_val = tmp_computer.compute_f(r)?;
             let temp = (f_val / sigma_sb).max(0.0).powf(0.25);
             profile.push((r, temp));
@@ -131,8 +148,8 @@ impl KerrTemperatureComputer {
     fn d_l_dr(&self, r: f64) -> Result<f64, RaytracerError> {
         let h = 1e-6 * r.max(1.0);
 
-        if r - h < self.r_isco {
-            // forward difference near ISCO to avoid going below ISCO
+        if r - h < self.anchor {
+            // forward difference near the anchor to avoid sampling below it
             Ok((self.conserved_angular_momentum(r + h)? - self.conserved_angular_momentum(r)?) / h)
         } else {
             Ok((self.conserved_angular_momentum(r + h)?
@@ -148,10 +165,10 @@ impl KerrTemperatureComputer {
     }
 
     fn compute_f(&self, r: f64) -> Result<f64, RaytracerError> {
-        let r_isco = self.r_isco;
+        let anchor = self.anchor;
         let r0 = self.radius;
 
-        let integral = self.compute_integral(r, r_isco)?;
+        let integral = self.compute_integral(r, anchor)?;
         let pre_factor = self.compute_prefactor(r)?;
         let coefficient = -self.m_dot / (PI * r0 * r0);
 
@@ -176,11 +193,11 @@ impl KerrTemperatureComputer {
         Ok(pre_factor)
     }
 
-    fn compute_integral(&self, r: f64, r_isco: f64) -> Result<f64, RaytracerError> {
-        let dr = (r - r_isco) / NUM_INTEGRATION_STEPS as f64;
+    fn compute_integral(&self, r: f64, anchor: f64) -> Result<f64, RaytracerError> {
+        let dr = (r - anchor) / NUM_INTEGRATION_STEPS as f64;
         let mut integral = 0.0;
         for i in 0..NUM_INTEGRATION_STEPS {
-            let r_prime = r_isco + (i as f64 + 0.5) * dr;
+            let r_prime = anchor + (i as f64 + 0.5) * dr;
             let e_prime = self.conserved_energy(r_prime)?;
             let l_prime = self.conserved_angular_momentum(r_prime)?;
             let omega_prime = self.angular_velocity(r_prime);
@@ -200,15 +217,16 @@ impl TemperatureComputer for KerrTemperatureComputer {
             return Err(RaytracerError::NonFiniteRadius);
         }
 
-        if radius < self.r_isco {
+        if radius < self.anchor {
             error!(
                 concat!(
-                    "Radius {} is below r_isco {}. Disc boundaries and the ",
-                    "temperature profile both use the Boyer-Lindquist-type ",
-                    "radial coordinate; for Disc config, use ",
-                    "inner_radius >= r_isco (a={})."
+                    "Radius {} is below the temperature-profile anchor {} ",
+                    "(the ISCO, or the disc inner edge past extremal spin). ",
+                    "Disc boundaries and the temperature profile both use ",
+                    "the Boyer-Lindquist-type radial coordinate; for Disc ",
+                    "config, use inner_radius >= the anchor (a={})."
                 ),
-                radius, self.r_isco, self.a
+                radius, self.anchor, self.a
             );
             return Err(RaytracerError::BelowRISCO);
         }
@@ -262,7 +280,7 @@ mod tests {
     /// 2^(1/4) (~19%) too large.
     #[test]
     fn test_far_field_temperature_slope_matches_shakura_sunyaev() {
-        let computer = KerrTemperatureComputer::new(2000.0, 400.0, 0.0, 1.0).unwrap();
+        let computer = KerrTemperatureComputer::new(2000.0, 3.0, 400.0, 0.0, 1.0).unwrap();
         let r_isco = 3.0;
         let t = |r: f64| computer.compute_temperature(r).unwrap();
         let expected = |r: f64| ((1.0 - (r_isco / r).sqrt()) / r.powi(3)).powf(0.25);
@@ -281,10 +299,40 @@ mod tests {
     /// retrograde ISCO, not the prograde one.
     #[test]
     fn test_retrograde_profile_starts_at_retrograde_isco() {
-        let computer = KerrTemperatureComputer::new(2000.0, 15.0, -0.499, 1.0).unwrap();
+        let computer = KerrTemperatureComputer::new(2000.0, 4.6, 15.0, -0.499, 1.0).unwrap();
         // Prograde ISCO for |a| = 0.499 is ~0.62; retrograde ~4.5. A radius
         // between the two must be rejected as below the ISCO.
         assert!(computer.compute_temperature(2.0).is_err());
         assert!(computer.compute_temperature(5.0).is_ok());
+    }
+
+    /// Exactly extremal spin (a = M): the ISCO coincides with the photon
+    /// orbit, where the circular-orbit quantities are degenerate. The
+    /// profile's first sample is nudged off the anchor, so construction
+    /// must succeed and produce a sane profile.
+    #[test]
+    fn test_exactly_extremal_spin_builds() {
+        let computer = KerrTemperatureComputer::new(6000.0, 0.51, 12.0, 0.5, 1.0).unwrap();
+        let t = computer.compute_temperature(1.0).unwrap();
+        assert!(t.is_finite() && t > 0.0, "T(1.0) = {}", t);
+    }
+
+    /// Past extremal spin (a > M, naked singularity) no ISCO exists; the
+    /// profile anchors at the disc inner edge instead (truncated disc with
+    /// a torque-free inner edge). The temperature must vanish toward the
+    /// inner edge and be rejected below it.
+    #[test]
+    fn test_past_extremal_anchors_at_disc_inner_edge() {
+        let computer = KerrTemperatureComputer::new(6000.0, 3.5, 12.0, 0.55, 1.0).unwrap();
+        assert!(computer.compute_temperature(3.0).is_err());
+        let t_near = computer.compute_temperature(3.6).unwrap();
+        let t_peak = computer.compute_temperature(5.0).unwrap();
+        assert!(t_near.is_finite() && t_peak.is_finite());
+        assert!(
+            t_near < t_peak,
+            "temperature should rise away from the torque-free inner edge (T(3.6)={}, T(5.0)={})",
+            t_near,
+            t_peak
+        );
     }
 }
