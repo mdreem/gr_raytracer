@@ -129,7 +129,7 @@ for i in $(seq 0 0.010 0.5); do
   echo "Creating kerr black hole with a=$a_value"
   # Scene template lives in the repo scene definitions (the script-local
   # resources/ dir referenced historically was never committed).
-  cp "scene-definitions/kerr-animation.toml" "kerr_images/kerr_a_${a_value}.toml"
+  cp "${SWEEP_SCENE:-scene-definitions/kerr-animation.toml}" "kerr_images/kerr_a_${a_value}.toml"
   sed -i.bak "s/^a = .*/a = ${a_value}/" "kerr_images/kerr_a_${a_value}.toml"
   # The disc's inner edge tracks the prograde ISCO (Bardeen-Press-Teukolsky,
   # r_s = 1 units) so every spin renders a physically valid disc and the
@@ -148,7 +148,7 @@ print(f'{1.02*r_isco:.3f}')")
   if [ -f "$FILE" ]; then
     echo "$FILE exists, skipping rendering."
   else
-    $command --width="$render_width" --height="$render_height" --max-steps=1000000 --exposure=2.5 --camera-position=-22,0,1.8 --theta=-3.14159 --psi=0 --phi=0 --config-file "kerr_images/kerr_a_${a_value}.toml" render --filename "$FILE"
+    $command --width="$render_width" --height="$render_height" --max-steps=1000000 --exposure="${SWEEP_EXPOSURE:-2.5}" --camera-position="${SWEEP_CAMERA:--22,0,1.8}" --theta=-3.14159 --psi=0 --phi=0 --config-file "kerr_images/kerr_a_${a_value}.toml" render --filename "$FILE"
   fi
   magick "$FILE" -gravity Northwest -font "${ANNOTATE_FONT:-/System/Library/Fonts/Helvetica.ttc}" -fill white -pointsize 30 -annotate +20+20 "a = ${a_value}" "$FILE_ANNOTATED"
   if (( grid_enabled )) && (( ${#grid_draw_args[@]} > 0 )); then
@@ -169,5 +169,5 @@ for i in $(seq 0 0.010 0.5); do
   echo "kerr_images/kerr_a_${a_value}_annotated.png"
 done > kerr_images/image_list.txt
 
-magick -delay 20 -loop 0 $(cat kerr_images/image_list.txt) kerr_animation_stars_and_disk.gif
-echo "Created kerr_animation_stars_and_disk.gif."
+magick -delay 20 -loop 0 $(cat kerr_images/image_list.txt) ${SWEEP_OUTPUT:-kerr_animation_stars_and_disk.gif}
+echo "Created ${SWEEP_OUTPUT:-kerr_animation_stars_and_disk.gif}."
