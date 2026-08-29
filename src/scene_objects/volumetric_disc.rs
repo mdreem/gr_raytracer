@@ -215,12 +215,19 @@ impl VolumetricDisc {
             return Ok(CIETristimulus::new(0.0, 0.0, 0.0, 0.0));
         }
 
+        // One call owns exactly one gas episode: it ends at the first
+        // inside-to-outside transition of the bounding cylinder, not only at
+        // a fully non-overlapping window. Otherwise a hole narrower than the
+        // local window spacing (every window starts inside or crosses a
+        // wall) would let this call march the far-side episode that the
+        // scene's re-entry firing marches again (double counting).
+        let mut entered_gas = false;
         for steps in remaining_steps.windows(2) {
             let from = &steps[0].x.get_spatial_vector_cartesian();
             let to = &steps[1].x.get_spatial_vector_cartesian();
 
-            let overlaps = self.is_inside_bounding_cylinder(from)
-                || self.intersects_internal(&steps[0].x, &steps[1].x).is_some();
+            let crosses_boundary = self.intersects_internal(&steps[0].x, &steps[1].x).is_some();
+            let overlaps = self.is_inside_bounding_cylinder(from) || crosses_boundary;
 
             // If the segment does not intersect the disc, we can skip it entirely.
             if !overlaps {
@@ -233,6 +240,15 @@ impl VolumetricDisc {
             if result == RaymarchResult::AlreadyOpaque {
                 break;
             }
+
+            let end_inside = self.is_inside_bounding_cylinder(to);
+            if !end_inside && (entered_gas || crosses_boundary) {
+                // The ray has left the volume: episode over. A later
+                // re-entry fires its own call (entry guard lets it through,
+                // since it starts outside).
+                break;
+            }
+            entered_gas |= end_inside;
         }
 
         // Final alpha combines physical opacity with texture alpha, applied once at the end.
@@ -985,6 +1001,48 @@ mod tests {
         assert_eq!(a.y, b.y);
         assert_eq!(a.alpha, b.alpha);
         // The re-entry call (starting outside, in the hole) marches episode 2.
+        assert!(c.alpha > 0.0);
+    }
+
+    /// PR #121 review (Codex): if the inner hole is narrower than the local
+    /// window spacing, NO window lies wholly outside the volume - each one
+    /// starts in gas or crosses a wall. The call must still end at the first
+    /// inside-to-outside transition; otherwise it marches the far-side
+    /// episode that the re-entry firing marches again (double counting).
+    #[test]
+    fn test_narrow_hole_does_not_double_count_far_episode() {
+        let disc = create_disc();
+        let mk = |x: f64| Step {
+            x: Point::new_cartesian(0.0, x, 0.5, 0.0),
+            p: FourVector::new_cartesian(1.0, 1.0, 0.0, 0.0),
+            t: 0.0,
+            step: 0,
+        };
+        // Chord at y = 0.5: gas at |x| in ~(0.866, 2.958). The cut at -0.7
+        // (r ~ 0.86) is the only point in the hole; the window (-0.7 -> 0.9)
+        // crosses back INTO gas, so no window is fully outside.
+        let full: Vec<Step> = [-5.0, -2.0, -0.7, 0.9, 2.0, 5.0]
+            .map(mk)
+            .into_iter()
+            .collect();
+        let episode1: Vec<Step> = [-5.0, -2.0, -0.7].map(mk).into_iter().collect();
+        let reentry: Vec<Step> = [-0.7, 0.9, 2.0, 5.0].map(mk).into_iter().collect();
+
+        let geometry = EuclideanSpace::new();
+        let a = disc
+            .raymarch(&geometry, &unit_frequency(), &full)
+            .expect("full-slice raymarch should succeed");
+        let b = disc
+            .raymarch(&geometry, &unit_frequency(), &episode1)
+            .expect("episode-1 raymarch should succeed");
+        let c = disc
+            .raymarch(&geometry, &unit_frequency(), &reentry)
+            .expect("re-entry raymarch should succeed");
+
+        // The full-slice call ends at the gas -> hole transition; the far
+        // episode belongs exclusively to the re-entry call.
+        assert_eq!(a.x, b.x);
+        assert_eq!(a.alpha, b.alpha);
         assert!(c.alpha > 0.0);
     }
 
