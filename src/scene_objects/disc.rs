@@ -1,4 +1,3 @@
-use crate::geometry::four_vector::FourVector;
 use crate::geometry::geometry::Geometry;
 use crate::geometry::point::Point;
 use crate::rendering::color::CIETristimulus;
@@ -89,7 +88,6 @@ impl Hittable for Disc {
                 uv: UVCoordinates { u, v },
                 intersection_point: intersection_point_p,
                 t,
-                direction: FourVector::new_cartesian(0.0, direction[0], direction[1], direction[2]),
             })
         } else {
             None
