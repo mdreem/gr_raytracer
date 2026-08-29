@@ -112,6 +112,14 @@ if (( grid_enabled )); then
   done
 fi
 
+declare -a font_args=()
+if [[ -n "${ANNOTATE_FONT:-}" ]]; then
+  font_args=(-font "$ANNOTATE_FONT")
+elif [[ -f /System/Library/Fonts/Helvetica.ttc ]]; then
+  # Homebrew ImageMagick on macOS has no default font configured.
+  font_args=(-font /System/Library/Fonts/Helvetica.ttc)
+fi
+
 BACKGROUND="resources/tmp/Messier_object_025.jpg"
 if [ ! -f "$BACKGROUND" ]; then
   echo "Downloading M25 star-field background from Wikimedia Commons..."
@@ -150,7 +158,7 @@ print(f'{1.02*r_isco:.3f}')")
   else
     $command --width="$render_width" --height="$render_height" --max-steps=1000000 --exposure="${SWEEP_EXPOSURE:-2.5}" --camera-position="${SWEEP_CAMERA:--22,0,1.8}" --theta=-3.14159 --psi=0 --phi=0 --config-file "kerr_images/kerr_a_${a_value}.toml" render --filename "$FILE"
   fi
-  magick "$FILE" -gravity Northwest -font "${ANNOTATE_FONT:-/System/Library/Fonts/Helvetica.ttc}" -fill "${SWEEP_LABEL_COLOR:-white}" -pointsize 30 -annotate +20+20 "a = ${a_value}" "$FILE_ANNOTATED"
+  magick "$FILE" -gravity Northwest "${font_args[@]}" -fill "${SWEEP_LABEL_COLOR:-white}" -pointsize 30 -annotate +20+20 "a = ${a_value}" "$FILE_ANNOTATED"
   if (( grid_enabled )) && (( ${#grid_draw_args[@]} > 0 )); then
     magick "$FILE_ANNOTATED" \
       \( -size "${render_width}x${render_height}" xc:none \
@@ -169,5 +177,5 @@ for i in $(seq 0 0.010 0.5); do
   echo "kerr_images/kerr_a_${a_value}_annotated.png"
 done > kerr_images/image_list.txt
 
-magick -delay 20 -loop 0 $(cat kerr_images/image_list.txt) ${SWEEP_OUTPUT:-kerr_animation_stars_and_disk.gif}
-echo "Created ${SWEEP_OUTPUT:-kerr_animation_stars_and_disk.gif}."
+magick -delay 20 -loop 0 $(cat kerr_images/image_list.txt) ${SWEEP_OUTPUT:-images/kerr_animation_stars_and_disk.gif}
+echo "Created ${SWEEP_OUTPUT:-images/kerr_animation_stars_and_disk.gif}."

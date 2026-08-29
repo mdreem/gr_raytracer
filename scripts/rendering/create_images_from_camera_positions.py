@@ -1,6 +1,8 @@
 #!/usr/bin/env -S uv run python
-import pandas as pd
+import os
 import subprocess
+
+import pandas as pd
 
 WIDTH = 500
 HEIGHT = 500
@@ -9,6 +11,7 @@ POSITIONS_FILE = "camera_positions.csv"
 
 # takes a csv created using the script create_camera_trajectory.py
 df = pd.read_csv(POSITIONS_FILE)
+os.makedirs("movie", exist_ok=True)
 
 for idx, row in df.iterrows():
     x, y, z = row["x"], row["y"], row["z"]
