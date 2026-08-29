@@ -2,6 +2,11 @@
 
 [← Back to the gallery index](images.md)
 
+All still images on this page are reproducible: `images/create-gallery-images.sh`
+(checkerboard and volumetric renders, grid animation),
+`images/create-showcase-images.sh` (showcase section), and
+`scripts/rendering/create_kerr_images.sh` (spin-sweep animations).
+
 ### Checkerboard Accretion Disk
 <div align="center">
   <img src="render_kerr_large_a_checker_texture.png" alt="Kerr black hole with high spin parameter and a checkerboard accretion disk">
@@ -11,27 +16,6 @@
 <div align="center">
   <img src="render_kerr_checker_texture.png" alt="Kerr black hole with a checkerboard accretion disk showing frame dragging and lensing">
   <p>Kerr black hole with a checkerboard accretion disk showing frame dragging and lensing</p>
-</div>
-
-### Blackbody Radiation
-<div align="center">
-  <img src="kerr_blackbody_disk_1.png" alt="Kerr black hole with an accretion disk rendered using blackbody radiation spectrum (view 1)">
-  <p>Kerr black hole with an accretion disk rendered using blackbody radiation spectrum (view 1) (background image: <a href="https://commons.wikimedia.org/wiki/File:Messier_object_025.jpg">M25</a>)</p>
-</div>
-
-<div align="center">
-  <img src="kerr_blackbody_disk_2.png" alt="Kerr black hole with an accretion disk rendered using blackbody radiation spectrum (view 2)">
-  <p>Kerr black hole with an accretion disk rendered using blackbody radiation spectrum (view 2) (background image: <a href="https://commons.wikimedia.org/wiki/File:Messier_object_025.jpg">M25</a>)</p>
-</div>
-
-<div align="center">
-  <img src="kerr_blackbody_disk_a_0_5__1.png" alt="Kerr black hole with spin parameter a=0.5 and a blackbody accretion disk (view 1)">
-  <p>Kerr black hole with spin parameter a=0.5 and a blackbody accretion disk (view 1) (background image: <a href="https://commons.wikimedia.org/wiki/File:Messier_object_025.jpg">M25</a>)</p>
-</div>
-
-<div align="center">
-  <img src="kerr_blackbody_disk_a_0_5__2.png" alt="Kerr black hole with spin parameter a=0.5 and a blackbody accretion disk (view 2)">
-  <p>Kerr black hole with spin parameter a=0.5 and a blackbody accretion disk (view 2) (background image: <a href="https://commons.wikimedia.org/wiki/File:Messier_object_025.jpg">M25</a>)</p>
 </div>
 
 ### Volumetric Rendering
