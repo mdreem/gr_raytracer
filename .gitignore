@@ -23,7 +23,9 @@ target/
 
 # use by manim
 media/
-kerr_images/
+/kerr_images/
 extra_resources/
-rays/
+/rays/
 
+__pycache__/
+*.pyc
