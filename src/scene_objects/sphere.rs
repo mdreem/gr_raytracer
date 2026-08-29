@@ -136,7 +136,7 @@ impl Hittable for Sphere {
         &self,
         color_computation_data: &ColorComputationData,
         _geometry: &dyn Geometry,
-    ) -> CIETristimulus {
+    ) -> Result<CIETristimulus, RaytracerError> {
         self.texture_mapper.color_at_uv(
             &color_computation_data.uv,
             &color_computation_data.temperature_data,

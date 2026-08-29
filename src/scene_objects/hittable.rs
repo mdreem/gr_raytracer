@@ -36,7 +36,7 @@ pub trait Hittable: Sync {
         &self,
         color_computation_data: &ColorComputationData,
         geometry: &dyn Geometry,
-    ) -> CIETristimulus;
+    ) -> Result<CIETristimulus, RaytracerError>;
     fn energy_of_emitter(
         &self,
         geometry: &dyn Geometry,
