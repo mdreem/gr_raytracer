@@ -67,6 +67,7 @@ impl<'a, G: Geometry> Objects<'a, G> {
         y_start: &Step,
         y_end: &Step,
         frequency: &RayFrequencyData,
+        remaining_steps: &[Step],
     ) -> Result<Option<CIETristimulus>, RaytracerError> {
         let redshift_computer = RedshiftComputer::new(self.geometry);
         let mut resulting_color = None;
@@ -112,6 +113,7 @@ impl<'a, G: Geometry> Objects<'a, G> {
                         intersection_point: intersection_data.intersection_point,
                         direction: intersection_data.direction,
                         frequency: *frequency,
+                        remaining_steps,
                     };
                     resulting_color =
                         Some(hittable.color_at_uv(&color_computation_data, self.geometry)?);
@@ -183,7 +185,7 @@ mod tests {
         };
 
         let result = objects
-            .intersects(&step_start, &step_end, &unit_frequency())
+            .intersects(&step_start, &step_end, &unit_frequency(), &[])
             .unwrap();
         assert!(result.is_some());
     }
@@ -212,7 +214,7 @@ mod tests {
         objects_setup_1.add_object(closer_sphere);
 
         let result_1 = objects_setup_1
-            .intersects(&step_start, &step_end, &unit_frequency())
+            .intersects(&step_start, &step_end, &unit_frequency(), &[])
             .unwrap();
         assert!(result_1.is_some());
         assert_abs_diff_eq!(result_1.unwrap().x, 0.121, epsilon = 1e-2);
@@ -224,7 +226,7 @@ mod tests {
         objects_setup_2.add_object(farther_sphere);
 
         let result_2 = objects_setup_2
-            .intersects(&step_start, &step_end, &unit_frequency())
+            .intersects(&step_start, &step_end, &unit_frequency(), &[])
             .unwrap();
         assert!(result_2.is_some());
         assert_abs_diff_eq!(result_2.unwrap().x, 0.121, epsilon = 1e-2);
@@ -272,7 +274,7 @@ mod tests {
         };
 
         let result = objects
-            .intersects(&step_start, &step_end, &unit_frequency())
+            .intersects(&step_start, &step_end, &unit_frequency(), &[])
             .unwrap();
         assert!(result.is_some());
     }
