@@ -1,4 +1,3 @@
-use crate::geometry::four_vector::FourVector;
 use crate::geometry::geometry::Geometry;
 use crate::geometry::point::Point;
 use crate::rendering::color::CIETristimulus;
@@ -10,15 +9,12 @@ use crate::rendering::texture::{TemperatureData, UVCoordinates};
 pub struct Intersection {
     pub uv: UVCoordinates,
     pub intersection_point: Point,
-    pub direction: FourVector,
     pub t: f64,
 }
 
 pub struct ColorComputationData<'a> {
     pub uv: UVCoordinates,
     pub temperature_data: TemperatureData,
-    pub intersection_point: Point,
-    pub direction: FourVector,
     /// Conserved per-ray frequency data; volumetric emitters use it to derive
     /// a per-sample redshift instead of the single per-intersection value in
     /// `temperature_data.redshift`.
