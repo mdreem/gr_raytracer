@@ -9,8 +9,8 @@ All still images on this page are reproducible: `images/create-gallery-images.sh
 
 ### Checkerboard Accretion Disk
 <div align="center">
-  <img src="render_kerr_large_a_checker_texture.png" alt="Kerr black hole with high spin parameter and a checkerboard accretion disk">
-  <p>Kerr black hole with high spin parameter and a checkerboard accretion disk</p>
+  <img src="render_kerr_large_a_checker_texture.png" alt="Super-extremal Kerr naked singularity (a greater than M): no horizon, no shadow">
+  <p>Super-extremal Kerr (a = 0.55 &gt; M): a naked singularity. With no horizon there is no shadow; where the black disc would be, you see light that passed arbitrarily close to the singularity, wound into a chaotic core.</p>
 </div>
 
 <div align="center">
