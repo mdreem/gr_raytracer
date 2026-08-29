@@ -94,19 +94,34 @@ impl VolumetricDisc {
         }
     }
 
-    fn compute_density(&self, p: &Vector3<f64>) -> f64 {
+    /// Cheap bounding test for whether a point is inside the disc's support region.
+    fn is_inside_disc(&self, p: &Vector3<f64>) -> bool {
         let h = p.dot(&self.axis).abs();
         let r = p.cross(&self.axis).norm();
 
         if r <= self.center_disk_inner_radius || r >= self.center_disk_outer_radius {
+            return false;
+        }
+
+        let vertical_falloff = self.compute_vertical_falloff(h);
+        vertical_falloff >= 0.001
+    }
+
+    // Smooth vertical falloff (Gaussian) using thickness as sigma
+    fn compute_vertical_falloff(&self, h: f64) -> f64 {
+        (-(h / self.thickness).powi(2)).exp()
+    }
+
+    fn compute_density(&self, p: &Vector3<f64>) -> f64 {
+        if !self.is_inside_disc(p) {
             return 0.0;
         }
 
-        // Smooth vertical falloff (Gaussian) using thickness as sigma
-        let vertical_falloff = (-(h / self.thickness).powi(2)).exp();
-        if vertical_falloff < 0.001 {
-            return 0.0;
-        }
+        let h = p.dot(&self.axis).abs();
+        let r = p.cross(&self.axis).norm();
+
+        // Part of the density profile, not only of the support test above.
+        let vertical_falloff = self.compute_vertical_falloff(h);
 
         // Radial base density (inverse power law)
         let radial_base = (self.center_disk_inner_radius / r).powf(1.5);
@@ -236,6 +251,10 @@ impl VolumetricDisc {
             d_o += d_s;
 
             step_count += 1;
+            if !self.is_inside_disc(&p) {
+                trace!("  Ray outside disc at step {}, position {:?}", i, p);
+                continue;
+            }
             let density = self.compute_density(&p);
 
             if density > 0.0 {
