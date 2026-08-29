@@ -1,5 +1,6 @@
 # Image Gallery
 
+All images are rendered with [gr_raytracer](https://github.com/mdreem/gr_raytracer).
 The gallery is split into one page per topic:
 
 ## [Schwarzschild Black Hole](schwarzschild.md)

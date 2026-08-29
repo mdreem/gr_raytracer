@@ -17,7 +17,7 @@ Inspired
 by [Seeing relativity -- I. Ray tracing in a Schwarzschild metric to explore the maximal analytic extension of the metric and making a proper rendering of the stars](https://arxiv.org/abs/1511.06025)
 and [BlackHoleViz_v2](https://github.com/HollowaySean/BlackHoleViz_v2).
 
-See the [Image Gallery](./images/images.md) for more rendered outputs.
+See the [Image Gallery](https://dreevich.dev/gr_raytracer/) for more rendered outputs.
 
 ## Table of Contents
 
