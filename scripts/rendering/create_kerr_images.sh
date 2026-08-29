@@ -1,4 +1,7 @@
 #!/bin/bash
+# NOTE: frames are resumed from kerr_images/ if present - delete that
+# directory whenever the scene, camera, or recipe changes, or stale frames
+# get silently reused (ANNOTATE_FONT overrides the macOS font path).
 
 set -euo pipefail
 
@@ -147,7 +150,7 @@ print(f'{1.02*r_isco:.3f}')")
   else
     $command --width="$render_width" --height="$render_height" --max-steps=1000000 --exposure=2.5 --camera-position=-22,0,1.8 --theta=-3.14159 --psi=0 --phi=0 --config-file "kerr_images/kerr_a_${a_value}.toml" render --filename "$FILE"
   fi
-  magick "$FILE" -gravity Northwest -pointsize 30 -annotate +20+20 "a = ${a_value}" "$FILE_ANNOTATED"
+  magick "$FILE" -gravity Northwest -font "${ANNOTATE_FONT:-/System/Library/Fonts/Helvetica.ttc}" -fill white -pointsize 30 -annotate +20+20 "a = ${a_value}" "$FILE_ANNOTATED"
   if (( grid_enabled )) && (( ${#grid_draw_args[@]} > 0 )); then
     magick "$FILE_ANNOTATED" \
       \( -size "${render_width}x${render_height}" xc:none \
