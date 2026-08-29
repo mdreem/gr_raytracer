@@ -57,6 +57,7 @@ pub enum RaytracerError {
 pub struct Raytracer<'a, G: Geometry> {
     pub scene: Scene<'a, G>,
     tone_mapping: ToneMappingMethod,
+    exposure: f64,
 }
 
 const MICHELSON_DENOMINATOR_EPSILON: f64 = 1e-4;
@@ -162,10 +163,11 @@ fn stratified_sample_offset(
 }
 
 impl<'a, G: Geometry> Raytracer<'a, G> {
-    pub fn new(scene: Scene<'a, G>, tone_mapping: ToneMappingMethod) -> Self {
+    pub fn new(scene: Scene<'a, G>, tone_mapping: ToneMappingMethod, exposure: f64) -> Self {
         Self {
             scene,
             tone_mapping,
+            exposure,
         }
     }
 
@@ -489,11 +491,14 @@ impl<'a, G: Geometry> Raytracer<'a, G> {
                 .map_err(RaytracerError::ImageError)?;
         } else {
             info!("Creating non-HDR image");
-            info!("Tone mapping method: {:?}", self.tone_mapping);
+            info!(
+                "Tone mapping method: {:?}, exposure: {}",
+                self.tone_mapping, self.exposure
+            );
             let cie_pixels =
                 self.render_section_to_cie_buffer(from_row, from_col, to_row, to_col)?;
             let linear_srgb = xyz_to_linear_srgb_buffer(&cie_pixels);
-            let colors = linear_srgb_to_srgb_buffer(&linear_srgb, 1.0, self.tone_mapping);
+            let colors = linear_srgb_to_srgb_buffer(&linear_srgb, self.exposure, self.tone_mapping);
             let buffer: Vec<u8> = colors.iter().flat_map(|c| [c.r, c.g, c.b]).collect();
             let imgbuf: ImageBuffer<Rgb<u8>, Vec<u8>> =
                 image::ImageBuffer::from_vec(to_col - from_col, to_row - from_row, buffer)
