@@ -1,0 +1,27 @@
+# Spin-sweep animation, cyan variant (modernized from the original
+# scripts/resources/kerr.toml recovered from 48e1953^): compact disc on a
+# flat cyan sky, beaming_exponent 3 for exaggerated Doppler asymmetry.
+# 4500 K is genuinely orange in the physical blackbody LUT (the original's
+# 2500 K looked orange only through the long-removed EqualLuminance
+# normalization). Run via: SWEEP_SCENE=... SWEEP_OUTPUT=kerr_animation.gif
+# SWEEP_EXPOSURE=11 scripts/rendering/create_kerr_images.sh
+celestial_temperature = 0.0
+
+[celestial_texture.Bitmap]
+beaming_exponent = 0.0
+path = "resources/cyan.png"
+
+[geometry_type.KerrBL]
+radius = 1.0
+a = 0.499
+horizon_epsilon = 1e-4
+
+[[objects]]
+
+[objects.Disc]
+inner_radius = 0.631
+outer_radius = 8.0
+temperature = 4500.0
+
+[objects.Disc.texture.BlackBody]
+beaming_exponent = 3.0
