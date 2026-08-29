@@ -110,8 +110,6 @@ impl<'a, G: Geometry> Objects<'a, G> {
                             redshift,
                             temperature,
                         },
-                        intersection_point: intersection_data.intersection_point,
-                        direction: intersection_data.direction,
                         frequency: *frequency,
                         remaining_steps,
                     };

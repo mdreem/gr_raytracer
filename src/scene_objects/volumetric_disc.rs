@@ -1,4 +1,3 @@
-use crate::geometry::four_vector::FourVector;
 use crate::geometry::geometry::Geometry;
 use crate::geometry::point::Point;
 use crate::rendering::color::CIETristimulus;
@@ -29,7 +28,6 @@ pub struct VolumetricDisc {
     e2: Vector3<f64>,
     perlin: Perlin,
     num_octaves: usize,
-    max_steps: usize,
     step_size: f64,
     thickness: f64,
     density_multiplier: f64,
@@ -63,7 +61,9 @@ impl VolumetricDisc {
         axis: Vector3<f64>,
         num_octaves: usize,
         perlin_seed: u32,
-        max_steps: usize,
+        // Retained for configuration compatibility; the march is bounded
+        // by the ray's step slice since plan 02, not by a step budget.
+        _max_steps: usize,
         step_size: f64,
         thickness: f64,
         density_multiplier: f64,
@@ -97,7 +97,6 @@ impl VolumetricDisc {
             e2,
             perlin: Perlin::new(perlin_seed),
             num_octaves,
-            max_steps,
             step_size,
             thickness,
             density_multiplier,
@@ -205,6 +204,9 @@ impl VolumetricDisc {
         let is_entering =
             !self.is_inside_bounding_cylinder(&first.x.get_spatial_vector_cartesian());
         if !is_entering {
+            // TODO: a camera INSIDE the gas also starts inside the cylinder
+            // and is suppressed here; supporting that case needs the window
+            // index (entry-guard exception for the ray's first window).
             trace!("Ray is exiting the disc, skipping raymarching.");
             return Ok(CIETristimulus::new(0.0, 0.0, 0.0, 0.0));
         }
@@ -244,13 +246,13 @@ impl VolumetricDisc {
     fn march_constant_step(
         &self,
         p: &Vector3<f64>,
-        sigma_a: f64,
-        sigma_s: f64,
-        step_size: f64,
         geometry: &dyn Geometry,
         frequency: &RayFrequencyData,
         segment_state: &mut SegmentState,
     ) -> Result<(), RaytracerError> {
+        let sigma_a = self.absorption;
+        let sigma_s = self.scattering;
+        let step_size = self.step_size;
         if !self.is_inside_disc(&p) {
             trace!("  Ray outside disc at position {:?}", p);
             return Ok(());
@@ -349,15 +351,7 @@ impl VolumetricDisc {
         while dist < segment_length {
             let p = from + direction * dist;
 
-            self.march_constant_step(
-                &p,
-                self.absorption,
-                self.scattering,
-                self.step_size,
-                geometry,
-                frequency,
-                segment_state,
-            )?;
+            self.march_constant_step(&p, geometry, frequency, segment_state)?;
 
             if segment_state.transparency <= 1e-3 {
                 return Ok(RaymarchResult::AlreadyOpaque);
@@ -628,7 +622,6 @@ impl VolumetricDisc {
                 intersection_point[2],
             ),
             t,
-            direction: FourVector::new_cartesian(0.0, direction[0], direction[1], direction[2]),
         })
     }
 }
@@ -683,6 +676,7 @@ impl SceneObject for VolumetricDisc {}
 mod tests {
     use super::*;
     use crate::geometry::euclidean::EuclideanSpace;
+    use crate::geometry::four_vector::FourVector;
     use crate::rendering::color::Color;
     use crate::rendering::texture::{CheckerMapper, TemperatureData, TextureMap};
     use approx::assert_abs_diff_eq;
