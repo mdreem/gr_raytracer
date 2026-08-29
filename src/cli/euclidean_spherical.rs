@@ -35,12 +35,14 @@ impl RenderableGeometry for EuclideanSpaceSpherical {
             &momentum,
         )?;
         let tone_mapping = opts.tone_mapping;
+        let exposure = opts.exposure;
         let scene = create_scene(self, camera_position, momentum, opts, config.clone())?;
 
         render(
             scene,
             filename,
             tone_mapping,
+            exposure,
             from_row,
             from_col,
             to_row,
@@ -67,7 +69,7 @@ impl RenderableGeometry for EuclideanSpaceSpherical {
         )?;
 
         let scene = create_scene(self, camera_position, momentum, opts, config.clone())?;
-        let raytracer = raytracer::Raytracer::new(scene, ToneMappingMethod::default());
+        let raytracer = raytracer::Raytracer::new(scene, ToneMappingMethod::default(), 1.0);
         let (integrated_ray, stop_reason) = raytracer.integrate_ray_at_point(row, col)?;
         debug!("Stop reason: {:?}", stop_reason);
         integrated_ray.save(write)?;
