@@ -347,10 +347,15 @@ impl VolumetricDisc {
         Ok(())
     }
 
-    // We will use constant step raymarching for the volumetric disc. This means the step sizes
-    // will not perfectly align with the segment boundaries, so we will need to keep track of the
-    // distance accumulated across segments.
-    // https://www.scratchapixel.com/lessons/3d-basic-rendering/volume-rendering-for-developers/ray-marching-get-it-right.html
+    // Constant-step marching with per-cell Beer-Lambert transmittance; the
+    // basic pattern follows the classic tutorial treatment
+    // (https://www.scratchapixel.com/lessons/3d-basic-rendering/volume-rendering-for-developers/ray-marching-get-it-right.html),
+    // but the emission is the thermal GRRT source term (see the Kirchhoff
+    // comment in march_constant_step and the references in
+    // docs/plan-02-segment-marching.md), and the march walks the ray's
+    // geodesic step windows: step sizes do not align with the segment
+    // boundaries, so the sampling phase (distance_accumulated) carries
+    // across segments to keep one uniform comb along the whole episode.
     fn raymarch_segment(
         &self,
         from: &Vector3<f64>,
