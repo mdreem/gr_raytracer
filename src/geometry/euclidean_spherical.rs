@@ -63,7 +63,7 @@ impl GeodesicSolver for EuclideanSpaceSphericalSolver {
 
         // y'
 
-        EquationOfMotionState::from_column_slice(&[
+        EquationOfMotionState::from([
             v_t, v_r, v_theta, v_phi, a_t, a_r, a_theta, a_phi,
         ])
     }

@@ -77,7 +77,7 @@ impl GeodesicSolver for SchwarzschildSolver {
         let a_theta = -(2.0 / r) * v_r * v_theta + sin_theta * cos_theta * v_phi * v_phi;
         let a_phi = -(2.0 / r) * v_phi * v_r - 2.0 * cos_theta / sin_theta * v_theta * v_phi;
 
-        EquationOfMotionState::from_column_slice(&[
+        EquationOfMotionState::from([
             v_t, v_r, v_theta, v_phi, a_t, a_r, a_theta, a_phi,
         ])
     }

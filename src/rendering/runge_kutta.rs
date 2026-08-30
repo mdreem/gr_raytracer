@@ -83,11 +83,11 @@ const H_MIN: f64 = 1e-12;
 /// region of the trajectory.
 const H_GROWTH_CAP: f64 = 4.0;
 
-fn rkf45_step<D: Dim>(
+fn rkf45_step<D: Dim, F: OdeFunction<D> + ?Sized>(
     y: &OVector<f64, D>,
     t: f64,
     h: f64,
-    f: &dyn OdeFunction<D>,
+    f: &F,
 ) -> (OVector<f64, D>, f64)
 where
     DefaultAllocator: Allocator<D>,
@@ -135,12 +135,18 @@ where
 /// Keeping `h_taken` and `h_next` separate matters: the controller's proposed
 /// next step can differ from the step just taken, so advancing `t` by the
 /// proposal would desynchronise the recorded parameterisation from the state.
-pub fn rkf45<D: Dim>(
+///
+/// Generic over the right-hand side rather than taking `&dyn OdeFunction`: the
+/// six stage evaluations are the innermost loop of the whole renderer, and
+/// monomorphising lets the geodesic equations inline into them. Callers that
+/// only hold a trait object reach this through `GeodesicSolver::advance`,
+/// whose default body is itself monomorphised per solver.
+pub fn rkf45<D: Dim, F: OdeFunction<D> + ?Sized>(
     y: &OVector<f64, D>,
     t: f64,
     h: f64,
     epsilon: f64,
-    f: &dyn OdeFunction<D>,
+    f: &F,
 ) -> Result<(OVector<f64, D>, f64, f64), RaytracerError>
 where
     DefaultAllocator: Allocator<D>,

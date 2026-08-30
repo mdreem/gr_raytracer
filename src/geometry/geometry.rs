@@ -6,7 +6,7 @@ use crate::geometry::point::{CoordinateSystem, Point};
 use crate::geometry::tetrad::Tetrad;
 use crate::rendering::ray::Ray;
 use crate::rendering::raytracer::RaytracerError;
-use crate::rendering::runge_kutta::OdeFunction;
+use crate::rendering::runge_kutta::{OdeFunction, rkf45};
 use crate::rendering::scene::EquationOfMotionState;
 use crate::rendering::temperature::TemperatureComputer;
 use nalgebra::{Const, Matrix4};
@@ -14,8 +14,29 @@ use std::io::Write;
 
 pub trait GeodesicSolver: OdeFunction<Const<8>> + HasCoordinateSystem {
     fn geodesic(&self, t: f64, y: &EquationOfMotionState) -> EquationOfMotionState;
+
+    /// Advance the geodesic by one adaptive RKF45 step; see [`rkf45`] for the
+    /// meaning of the returned triple.
+    ///
+    /// This exists as a defaulted trait method purely for speed. The
+    /// integrator holds the solver as a trait object, so calling `rkf45` from
+    /// there would dispatch dynamically for each of the six stage evaluations
+    /// and leave the right-hand side un-inlinable. A default body is compiled
+    /// once per implementing type and reached through a single vtable entry,
+    /// so the step costs one dynamic call and the solver's own `geodesic` is
+    /// inlined into every stage.
+    fn advance(
+        &self,
+        y: &EquationOfMotionState,
+        t: f64,
+        h: f64,
+        epsilon: f64,
+    ) -> Result<(EquationOfMotionState, f64, f64), RaytracerError> {
+        rkf45(y, t, h, epsilon, self)
+    }
+
     fn create_initial_state(&self, ray: &Ray) -> EquationOfMotionState {
-        EquationOfMotionState::from_column_slice(&[
+        EquationOfMotionState::from([
             ray.position[0],
             ray.position[1],
             ray.position[2],

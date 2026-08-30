@@ -6,7 +6,6 @@ use crate::rendering::integrator::StopReason::{
 };
 use crate::rendering::ray::{IntegratedRay, Ray, take_step_buffer};
 use crate::rendering::raytracer::RaytracerError;
-use crate::rendering::runge_kutta::rkf45;
 use crate::rendering::scene::{EquationOfMotionState, get_position};
 use log::debug;
 use nalgebra::Vector3;
@@ -148,13 +147,8 @@ impl<G: Geometry> Integrator<'_, G> {
         let mut h = self.integration_configuration.step_size;
         for i in 1..self.integration_configuration.max_steps {
             let last_y = y;
-            let (y_new, h_taken, h_next) = rkf45(
-                &y,
-                t,
-                h,
-                self.integration_configuration.epsilon,
-                &*geodesic_solver,
-            )?;
+            let (y_new, h_taken, h_next) =
+                geodesic_solver.advance(&y, t, h, self.integration_configuration.epsilon)?;
             y = y_new;
             // Advance the affine parameter by the step actually taken, and carry
             // the controller's suggestion into the next iteration.

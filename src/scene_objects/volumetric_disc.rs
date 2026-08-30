@@ -139,7 +139,10 @@ impl VolumetricDisc {
     fn cylindrical_frame(&self, p: &Vector3<f64>) -> CylindricalFrame {
         let x_local = p.dot(&self.e1);
         let y_local = p.dot(&self.e2);
-        let r = x_local.hypot(y_local);
+        // `sqrt(x^2 + y^2)`, not `hypot`: glibc's `hypot` pays for extreme-range
+        // exactness that these ordinary magnitudes never need, and it showed up
+        // as ~2% of a volumetric render on its own.
+        let r = (x_local * x_local + y_local * y_local).sqrt();
         let (cos_phi, sin_phi) = if r > 0.0 {
             (x_local / r, y_local / r)
         } else {
@@ -172,9 +175,13 @@ impl VolumetricDisc {
         (-(q * q)).exp()
     }
 
+    #[allow(dead_code)] // Used by this module's tests.
     fn compute_density(&self, p: &Vector3<f64>) -> f64 {
-        let frame = self.cylindrical_frame(p);
-        if !self.is_inside_disc(&frame) {
+        self.compute_density_in_frame(&self.cylindrical_frame(p))
+    }
+
+    fn compute_density_in_frame(&self, frame: &CylindricalFrame) -> f64 {
+        if !self.is_inside_disc(frame) {
             return 0.0;
         }
 
@@ -213,7 +220,10 @@ impl VolumetricDisc {
     }
 
     fn get_uv(&self, p: &Vector3<f64>) -> UVCoordinates {
-        let frame = self.cylindrical_frame(p);
+        self.get_uv_in_frame(&self.cylindrical_frame(p))
+    }
+
+    fn get_uv_in_frame(&self, frame: &CylindricalFrame) -> UVCoordinates {
         let r = (frame.r - self.center_disk_inner_radius)
             / (self.center_disk_outer_radius - self.center_disk_inner_radius);
 
@@ -310,7 +320,10 @@ impl VolumetricDisc {
         let sigma_a = self.absorption;
         let sigma_s = self.scattering;
         let step_size = self.step_size;
-        let density = self.compute_density(p);
+        // Resolve the sample into the disc's cylindrical frame once and reuse
+        // it for the density, the temperature radius and the UV lookup.
+        let frame = self.cylindrical_frame(p);
+        let density = self.compute_density_in_frame(&frame);
 
         if density > 0.0 {
             let sigma_t = sigma_a + sigma_s;
@@ -331,9 +344,8 @@ impl VolumetricDisc {
                     coefficients.u_t * frequency.p_t + coefficients.u_phi * frequency.p_phi;
                 let redshift = frequency.observer_energy / emitter_energy;
 
-                let r_dist = p.cross(&self.axis).norm();
-                let temperature = self.temperature_computer.compute_temperature(r_dist)?;
-                let uv = self.get_uv(p);
+                let temperature = self.temperature_computer.compute_temperature(frame.r)?;
+                let uv = self.get_uv_in_frame(&frame);
                 let light_color = self.texture_mapper.color_at_uv(
                     &uv,
                     &crate::rendering::texture::TemperatureData {
