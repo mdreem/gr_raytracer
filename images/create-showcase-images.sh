@@ -66,8 +66,12 @@ for set in "${SETS[@]}"; do
     framedrag)
         # Pole-on view down the spin axis; sky spokes twist near the shadow
         # at a = 0.499, ruler-straight at a = 0.
+        # NEVER place the camera exactly on the axis (x=y=0): the camera
+        # tetrad degenerates there (in the KS chart too, not only BL) and
+        # the winding band around the shadow silently disappears; the 0.15
+        # offset (0.5 degrees of parallax) is the workaround.
         CAM=(--width="$SIZE" --height="$SIZE" \
-             --camera-position=0.0,0.0,-18.0 --theta=0.0 --psi=0.0 --phi=0.0)
+             --camera-position=0.15,0.0,-18.0 --theta=0.0 --psi=0.0 --phi=0.0)
         render showcase-kerr-checker-sky.toml    showcase_kerr_framedrag_spin.png "${CAM[@]}"
         render showcase-kerr-checker-sky-a0.toml showcase_kerr_framedrag_a0.png   "${CAM[@]}"
         ;;
@@ -75,8 +79,10 @@ for set in "${SETS[@]}"; do
         # Same pole-on camera at 3x virtual resolution, rendering only the
         # central third (section render): a 3x zoom onto the shadow region.
         Z=$((SIZE * 3)); LO=$((SIZE)); HI=$((SIZE * 2))
+        # Same 0.15 off-axis offset as the framedrag set (axis-degenerate
+        # camera tetrad).
         CAM=(--width="$Z" --height="$Z" \
-             --camera-position=0.0,0.0,-18.0 --theta=0.0 --psi=0.0 --phi=0.0)
+             --camera-position=0.15,0.0,-18.0 --theta=0.0 --psi=0.0 --phi=0.0)
         SEC=(--from-row="$LO" --to-row="$HI" --from-col="$LO" --to-col="$HI")
         echo "Rendering showcase_kerr_framedrag_zoom_spin.png ..."
         "$BIN" --config-file scene-definitions/showcase-kerr-checker-sky.toml \
