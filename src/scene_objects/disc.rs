@@ -110,8 +110,19 @@ impl Hittable for Disc {
             return self.create_intersection(geometry, center, y_start_spatial, direction, t);
         }
 
-        // If the segment does not cross the plane, check if the cubic Hermite interpolation of
-        // the z-coordinate intersects the plane.
+        // Same-sign endpoints: the straight chord never crosses the plane, but
+        // the true geodesic may dip through it and back within this single step.
+        // Reconstruct z(s) as a cubic Hermite from the endpoint heights and
+        // z-velocities and look for a hidden crossing.
+        //
+        // Note: in practice this branch is effectively inert for the black-hole
+        // scenes (e.g. Kerr). The adaptive integrator slows for curvature near
+        // the equatorial plane, so its steps are too small to straddle a
+        // dip-and-back; every real crossing shows up as an endpoint sign change
+        // handled by the linear branch above. Instrumenting a full vantage
+        // render produced zero hits here (see docs/known-rendering-behaviors.md).
+        // The reconstruction is kept because it is correct and cheap and would
+        // catch a genuine in-step double crossing if a camera ever produced one.
         let d_lambda = y_end.t - y_start.t;
         let p0 = y_start_spatial[2];
         let p1 = y_end_spatial[2];
