@@ -1,4 +1,4 @@
-use crate::geometry::point::CoordinateSystem;
+use crate::geometry::point::{CoordinateSystem, Point};
 use nalgebra::{Vector3, Vector4};
 use std::ops::{Add, Div, Index, Mul, Neg};
 
@@ -105,6 +105,19 @@ impl FourVector {
 
     pub fn get_spatial_vector(self) -> Vector3<f64> {
         Vector3::new(self.vector[1], self.vector[2], self.vector[3])
+    }
+
+    pub fn get_z_cartesian(self, at: &Point) -> f64 {
+        debug_assert_eq!(self.coordinate_system, at.coordinate_system);
+        match self.coordinate_system {
+            CoordinateSystem::Cartesian => self.vector[3],
+            CoordinateSystem::Spherical | CoordinateSystem::BoyerLindquist => {
+                let r = at.vector[1];
+                let theta = at.vector[2];
+                let (st, ct) = (theta.sin(), theta.cos());
+                ct * self.vector[1] - r * st * self.vector[2]
+            }
+        }
     }
 }
 
