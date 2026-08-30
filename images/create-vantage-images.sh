@@ -36,7 +36,10 @@ render vantage_kerr_grazing_winding.png "$KV" "-1.12,0,0"   -2.25   4
 render vantage_kerr_rearview.png       "$KV" "-2.55,0,0.4" -0.5     4
 # Kerr-only vantages
 render vantage_kerr_ergosphere_prograde.png "$KV" "-0.86,0,0" -1.5708 4
-render vantage_kerr_polar.png          "$KV" "0,0,-1.3"    0.3     0.5
+# NEVER place the camera exactly on the axis (x=y=0): the BL chart is
+# degenerate at sin(theta)=0 and the rays get mis-launched; the 0.05
+# offset is the workaround.
+render vantage_kerr_polar.png          "$KV" "0.05,0,-3"   -3.14159 1
 render vantage_kerr_gap_rim.png        "$KV" "-0.86,0,0"   -2.4    4
 render vantage_kerr_gap_outward.png    "$KV" "-0.86,0,0"   0       4
 echo "Done."
