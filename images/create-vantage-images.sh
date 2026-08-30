@@ -16,7 +16,11 @@ SV=scene-definitions/vantages/schwarzschild-vantage.toml
 KV=scene-definitions/vantages/kerr-zamo-vantage.toml
 render() { # out scene pos theta exposure
   echo "Rendering $1 ..."
-  "$BIN" --width=800 --height=800 --max-steps=1000000 \
+  # Tight integrator tolerance: disc hits are tested on straight chords
+  # between adaptive steps, and the grazing plane-dips these close-in
+  # cameras produce get skipped at the default epsilon, leaving ragged
+  # false-sky bites along the wound disc edges.
+  "$BIN" --width=800 --height=800 --max-steps=1000000 --epsilon=1e-9 \
     --camera-position="$3" --theta="$4" --psi=0 --phi=0 --exposure="$5" \
     --config-file "$2" render --filename="images/$1"
 }
