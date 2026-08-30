@@ -2,6 +2,7 @@ use crate::geometry::four_vector::FourVector;
 use crate::geometry::point::Point;
 use crate::rendering::integrator::Step;
 use crate::rendering::raytracer::RaytracerError;
+use std::cell::RefCell;
 use std::io::Write;
 use std::ops::Index;
 
@@ -23,8 +24,45 @@ impl Ray {
     }
 }
 
+thread_local! {
+    /// Per-thread scratch buffer for a ray's step trajectory.
+    ///
+    /// A ray's trajectory used to be allocated with `max_steps` capacity up
+    /// front, once per pixel. At the `--max-steps=1000000` the gallery
+    /// scripts use that is a ~100 MB allocation (and matching page faults)
+    /// per ray, almost all of it untouched. Recycling one buffer per
+    /// rendering thread instead lets the capacity settle at the actual
+    /// high-water mark after the first few rays, after which tracing a ray
+    /// allocates nothing at all.
+    static STEP_BUFFER: RefCell<Vec<Step>> = const { RefCell::new(Vec::new()) };
+}
+
+/// Take this thread's recycled (empty) step buffer.
+pub fn take_step_buffer() -> Vec<Step> {
+    STEP_BUFFER.with(|buffer| std::mem::take(&mut *buffer.borrow_mut()))
+}
+
 pub struct IntegratedRay {
     pub steps: Vec<Step>,
+}
+
+impl Drop for IntegratedRay {
+    /// Hand the trajectory's storage back to the thread-local pool, keeping
+    /// whichever of the two buffers has the larger capacity so the pool
+    /// converges on the high-water mark instead of thrashing.
+    fn drop(&mut self) {
+        let mut steps = std::mem::take(&mut self.steps);
+        steps.clear();
+        // `try_with` (not `with`): a ray dropped while thread-locals are
+        // being torn down must not panic just because the pool is gone.
+        let _ = STEP_BUFFER.try_with(|buffer| {
+            if let Ok(mut pooled) = buffer.try_borrow_mut()
+                && steps.capacity() > pooled.capacity()
+            {
+                *pooled = steps;
+            }
+        });
+    }
 }
 
 impl IntegratedRay {

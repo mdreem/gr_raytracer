@@ -5,7 +5,7 @@ use crate::rendering::integrator::Step;
 use crate::rendering::raytracer::RaytracerError;
 use crate::rendering::temperature::TemperatureComputer;
 use crate::rendering::texture::{TextureMapHandle, UVCoordinates};
-use crate::scene_objects::hittable::{ColorComputationData, Hittable, Intersection};
+use crate::scene_objects::hittable::{ColorComputationData, Hittable, Intersection, Segment};
 use crate::scene_objects::objects::SceneObject;
 use nalgebra::Vector3;
 
@@ -37,21 +37,17 @@ impl Hittable for Disc {
     // here. See with current test setup. Intersection should be at t=7.63. With z=-2.442748091.
     // The intersection should be with an interval crossing y=0. But it seems to happen near 0 with
     // both coordinates.
-    fn intersects(
-        &self,
-        y_start: &Point,
-        y_end: &Point,
-        geometry: &dyn Geometry,
-    ) -> Option<Intersection> {
+    fn intersects(&self, segment: &Segment, geometry: &dyn Geometry) -> Option<Intersection> {
         // z x y
-        let normal = Vector3::new(0.0, 0.0, 1.0);
         let center = Vector3::new(0.0, 0.0, 0.0);
-        let y_start_spatial = y_start.get_spatial_vector_cartesian();
-        let y_end_spatial = y_end.get_spatial_vector_cartesian();
+        let y_start_spatial = segment.start_cartesian;
+        let y_end_spatial = segment.end_cartesian;
         let direction = y_end_spatial - y_start_spatial;
 
-        let p1 = (center - y_start_spatial).dot(&normal);
-        let p2 = direction.dot(&normal);
+        // The disc plane's normal is (0, 0, 1), so both dot products below
+        // reduce to reading the z component.
+        let p1 = -y_start_spatial[2];
+        let p2 = direction[2];
 
         // TODO: p2 can be 0 if parallel -> handle
         let t = p1 / p2; // plane intersection parameter.
@@ -77,12 +73,23 @@ impl Hittable for Disc {
         if r >= self.center_disk_inner_radius && r <= self.center_disk_outer_radius {
             let vector_in_plane = intersection_point - center;
 
-            let phi = vector_in_plane[1].atan2(vector_in_plane[0]); // phi in x-y plane.
+            // cos/sin of the in-plane angle, taken straight from the
+            // normalized components rather than round-tripping through
+            // atan2 and back (identical result, no transcendentals).
+            let planar_radius = vector_in_plane[0].hypot(vector_in_plane[1]);
+            let (cos_phi, sin_phi) = if planar_radius > 0.0 {
+                (
+                    vector_in_plane[0] / planar_radius,
+                    vector_in_plane[1] / planar_radius,
+                )
+            } else {
+                (1.0, 0.0)
+            };
             let r_normalized = (r - self.center_disk_inner_radius)
                 / (self.center_disk_outer_radius - self.center_disk_inner_radius);
 
-            let u = 0.5 + 0.5 * r_normalized * phi.cos();
-            let v = 0.5 + 0.5 * r_normalized * phi.sin();
+            let u = 0.5 + 0.5 * r_normalized * cos_phi;
+            let v = 0.5 + 0.5 * r_normalized * sin_phi;
 
             Some(Intersection {
                 uv: UVCoordinates { u, v },
@@ -173,15 +180,15 @@ mod tests {
         // Cartesian R = 0.8 -> BL r = sqrt(0.64 - 0.499^2) ~ 0.625 < 0.795:
         // no gas there.
         let (start, end) = crossing_at(0.8);
-        assert!(disc.intersects(&start, &end, &geometry).is_none());
+        assert!(disc.intersects(&Segment::from_points(&start, &end), &geometry).is_none());
 
         // Cartesian R = 0.95 -> BL r ~ 0.808 > 0.795: inside the disc.
         let (start, end) = crossing_at(0.95);
-        assert!(disc.intersects(&start, &end, &geometry).is_some());
+        assert!(disc.intersects(&Segment::from_points(&start, &end), &geometry).is_some());
 
         // Outer edge: Cartesian R = 8.01 -> BL r ~ 7.994 < 8.0: still gas.
         let (start, end) = crossing_at(8.01);
-        assert!(disc.intersects(&start, &end, &geometry).is_some());
+        assert!(disc.intersects(&Segment::from_points(&start, &end), &geometry).is_some());
     }
 
     #[test]
@@ -190,11 +197,11 @@ mod tests {
         let disc = create_disc(3.05, 8.0);
 
         let (start, end) = crossing_at(3.0);
-        assert!(disc.intersects(&start, &end, &geometry).is_none());
+        assert!(disc.intersects(&Segment::from_points(&start, &end), &geometry).is_none());
         let (start, end) = crossing_at(3.1);
-        assert!(disc.intersects(&start, &end, &geometry).is_some());
+        assert!(disc.intersects(&Segment::from_points(&start, &end), &geometry).is_some());
         let (start, end) = crossing_at(8.1);
-        assert!(disc.intersects(&start, &end, &geometry).is_none());
+        assert!(disc.intersects(&Segment::from_points(&start, &end), &geometry).is_none());
     }
 
     #[test]
@@ -209,7 +216,7 @@ mod tests {
         let r_inner_cartesian = (0.795f64 * 0.795 + 0.499 * 0.499).sqrt();
         let (start, end) = crossing_at(r_inner_cartesian + 1e-6);
         let intersection = disc
-            .intersects(&start, &end, &geometry)
+            .intersects(&Segment::from_points(&start, &end), &geometry)
             .expect("should hit the inner edge");
         // u = 0.5 + 0.5 * r_normalized * cos(phi); at phi = 0 and
         // r_normalized ~ 0 this is ~0.5.

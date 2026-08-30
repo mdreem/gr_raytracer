@@ -65,14 +65,17 @@ impl GeodesicSolver for SchwarzschildSolver {
         let a = 1.0 - self.radius / r;
         let a_prime = self.radius / (r * r);
         let aprime_over_a = a_prime / a;
+        // One sin/cos evaluation for the whole right-hand side; this runs six
+        // times per RKF45 step, for every step of every ray.
+        let (sin_theta, cos_theta) = theta.sin_cos();
 
         // acceleration
         let a_t = -(aprime_over_a) * v_t * v_r;
         let a_r = -0.5 * a * a_prime * v_t * v_t
             + 0.5 * (aprime_over_a) * v_r * v_r
-            + a * r * (v_theta * v_theta + v_phi * v_phi * theta.sin() * theta.sin());
-        let a_theta = -(2.0 / r) * v_r * v_theta + theta.sin() * theta.cos() * v_phi * v_phi;
-        let a_phi = -(2.0 / r) * v_phi * v_r - 2.0 * theta.cos() / theta.sin() * v_theta * v_phi;
+            + a * r * (v_theta * v_theta + v_phi * v_phi * sin_theta * sin_theta);
+        let a_theta = -(2.0 / r) * v_r * v_theta + sin_theta * cos_theta * v_phi * v_phi;
+        let a_phi = -(2.0 / r) * v_phi * v_r - 2.0 * cos_theta / sin_theta * v_theta * v_phi;
 
         EquationOfMotionState::from_column_slice(&[
             v_t, v_r, v_theta, v_phi, a_t, a_r, a_theta, a_phi,

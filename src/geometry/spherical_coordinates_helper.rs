@@ -31,9 +31,13 @@ pub fn spherical_to_cartesian(spherical: &Point) -> Point {
     let theta = spherical[2];
     let phi = spherical[3];
 
-    let x = r * theta.sin() * phi.cos();
-    let y = r * theta.sin() * phi.sin();
-    let z = r * theta.cos();
+    let (sin_theta, cos_theta) = theta.sin_cos();
+    let (sin_phi, cos_phi) = phi.sin_cos();
+
+    let r_sin_theta = r * sin_theta;
+    let x = r_sin_theta * cos_phi;
+    let y = r_sin_theta * sin_phi;
+    let z = r * cos_theta;
 
     Point::new(t, x, y, z, CoordinateSystem::Cartesian)
 }

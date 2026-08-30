@@ -99,8 +99,7 @@ fn potential_r_derivative(r: f64, r_s: f64, a: f64, e: f64, l_z: f64, q: f64) ->
 /// assumes θ is bounded away from the poles. Near-axial trajectories with L_z ≈ 0
 /// are safe; others will produce ±inf which the caller must handle.
 fn potential_theta(theta: f64, a: f64, e: f64, l_z: f64, q: f64) -> f64 {
-    let cos_t = theta.cos();
-    let sin_t = theta.sin();
+    let (sin_t, cos_t) = theta.sin_cos();
     q + a * a * e * e * cos_t * cos_t - l_z * l_z * cos_t * cos_t / (sin_t * sin_t)
 }
 
@@ -111,10 +110,19 @@ fn potential_theta(theta: f64, a: f64, e: f64, l_z: f64, q: f64) -> f64 {
 /// in this renderer are null geodesics, so μ = 0 is assumed throughout.
 ///
 /// NOTE: the 2L_z²cosθ/sin³θ term diverges at the poles. Same caveat as potential_theta.
+/// As `potential_theta_derivative`, but with `sin(theta)` and `cos(theta)`
+/// supplied by the caller. The geodesic right-hand side already needs
+/// `sin(theta)` for `dt/dlambda` and `dphi/dlambda`, and recomputing the pair
+/// here doubled the trigonometry of the innermost loop.
+fn potential_theta_derivative_from_sin_cos(sin_t: f64, cos_t: f64, a: f64, e: f64, l_z: f64) -> f64 {
+    let sin3 = sin_t * sin_t * sin_t;
+    -2.0 * a * a * e * e * cos_t * sin_t + 2.0 * l_z * l_z * cos_t / sin3
+}
+
+#[cfg(test)]
 fn potential_theta_derivative(theta: f64, a: f64, e: f64, l_z: f64, _q: f64) -> f64 {
-    let cos_t = theta.cos();
-    let sin_t = theta.sin();
-    -2.0 * a * a * e * e * cos_t * sin_t + 2.0 * l_z * l_z * cos_t / (sin_t.powi(3))
+    let (sin_t, cos_t) = theta.sin_cos();
+    potential_theta_derivative_from_sin_cos(sin_t, cos_t, a, e, l_z)
 }
 
 struct KerrBLSolver {
@@ -148,7 +156,7 @@ impl GeodesicSolver for KerrBLSolver {
         let p_r = (r * r + self.a * self.a) * self.e - self.a * self.l_z;
 
         // dt/dλ = (r²+a²)/Δ * P_r + a(L_z - aE sin²θ)
-        let sin_t = theta.sin();
+        let (sin_t, cos_t) = theta.sin_cos();
         let sin2 = sin_t * sin_t;
         let dt =
             (r * r + self.a * self.a) / del * p_r + self.a * (self.l_z - self.a * self.e * sin2);
@@ -166,7 +174,8 @@ impl GeodesicSolver for KerrBLSolver {
         let dv_r = potential_r_derivative(r, self.radius, self.a, self.e, self.l_z, self.q) / 2.0;
 
         // d²θ/dλ² = Θ'(θ)/2
-        let dv_theta = potential_theta_derivative(theta, self.a, self.e, self.l_z, self.q) / 2.0;
+        let dv_theta =
+            potential_theta_derivative_from_sin_cos(sin_t, cos_t, self.a, self.e, self.l_z) / 2.0;
 
         EquationOfMotionState::from_column_slice(&[
             dt, v_r, v_theta, dphi, dv_r, dv_theta, 0.0, 0.0,
@@ -229,8 +238,9 @@ impl GeodesicSolver for KerrBLSolver {
         let v_theta = y[5]; // dθ/dλ
 
         let del = delta(r, self.radius, self.a);
-        let sig = sigma(r, self.a, theta);
-        let sin2 = theta.sin().powi(2);
+        let (sin_t, cos_t) = theta.sin_cos();
+        let sig = r * r + self.a * self.a * cos_t * cos_t;
+        let sin2 = sin_t * sin_t;
         let p_r_term = (r * r + self.a * self.a) * self.e - self.a * self.l_z;
 
         // Algebraic Mino-time velocities for t and φ
@@ -251,8 +261,8 @@ impl GeodesicSolver for KerrBLSolver {
 
 /// Covariant BL Kerr metric g_μν. Signature (−,+,+,+).
 fn metric_bl(r_s: f64, a: f64, r: f64, theta: f64) -> Matrix4<f64> {
-    let sig = sigma(r, a, theta);
-    let sin_t = theta.sin();
+    let (sin_t, cos_t) = theta.sin_cos();
+    let sig = r * r + a * a * cos_t * cos_t;
     let sin2 = sin_t * sin_t;
 
     let g_tt = -(1.0 - r_s * r / sig);

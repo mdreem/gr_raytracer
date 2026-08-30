@@ -6,7 +6,7 @@ use crate::rendering::integrator::Step;
 use crate::rendering::raytracer::RaytracerError;
 use crate::rendering::redshift::{RayFrequencyData, RedshiftComputer};
 use crate::rendering::texture::TemperatureData;
-use crate::scene_objects::hittable::{ColorComputationData, Hittable};
+use crate::scene_objects::hittable::{ColorComputationData, Hittable, Segment};
 
 /// Build the integration `Step` at the exact object intersection: the position
 /// is the already-solved intersection point (exact, not interpolated), and the
@@ -29,18 +29,18 @@ fn step_at_intersection(y_start: &Step, y_end: &Step, intersection_point: Point,
     debug_assert_eq!(y_start.p.coordinate_system, y_end.p.coordinate_system);
     let cs = y_start.p.coordinate_system;
     let s = 1.0 - t;
-    Step {
-        t: s * y_start.t + t * y_end.t,
-        step: y_start.step,
-        x: intersection_point.to_coordinate_system(y_start.x.coordinate_system),
-        p: FourVector::new(
+    Step::new(
+        intersection_point.to_coordinate_system(y_start.x.coordinate_system),
+        FourVector::new(
             s * y_start.p[0] + t * y_end.p[0],
             s * y_start.p[1] + t * y_end.p[1],
             s * y_start.p[2] + t * y_end.p[2],
             s * y_start.p[3] + t * y_end.p[3],
             cs,
         ),
-    }
+        s * y_start.t + t * y_end.t,
+        y_start.step,
+    )
 }
 
 pub trait SceneObject: Hittable {}
@@ -48,6 +48,7 @@ pub trait SceneObject: Hittable {}
 pub struct Objects<'a, G: Geometry> {
     geometry: &'a G,
     objects: Vec<Box<dyn SceneObject>>,
+    redshift_computer: RedshiftComputer<'a, G>,
 }
 
 impl<'a, G: Geometry> Objects<'a, G> {
@@ -55,6 +56,7 @@ impl<'a, G: Geometry> Objects<'a, G> {
         Self {
             geometry,
             objects: Vec::new(),
+            redshift_computer: RedshiftComputer::new(geometry),
         }
     }
 
@@ -69,26 +71,24 @@ impl<'a, G: Geometry> Objects<'a, G> {
         frequency: &RayFrequencyData,
         remaining_steps: &[Step],
     ) -> Result<Option<CIETristimulus>, RaytracerError> {
-        let redshift_computer = RedshiftComputer::new(self.geometry);
         let mut resulting_color = None;
-        let mut shortest_distance = f64::MAX;
+        let mut shortest_distance_squared = f64::MAX;
 
-        let y_start_point = y_start.x;
-        let y_end_point = y_end.x;
-        let y_start_cartesian = y_start_point.get_spatial_vector_cartesian();
+        let segment = Segment::from_steps(y_start, y_end);
+        let y_start_cartesian = segment.start_cartesian;
 
         // The step size can be rather large, so it makes sense to sort the objects by their
         // distance to the y_start point.
         for hittable in &self.objects {
-            if let Some(intersection_data) =
-                hittable.intersects(&y_start_point, &y_end_point, self.geometry)
-            {
+            if let Some(intersection_data) = hittable.intersects(&segment, self.geometry) {
                 let intersection_point = intersection_data
                     .intersection_point
                     .get_spatial_vector_cartesian();
-                let distance = (intersection_point - y_start_cartesian).norm();
-                if distance < shortest_distance {
-                    shortest_distance = distance;
+                // Compared squared: the ordering is the same and the square
+                // root is pure cost in a per-step loop.
+                let distance_squared = (intersection_point - y_start_cartesian).norm_squared();
+                if distance_squared < shortest_distance_squared {
+                    shortest_distance_squared = distance_squared;
                     let intersection_step = step_at_intersection(
                         y_start,
                         y_end,
@@ -97,7 +97,8 @@ impl<'a, G: Geometry> Objects<'a, G> {
                     );
                     let emitter_energy =
                         hittable.energy_of_emitter(self.geometry, &intersection_step)?;
-                    let redshift = redshift_computer
+                    let redshift = self
+                        .redshift_computer
                         .compute_redshift_from_energies(emitter_energy, frequency.observer_energy);
                     let temperature = hittable.temperature_of_emitter(
                         &intersection_data.intersection_point,
@@ -169,18 +170,18 @@ mod tests {
         objects.add_object(farther_sphere);
         objects.add_object(closer_sphere);
 
-        let step_start = Step {
-            t: 0.0,
-            step: 0,
-            x: Point::new_cartesian(0.0, 0.0, 0.0, -3.0),
-            p: FourVector::new_cartesian(1.0, 0.0, 0.0, 0.0),
-        };
-        let step_end = Step {
-            t: 100.0,
-            step: 1000,
-            x: Point::new_cartesian(0.0, 0.0, 0.0, 3.0),
-            p: FourVector::new_cartesian(1.0, 0.0, 0.0, 0.0),
-        };
+        let step_start = Step::new(
+            Point::new_cartesian(0.0, 0.0, 0.0, -3.0),
+            FourVector::new_cartesian(1.0, 0.0, 0.0, 0.0),
+            0.0,
+            0,
+        );
+        let step_end = Step::new(
+            Point::new_cartesian(0.0, 0.0, 0.0, 3.0),
+            FourVector::new_cartesian(1.0, 0.0, 0.0, 0.0),
+            100.0,
+            1000,
+        );
 
         let result = objects
             .intersects(&step_start, &step_end, &unit_frequency(), &[])
@@ -190,18 +191,18 @@ mod tests {
 
     #[test]
     fn test_add_and_intersect_spheres_inside_each_other() {
-        let step_start = Step {
-            t: 0.0,
-            step: 0,
-            x: Point::new_cartesian(0.0, 0.0, 0.0, -3.0),
-            p: FourVector::new_cartesian(1.0, 0.0, 0.0, 0.0),
-        };
-        let step_end = Step {
-            t: 100.0,
-            step: 1000,
-            x: Point::new_cartesian(0.0, 0.0, 0.0, 0.0),
-            p: FourVector::new_cartesian(1.0, 0.0, 0.0, 0.0),
-        };
+        let step_start = Step::new(
+            Point::new_cartesian(0.0, 0.0, 0.0, -3.0),
+            FourVector::new_cartesian(1.0, 0.0, 0.0, 0.0),
+            0.0,
+            0,
+        );
+        let step_end = Step::new(
+            Point::new_cartesian(0.0, 0.0, 0.0, 0.0),
+            FourVector::new_cartesian(1.0, 0.0, 0.0, 0.0),
+            100.0,
+            1000,
+        );
 
         let geometry = EuclideanSpace::new();
         let mut objects_setup_1 = Objects::new(&geometry);
@@ -258,18 +259,18 @@ mod tests {
 
         // r = 6 (inside the disc annulus), phi = 0, theta straddling the
         // equatorial plane pi/2 where the disc lives.
-        let step_start = Step {
-            t: 0.0,
-            step: 0,
-            x: Point::new_spherical(0.0, 6.0, std::f64::consts::FRAC_PI_2 - 0.3, 0.0),
-            p: FourVector::new_spherical(1.0, 0.0, 0.1, 0.0),
-        };
-        let step_end = Step {
-            t: 1.0,
-            step: 1,
-            x: Point::new_spherical(0.0, 6.0, std::f64::consts::FRAC_PI_2 + 0.3, 0.0),
-            p: FourVector::new_spherical(1.0, 0.0, 0.1, 0.0),
-        };
+        let step_start = Step::new(
+            Point::new_spherical(0.0, 6.0, std::f64::consts::FRAC_PI_2 - 0.3, 0.0),
+            FourVector::new_spherical(1.0, 0.0, 0.1, 0.0),
+            0.0,
+            0,
+        );
+        let step_end = Step::new(
+            Point::new_spherical(0.0, 6.0, std::f64::consts::FRAC_PI_2 + 0.3, 0.0),
+            FourVector::new_spherical(1.0, 0.0, 0.1, 0.0),
+            1.0,
+            1,
+        );
 
         let result = objects
             .intersects(&step_start, &step_end, &unit_frequency(), &[])

@@ -2,7 +2,7 @@ use crate::rendering::black_body_radiation::get_cie_xyz_of_black_body_redshifted
 use crate::rendering::color::{CIETristimulus, Color, srgb_to_xyz};
 use crate::rendering::raytracer::RaytracerError;
 use crate::rendering::texture::TextureError::DecodeError;
-use image::{DynamicImage, GenericImageView, ImageReader};
+use image::{ImageReader, RgbaImage};
 use log::{error, warn};
 use std::sync::Arc;
 
@@ -43,7 +43,16 @@ pub trait TextureMap: Sync {
 #[derive(Clone)]
 pub struct TextureMapper {
     beaming_exponent: f64,
-    image: DynamicImage,
+    /// The decoded texture as a flat RGBA8 buffer.
+    ///
+    /// Kept as a plain `RgbaImage` rather than a `DynamicImage` so a texel
+    /// read is a direct index into contiguous bytes. `DynamicImage::get_pixel`
+    /// dispatches on the variant and converts the sample format on every
+    /// call, and the celestial map is sampled four times for every escaped
+    /// ray.
+    image: RgbaImage,
+    width: u32,
+    height: u32,
 }
 
 impl TextureMapper {
@@ -53,17 +62,24 @@ impl TextureMapper {
             .map_err(RaytracerError::TextureError)?
             .decode()
             .map_err(DecodeError)
-            .map_err(RaytracerError::TextureError)?;
+            .map_err(RaytracerError::TextureError)?
+            .to_rgba8();
 
         Ok(TextureMapper {
             beaming_exponent,
+            width: image.width(),
+            height: image.height(),
             image,
         })
     }
 
+    fn texel(&self, x: u32, y: u32) -> CIETristimulus {
+        CIETristimulus::from_rgba(self.image.get_pixel(x, y))
+    }
+
     /// https://en.wikipedia.org/wiki/Bilinear_interpolation
     fn bilinear(&self, uv: &UVCoordinates) -> CIETristimulus {
-        let (width, height) = self.image.dimensions();
+        let (width, height) = (self.width, self.height);
         let p_x = (width as f64) * uv.u;
         let p_y = (height as f64) * uv.v;
 
@@ -76,10 +92,10 @@ impl TextureMapper {
         let p_x_ceil = (p_x.ceil() as u32).min(width - 1);
         let p_y_ceil = (p_y.ceil() as u32).min(height - 1);
 
-        let c00 = CIETristimulus::from_rgba(&self.image.get_pixel(p_x_floor, p_y_floor));
-        let c01 = CIETristimulus::from_rgba(&self.image.get_pixel(p_x_floor, p_y_ceil));
-        let c11 = CIETristimulus::from_rgba(&self.image.get_pixel(p_x_ceil, p_y_ceil));
-        let c10 = CIETristimulus::from_rgba(&self.image.get_pixel(p_x_ceil, p_y_floor));
+        let c00 = self.texel(p_x_floor, p_y_floor);
+        let c01 = self.texel(p_x_floor, p_y_ceil);
+        let c11 = self.texel(p_x_ceil, p_y_ceil);
+        let c10 = self.texel(p_x_ceil, p_y_floor);
 
         let dx = p_x - (p_x_floor as f64);
         let dy = p_y - (p_y_floor as f64);
@@ -112,8 +128,14 @@ pub struct BlackBodyMapper {
     /// scenes that want a stronger beaming look (e.g. the accretion-disc
     /// examples in scene-definitions/) can dial this up.
     beaming_exponent: f64,
-    /// Precomputed blackbody colors indexed by log10(temperature).
-    color_profile: Vec<(f64, CIETristimulus)>,
+    /// Precomputed blackbody colors on a uniform log10(temperature) grid
+    /// running from `MIN_TEMPERATURE` to `MAX_TEMPERATURE`.
+    color_profile: Vec<CIETristimulus>,
+    /// log10 of the first grid point and the uniform spacing between them.
+    /// Uniform spacing turns a lookup into an index computation instead of a
+    /// binary search; this is evaluated once per volumetric march sample.
+    profile_min_log: f64,
+    profile_log_step: f64,
 }
 
 const NUM_COLOR_LUT_STEPS: usize = 1000;
@@ -131,12 +153,14 @@ impl BlackBodyMapper {
             let log_t = min_log + (i as f64) * step;
             let t = 10.0_f64.powf(log_t);
             let color = get_cie_xyz_of_black_body_redshifted(t, 1.0);
-            color_profile.push((log_t, color));
+            color_profile.push(color);
         }
 
         BlackBodyMapper {
             beaming_exponent,
             color_profile,
+            profile_min_log: min_log,
+            profile_log_step: step,
         }
     }
 
@@ -150,14 +174,15 @@ impl BlackBodyMapper {
     }
 
     fn sample_blackbody(&self, temperature: f64) -> CIETristimulus {
-        let Some((first_log_t, first_color)) = self.color_profile.first().copied() else {
+        let Some(first_color) = self.color_profile.first().copied() else {
             error!("BlackBodyMapper color_profile is empty; falling back to black.");
             return CIETristimulus::new(0.0, 0.0, 0.0, 1.0);
         };
-        let Some((last_log_t, last_color)) = self.color_profile.last().copied() else {
+        let Some(last_color) = self.color_profile.last().copied() else {
             error!("BlackBodyMapper color_profile is empty; falling back to black.");
             return CIETristimulus::new(0.0, 0.0, 0.0, 1.0);
         };
+        let last_index = self.color_profile.len() - 1;
 
         let log_t = temperature.max(MIN_TEMPERATURE).log10();
         if !log_t.is_finite() {
@@ -168,26 +193,22 @@ impl BlackBodyMapper {
             return first_color;
         }
 
-        if log_t <= first_log_t {
+        // The grid is uniform in log10(T), so the bracketing entry follows
+        // from arithmetic; the binary search this replaces ran once per
+        // marched volumetric sample.
+        let position = (log_t - self.profile_min_log) / self.profile_log_step;
+        if position <= 0.0 {
             return first_color;
         }
-        if log_t >= last_log_t {
+        if position >= last_index as f64 {
             return last_color;
         }
 
-        let idx = match self
-            .color_profile
-            .binary_search_by(|(lt, _)| lt.total_cmp(&log_t))
-        {
-            Ok(i) => i,
-            Err(0) => 0,
-            Err(i) => i - 1,
-        };
+        let idx = (position as usize).min(last_index - 1);
+        let c0 = self.color_profile[idx];
+        let c1 = self.color_profile[idx + 1];
 
-        let (lt0, c0) = self.color_profile[idx];
-        let (lt1, c1) = self.color_profile[idx + 1];
-
-        let t = (log_t - lt0) / (lt1 - lt0);
+        let t = position - idx as f64;
 
         CIETristimulus::new(
             c0.x + t * (c1.x - c0.x),
@@ -324,12 +345,12 @@ mod tests {
             }
         });
 
-        let dynamic_image = image::DynamicImage::ImageRgba8(image_buffer);
-        let texture_mapper = TextureMapper {
+        TextureMapper {
             beaming_exponent: 3.0,
-            image: dynamic_image,
-        };
-        texture_mapper
+            width: image_buffer.width(),
+            height: image_buffer.height(),
+            image: image_buffer,
+        }
     }
 
     #[test]

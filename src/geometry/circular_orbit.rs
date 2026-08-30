@@ -37,8 +37,18 @@ pub struct OrbitKillingDecomposition {
 
 /// BL metric components (g_tt, g_tphi, g_phiphi) at (r, theta).
 fn metric_components_at(r_s: f64, a: f64, r: f64, theta: f64) -> (f64, f64, f64) {
-    let sig = r * r + a * a * theta.cos().powi(2);
-    let sin2 = theta.sin().powi(2);
+    let (sin_t, cos_t) = theta.sin_cos();
+    metric_components_from_sin2(r_s, a, r, sin_t * sin_t, cos_t * cos_t)
+}
+
+fn metric_components_from_sin2(
+    r_s: f64,
+    a: f64,
+    r: f64,
+    sin2: f64,
+    cos2: f64,
+) -> (f64, f64, f64) {
+    let sig = r * r + a * a * cos2;
     let g_tt = -(1.0 - r_s * r / sig);
     let g_tphi = -a * r_s * r * sin2 / sig;
     let g_phiphi = (r * r + a * a + a * a * r_s * r * sin2 / sig) * sin2;
@@ -46,8 +56,12 @@ fn metric_components_at(r_s: f64, a: f64, r: f64, theta: f64) -> (f64, f64, f64)
 }
 
 /// Equatorial BL metric components (theta = pi/2).
+///
+/// Substituting sin^2 = 1, cos^2 = 0 directly rather than going through
+/// `metric_components_at(.., FRAC_PI_2)`: this is called once per volumetric
+/// march sample, and the sin/cos of a constant is pure overhead.
 fn metric_components(r_s: f64, a: f64, r: f64) -> (f64, f64, f64) {
-    metric_components_at(r_s, a, r, std::f64::consts::FRAC_PI_2)
+    metric_components_from_sin2(r_s, a, r, 1.0, 0.0)
 }
 
 /// Killing coefficients (u^t, u^phi) of the ZAMO (zero angular momentum
@@ -76,7 +90,9 @@ pub fn zamo_killing_coefficients(
 pub fn angular_velocity(r_s: f64, a: f64, r: f64) -> f64 {
     let m = 0.5 * r_s;
     let sqrt_m = m.sqrt();
-    sqrt_m / (r.powf(1.5) + a * sqrt_m)
+    // r^1.5 as r * sqrt(r): a multiply plus a hardware square root, instead
+    // of the generic `pow` this is called once per volumetric march sample.
+    sqrt_m / (r * r.sqrt() + a * sqrt_m)
 }
 
 /// Killing coefficients (u^t, u^phi) of the circular orbit at radius r.
