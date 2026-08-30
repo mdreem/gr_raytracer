@@ -73,16 +73,12 @@ impl<'a, G: Geometry> Objects<'a, G> {
         let mut resulting_color = None;
         let mut shortest_distance = f64::MAX;
 
-        let y_start_point = y_start.x;
-        let y_end_point = y_end.x;
-        let y_start_cartesian = y_start_point.get_spatial_vector_cartesian();
+        let y_start_cartesian = y_start.x.get_spatial_vector_cartesian();
 
         // The step size can be rather large, so it makes sense to sort the objects by their
         // distance to the y_start point.
         for hittable in &self.objects {
-            if let Some(intersection_data) =
-                hittable.intersects(&y_start_point, &y_end_point, self.geometry)
-            {
+            if let Some(intersection_data) = hittable.intersects(&y_start, &y_end, self.geometry) {
                 let intersection_point = intersection_data
                     .intersection_point
                     .get_spatial_vector_cartesian();

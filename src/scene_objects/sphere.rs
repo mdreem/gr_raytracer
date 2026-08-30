@@ -60,14 +60,14 @@ impl Hittable for Sphere {
     // y_start and y_end have to be Cartesian.
     fn intersects(
         &self,
-        y_start: &Point,
-        y_end: &Point,
+        y_start: &Step,
+        y_end: &Step,
         _geometry: &dyn Geometry,
     ) -> Option<Intersection> {
         debug_assert_eq!(self.position.coordinate_system, CoordinateSystem::Cartesian);
 
-        let y_start_cartesian = y_start.to_cartesian();
-        let y_end_cartesian = y_end.to_cartesian();
+        let y_start_cartesian = y_start.x.to_cartesian();
+        let y_end_cartesian = y_end.x.to_cartesian();
 
         let neg_position = -self.position;
         let y_start_shifted = y_start_cartesian + neg_position;
@@ -167,12 +167,24 @@ impl SceneObject for Sphere {}
 mod tests {
     use super::*;
     use crate::geometry::euclidean::EuclideanSpace;
+    use crate::geometry::four_vector::FourVector;
     use crate::geometry::point::Point;
     use crate::rendering::color::Color;
     use crate::rendering::texture::CheckerMapper;
     use crate::scene_objects::hittable::Hittable;
     use approx::assert_abs_diff_eq;
     use std::sync::Arc;
+
+    // Sphere intersection only reads the endpoint positions; the momentum is
+    // a placeholder so the tests can build `Step`s.
+    fn as_step(p: Point) -> Step {
+        Step {
+            x: p,
+            p: FourVector::new_cartesian(1.0, 0.0, 0.0, 0.0),
+            t: 0.0,
+            step: 0,
+        }
+    }
 
     fn create_sphere_at(x: f64, y: f64, z: f64) -> Sphere {
         Sphere::new(
@@ -197,7 +209,7 @@ mod tests {
 
         assert!(
             sphere
-                .intersects(&y_start, &y_end, &EuclideanSpace::new())
+                .intersects(&as_step(y_start), &as_step(y_end), &EuclideanSpace::new())
                 .is_some()
         );
     }
@@ -210,7 +222,7 @@ mod tests {
 
         assert!(
             sphere
-                .intersects(&y_start, &y_end, &EuclideanSpace::new())
+                .intersects(&as_step(y_start), &as_step(y_end), &EuclideanSpace::new())
                 .is_none()
         );
     }
@@ -223,7 +235,7 @@ mod tests {
 
         assert!(
             sphere
-                .intersects(&y_start, &y_end, &EuclideanSpace::new())
+                .intersects(&as_step(y_start), &as_step(y_end), &EuclideanSpace::new())
                 .is_some()
         );
     }
@@ -236,7 +248,7 @@ mod tests {
 
         assert!(
             sphere
-                .intersects(&y_start, &y_end, &EuclideanSpace::new())
+                .intersects(&as_step(y_start), &as_step(y_end), &EuclideanSpace::new())
                 .is_none()
         );
     }
@@ -253,7 +265,7 @@ mod tests {
         let y_end = Point::new_cartesian(0.0, 0.0, 0.0, 19.5);
 
         let intersection = sphere
-            .intersects(&y_start, &y_end, &EuclideanSpace::new())
+            .intersects(&as_step(y_start), &as_step(y_end), &EuclideanSpace::new())
             .expect("ray should hit sphere");
         let hit = intersection
             .intersection_point
