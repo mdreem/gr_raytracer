@@ -135,8 +135,8 @@ frame dragging pulls every one of them into asymmetry. The disc glow is
 </div>
 
 <div align="center">
-  <img src="vantage_kerr_polar.png" alt="The accretion disc seen face-on from above the pole">
-  <p>From the rotation axis, looking down at the disc face-on: the dark lane is the disc gap between the inner edge and the hole, wrapped around the shadow.</p>
+  <img src="vantage_kerr_polar.png" alt="The shadow seen from the rotation axis, circular despite near-extremal spin">
+  <p>From the rotation axis, facing the hole: the disc face-on behind a shadow that stays circular; pole-on, even near-extremal spin barely distorts the silhouette, in contrast to every equatorial view.</p>
 </div>
 
 <div align="center">
