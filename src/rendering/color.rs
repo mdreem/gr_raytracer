@@ -326,9 +326,8 @@ fn inv_compand_srgb(u: f64) -> f64 {
 /// ray bilinearly samples four texels, and each texel used to cost three
 /// `powf(2.4)` calls. The input is an integer code, so the whole transfer
 /// function fits in a table and the result is bit-identical to computing it.
-static SRGB_TO_LINEAR: std::sync::LazyLock<[f64; 256]> = std::sync::LazyLock::new(|| {
-    std::array::from_fn(|code| inv_compand_srgb(code as f64 / 255.0))
-});
+static SRGB_TO_LINEAR: std::sync::LazyLock<[f64; 256]> =
+    std::sync::LazyLock::new(|| std::array::from_fn(|code| inv_compand_srgb(code as f64 / 255.0)));
 
 pub fn srgb_to_xyz(color: &Color) -> CIETristimulus {
     let r = SRGB_TO_LINEAR[color.r as usize];

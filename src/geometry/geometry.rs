@@ -135,6 +135,17 @@ pub trait Geometry:
     fn closed_orbit(&self, position: &Point, step_index: usize, max_steps: usize) -> bool;
     fn get_geodesic_solver(&self, ray: &Ray) -> Box<dyn GeodesicSolver>;
     fn get_radial_coordinate(&self, position: &Point) -> f64;
+    /// Upper bound on the Cartesian distance from the origin of any point
+    /// whose metric radial coordinate (`get_radial_coordinate`) is at most
+    /// `r`.
+    ///
+    /// The two agree in spherical charts, but Kerr's Cartesian embedding
+    /// satisfies `x^2 + y^2 + z^2 = r^2 + a^2 sin^2(theta)`, so a disc
+    /// specified by metric radii reaches farther out in Cartesian terms than
+    /// its outer radius suggests. `Objects` uses this to bound the scene for
+    /// its broad-phase rejection, where a bound that is too small would drop
+    /// real intersections.
+    fn cartesian_bound_for_radial_coordinate(&self, r: f64) -> f64;
     /// Return the invariants along a geodesic, e.g. E and L_z.
     #[allow(dead_code)]
     fn get_constants_of_motion(&self, position: &Point, momentum: &FourVector)

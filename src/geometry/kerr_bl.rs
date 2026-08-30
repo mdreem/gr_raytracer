@@ -114,7 +114,13 @@ fn potential_theta(theta: f64, a: f64, e: f64, l_z: f64, q: f64) -> f64 {
 /// supplied by the caller. The geodesic right-hand side already needs
 /// `sin(theta)` for `dt/dlambda` and `dphi/dlambda`, and recomputing the pair
 /// here doubled the trigonometry of the innermost loop.
-fn potential_theta_derivative_from_sin_cos(sin_t: f64, cos_t: f64, a: f64, e: f64, l_z: f64) -> f64 {
+fn potential_theta_derivative_from_sin_cos(
+    sin_t: f64,
+    cos_t: f64,
+    a: f64,
+    e: f64,
+    l_z: f64,
+) -> f64 {
     let sin3 = sin_t * sin_t * sin_t;
     -2.0 * a * a * e * e * cos_t * sin_t + 2.0 * l_z * l_z * cos_t / sin3
 }
@@ -177,9 +183,7 @@ impl GeodesicSolver for KerrBLSolver {
         let dv_theta =
             potential_theta_derivative_from_sin_cos(sin_t, cos_t, self.a, self.e, self.l_z) / 2.0;
 
-        EquationOfMotionState::from([
-            dt, v_r, v_theta, dphi, dv_r, dv_theta, 0.0, 0.0,
-        ])
+        EquationOfMotionState::from([dt, v_r, v_theta, dphi, dv_r, dv_theta, 0.0, 0.0])
     }
 
     fn create_initial_state(&self, ray: &Ray) -> EquationOfMotionState {
@@ -601,6 +605,12 @@ impl Geometry for KerrBL {
                 )
             }
         }
+    }
+
+    fn cartesian_bound_for_radial_coordinate(&self, r: f64) -> f64 {
+        // Same embedding as the Kerr-Schild chart: the Cartesian radius of a
+        // Boyer-Lindquist point is sqrt(r^2 + a^2 sin^2(theta)).
+        (r * r + self.a * self.a).sqrt()
     }
 
     fn get_constants_of_motion(
@@ -1604,8 +1614,7 @@ mod tests {
         let theta = 1.2;
         let v_r = 0.1;
         let v_theta = -0.05;
-        let y =
-            EquationOfMotionState::from([0.0, r, theta, 0.0, v_r, v_theta, 0.0, 0.0]);
+        let y = EquationOfMotionState::from([0.0, r, theta, 0.0, v_r, v_theta, 0.0, 0.0]);
 
         let rhs = solver.geodesic(0.0, &y);
 

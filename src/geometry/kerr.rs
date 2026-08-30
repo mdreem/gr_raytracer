@@ -428,6 +428,11 @@ impl Geometry for Kerr {
         rho_sqr.sqrt()
     }
 
+    fn cartesian_bound_for_radial_coordinate(&self, r: f64) -> f64 {
+        // Kerr-Schild: x^2 + y^2 + z^2 = r^2 + a^2 sin^2(theta) <= r^2 + a^2.
+        (r * r + self.a * self.a).sqrt()
+    }
+
     fn get_constants_of_motion(
         &self,
         position: &Point,

@@ -41,13 +41,7 @@ fn metric_components_at(r_s: f64, a: f64, r: f64, theta: f64) -> (f64, f64, f64)
     metric_components_from_sin2(r_s, a, r, sin_t * sin_t, cos_t * cos_t)
 }
 
-fn metric_components_from_sin2(
-    r_s: f64,
-    a: f64,
-    r: f64,
-    sin2: f64,
-    cos2: f64,
-) -> (f64, f64, f64) {
+fn metric_components_from_sin2(r_s: f64, a: f64, r: f64, sin2: f64, cos2: f64) -> (f64, f64, f64) {
     let sig = r * r + a * a * cos2;
     let g_tt = -(1.0 - r_s * r / sig);
     let g_tphi = -a * r_s * r * sin2 / sig;

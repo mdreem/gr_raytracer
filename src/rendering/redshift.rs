@@ -266,12 +266,7 @@ mod tests {
         let u_camera = geometry.get_stationary_velocity_at(&camera_position);
         let observer_energy = geometry.inner_product(&camera_position, &u_camera, &p_camera);
 
-        let step = Step::new(
-            emitter_position,
-            p_emitter,
-            1.0,
-            1,
-        );
+        let step = Step::new(emitter_position, p_emitter, 1.0, 1);
         let redshift = computer.compute_redshift(&step, observer_energy);
         assert_abs_diff_eq!(redshift, (a_emitter / a_camera).sqrt(), epsilon = 1e-12);
     }

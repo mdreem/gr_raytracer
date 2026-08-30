@@ -103,6 +103,12 @@ impl Hittable for Disc {
         }
     }
 
+    fn bounding_radius(&self, geometry: &dyn Geometry) -> f64 {
+        // The annulus is specified with metric radii (see `intersects`), so
+        // the Cartesian bound is the geometry's, not the outer radius itself.
+        geometry.cartesian_bound_for_radial_coordinate(self.center_disk_outer_radius)
+    }
+
     fn color_at_uv(
         &self,
         color_computation_data: &ColorComputationData,
@@ -182,15 +188,24 @@ mod tests {
         // Cartesian R = 0.8 -> BL r = sqrt(0.64 - 0.499^2) ~ 0.625 < 0.795:
         // no gas there.
         let (start, end) = crossing_at(0.8);
-        assert!(disc.intersects(&Segment::from_points(&start, &end), &geometry).is_none());
+        assert!(
+            disc.intersects(&Segment::from_points(&start, &end), &geometry)
+                .is_none()
+        );
 
         // Cartesian R = 0.95 -> BL r ~ 0.808 > 0.795: inside the disc.
         let (start, end) = crossing_at(0.95);
-        assert!(disc.intersects(&Segment::from_points(&start, &end), &geometry).is_some());
+        assert!(
+            disc.intersects(&Segment::from_points(&start, &end), &geometry)
+                .is_some()
+        );
 
         // Outer edge: Cartesian R = 8.01 -> BL r ~ 7.994 < 8.0: still gas.
         let (start, end) = crossing_at(8.01);
-        assert!(disc.intersects(&Segment::from_points(&start, &end), &geometry).is_some());
+        assert!(
+            disc.intersects(&Segment::from_points(&start, &end), &geometry)
+                .is_some()
+        );
     }
 
     #[test]
@@ -199,11 +214,20 @@ mod tests {
         let disc = create_disc(3.05, 8.0);
 
         let (start, end) = crossing_at(3.0);
-        assert!(disc.intersects(&Segment::from_points(&start, &end), &geometry).is_none());
+        assert!(
+            disc.intersects(&Segment::from_points(&start, &end), &geometry)
+                .is_none()
+        );
         let (start, end) = crossing_at(3.1);
-        assert!(disc.intersects(&Segment::from_points(&start, &end), &geometry).is_some());
+        assert!(
+            disc.intersects(&Segment::from_points(&start, &end), &geometry)
+                .is_some()
+        );
         let (start, end) = crossing_at(8.1);
-        assert!(disc.intersects(&Segment::from_points(&start, &end), &geometry).is_none());
+        assert!(
+            disc.intersects(&Segment::from_points(&start, &end), &geometry)
+                .is_none()
+        );
     }
 
     #[test]
