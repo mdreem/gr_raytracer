@@ -1,5 +1,5 @@
 use crate::geometry::geometry::Geometry;
-use crate::geometry::point::Point;
+use crate::geometry::point::{CoordinateSystem, Point};
 use crate::rendering::color::CIETristimulus;
 use crate::rendering::integrator::Step;
 use crate::rendering::raytracer::RaytracerError;
@@ -40,13 +40,15 @@ impl Disc {
         direction: Vector3<f64>,
         t: f64,
     ) -> Option<Intersection> {
+        // In-plane coordinates are interpolated at t; z is pinned to the disc
+        // plane (z = 0). For the linear branch the chord already crosses at
+        // z = 0, but the cubic branch solves z(s) = 0 on the reconstructed
+        // curve while x and y are still taken from the straight chord, so the
+        // chord's z at that t is nonzero and must not leak into the radius,
+        // UV, emitter velocity or distance.
         let intersection_point = y_start_spatial + t * direction;
-        let intersection_point_p = Point::new_cartesian(
-            0.0,
-            intersection_point[0],
-            intersection_point[1],
-            intersection_point[2],
-        );
+        let intersection_point_p =
+            Point::new_cartesian(0.0, intersection_point[0], intersection_point[1], 0.0);
         // The disc's inner/outer radius are metric radial coordinates (the
         // convention the ISCO, orbit velocities, and temperature profile use).
         // In Kerr charts the equatorial Cartesian radius obeys
@@ -123,11 +125,25 @@ impl Hittable for Disc {
         // render produced zero hits here (see docs/known-rendering-behaviors.md).
         // The reconstruction is kept because it is correct and cheap and would
         // catch a genuine in-step double crossing if a camera ever produced one.
+        // The Hermite slopes are dz/ds with s running over the step's own
+        // integration parameter (Step::t). get_z_cartesian returns dz/d(affine
+        // lambda); on charts whose Step::t is not the affine parameter this
+        // needs rescaling by d(affine)/d(Step::t). KerrBL integrates in Mino
+        // time, where d(affine) = Sigma d(Mino), so its slopes carry a factor
+        // of Sigma = r^2 + a^2 cos^2(theta); the affine-parametrised charts
+        // (Kerr/KS, Schwarzschild) use 1.
+        let param_scale = |p: &Point| match p.coordinate_system {
+            CoordinateSystem::BoyerLindquist { a } => {
+                let (r, theta) = (p[1], p[2]);
+                r * r + a * a * theta.cos().powi(2)
+            }
+            _ => 1.0,
+        };
         let d_lambda = y_end.t - y_start.t;
         let p0 = y_start_spatial[2];
         let p1 = y_end_spatial[2];
-        let m0 = y_start.p.get_z_cartesian(&y_start.x) * d_lambda;
-        let m1 = y_end.p.get_z_cartesian(&y_end.x) * d_lambda;
+        let m0 = y_start.p.get_z_cartesian(&y_start.x) * param_scale(&y_start.x) * d_lambda;
+        let m1 = y_end.p.get_z_cartesian(&y_end.x) * param_scale(&y_end.x) * d_lambda;
 
         // p(t) = (2 t^3 - 3 t^2 + 1) p0 + (t^3 - 2 t^2 + t) m0 + (-2 t^3 + 3 t^2) p1 + (t^3 - t^2) m1
         //      = p0 + m0 t + (-2 m0 - m1 - 3 p0 + 3 p1) t^2 + (m0 + m1 + 2 p0 - 2 p1) t^3
@@ -360,7 +376,12 @@ mod tests {
         let geometry = EuclideanSpace::new();
         let disc = create_disc(3.0, 8.0);
         let (start, end) = dip_steps(5.0, 0.1, 0.1, -1.0, 1.0);
-        assert!(disc.intersects(&start, &end, &geometry).is_some());
+        let hit = disc
+            .intersects(&start, &end, &geometry)
+            .expect("cubic must catch the same-side dip");
+        // The hit must sit on the disc plane, not at the chord's z (0.1);
+        // otherwise the radius/UV/emitter are evaluated off the disc.
+        assert!(hit.intersection_point.get_spatial_vector_cartesian()[2].abs() < 1e-9);
     }
 
     #[test]
