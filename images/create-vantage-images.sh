@@ -14,13 +14,13 @@ BIN="target/release/gr_raytracer"
 [ -x "$BIN" ] || cargo build --release
 SV=scene-definitions/vantages/schwarzschild-vantage.toml
 KV=scene-definitions/vantages/kerr-zamo-vantage.toml
-render() { # out scene pos theta exposure
+render() { # out scene pos theta exposure [epsilon]
   echo "Rendering $1 ..."
   # Tight integrator tolerance: disc hits are tested on straight chords
   # between adaptive steps, and the grazing plane-dips these close-in
   # cameras produce get skipped at the default epsilon, leaving ragged
   # false-sky bites along the wound disc edges.
-  "$BIN" --width=800 --height=800 --max-steps=1000000 --epsilon=1e-9 \
+  "$BIN" --width=800 --height=800 --max-steps=1000000 --epsilon="${6:-1e-9}" \
     --camera-position="$3" --theta="$4" --psi=0 --phi=0 --exposure="$5" \
     --config-file "$2" render --filename="images/$1"
 }
@@ -35,7 +35,10 @@ render vantage_rearview.png            "$SV" "-2.0,0,0.4" -0.5     4
 # disc surface and which side they see depends on floating-point noise
 # in the chart conversion; the 0.02 lift keeps them just above it.
 render vantage_kerr_dragged_porthole.png "$KV" "-0.75,0,0"   0       4
-render vantage_kerr_photonsphere_edge.png "$KV" "-0.95,0,0.02" -1.75 4
+# The photonsphere camera needs 1e-11: hovering 0.02 above the surface
+# makes the grazing dips brief enough that even 1e-9 leaves sawtooth
+# bites along the inner disc edge.
+render vantage_kerr_photonsphere_edge.png "$KV" "-0.95,0,0.02" -1.75 4 1e-11
 render vantage_kerr_grazing_winding.png "$KV" "-1.12,0,0.02" -2.25   4
 render vantage_kerr_rearview.png       "$KV" "-2.55,0,0.4" -0.5     4
 # Kerr-only vantages
