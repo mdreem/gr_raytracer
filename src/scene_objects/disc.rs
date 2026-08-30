@@ -8,6 +8,7 @@ use crate::rendering::texture::{TextureMapHandle, UVCoordinates};
 use crate::scene_objects::hittable::{ColorComputationData, Hittable, Intersection};
 use crate::scene_objects::objects::SceneObject;
 use nalgebra::Vector3;
+use roots::{SimpleConvergency, find_root_brent};
 
 pub struct Disc {
     center_disk_inner_radius: f64,
@@ -30,36 +31,15 @@ impl Disc {
             temperature_computer,
         }
     }
-}
 
-impl Hittable for Disc {
-    // TODO: explicitly construct the ray. Follow the integration. Some intervals seem to be skipped
-    // here. See with current test setup. Intersection should be at t=7.63. With z=-2.442748091.
-    // The intersection should be with an interval crossing y=0. But it seems to happen near 0 with
-    // both coordinates.
-    fn intersects(
+    fn create_intersection(
         &self,
-        y_start: &Step,
-        y_end: &Step,
         geometry: &dyn Geometry,
+        center: Vector3<f64>,
+        y_start_spatial: Vector3<f64>,
+        direction: Vector3<f64>,
+        t: f64,
     ) -> Option<Intersection> {
-        // z x y
-        let normal = Vector3::new(0.0, 0.0, 1.0);
-        let center = Vector3::new(0.0, 0.0, 0.0);
-        let y_start_spatial = y_start.x.get_spatial_vector_cartesian();
-        let y_end_spatial = y_end.x.get_spatial_vector_cartesian();
-        let direction = y_end_spatial - y_start_spatial;
-
-        let p1 = (center - y_start_spatial).dot(&normal);
-        let p2 = direction.dot(&normal);
-
-        // TODO: p2 can be 0 if parallel -> handle
-        let t = p1 / p2; // plane intersection parameter.
-
-        if !(0.0..=1.0).contains(&t) {
-            return None;
-        }
-
         let intersection_point = y_start_spatial + t * direction;
         let intersection_point_p = Point::new_cartesian(
             0.0,
@@ -84,14 +64,117 @@ impl Hittable for Disc {
             let u = 0.5 + 0.5 * r_normalized * phi.cos();
             let v = 0.5 + 0.5 * r_normalized * phi.sin();
 
-            Some(Intersection {
+            return Some(Intersection {
                 uv: UVCoordinates { u, v },
                 intersection_point: intersection_point_p,
                 t,
-            })
+            });
         } else {
-            None
+            return None;
         }
+    }
+}
+
+impl Hittable for Disc {
+    // TODO: explicitly construct the ray. Follow the integration. Some intervals seem to be skipped
+    // here. See with current test setup. Intersection should be at t=7.63. With z=-2.442748091.
+    // The intersection should be with an interval crossing y=0. But it seems to happen near 0 with
+    // both coordinates.
+    fn intersects(
+        &self,
+        y_start: &Step,
+        y_end: &Step,
+        geometry: &dyn Geometry,
+    ) -> Option<Intersection> {
+        // z x y
+        let normal = Vector3::new(0.0, 0.0, 1.0);
+        let center = Vector3::new(0.0, 0.0, 0.0);
+        let y_start_spatial = y_start.x.get_spatial_vector_cartesian();
+        let y_end_spatial = y_end.x.get_spatial_vector_cartesian();
+        let direction = y_end_spatial - y_start_spatial;
+
+        // Note: most of the following assumes that normal will be in the z direction.
+
+        // Start and end point along the normal direction.
+        let point_start = (center - y_start_spatial).dot(&normal);
+        let point_end = direction.dot(&normal);
+
+        // The segment crosses the plane.
+        let z0 = y_start_spatial[2];
+        let z1 = y_end_spatial[2];
+        if z0.signum() != z1.signum() {
+            // TODO: p2 can be 0 if parallel -> handle
+            let t = point_start / point_end; // plane intersection parameter.
+
+            if !(0.0..=1.0).contains(&t) {
+                return None;
+            }
+
+            return self.create_intersection(geometry, center, y_start_spatial, direction, t);
+        }
+
+        // If the segment does not cross the plane, check if the cubic Hermite interpolation of
+        // the z-coordinate intersects the plane.
+        let d_lambda = y_end.t - y_start.t;
+        let p0 = y_start_spatial[2];
+        let p1 = y_end_spatial[2];
+        let m0 = y_start.p.get_z_cartesian(&y_start.x) * d_lambda;
+        let m1 = y_end.p.get_z_cartesian(&y_end.x) * d_lambda;
+
+        // p(t) = (2 t^3 - 3 t^2 + 1) p0 + (t^3 - 2 t^2 + t) m0 + (-2 t^3 + 3 t^2) p1 + (t^3 - t^2) m1
+        //      = p0 + m0 t + (-2 m0 - m1 - 3 p0 + 3 p1) t^2 + (m0 + m1 + 2 p0 - 2 p1) t^3
+        // p'(t) = (6 t^2 - 6 t) p0 + (3 t^2 - 4 t + 1) m0 + (-6 t^2 + 6 t) p1 + (3 t^2 - 2 t) m1
+        //       = m0 + (-4 m0 - 2 m1 - 6 p0 + 6 p1) t + (3 m0 + 3 m1 + 6 p0 - 6 p1) t^2
+
+        let c0 = p0;
+        let c1 = m0;
+        let c2 = -3.0 * p0 - 2.0 * m0 + 3.0 * p1 - m1;
+        let c3 = 2.0 * p0 + m0 - 2.0 * p1 + m1;
+
+        let a = 3.0 * c3;
+        let b = 2.0 * c2;
+        let c = c1;
+        let discriminant = b * b - 4.0 * a * c;
+
+        // If the discriminant is negative, there are no real roots, and thus no intersection with the plane.
+        // We already checked that the segment does not cross the plane.
+        if discriminant < 0.0 {
+            return None;
+        }
+        let int_p1 = (-b - discriminant.sqrt()) / (2.0 * a);
+        let int_p2 = (-b + discriminant.sqrt()) / (2.0 * a);
+
+        let mut points = vec![0.0, 1.0];
+        for tp in [int_p1, int_p2] {
+            if tp.is_finite() && tp > 0.0 && tp < 1.0 {
+                points.push(tp);
+            }
+        }
+        points.sort_by(f64::total_cmp);
+
+        for points in points.windows(2) {
+            let p1 = points[0];
+            let p2 = points[1];
+
+            let f = |s: f64| c0 + c1 * s + c2 * s * s + c3 * s * s * s;
+            let mut conv = SimpleConvergency {
+                eps: 1e-12,
+                max_iter: 100,
+            };
+            let root = find_root_brent(p1, p2, &f, &mut conv);
+            let t = match root {
+                Ok(t) => t,
+                Err(_) => continue,
+            };
+
+            let intersection =
+                self.create_intersection(geometry, center, y_start_spatial, direction, t);
+
+            if intersection.is_some() {
+                return intersection;
+            }
+        }
+        None
     }
 
     fn color_at_uv(
