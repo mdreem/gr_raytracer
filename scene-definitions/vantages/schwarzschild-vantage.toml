@@ -1,0 +1,22 @@
+# Close-vantage exploration scene (Schwarzschild): labeled checker sky for
+# readable distortions, golden flat disc. Cameras supplied per shot; see
+# images/create-vantage-images.sh once recipes are frozen.
+celestial_temperature = 0.0
+
+[celestial_texture.Bitmap]
+beaming_exponent = 0.0
+path = "resources/celestial.png"
+
+[geometry_type.Schwarzschild]
+radius = 1.0
+horizon_epsilon = 1e-4
+
+[[objects]]
+
+[objects.Disc]
+inner_radius = 3.06
+outer_radius = 15.0
+temperature = 3500.0
+
+[objects.Disc.texture.BlackBody]
+beaming_exponent = 0.0

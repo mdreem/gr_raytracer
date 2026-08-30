@@ -1,0 +1,24 @@
+# Close-vantage exploration scene (Kerr a=0.499, ZAMO camera): valid inside
+# the ergosphere down to the horizon. ISCO-hugging disc (inner 0.8 leaves a
+# gap for between-disc-and-hole camera placements).
+celestial_temperature = 0.0
+camera_velocity = "Zamo"
+
+[celestial_texture.Bitmap]
+beaming_exponent = 0.0
+path = "resources/celestial.png"
+
+[geometry_type.KerrBL]
+radius = 1.0
+a = 0.499
+horizon_epsilon = 1e-4
+
+[[objects]]
+
+[objects.Disc]
+inner_radius = 0.8
+outer_radius = 15.0
+temperature = 3500.0
+
+[objects.Disc.texture.BlackBody]
+beaming_exponent = 0.0

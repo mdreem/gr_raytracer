@@ -9,6 +9,10 @@
 #
 # Usage:  images/create-main-image.sh [output.png]
 #   WIDTH/HEIGHT env vars override the resolution (default 1280x720).
+#   TEMPERATURE/EXPOSURE env vars override the peak disc temperature and
+#   exposure (defaults 10000.0 / 2.0); the temperature series in
+#   images/kerr.md is this same recipe at TEMPERATURE=8000 EXPOSURE=5,
+#   TEMPERATURE=12000 EXPOSURE=1, and TEMPERATURE=20000 EXPOSURE=0.13.
 #   Rendering takes roughly half an hour at the default resolution.
 set -euo pipefail
 
@@ -19,6 +23,8 @@ BACKGROUND="resources/tmp/Messier_object_025.jpg"
 OUTPUT="${1:-kerr_black_hole_with_stars.png}"
 WIDTH="${WIDTH:-1280}"
 HEIGHT="${HEIGHT:-720}"
+TEMPERATURE="${TEMPERATURE:-10000.0}"
+EXPOSURE="${EXPOSURE:-2.0}"
 
 if [ ! -f "$BACKGROUND" ]; then
     echo "Downloading M25 star-field background from Wikimedia Commons..."
@@ -41,7 +47,7 @@ trap 'rm -f "$SCENE"' EXIT
 # flag compensates the (T/T_ref)^4 brightness drop. The bright side of the
 # disc is the approaching (left) side; renders made before the redshift-sign
 # fix show it mirrored. See images/kerr.md for the temperature series.
-cat > "$SCENE" <<'EOF'
+cat > "$SCENE" <<EOF
 celestial_temperature = 0.0
 
 [celestial_texture.Bitmap]
@@ -58,7 +64,7 @@ horizon_epsilon = 1e-4
 [objects.VolumetricDisc]
 inner_radius = 0.8
 outer_radius = 16.0
-temperature = 10000.0
+temperature = $TEMPERATURE
 num_octaves = 8
 max_steps = 50000
 step_size = 0.0002
@@ -78,7 +84,7 @@ cargo build --release
 
 ./target/release/gr_raytracer \
     --width="$WIDTH" --height="$HEIGHT" \
-    --exposure=2.0 \
+    --exposure="$EXPOSURE" \
     --camera-position=-17,0,1.5 --theta=-3.14159 --psi=0.0 --phi=0 \
     --config-file "$SCENE" \
     render --filename="$OUTPUT"
