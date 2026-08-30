@@ -155,7 +155,6 @@ mod tests {
         ))
     }
     #[test]
-    #[ignore] // TODO: if step goes through sphere fully, not intersection seen. Need to fix.
     fn test_add_and_intersect_two_sphere() {
         let geometry = EuclideanSpace::new();
         let mut objects = Objects::new(&geometry);

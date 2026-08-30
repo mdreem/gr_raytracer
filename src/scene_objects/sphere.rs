@@ -44,12 +44,15 @@ fn solve_for_t(y_start_spatial: Vector3<f64>, direction: Vector3<f64>, r: f64) -
         None
     } else {
         let sqrt_disc = discriminant.sqrt();
-        let t1 = (-b + sqrt_disc) / (2.0 * a);
-        let t2 = (-b - sqrt_disc) / (2.0 * a);
-        if (0.0..=1.0).contains(&t1) {
-            Some(t1)
-        } else if (0.0..=1.0).contains(&t2) {
-            Some(t2)
+        // t_near <= t_far since a = |direction|^2 > 0. Return the nearest
+        // surface crossing inside the segment: t_near for an entering or
+        // tunnelling ray, t_far when the segment starts inside the sphere.
+        let t_near = (-b - sqrt_disc) / (2.0 * a);
+        let t_far = (-b + sqrt_disc) / (2.0 * a);
+        if (0.0..=1.0).contains(&t_near) {
+            Some(t_near)
+        } else if (0.0..=1.0).contains(&t_far) {
+            Some(t_far)
         } else {
             None
         }
@@ -72,62 +75,53 @@ impl Hittable for Sphere {
         let neg_position = -self.position;
         let y_start_shifted = y_start_cartesian + neg_position;
         let y_end_shifted = y_end_cartesian + neg_position;
-        let r_start = y_start_shifted.radial_distance_spatial_part_squared();
-        let r_end = y_end_shifted.radial_distance_spatial_part_squared();
 
-        // Checks if the line element intersects the surface of the sphere.
-        if (r_start >= self.radius.powi(2) && r_end <= self.radius.powi(2))
-            || (r_start <= self.radius.powi(2) && r_end >= self.radius.powi(2))
-        {
-            let y_start_spatial = y_start_shifted.get_spatial_vector_cartesian();
-            let y_end_spatial = y_end_shifted.get_spatial_vector_cartesian();
-            let direction = y_end_spatial - y_start_spatial;
+        let y_start_spatial = y_start_shifted.get_spatial_vector_cartesian();
+        let y_end_spatial = y_end_shifted.get_spatial_vector_cartesian();
+        let direction = y_end_spatial - y_start_spatial;
 
-            let t = match solve_for_t(y_start_spatial, direction, self.radius) {
-                None => {
-                    return None;
-                }
-                Some(t) => t,
-            };
+        // Solve the ray-sphere quadratic over the whole segment rather than
+        // gating on the endpoints' radii: a step that passes fully through the
+        // sphere leaves both endpoints outside, so an endpoint-inside/outside
+        // test would tunnel straight through it. The quadratic classifies every
+        // case (no hit -> negative discriminant or roots outside [0,1]).
+        let t = solve_for_t(y_start_spatial, direction, self.radius)?;
 
-            // UV mapping needs the hit point in the sphere's own local frame
-            // (so e.g. the texture's north pole is always the sphere's own
-            // north pole, regardless of where the sphere sits in the scene).
-            let point_on_sphere_spatial = y_start_spatial + t * direction;
-            let point_on_sphere_local = cartesian_to_spherical(&Point::new(
-                0.0,
-                point_on_sphere_spatial[0],
-                point_on_sphere_spatial[1],
-                point_on_sphere_spatial[2],
-                CoordinateSystem::Cartesian,
-            ));
+        // UV mapping needs the hit point in the sphere's own local frame
+        // (so e.g. the texture's north pole is always the sphere's own
+        // north pole, regardless of where the sphere sits in the scene).
+        let point_on_sphere_spatial = y_start_spatial + t * direction;
+        let point_on_sphere_local = cartesian_to_spherical(&Point::new(
+            0.0,
+            point_on_sphere_spatial[0],
+            point_on_sphere_spatial[1],
+            point_on_sphere_spatial[2],
+            CoordinateSystem::Cartesian,
+        ));
 
-            let theta = point_on_sphere_local[2];
-            let phi = point_on_sphere_local[3];
-            let u = (PI + phi) / (2.0 * PI);
-            let v = theta / PI;
+        let theta = point_on_sphere_local[2];
+        let phi = point_on_sphere_local[3];
+        let u = (PI + phi) / (2.0 * PI);
+        let v = theta / PI;
 
-            // `Intersection::intersection_point` itself must be world-space:
-            // it's used (via `energy_of_emitter`) to evaluate the geometry's
-            // fields (e.g. the stationary observer's velocity) at the
-            // emitter's actual location relative to the black hole, not
-            // relative to the sphere's own center.
-            let position_spatial = self.position.get_spatial_vector_cartesian();
-            let point_on_sphere_world = Point::new_cartesian(
-                0.0,
-                point_on_sphere_spatial[0] + position_spatial[0],
-                point_on_sphere_spatial[1] + position_spatial[1],
-                point_on_sphere_spatial[2] + position_spatial[2],
-            );
+        // `Intersection::intersection_point` itself must be world-space:
+        // it's used (via `energy_of_emitter`) to evaluate the geometry's
+        // fields (e.g. the stationary observer's velocity) at the
+        // emitter's actual location relative to the black hole, not
+        // relative to the sphere's own center.
+        let position_spatial = self.position.get_spatial_vector_cartesian();
+        let point_on_sphere_world = Point::new_cartesian(
+            0.0,
+            point_on_sphere_spatial[0] + position_spatial[0],
+            point_on_sphere_spatial[1] + position_spatial[1],
+            point_on_sphere_spatial[2] + position_spatial[2],
+        );
 
-            return Some(Intersection {
-                uv: UVCoordinates { u: 1.0 - u, v },
-                intersection_point: point_on_sphere_world,
-                t,
-            });
-        }
-
-        None
+        Some(Intersection {
+            uv: UVCoordinates { u: 1.0 - u, v },
+            intersection_point: point_on_sphere_world,
+            t,
+        })
     }
 
     fn color_at_uv(
