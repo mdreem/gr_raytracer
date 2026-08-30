@@ -2,10 +2,15 @@
 
 [← Back to the gallery index](images.md)
 
-All still images on this page are reproducible: `images/create-gallery-images.sh`
-(checkerboard and volumetric renders, grid animation),
-`images/create-showcase-images.sh` (showcase section), and
+Recipes: `images/create-gallery-images.sh` (checkerboard, blackbody, and
+volumetric renders, grid animation), `images/create-vantage-images.sh`
+(close vantages), `images/create-main-image.sh` with its
+`TEMPERATURE`/`EXPOSURE` overrides (temperature series), and
 `scripts/rendering/create_kerr_images.sh` (spin-sweep animations).
+Not scripted: the photon-ring pair (6x zoom section renders of the
+main-image scene, with the disc removed for the control) and the
+trajectory visualization (ray-export plus `scripts/plotting`; see
+`scripts/Readme.md`).
 
 ### Checkerboard Accretion Disk
 <div align="center">
