@@ -39,15 +39,15 @@ impl Hittable for Disc {
     // both coordinates.
     fn intersects(
         &self,
-        y_start: &Point,
-        y_end: &Point,
+        y_start: &Step,
+        y_end: &Step,
         geometry: &dyn Geometry,
     ) -> Option<Intersection> {
         // z x y
         let normal = Vector3::new(0.0, 0.0, 1.0);
         let center = Vector3::new(0.0, 0.0, 0.0);
-        let y_start_spatial = y_start.get_spatial_vector_cartesian();
-        let y_end_spatial = y_end.get_spatial_vector_cartesian();
+        let y_start_spatial = y_start.x.get_spatial_vector_cartesian();
+        let y_end_spatial = y_end.x.get_spatial_vector_cartesian();
         let direction = y_end_spatial - y_start_spatial;
 
         let p1 = (center - y_start_spatial).dot(&normal);
@@ -133,6 +133,7 @@ impl SceneObject for Disc {}
 mod tests {
     use super::*;
     use crate::geometry::euclidean::EuclideanSpace;
+    use crate::geometry::four_vector::FourVector;
     use crate::geometry::kerr::Kerr;
     use crate::rendering::color::Color;
     use crate::rendering::temperature::ConstantTemperatureComputer;
@@ -154,10 +155,25 @@ mod tests {
         )
     }
 
-    fn crossing_at(x: f64) -> (Point, Point) {
+    fn crossing_at(x: f64) -> (Step, Step) {
+        let start = Point::new_cartesian(0.0, x, 0.0, 0.1);
+        let end = Point::new_cartesian(0.0, x, 0.0, -0.1);
+        // Straight-line tangent, so the Cubic Hermite reduces to the linear crossing this fixture describes.
+        let dir = end.get_spatial_vector_cartesian() - start.get_spatial_vector_cartesian();
+        let p = FourVector::new_cartesian(1.0, dir[0], dir[1], dir[2]);
         (
-            Point::new_cartesian(0.0, x, 0.0, 0.1),
-            Point::new_cartesian(0.0, x, 0.0, -0.1),
+            Step {
+                x: start,
+                p,
+                t: 0.0,
+                step: 0,
+            },
+            Step {
+                x: end,
+                p,
+                t: 1.0,
+                step: 1,
+            },
         )
     }
 
