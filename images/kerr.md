@@ -101,6 +101,54 @@ the (T/T_ref)^4 brightness difference so the frames stay comparable.
   <p>Animation of a Kerr black hole with background stars and a rotating accretion disk (background image: <a href="https://commons.wikimedia.org/wiki/File:Messier_object_025.jpg">M25</a>)</p>
 </div>
 
+### Close vantages
+
+First-person views near the near-extremal hole (a = 0.499, ZAMO
+observer; recipes: `images/create-vantage-images.sh`). The first four
+placements mirror the [Schwarzschild series](schwarzschild.md#close-vantages);
+frame dragging pulls every one of them into asymmetry. The disc glow is
+3500 K gas, blueshifted by the deep gravity well.
+
+<div align="center">
+  <img src="vantage_kerr_dragged_porthole.png" alt="The sky porthole near the Kerr horizon, dragged into asymmetry">
+  <p>Dragged porthole (just outside the horizon, looking straight out): the Schwarzschild porthole again, but frame dragging squeezes the sky circle off-axis and the plunging inner disc glow floods in from the sides.</p>
+</div>
+
+<div align="center">
+  <img src="vantage_kerr_photonsphere_edge.png" alt="The Kerr winding wall over bright inner-disc glow">
+  <p>Photon-shell edge: the winding wall of stacked disc and sky images, over the blinding glow of gas orbiting deep inside the well.</p>
+</div>
+
+<div align="center">
+  <img src="vantage_kerr_grazing_winding.png" alt="Grazing multiple windings around the Kerr hole">
+  <p>Grazing view: the multiple-winding band, distorted relative to Schwarzschild because prograde and retrograde light circle at different radii around a spinning hole.</p>
+</div>
+
+<div align="center">
+  <img src="vantage_kerr_rearview.png" alt="Looking away from the Kerr hole at sky and disc">
+  <p>Rearview: the magnified outward sky and the disc band, the near-side gas brightened by Doppler beaming.</p>
+</div>
+
+<div align="center">
+  <img src="vantage_kerr_ergosphere_prograde.png" alt="Looking prograde from inside the ergosphere">
+  <p>Inside the ergosphere, looking prograde (the direction spacetime itself rotates): the winding wall seen from a region where standing still relative to the stars is impossible.</p>
+</div>
+
+<div align="center">
+  <img src="vantage_kerr_polar.png" alt="The accretion disc seen face-on from above the pole">
+  <p>From the rotation axis, looking down at the disc face-on: the dark lane is the disc gap between the inner edge and the hole, wrapped around the shadow.</p>
+</div>
+
+<div align="center">
+  <img src="vantage_kerr_gap_rim.png" alt="View from inside the gap between disc and horizon, toward the rim">
+  <p>From inside the gap between the disc's inner edge and the horizon, looking back along the orbit: the wound images pile up against the rim of the shadow.</p>
+</div>
+
+<div align="center">
+  <img src="vantage_kerr_gap_outward.png" alt="Looking outward from inside the disc gap">
+  <p>The same spot, looking straight out: the sky and outer disc compressed into an oval by the gravity of the hole behind the camera.</p>
+</div>
+
 ### Trajectories
 <div align="center">
   <img src="kerr_trajectory_near_horizon.png" alt="Visualization of a ray trajectory approaching the event horizon of a Kerr black hole">
