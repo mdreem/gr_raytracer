@@ -63,9 +63,7 @@ impl GeodesicSolver for EuclideanSpaceSphericalSolver {
 
         // y'
 
-        EquationOfMotionState::from([
-            v_t, v_r, v_theta, v_phi, a_t, a_r, a_theta, a_phi,
-        ])
+        EquationOfMotionState::from([v_t, v_r, v_theta, v_phi, a_t, a_r, a_theta, a_phi])
     }
 }
 
@@ -142,6 +140,11 @@ impl Geometry for EuclideanSpaceSpherical {
                 )
             }
         }
+    }
+
+    fn cartesian_bound_for_radial_coordinate(&self, r: f64) -> f64 {
+        // Flat spherical chart: r is the Cartesian radius.
+        r
     }
 
     fn get_constants_of_motion(

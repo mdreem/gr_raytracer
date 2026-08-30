@@ -60,6 +60,15 @@ pub struct ColorComputationData<'a> {
 
 pub trait Hittable: Sync {
     fn intersects(&self, segment: &Segment, geometry: &dyn Geometry) -> Option<Intersection>;
+    /// Radius of an origin-centred Cartesian sphere containing every point
+    /// this object can report as an intersection.
+    ///
+    /// Purely a broad-phase hint: `Objects` skips the narrow-phase tests for
+    /// step windows whose chord stays outside the scene's bound, which is
+    /// almost every step of a ray that escapes to the celestial sphere. It
+    /// must be an over-estimate, never an under-estimate - returning
+    /// `f64::INFINITY` disables the rejection for this object.
+    fn bounding_radius(&self, geometry: &dyn Geometry) -> f64;
     fn color_at_uv(
         &self,
         color_computation_data: &ColorComputationData,

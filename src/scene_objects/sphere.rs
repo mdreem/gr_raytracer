@@ -119,6 +119,11 @@ impl Hittable for Sphere {
         None
     }
 
+    fn bounding_radius(&self, _geometry: &dyn Geometry) -> f64 {
+        // The sphere is specified directly in Cartesian coordinates.
+        self.position.get_spatial_vector_cartesian().norm() + self.radius
+    }
+
     fn color_at_uv(
         &self,
         color_computation_data: &ColorComputationData,
@@ -186,7 +191,10 @@ mod tests {
 
         assert!(
             sphere
-                .intersects(&Segment::from_points(&y_start, &y_end), &EuclideanSpace::new())
+                .intersects(
+                    &Segment::from_points(&y_start, &y_end),
+                    &EuclideanSpace::new()
+                )
                 .is_some()
         );
     }
@@ -199,7 +207,10 @@ mod tests {
 
         assert!(
             sphere
-                .intersects(&Segment::from_points(&y_start, &y_end), &EuclideanSpace::new())
+                .intersects(
+                    &Segment::from_points(&y_start, &y_end),
+                    &EuclideanSpace::new()
+                )
                 .is_none()
         );
     }
@@ -212,7 +223,10 @@ mod tests {
 
         assert!(
             sphere
-                .intersects(&Segment::from_points(&y_start, &y_end), &EuclideanSpace::new())
+                .intersects(
+                    &Segment::from_points(&y_start, &y_end),
+                    &EuclideanSpace::new()
+                )
                 .is_some()
         );
     }
@@ -225,7 +239,10 @@ mod tests {
 
         assert!(
             sphere
-                .intersects(&Segment::from_points(&y_start, &y_end), &EuclideanSpace::new())
+                .intersects(
+                    &Segment::from_points(&y_start, &y_end),
+                    &EuclideanSpace::new()
+                )
                 .is_none()
         );
     }
@@ -242,7 +259,10 @@ mod tests {
         let y_end = Point::new_cartesian(0.0, 0.0, 0.0, 19.5);
 
         let intersection = sphere
-            .intersects(&Segment::from_points(&y_start, &y_end), &EuclideanSpace::new())
+            .intersects(
+                &Segment::from_points(&y_start, &y_end),
+                &EuclideanSpace::new(),
+            )
             .expect("ray should hit sphere");
         let hit = intersection
             .intersection_point

@@ -716,6 +716,16 @@ impl Hittable for VolumetricDisc {
         self.intersects_internal(segment)
     }
 
+    fn bounding_radius(&self, _geometry: &dyn Geometry) -> f64 {
+        // The volume boundary is a Cartesian cylinder (see
+        // `intersects_internal`), so its corner is the farthest reachable
+        // point.
+        let capture_height = self.thickness * CAPTURE_HEIGHT_FACTOR;
+        (self.center_disk_outer_radius * self.center_disk_outer_radius
+            + capture_height * capture_height)
+            .sqrt()
+    }
+
     fn color_at_uv(
         &self,
         color_computation_data: &ColorComputationData,

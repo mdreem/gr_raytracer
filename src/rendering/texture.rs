@@ -63,7 +63,9 @@ impl TextureMapper {
             .decode()
             .map_err(DecodeError)
             .map_err(RaytracerError::TextureError)?
-            .to_rgba8();
+            // `into_rgba8`, not `to_rgba8`: an already-RGBA8 decode is moved
+            // rather than copied.
+            .into_rgba8();
 
         Ok(TextureMapper {
             beaming_exponent,

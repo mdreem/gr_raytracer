@@ -155,15 +155,23 @@ where
     for _i in 0..MAX_RETRY_STEP {
         let (y_new, truncation_error) = rkf45_step(y, t, h_cur, f);
 
-        // Compute the proposed next step. Guard against truncation_error == 0
-        // (which would otherwise make h_new = +inf) and clamp the proposal so
+        // The controller's proposal. Guards against truncation_error == 0
+        // (which would otherwise make h_new = +inf) and clamps the proposal so
         // the controller cannot grow the step without bound on easy regions.
-        let h_proposed = if truncation_error > 0.0 {
-            BETA * h_cur * (epsilon / truncation_error).powf(1.0 / CONVERGENCY_ORDER)
-        } else {
-            h_cur * H_GROWTH_CAP
+        //
+        // Deliberately a closure rather than a `let`: the `powf` inside is one
+        // of the more expensive operations in the whole integrator, and the
+        // "error is negligible, just grow the step" branch below - the common
+        // case in the weakly curved regions where most of a ray's steps are
+        // taken - does not need the proposal at all.
+        let propose_next_step = || {
+            let proposed = if truncation_error > 0.0 {
+                BETA * h_cur * (epsilon / truncation_error).powf(1.0 / CONVERGENCY_ORDER)
+            } else {
+                h_cur * H_GROWTH_CAP
+            };
+            proposed.min(h_cur * H_GROWTH_CAP).clamp(H_MIN, H_MAX)
         };
-        let h_proposed = h_proposed.min(h_cur * H_GROWTH_CAP).clamp(H_MIN, H_MAX);
 
         if truncation_error > epsilon {
             // Halve the step size and retry — but if we have already hit the
@@ -171,13 +179,13 @@ where
             if h_cur <= H_MIN {
                 return Ok((y_new, h_cur, h_cur));
             }
-            h_cur = (h_proposed / 2.0).clamp(H_MIN, H_MAX);
+            h_cur = (propose_next_step() / 2.0).clamp(H_MIN, H_MAX);
         } else {
             // step is accepted
             let h_next = if truncation_error / epsilon < ERROR_RATIO_SMALL_ERROR {
                 (h_cur * H_GROWTH_CAP).clamp(H_MIN, H_MAX)
             } else {
-                h_proposed
+                propose_next_step()
             };
             return Ok((y_new, h_cur, h_next));
         }

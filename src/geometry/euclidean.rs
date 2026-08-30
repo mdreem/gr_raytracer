@@ -157,6 +157,11 @@ impl Geometry for EuclideanSpace {
         position.get_as_spherical()[0]
     }
 
+    fn cartesian_bound_for_radial_coordinate(&self, r: f64) -> f64 {
+        // Flat Cartesian space: the radial coordinate is the Cartesian radius.
+        r
+    }
+
     fn get_constants_of_motion(
         &self,
         position: &Point,
