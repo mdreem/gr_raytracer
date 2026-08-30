@@ -141,8 +141,11 @@ impl Hittable for Disc {
         if discriminant < 0.0 {
             return None;
         }
-        let int_p1 = (-b - discriminant.sqrt()) / (2.0 * a);
-        let int_p2 = (-b + discriminant.sqrt()) / (2.0 * a);
+        // Safe way to compute the roots of a quadratic equation. This will not blow up all values
+        // if a is very small. See https://people.csail.mit.edu/bkph/articles/Quadratics.pdf
+        let q = -0.5 * (b + discriminant.sqrt().copysign(b));
+        let int_p1 = q / a;
+        let int_p2 = c / q;
 
         let mut points = vec![0.0, 1.0];
         for tp in [int_p1, int_p2] {
