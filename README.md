@@ -57,6 +57,18 @@ model.
 cargo build --release
 ```
 
+The release profile uses fat LTO and a single codegen unit, which makes the
+build noticeably slower but matters for render times: the hot loops are small
+generic functions (the RKF45 stages, `nalgebra`'s fixed-size vectors, the
+volumetric march) that only get inlined into each other across crate
+boundaries.
+
+Tuning the build for the machine it will run on (`RUSTFLAGS="-C
+target-cpu=native"`) is worth trying but is not a free win, and is not the
+default: besides making the binary unportable, it cuts both ways. On an
+AVX-512 Xeon it took a Schwarzschild render 12% faster and a Kerr volumetric
+render 23% *slower*. Measure your own scenes before adopting it.
+
 ### Render a First Image
 
 ```sh
