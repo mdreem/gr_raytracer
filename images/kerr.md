@@ -2,10 +2,20 @@
 
 [← Back to the gallery index](images.md)
 
+Recipes: `images/create-gallery-images.sh` (checkerboard, blackbody, and
+volumetric renders, grid animation), `images/create-vantage-images.sh`
+(close vantages), `images/create-main-image.sh` with its
+`TEMPERATURE`/`EXPOSURE` overrides (temperature series), and
+`scripts/rendering/create_kerr_images.sh` (spin-sweep animations).
+Not scripted: the photon-ring pair (6x zoom section renders of the
+main-image scene, with the disc removed for the control) and the
+trajectory visualization (ray-export plus `scripts/plotting`; see
+`scripts/Readme.md`).
+
 ### Checkerboard Accretion Disk
 <div align="center">
-  <img src="render_kerr_large_a_checker_texture.png" alt="Kerr black hole with high spin parameter and a checkerboard accretion disk">
-  <p>Kerr black hole with high spin parameter and a checkerboard accretion disk</p>
+  <img src="render_kerr_large_a_checker_texture.png" alt="Super-extremal Kerr naked singularity (a greater than M): no horizon, no shadow">
+  <p>Super-extremal Kerr (a = 0.55 &gt; M): a naked singularity. With no horizon there is no shadow; where the black disc would be, you see light that passed arbitrarily close to the singularity, wound into a chaotic core.</p>
 </div>
 
 <div align="center">
@@ -14,24 +24,30 @@
 </div>
 
 ### Blackbody Radiation
+
+Two vantages on a Novikov-Thorne blackbody disc: a distant view of the
+full system and a close-up where the shadow dominates and the disc wraps
+over the top. The pairs differ in disc temperature (8000 K vs 4000 K)
+and spin: the red pair sits at a = 0.4995, essentially extremal.
+
 <div align="center">
-  <img src="kerr_blackbody_disk_1.png" alt="Kerr black hole with an accretion disk rendered using blackbody radiation spectrum (view 1)">
-  <p>Kerr black hole with an accretion disk rendered using blackbody radiation spectrum (view 1) (background image: <a href="https://commons.wikimedia.org/wiki/File:Messier_object_025.jpg">M25</a>)</p>
+  <img src="kerr_blackbody_disk_1.png" alt="Kerr black hole with a hot blackbody accretion disk, distant view">
+  <p>Hot (8000 K) blackbody disc at a = 0.499, distant view (background image: <a href="https://commons.wikimedia.org/wiki/File:Messier_object_025.jpg">M25</a>)</p>
 </div>
 
 <div align="center">
-  <img src="kerr_blackbody_disk_2.png" alt="Kerr black hole with an accretion disk rendered using blackbody radiation spectrum (view 2)">
-  <p>Kerr black hole with an accretion disk rendered using blackbody radiation spectrum (view 2) (background image: <a href="https://commons.wikimedia.org/wiki/File:Messier_object_025.jpg">M25</a>)</p>
+  <img src="kerr_blackbody_disk_2.png" alt="Kerr black hole with a hot blackbody accretion disk, close-up on the shadow">
+  <p>The same disc up close: the shadow dominates, the disc wraps over the top, and the approaching side is visibly blueshifted</p>
 </div>
 
 <div align="center">
-  <img src="kerr_blackbody_disk_a_0_5__1.png" alt="Kerr black hole with spin parameter a=0.5 and a blackbody accretion disk (view 1)">
-  <p>Kerr black hole with spin parameter a=0.5 and a blackbody accretion disk (view 1) (background image: <a href="https://commons.wikimedia.org/wiki/File:Messier_object_025.jpg">M25</a>)</p>
+  <img src="kerr_blackbody_disk_a_0_5__1.png" alt="Essentially extremal Kerr black hole with a cool red blackbody disk, distant view">
+  <p>Cool (4000 K) blackbody disc at a = 0.4995 (essentially extremal; exactly a = M is degenerate as the ISCO meets the photon orbit), distant view</p>
 </div>
 
 <div align="center">
-  <img src="kerr_blackbody_disk_a_0_5__2.png" alt="Kerr black hole with spin parameter a=0.5 and a blackbody accretion disk (view 2)">
-  <p>Kerr black hole with spin parameter a=0.5 and a blackbody accretion disk (view 2) (background image: <a href="https://commons.wikimedia.org/wiki/File:Messier_object_025.jpg">M25</a>)</p>
+  <img src="kerr_blackbody_disk_a_0_5__2.png" alt="Essentially extremal Kerr black hole with a cool red blackbody disk, close-up on the shadow">
+  <p>The extremal-limit disc up close</p>
 </div>
 
 ### Volumetric Rendering
@@ -88,6 +104,54 @@ the (T/T_ref)^4 brightness difference so the frames stay comparable.
 <div align="center">
   <img src="kerr_animation_stars_and_disk.gif" alt="Animation of a Kerr black hole with background stars and a rotating accretion disk">
   <p>Animation of a Kerr black hole with background stars and a rotating accretion disk (background image: <a href="https://commons.wikimedia.org/wiki/File:Messier_object_025.jpg">M25</a>)</p>
+</div>
+
+### Close vantages
+
+First-person views near the near-extremal hole (a = 0.499, ZAMO
+observer; recipes: `images/create-vantage-images.sh`). The first four
+placements mirror the [Schwarzschild series](schwarzschild.md#close-vantages);
+frame dragging pulls every one of them into asymmetry. The disc glow is
+3500 K gas, blueshifted by the deep gravity well.
+
+<div align="center">
+  <img src="vantage_kerr_dragged_porthole.png" alt="The sky porthole near the Kerr horizon, dragged into asymmetry">
+  <p>Dragged porthole (just outside the horizon, looking straight out): the Schwarzschild porthole again, but frame dragging squeezes the sky circle off-axis and the plunging inner disc glow floods in from the sides.</p>
+</div>
+
+<div align="center">
+  <img src="vantage_kerr_photonsphere_edge.png" alt="The Kerr winding wall over bright inner-disc glow">
+  <p>Photon-shell edge, hovering just above the disc surface: the winding wall of stacked disc and sky images, with the glowing surface curving away beneath the camera.</p>
+</div>
+
+<div align="center">
+  <img src="vantage_kerr_grazing_winding.png" alt="Grazing multiple windings around the Kerr hole">
+  <p>Grazing view, skimming just above the disc surface inside its annulus: the multiple-winding band, distorted relative to Schwarzschild because prograde and retrograde light circle at different radii around a spinning hole.</p>
+</div>
+
+<div align="center">
+  <img src="vantage_kerr_rearview.png" alt="Looking away from the Kerr hole at sky and disc">
+  <p>Rearview: the magnified outward sky and the disc band, the near-side gas brightened by Doppler beaming.</p>
+</div>
+
+<div align="center">
+  <img src="vantage_kerr_ergosphere_prograde.png" alt="Looking prograde from inside the ergosphere">
+  <p>Inside the ergosphere, looking prograde (the direction spacetime itself rotates): the winding wall seen from a region where standing still relative to the stars is impossible.</p>
+</div>
+
+<div align="center">
+  <img src="vantage_kerr_polar.png" alt="The shadow seen from the rotation axis, circular despite near-extremal spin">
+  <p>From the rotation axis, facing the hole: the disc face-on behind a shadow that stays circular; pole-on, even near-extremal spin barely distorts the silhouette, in contrast to every equatorial view.</p>
+</div>
+
+<div align="center">
+  <img src="vantage_kerr_gap_rim.png" alt="View from inside the gap between disc and horizon, toward the rim">
+  <p>From inside the gap between the disc's inner edge and the horizon, looking back along the orbit: the wound images pile up against the rim of the shadow.</p>
+</div>
+
+<div align="center">
+  <img src="vantage_kerr_gap_outward.png" alt="Looking outward from inside the disc gap">
+  <p>The same spot, looking straight out: the sky and outer disc compressed into an oval by the gravity of the hole behind the camera.</p>
 </div>
 
 ### Trajectories
