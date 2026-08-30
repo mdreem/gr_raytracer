@@ -84,6 +84,12 @@ impl CIETristimulus {
         if redshift <= 0.0 {
             return Err(RaytracerError::UnphysicalRedshift(redshift));
         }
+        // z^0 == 1 for every positive z, and a zero exponent is the common
+        // case (the physically exact blackbody path uses it), so skip the
+        // `pow` call rather than paying for it once per marched sample.
+        if beaming_exponent == 0.0 {
+            return Ok(*self);
+        }
         let beaming_factor = redshift.powf(beaming_exponent);
         Ok(CIETristimulus {
             x: self.x * beaming_factor,
@@ -314,14 +320,20 @@ fn inv_compand_srgb(u: f64) -> f64 {
     }
 }
 
-pub fn srgb_to_xyz(color: &Color) -> CIETristimulus {
-    let r_s = color.r as f64 / 255.0;
-    let g_s = color.g as f64 / 255.0;
-    let b_s = color.b as f64 / 255.0;
+/// Linearized values of all 256 possible 8-bit sRGB channel codes.
+///
+/// Texture lookups are the hottest consumer of `srgb_to_xyz`: every escaped
+/// ray bilinearly samples four texels, and each texel used to cost three
+/// `powf(2.4)` calls. The input is an integer code, so the whole transfer
+/// function fits in a table and the result is bit-identical to computing it.
+static SRGB_TO_LINEAR: std::sync::LazyLock<[f64; 256]> = std::sync::LazyLock::new(|| {
+    std::array::from_fn(|code| inv_compand_srgb(code as f64 / 255.0))
+});
 
-    let r = inv_compand_srgb(r_s);
-    let g = inv_compand_srgb(g_s);
-    let b = inv_compand_srgb(b_s);
+pub fn srgb_to_xyz(color: &Color) -> CIETristimulus {
+    let r = SRGB_TO_LINEAR[color.r as usize];
+    let g = SRGB_TO_LINEAR[color.g as usize];
+    let b = SRGB_TO_LINEAR[color.b as usize];
 
     let m = Matrix3::new(
         0.412_456_4,

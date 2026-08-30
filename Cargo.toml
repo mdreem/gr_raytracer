@@ -19,3 +19,10 @@ thiserror = "2.0.18"
 [dev-dependencies]
 approx = "0.5.1"
 test-log = "0.2.21"
+
+# Rendering is CPU-bound floating-point work in tight, heavily generic inner
+# loops (RKF45 stages, nalgebra fixed-size vectors, the volumetric march), so
+# cross-crate inlining and a single codegen unit pay for the longer build.
+[profile.release]
+lto = "fat"
+codegen-units = 1

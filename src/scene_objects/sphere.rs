@@ -5,7 +5,7 @@ use crate::rendering::color::CIETristimulus;
 use crate::rendering::integrator::Step;
 use crate::rendering::raytracer::RaytracerError;
 use crate::rendering::texture::{TextureMapHandle, UVCoordinates};
-use crate::scene_objects::hittable::{ColorComputationData, Hittable, Intersection};
+use crate::scene_objects::hittable::{ColorComputationData, Hittable, Intersection, Segment};
 use crate::scene_objects::objects::SceneObject;
 use nalgebra::Vector3;
 use std::f64::consts::PI;
@@ -57,30 +57,20 @@ fn solve_for_t(y_start_spatial: Vector3<f64>, direction: Vector3<f64>, r: f64) -
 }
 
 impl Hittable for Sphere {
-    // y_start and y_end have to be Cartesian.
-    fn intersects(
-        &self,
-        y_start: &Point,
-        y_end: &Point,
-        _geometry: &dyn Geometry,
-    ) -> Option<Intersection> {
+    fn intersects(&self, segment: &Segment, _geometry: &dyn Geometry) -> Option<Intersection> {
         debug_assert_eq!(self.position.coordinate_system, CoordinateSystem::Cartesian);
 
-        let y_start_cartesian = y_start.to_cartesian();
-        let y_end_cartesian = y_end.to_cartesian();
-
-        let neg_position = -self.position;
-        let y_start_shifted = y_start_cartesian + neg_position;
-        let y_end_shifted = y_end_cartesian + neg_position;
-        let r_start = y_start_shifted.radial_distance_spatial_part_squared();
-        let r_end = y_end_shifted.radial_distance_spatial_part_squared();
+        let position_spatial = self.position.get_spatial_vector_cartesian();
+        let y_start_spatial = segment.start_cartesian - position_spatial;
+        let y_end_spatial = segment.end_cartesian - position_spatial;
+        let r_start = y_start_spatial.norm_squared();
+        let r_end = y_end_spatial.norm_squared();
+        let radius_squared = self.radius * self.radius;
 
         // Checks if the line element intersects the surface of the sphere.
-        if (r_start >= self.radius.powi(2) && r_end <= self.radius.powi(2))
-            || (r_start <= self.radius.powi(2) && r_end >= self.radius.powi(2))
+        if (r_start >= radius_squared && r_end <= radius_squared)
+            || (r_start <= radius_squared && r_end >= radius_squared)
         {
-            let y_start_spatial = y_start_shifted.get_spatial_vector_cartesian();
-            let y_end_spatial = y_end_shifted.get_spatial_vector_cartesian();
             let direction = y_end_spatial - y_start_spatial;
 
             let t = match solve_for_t(y_start_spatial, direction, self.radius) {
@@ -112,7 +102,6 @@ impl Hittable for Sphere {
             // fields (e.g. the stationary observer's velocity) at the
             // emitter's actual location relative to the black hole, not
             // relative to the sphere's own center.
-            let position_spatial = self.position.get_spatial_vector_cartesian();
             let point_on_sphere_world = Point::new_cartesian(
                 0.0,
                 point_on_sphere_spatial[0] + position_spatial[0],
@@ -170,7 +159,7 @@ mod tests {
     use crate::geometry::point::Point;
     use crate::rendering::color::Color;
     use crate::rendering::texture::CheckerMapper;
-    use crate::scene_objects::hittable::Hittable;
+    use crate::scene_objects::hittable::{Hittable, Segment};
     use approx::assert_abs_diff_eq;
     use std::sync::Arc;
 
@@ -197,7 +186,7 @@ mod tests {
 
         assert!(
             sphere
-                .intersects(&y_start, &y_end, &EuclideanSpace::new())
+                .intersects(&Segment::from_points(&y_start, &y_end), &EuclideanSpace::new())
                 .is_some()
         );
     }
@@ -210,7 +199,7 @@ mod tests {
 
         assert!(
             sphere
-                .intersects(&y_start, &y_end, &EuclideanSpace::new())
+                .intersects(&Segment::from_points(&y_start, &y_end), &EuclideanSpace::new())
                 .is_none()
         );
     }
@@ -223,7 +212,7 @@ mod tests {
 
         assert!(
             sphere
-                .intersects(&y_start, &y_end, &EuclideanSpace::new())
+                .intersects(&Segment::from_points(&y_start, &y_end), &EuclideanSpace::new())
                 .is_some()
         );
     }
@@ -236,7 +225,7 @@ mod tests {
 
         assert!(
             sphere
-                .intersects(&y_start, &y_end, &EuclideanSpace::new())
+                .intersects(&Segment::from_points(&y_start, &y_end), &EuclideanSpace::new())
                 .is_none()
         );
     }
@@ -253,7 +242,7 @@ mod tests {
         let y_end = Point::new_cartesian(0.0, 0.0, 0.0, 19.5);
 
         let intersection = sphere
-            .intersects(&y_start, &y_end, &EuclideanSpace::new())
+            .intersects(&Segment::from_points(&y_start, &y_end), &EuclideanSpace::new())
             .expect("ray should hit sphere");
         let hit = intersection
             .intersection_point

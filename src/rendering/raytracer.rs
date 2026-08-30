@@ -62,6 +62,23 @@ pub struct Raytracer<'a, G: Geometry> {
 
 const MICHELSON_DENOMINATOR_EPSILON: f64 = 1e-4;
 
+/// How many completed pixels between progress-bar updates.
+///
+/// `ProgressBar::set_position` takes the bar's lock, so calling it from every
+/// worker on every pixel serializes the render on that one mutex whenever
+/// individual rays are cheap. Updating in batches keeps the bar smooth (a
+/// full frame is many thousands of pixels) at a fraction of the contention.
+const PROGRESS_UPDATE_INTERVAL: usize = 256;
+
+/// Count one finished pixel, refreshing the bar every
+/// `PROGRESS_UPDATE_INTERVAL` of them.
+fn report_progress(progress_bar: &indicatif::ProgressBar, count: &AtomicUsize) {
+    let completed = count.fetch_add(1, Ordering::Relaxed) + 1;
+    if completed.is_multiple_of(PROGRESS_UPDATE_INTERVAL) {
+        progress_bar.set_position(completed as u64);
+    }
+}
+
 #[derive(PartialEq)]
 struct PixelToSample {
     pub row: u32,
@@ -221,8 +238,7 @@ impl<'a, G: Geometry> Raytracer<'a, G> {
             .progress_chars("█▇▆▅▄▃▂▁  "));
 
         buffer.par_iter_mut().enumerate().for_each(|(i, p)| {
-            count.fetch_add(1, Ordering::SeqCst);
-            pb.set_position(count.load(Ordering::Relaxed) as u64);
+            report_progress(&pb, &count);
 
             let y = i as u32 / (to_col - from_col);
             let x = i as u32 % (to_col - from_col);
@@ -244,6 +260,7 @@ impl<'a, G: Geometry> Raytracer<'a, G> {
                 }
             }
         });
+        pb.set_position(max_count as u64);
         pb.finish();
         Ok(buffer)
     }
@@ -340,8 +357,7 @@ impl<'a, G: Geometry> Raytracer<'a, G> {
             .progress_chars("█▇▆▅▄▃▂▁  "));
 
         pixels_to_sample.par_iter_mut().for_each(|pixel| {
-            count.fetch_add(1, Ordering::SeqCst);
-            pb.set_position(count.load(Ordering::Relaxed) as u64);
+            report_progress(&pb, &count);
 
             let mut sample_color = CIETristimulus::new(0.0, 0.0, 0.0, 0.0);
             let mut valid_samples = 0u32;
@@ -386,6 +402,7 @@ impl<'a, G: Geometry> Raytracer<'a, G> {
                 pixel.result = Some(sample_color);
             }
         });
+        pb.set_position(pixels_to_sample.len() as u64);
         pb.finish();
 
         Ok(())

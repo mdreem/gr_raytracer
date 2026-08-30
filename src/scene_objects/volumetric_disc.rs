@@ -6,7 +6,7 @@ use crate::rendering::raytracer::RaytracerError;
 use crate::rendering::redshift::RayFrequencyData;
 use crate::rendering::temperature::TemperatureComputer;
 use crate::rendering::texture::{TextureMapHandle, UVCoordinates};
-use crate::scene_objects::hittable::{ColorComputationData, Hittable, Intersection};
+use crate::scene_objects::hittable::{ColorComputationData, Hittable, Intersection, Segment};
 use crate::scene_objects::objects::SceneObject;
 use crate::scene_objects::volumetric_disc::CylinderIntersection::{
     NoIntersection, OneIntersection, Parallel, TwoIntersections,
@@ -23,6 +23,21 @@ const CAPTURE_HEIGHT_FACTOR: f64 = 3.0;
 /// radiance is unbounded (boosted inner-disc regions reach ~1e5 linear) and
 /// the threshold is chosen conservatively small rather than the classic 1e-3.
 const TRANSPARENCY_EARLY_EXIT: f64 = 1e-5;
+/// `-ln(0.001)` = `ln(1000)`, where 0.001 is the vertical falloff below which
+/// a sample counts as outside the disc. The support test compares the
+/// falloff's exponent against this rather than evaluating `exp` on every
+/// sample: `exp(-q) >= f` iff `q <= -ln(f)`.
+const MAXIMUM_VERTICAL_FALLOFF_EXPONENT: f64 = 6.907_755_278_982_137;
+
+/// A point expressed in the disc's cylindrical frame.
+struct CylindricalFrame {
+    /// Distance from the disc's mid-plane.
+    h: f64,
+    /// Cylindrical radius about the disc axis.
+    r: f64,
+    cos_phi: f64,
+    sin_phi: f64,
+}
 
 pub struct VolumetricDisc {
     center_disk_inner_radius: f64,
@@ -114,58 +129,83 @@ impl VolumetricDisc {
         }
     }
 
-    /// Cheap bounding test for whether a point is inside the disc's support region.
-    fn is_inside_disc(&self, p: &Vector3<f64>) -> bool {
-        let h = p.dot(&self.axis).abs();
-        let r = p.cross(&self.axis).norm();
+    /// A point resolved into the disc's own cylindrical frame: height above
+    /// the mid-plane, cylindrical radius, and the cosine/sine of the azimuth.
+    ///
+    /// `(e1, e2, axis)` is orthonormal, so the cylindrical radius is just the
+    /// length of the `(e1, e2)` projection and the azimuth's cosine and sine
+    /// are that projection normalized - no cross product, no `atan2`, and no
+    /// `sin`/`cos` to undo it. Every marched sample goes through here.
+    fn cylindrical_frame(&self, p: &Vector3<f64>) -> CylindricalFrame {
+        let x_local = p.dot(&self.e1);
+        let y_local = p.dot(&self.e2);
+        let r = x_local.hypot(y_local);
+        let (cos_phi, sin_phi) = if r > 0.0 {
+            (x_local / r, y_local / r)
+        } else {
+            (1.0, 0.0)
+        };
+        CylindricalFrame {
+            h: p.dot(&self.axis).abs(),
+            r,
+            cos_phi,
+            sin_phi,
+        }
+    }
 
-        if r <= self.center_disk_inner_radius || r >= self.center_disk_outer_radius {
+    /// Cheap bounding test for whether a point is inside the disc's support region.
+    fn is_inside_disc(&self, frame: &CylindricalFrame) -> bool {
+        if frame.r <= self.center_disk_inner_radius || frame.r >= self.center_disk_outer_radius {
             return false;
         }
 
-        let vertical_falloff = self.compute_vertical_falloff(h);
-        vertical_falloff >= 0.001
+        // `vertical_falloff >= MINIMUM_VERTICAL_FALLOFF` written without the
+        // exponential: exp(-q) >= f is q <= -ln(f). Keeps the rejection path
+        // (most samples) free of a transcendental call.
+        let q = frame.h / self.thickness;
+        q * q <= MAXIMUM_VERTICAL_FALLOFF_EXPONENT
     }
 
     // Smooth vertical falloff (Gaussian) using thickness as sigma
     fn compute_vertical_falloff(&self, h: f64) -> f64 {
-        (-(h / self.thickness).powi(2)).exp()
+        let q = h / self.thickness;
+        (-(q * q)).exp()
     }
 
     fn compute_density(&self, p: &Vector3<f64>) -> f64 {
-        if !self.is_inside_disc(p) {
+        let frame = self.cylindrical_frame(p);
+        if !self.is_inside_disc(&frame) {
             return 0.0;
         }
 
-        let h = p.dot(&self.axis).abs();
-        let r = p.cross(&self.axis).norm();
+        let (h, r) = (frame.h, frame.r);
 
         // Part of the density profile, not only of the support test above.
         let vertical_falloff = self.compute_vertical_falloff(h);
 
-        // Radial base density (inverse power law)
-        let radial_base = (self.center_disk_inner_radius / r).powf(1.5);
+        // Radial base density (inverse power law). x^1.5 = x * sqrt(x), which
+        // is a multiply and a hardware square root instead of a `pow` call.
+        let radial_ratio = self.center_disk_inner_radius / r;
+        let radial_base = radial_ratio * radial_ratio.sqrt();
 
         // Smooth radial boundaries
+        let outer_gap = self.center_disk_outer_radius - r;
+        let inner_gap = r - self.center_disk_inner_radius;
         let mut boundary_falloff = 1.0;
-        boundary_falloff *= (-1.0 / (self.center_disk_outer_radius - r).powi(2).max(0.0001)).exp();
-        boundary_falloff *= (-1.0 / (r - self.center_disk_inner_radius).powi(2).max(0.0001)).exp();
+        boundary_falloff *= (-1.0 / (outer_gap * outer_gap).max(0.0001)).exp();
+        boundary_falloff *= (-1.0 / (inner_gap * inner_gap).max(0.0001)).exp();
 
-        // Periodic Cylindrical Noise Mapping (removes the phi-seam)
-        let x_local = p.dot(&self.e1);
-        let y_local = p.dot(&self.e2);
-        let phi = y_local.atan2(x_local);
-
-        // Map phi to a circle in noise space to ensure continuity
-        let noise_phi_x = phi.cos() * self.noise_scale.y;
-        let noise_phi_y = phi.sin() * self.noise_scale.y;
+        // Periodic Cylindrical Noise Mapping (removes the phi-seam):
+        // map phi to a circle in noise space to ensure continuity.
+        let noise_phi_x = frame.cos_phi * self.noise_scale.y;
+        let noise_phi_y = frame.sin_phi * self.noise_scale.y;
 
         // Use a 3D noise sample where phi-components are coordinates
         let noise_p = Vector3::new(r * self.noise_scale.x, noise_phi_x, noise_phi_y);
         let mut n = self.fbm(noise_p, 0.5);
 
         // Add vertical variation separately
-        n += self.noise(Vector3::new(r * 0.5, h * self.noise_scale.z, phi.cos())) * 0.5;
+        n += self.noise(Vector3::new(r * 0.5, h * self.noise_scale.z, frame.cos_phi)) * 0.5;
 
         let n = (n + self.noise_offset).max(0.0) * self.density_multiplier;
 
@@ -173,16 +213,12 @@ impl VolumetricDisc {
     }
 
     fn get_uv(&self, p: &Vector3<f64>) -> UVCoordinates {
-        let x = p.dot(&self.e1);
-        let y = p.dot(&self.e2);
-        let rr = (x * x + y * y).sqrt();
-
-        let phi = y.atan2(x);
-        let r = (rr - self.center_disk_inner_radius)
+        let frame = self.cylindrical_frame(p);
+        let r = (frame.r - self.center_disk_inner_radius)
             / (self.center_disk_outer_radius - self.center_disk_inner_radius);
 
-        let u = 0.5 + 0.5 * r * phi.cos();
-        let v = 0.5 + 0.5 * r * phi.sin();
+        let u = 0.5 + 0.5 * r * frame.cos_phi;
+        let v = 0.5 + 0.5 * r * frame.sin_phi;
         UVCoordinates { u, v }
     }
 
@@ -205,8 +241,7 @@ impl VolumetricDisc {
         };
 
         // If the first point is outside of the disc it is an entering ray, otherwise it is an exiting ray.
-        let is_entering =
-            !self.is_inside_bounding_cylinder(&first.x.get_spatial_vector_cartesian());
+        let is_entering = !self.is_inside_bounding_cylinder(&first.spatial_cartesian());
         if !is_entering {
             // TODO: a camera INSIDE the gas also starts inside the cylinder
             // and is suppressed here; supporting that case needs the window
@@ -223,10 +258,11 @@ impl VolumetricDisc {
         // scene's re-entry firing marches again (double counting).
         let mut entered_gas = false;
         for steps in remaining_steps.windows(2) {
-            let from = &steps[0].x.get_spatial_vector_cartesian();
-            let to = &steps[1].x.get_spatial_vector_cartesian();
+            let segment = Segment::from_steps(&steps[0], &steps[1]);
+            let from = &segment.start_cartesian;
+            let to = &segment.end_cartesian;
 
-            let crosses_boundary = self.intersects_internal(&steps[0].x, &steps[1].x).is_some();
+            let crosses_boundary = self.intersects_internal(&segment).is_some();
             let overlaps = self.is_inside_bounding_cylinder(from) || crosses_boundary;
 
             // If the segment does not intersect the disc, we can skip it entirely.
@@ -446,24 +482,27 @@ impl VolumetricDisc {
         let t1_dist = (-b - sqrt_disc) / (2.0 * a);
         let t2_dist = (-b + sqrt_disc) / (2.0 * a);
 
-        let mut hits = Vec::new();
+        // Fixed-size accumulator: at most two roots, and this runs on every
+        // step window of every ray, so a heap `Vec` here is pure allocator
+        // traffic.
+        let mut hits = [0.0f64; 2];
+        let mut hit_count = 0usize;
         for dist in [t1_dist, t2_dist] {
             let t = dist / segment_length;
             if (0.0..=1.0).contains(&t) {
                 let p = from + t * (to - from);
                 if p.dot(axis).abs() <= half_height {
-                    hits.push(t);
+                    hits[hit_count] = t;
+                    hit_count += 1;
                 }
             }
         }
 
-        if hits.is_empty() {
-            return NoIntersection;
+        match hit_count {
+            0 => NoIntersection,
+            1 => OneIntersection(hits[0]),
+            _ => TwoIntersections(hits[0].min(hits[1]), hits[0].max(hits[1])),
         }
-        if hits.len() == 1 {
-            return OneIntersection(hits[0]);
-        }
-        TwoIntersections(hits[0].min(hits[1]), hits[0].max(hits[1]))
     }
 
     fn intersects_cap(
@@ -509,7 +548,15 @@ impl VolumetricDisc {
         outer_radius: f64,
         axis: &Vector3<f64>,
     ) -> CylinderIntersection {
-        let mut hits = Vec::new();
+        // At most six candidate parameters (two tubes x two roots, two caps).
+        // Stack-allocated for the same reason as in the clipped-cylinder
+        // solver above: this is per-step, per-ray code.
+        let mut hits = [0.0f64; 6];
+        let mut hit_count = 0usize;
+        fn push(t: f64, hits: &mut [f64; 6], hit_count: &mut usize) {
+            hits[*hit_count] = t;
+            *hit_count += 1;
+        }
         let dir = to - from;
 
         // Use 3.0 * thickness to capture the Gaussian tail
@@ -517,19 +564,19 @@ impl VolumetricDisc {
 
         // Check Outer Tube
         match self.intersects_clipped_cylinder(from, to, outer_radius, axis, capture_height) {
-            OneIntersection(t) => hits.push(t),
+            OneIntersection(t) => push(t, &mut hits, &mut hit_count),
             TwoIntersections(t1, t2) => {
-                hits.push(t1);
-                hits.push(t2);
+                push(t1, &mut hits, &mut hit_count);
+                push(t2, &mut hits, &mut hit_count);
             }
             _ => {}
         }
         // Check Inner Tube
         match self.intersects_clipped_cylinder(from, to, inner_radius, axis, capture_height) {
-            OneIntersection(t) => hits.push(t),
+            OneIntersection(t) => push(t, &mut hits, &mut hit_count),
             TwoIntersections(t1, t2) => {
-                hits.push(t1);
-                hits.push(t2);
+                push(t1, &mut hits, &mut hit_count);
+                push(t2, &mut hits, &mut hit_count);
             }
             _ => {}
         }
@@ -539,28 +586,31 @@ impl VolumetricDisc {
                 let p = from + t * dir;
                 let r_sq = p.cross(axis).norm_squared();
                 if r_sq >= inner_radius * inner_radius {
-                    hits.push(t);
+                    push(t, &mut hits, &mut hit_count);
                 }
             }
         }
 
+        let hits = &mut hits[..hit_count];
         hits.sort_by(|a, b| a.total_cmp(b));
 
-        if hits.is_empty() {
-            NoIntersection
-        } else if hits.len() == 1 {
-            OneIntersection(hits[0])
-        } else {
-            TwoIntersections(hits[0], hits[1])
+        match hit_count {
+            0 => NoIntersection,
+            1 => OneIntersection(hits[0]),
+            _ => TwoIntersections(hits[0], hits[1]),
         }
     }
 
     fn is_inside_bounding_cylinder(&self, p: &Vector3<f64>) -> bool {
-        let h = p.dot(&self.axis).abs();
-        let r = p.cross(&self.axis).norm();
-        h <= self.thickness * CAPTURE_HEIGHT_FACTOR
-            && r > self.center_disk_inner_radius
-            && r < self.center_disk_outer_radius
+        if p.dot(&self.axis).abs() > self.thickness * CAPTURE_HEIGHT_FACTOR {
+            return false;
+        }
+        // Compared squared to skip the square root; `axis` is a unit vector,
+        // so |p x axis|^2 = |p|^2 - (p . axis)^2.
+        let axial = p.dot(&self.axis);
+        let radial_squared = (p.norm_squared() - axial * axial).max(0.0);
+        radial_squared > self.center_disk_inner_radius * self.center_disk_inner_radius
+            && radial_squared < self.center_disk_outer_radius * self.center_disk_outer_radius
     }
 }
 
@@ -575,9 +625,9 @@ pub enum CylinderIntersection {
 impl VolumetricDisc {
     // The volume boundary is deliberately a Cartesian cylinder (the disc is a
     // stylized visual model); it does not need the metric radial coordinate.
-    fn intersects_internal(&self, y_start: &Point, y_end: &Point) -> Option<Intersection> {
-        let y_start_spatial = y_start.get_spatial_vector_cartesian();
-        let y_end_spatial = y_end.get_spatial_vector_cartesian();
+    fn intersects_internal(&self, segment: &Segment) -> Option<Intersection> {
+        let y_start_spatial = segment.start_cartesian;
+        let y_end_spatial = segment.end_cartesian;
 
         let direction = y_end_spatial - y_start_spatial;
 
@@ -650,13 +700,8 @@ impl VolumetricDisc {
 }
 
 impl Hittable for VolumetricDisc {
-    fn intersects(
-        &self,
-        y_start: &Point,
-        y_end: &Point,
-        _geometry: &dyn Geometry,
-    ) -> Option<Intersection> {
-        self.intersects_internal(y_start, y_end)
+    fn intersects(&self, segment: &Segment, _geometry: &dyn Geometry) -> Option<Intersection> {
+        self.intersects_internal(segment)
     }
 
     fn color_at_uv(
@@ -770,7 +815,10 @@ mod tests {
         let y_start = Point::new_cartesian(0.0, 0.5, 0.0, 0.0);
         let y_end = Point::new_cartesian(0.0, 1.5, 0.0, 0.0);
 
-        assert!(disc.intersects_internal(&y_start, &y_end).is_some());
+        assert!(
+            disc.intersects_internal(&Segment::from_points(&y_start, &y_end))
+                .is_some()
+        );
     }
 
     #[test]
@@ -779,7 +827,10 @@ mod tests {
         let y_start = Point::new_cartesian(0.0, 1.5, 0.0, 2.0);
         let y_end = Point::new_cartesian(0.0, 2.5, 0.0, 2.0);
 
-        assert!(disc.intersects_internal(&y_start, &y_end).is_none());
+        assert!(
+            disc.intersects_internal(&Segment::from_points(&y_start, &y_end))
+                .is_none()
+        );
     }
 
     #[test]
@@ -798,11 +849,13 @@ mod tests {
     /// Two-point straight step slice mimicking a fired entry window: starts
     /// outside the bounding cylinder (inner hole) and crosses the gas.
     fn straight_steps(from: Vector3<f64>, to: Vector3<f64>) -> Vec<Step> {
-        let mk = |v: &Vector3<f64>| Step {
-            x: Point::new_cartesian(0.0, v[0], v[1], v[2]),
-            p: FourVector::new_cartesian(1.0, 1.0, 0.0, 0.0),
-            t: 0.0,
-            step: 0,
+        let mk = |v: &Vector3<f64>| {
+            Step::new(
+                Point::new_cartesian(0.0, v[0], v[1], v[2]),
+                FourVector::new_cartesian(1.0, 1.0, 0.0, 0.0),
+                0.0,
+                0,
+            )
         };
         vec![mk(&from), mk(&to)]
     }
@@ -927,11 +980,13 @@ mod tests {
         let xs = [0.2, 1.35, 2.1, 2.8005, 3.4, 5.0];
         let many: Vec<Step> = xs
             .iter()
-            .map(|x| Step {
-                x: Point::new_cartesian(0.0, *x, 0.0, 0.0),
-                p: FourVector::new_cartesian(1.0, 1.0, 0.0, 0.0),
-                t: 0.0,
-                step: 0,
+            .map(|x| {
+                Step::new(
+                    Point::new_cartesian(0.0, *x, 0.0, 0.0),
+                    FourVector::new_cartesian(1.0, 1.0, 0.0, 0.0),
+                    0.0,
+                    0,
+                )
             })
             .collect();
 
@@ -975,11 +1030,13 @@ mod tests {
     #[test]
     fn test_one_episode_per_call_with_reentry() {
         let disc = create_disc();
-        let mk = |x: f64| Step {
-            x: Point::new_cartesian(0.0, x, 0.5, 0.0),
-            p: FourVector::new_cartesian(1.0, 1.0, 0.0, 0.0),
-            t: 0.0,
-            step: 0,
+        let mk = |x: f64| {
+            Step::new(
+                Point::new_cartesian(0.0, x, 0.5, 0.0),
+                FourVector::new_cartesian(1.0, 1.0, 0.0, 0.0),
+                0.0,
+                0,
+            )
         };
         // Chord at y = 0.5: gas episodes at |x| in ~(0.866, 2.958); the
         // window (-0.5 -> 0.5) lies wholly in the inner hole.
@@ -1017,11 +1074,13 @@ mod tests {
     #[test]
     fn test_narrow_hole_does_not_double_count_far_episode() {
         let disc = create_disc();
-        let mk = |x: f64| Step {
-            x: Point::new_cartesian(0.0, x, 0.5, 0.0),
-            p: FourVector::new_cartesian(1.0, 1.0, 0.0, 0.0),
-            t: 0.0,
-            step: 0,
+        let mk = |x: f64| {
+            Step::new(
+                Point::new_cartesian(0.0, x, 0.5, 0.0),
+                FourVector::new_cartesian(1.0, 1.0, 0.0, 0.0),
+                0.0,
+                0,
+            )
         };
         // Chord at y = 0.5: gas at |x| in ~(0.866, 2.958). The cut at -0.7
         // (r ~ 0.86) is the only point in the hole; the window (-0.7 -> 0.9)

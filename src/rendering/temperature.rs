@@ -34,7 +34,13 @@ pub struct KerrTemperatureComputer {
     r_isco: f64,
     /// Mass accretion rate in internal units.
     m_dot: f64,
-    radial_temperature_profile: Vec<(f64, f64)>,
+    /// Temperatures on a uniform radial grid starting at `r_isco`.
+    radial_temperature_profile: Vec<f64>,
+    /// First radius of the profile (== `r_isco`) and the uniform spacing
+    /// between entries, so a lookup is an index computation rather than a
+    /// binary search. This runs once per volumetric march sample.
+    profile_first_radius: f64,
+    profile_step: f64,
 }
 
 const NUM_LUT_STEPS: usize = 1000;
@@ -71,6 +77,8 @@ impl KerrTemperatureComputer {
             r_isco,
             m_dot: 1.0,
             radial_temperature_profile: Vec::new(),
+            profile_first_radius: r_isco,
+            profile_step: 0.0,
         };
 
         let mut max_f = 0.0;
@@ -109,9 +117,11 @@ impl KerrTemperatureComputer {
             let r = r_isco + (i as f64) * radial_profile_step;
             let f_val = tmp_computer.compute_f(r)?;
             let temp = (f_val / sigma_sb).max(0.0).powf(0.25);
-            profile.push((r, temp));
+            profile.push(temp);
         }
         tmp_computer.radial_temperature_profile = profile;
+        tmp_computer.profile_first_radius = r_isco;
+        tmp_computer.profile_step = radial_profile_step;
 
         Ok(tmp_computer)
     }
@@ -213,40 +223,32 @@ impl TemperatureComputer for KerrTemperatureComputer {
             return Err(RaytracerError::BelowRISCO);
         }
 
-        // Use radial temperature profile for fast lookup with linear interpolation.
-        let (first_r, first_t) = *self
-            .radial_temperature_profile
-            .first()
-            .ok_or(RaytracerError::BelowRISCO)?;
-        let (last_r, last_t) = *self
-            .radial_temperature_profile
-            .last()
-            .ok_or(RaytracerError::BelowRISCO)?;
+        // Use radial temperature profile for fast lookup with linear
+        // interpolation. The profile is on a uniform grid, so the bracketing
+        // entry is an index computation - no binary search, which used to
+        // cost ~10 dependent, cache-missing branches per march sample.
+        let profile = &self.radial_temperature_profile;
+        let first_t = *profile.first().ok_or(RaytracerError::BelowRISCO)?;
+        let last_t = *profile.last().ok_or(RaytracerError::BelowRISCO)?;
+        let last_index = profile.len() - 1;
+        let last_r = self.profile_first_radius + (last_index as f64) * self.profile_step;
 
-        if radius <= first_r {
+        if radius <= self.profile_first_radius {
             return Ok(first_t);
         }
         if radius >= last_r {
             return Ok(last_t);
         }
 
-        let idx = match self
-            .radial_temperature_profile
-            .binary_search_by(|(r, _)| r.total_cmp(&radius))
-        {
-            Ok(i) => i,
-            Err(0) => 0,
-            Err(i) => i - 1,
-        };
+        let position = (radius - self.profile_first_radius) / self.profile_step;
+        let idx = (position as usize).min(last_index - 1);
 
-        let (r0, t0) = self.radial_temperature_profile[idx];
-        let (r1, t1) = self.radial_temperature_profile[idx + 1];
+        let t0 = profile[idx];
+        let t1 = profile[idx + 1];
 
         // Linear interpolation
-        let t = (radius - r0) / (r1 - r0);
-        let temperature = t0 + t * (t1 - t0);
-
-        Ok(temperature)
+        let t = position - idx as f64;
+        Ok(t0 + t * (t1 - t0))
     }
 }
 

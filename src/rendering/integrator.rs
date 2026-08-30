@@ -1,14 +1,15 @@
 use crate::geometry::four_vector::FourVector;
 use crate::geometry::geometry::Geometry;
-use crate::geometry::point::Point;
+use crate::geometry::point::{CoordinateSystem, Point};
 use crate::rendering::integrator::StopReason::{
     CelestialSphereReached, CoordinateIsNan, HorizonReached,
 };
-use crate::rendering::ray::{IntegratedRay, Ray};
+use crate::rendering::ray::{IntegratedRay, Ray, take_step_buffer};
 use crate::rendering::raytracer::RaytracerError;
 use crate::rendering::runge_kutta::rkf45;
 use crate::rendering::scene::{EquationOfMotionState, get_position};
 use log::debug;
+use nalgebra::Vector3;
 
 #[derive(Debug)]
 pub struct Step {
@@ -16,6 +17,33 @@ pub struct Step {
     pub p: FourVector,
     pub t: f64,
     pub step: usize,
+    /// Spatial part of `x` in Cartesian coordinates, computed once when the
+    /// step is built.
+    ///
+    /// Every scene object works in Cartesian space while the integrator runs
+    /// in the geometry's native chart, so each intersection test used to
+    /// redo the same spherical/Boyer-Lindquist -> Cartesian conversion (a
+    /// sin/cos pair per endpoint) for every object, on every step, of every
+    /// ray. Caching it on the step makes those conversions a single one per
+    /// step.
+    x_cartesian: Vector3<f64>,
+}
+
+impl Step {
+    pub fn new(x: Point, p: FourVector, t: f64, step: usize) -> Step {
+        Step {
+            x_cartesian: x.get_spatial_vector_cartesian(),
+            x,
+            p,
+            t,
+            step,
+        }
+    }
+
+    /// The spatial part of this step's position in Cartesian coordinates.
+    pub fn spatial_cartesian(&self) -> Vector3<f64> {
+        self.x_cartesian
+    }
 }
 
 #[derive(Debug, PartialEq)]
@@ -74,6 +102,27 @@ pub enum IntegrationError {
     NoStepsProduced,
 }
 
+/// Squared Cartesian distance of `position` from the origin, without ever
+/// building the Cartesian point.
+///
+/// This is the escape test, so it runs on every integration step of every
+/// ray. Going through `Point::to_cartesian` costs a sin/cos pair per step for
+/// nothing: the closed forms below are the identities that conversion would
+/// evaluate anyway (`x^2 + y^2 + z^2 = r^2` in spherical, and
+/// `r^2 + a^2 sin^2(theta)` for the Kerr-Schild embedding of Boyer-Lindquist).
+fn cartesian_radial_distance_squared(position: &Point) -> f64 {
+    match position.coordinate_system {
+        CoordinateSystem::Cartesian | CoordinateSystem::Spherical => {
+            position.radial_distance_spatial_part_squared()
+        }
+        CoordinateSystem::BoyerLindquist { a } => {
+            let r = position[1];
+            let sin_theta = position[2].sin();
+            r * r + a * a * sin_theta * sin_theta
+        }
+    }
+}
+
 impl<G: Geometry> Integrator<'_, G> {
     pub fn integrate(
         &self,
@@ -83,10 +132,10 @@ impl<G: Geometry> Integrator<'_, G> {
         let geodesic_solver = self.geometry.get_geodesic_solver(ray);
         let mut y = geodesic_solver.create_initial_state(ray);
 
-        let mut result: Vec<Step> = Vec::with_capacity(self.integration_configuration.max_steps);
+        let mut result: Vec<Step> = take_step_buffer();
         let x = Point::new(y[0], y[1], y[2], y[3], self.geometry.coordinate_system());
         let p = geodesic_solver.momentum_from_state(&y);
-        result.push(Step { x, p, t, step: 0 });
+        result.push(Step::new(x, p, t, 0));
 
         #[cfg(debug_assertions)]
         let initial_constants = self.geometry.get_constants_of_motion(&x, &p);
@@ -114,7 +163,7 @@ impl<G: Geometry> Integrator<'_, G> {
 
             let x = Point::new(y[0], y[1], y[2], y[3], self.geometry.coordinate_system());
             let p = geodesic_solver.momentum_from_state(&y);
-            result.push(Step { x, p, t, step: i });
+            result.push(Step::new(x, p, t, i));
 
             #[cfg(debug_assertions)]
             {
@@ -217,24 +266,15 @@ impl<G: Geometry> Integrator<'_, G> {
             return Some(CoordinateIsNan);
         }
 
-        if self.geometry.inside_horizon(&Point::new(
-            cur_y[0],
-            cur_y[1],
-            cur_y[2],
-            cur_y[3],
-            self.geometry.coordinate_system(),
-        )) {
+        let coordinate_system = self.geometry.coordinate_system();
+        let position = Point::new(cur_y[0], cur_y[1], cur_y[2], cur_y[3], coordinate_system);
+
+        if self.geometry.inside_horizon(&position) {
             return Some(HorizonReached);
         }
 
         if self.geometry.closed_orbit(
-            &Point::new(
-                cur_y[0],
-                cur_y[1],
-                cur_y[2],
-                cur_y[3],
-                self.geometry.coordinate_system(),
-            ),
+            &position,
             step_index,
             self.integration_configuration.max_steps,
         ) {
@@ -242,8 +282,7 @@ impl<G: Geometry> Integrator<'_, G> {
         }
 
         // iterate until the celestial plane distance has been reached.
-        if get_position(cur_y, self.geometry.coordinate_system())
-            .radial_distance_spatial_part_squared()
+        if cartesian_radial_distance_squared(&position)
             > self.integration_configuration.max_radius_sq
         {
             return Some(CelestialSphereReached);
