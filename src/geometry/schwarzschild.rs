@@ -267,11 +267,12 @@ impl SupportQuantities for Schwarzschild {
     fn get_temperature_computer(
         &self,
         temperature: f64,
-        _inner_radius: f64,
+        inner_radius: f64,
         outer_radius: f64,
     ) -> Result<Box<dyn TemperatureComputer>, RaytracerError> {
         Ok(Box::new(KerrTemperatureComputer::new(
             temperature,
+            inner_radius,
             outer_radius,
             0.0,
             self.radius,
