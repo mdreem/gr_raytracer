@@ -30,9 +30,13 @@ render vantage_photonsphere_edge.png   "$SV" "-1.25,0,0"  -1.5708  4
 render vantage_grazing_winding.png     "$SV" "-1.55,0,0"  -2.1     4
 render vantage_rearview.png            "$SV" "-2.0,0,0.4" -0.5     4
 # Kerr companions (ZAMO)
+# The photonsphere/grazing cameras have BL radii (0.808, 1.003) inside
+# the disc annulus, so at z=0 they would sit exactly ON the razor-thin
+# disc surface and which side they see depends on floating-point noise
+# in the chart conversion; the 0.02 lift keeps them just above it.
 render vantage_kerr_dragged_porthole.png "$KV" "-0.75,0,0"   0       4
-render vantage_kerr_photonsphere_edge.png "$KV" "-0.95,0,0"  -1.75   4
-render vantage_kerr_grazing_winding.png "$KV" "-1.12,0,0"   -2.25   4
+render vantage_kerr_photonsphere_edge.png "$KV" "-0.95,0,0.02" -1.75 4
+render vantage_kerr_grazing_winding.png "$KV" "-1.12,0,0.02" -2.25   4
 render vantage_kerr_rearview.png       "$KV" "-2.55,0,0.4" -0.5     4
 # Kerr-only vantages
 render vantage_kerr_ergosphere_prograde.png "$KV" "-0.86,0,0" -1.5708 4

@@ -116,12 +116,12 @@ frame dragging pulls every one of them into asymmetry. The disc glow is
 
 <div align="center">
   <img src="vantage_kerr_photonsphere_edge.png" alt="The Kerr winding wall over bright inner-disc glow">
-  <p>Photon-shell edge: the winding wall of stacked disc and sky images, over the blinding glow of gas orbiting deep inside the well.</p>
+  <p>Photon-shell edge, hovering just above the disc surface: the winding wall of stacked disc and sky images, with the glowing surface curving away beneath the camera.</p>
 </div>
 
 <div align="center">
   <img src="vantage_kerr_grazing_winding.png" alt="Grazing multiple windings around the Kerr hole">
-  <p>Grazing view: the multiple-winding band, distorted relative to Schwarzschild because prograde and retrograde light circle at different radii around a spinning hole.</p>
+  <p>Grazing view, skimming just above the disc surface inside its annulus: the multiple-winding band, distorted relative to Schwarzschild because prograde and retrograde light circle at different radii around a spinning hole.</p>
 </div>
 
 <div align="center">
