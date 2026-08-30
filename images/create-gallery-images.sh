@@ -61,7 +61,10 @@ for set in "${SETS[@]}"; do
                 -e "s/^inner_radius = .*/inner_radius = $inner/" \
                 scene-definitions/kerr-checker-disc.toml > "$scene"
             echo "Rendering $out ..."
-            "$BIN" --width=1000 --height=1000 --max-steps=1000000 \
+            # epsilon 1e-9: avoids missed grazing disc hits at the wound
+            # inner arcs (chord-based intersection test); pull back once
+            # in-step crossing detection lands.
+            "$BIN" --width=1000 --height=1000 --max-steps=1000000 --epsilon=1e-9 \
                 --camera-position=-19,0,1.4 --theta=-3.14159 --psi=0 --phi=0 \
                 --config-file "$scene" render --filename="$out"
         done
@@ -117,7 +120,9 @@ for set in "${SETS[@]}"; do
             scene-definitions/kerr-blackbody-disc.toml > "$red"
         render_bb() { # scene camera exposure out
             echo "Rendering $4 ..."
-            "$BIN" --width=1000 --height=1000 --max-steps=1000000 \
+            # epsilon 1e-9: same missed-grazing-hit rationale as the
+            # checker set; pull back once the intersection test is fixed.
+            "$BIN" --width=1000 --height=1000 --max-steps=1000000 --epsilon=1e-9 \
                 --camera-position="$2" --theta=-3.14159 --psi=0 --phi=0 \
                 --exposure="$3" --config-file "$1" render --filename="$4"
         }
