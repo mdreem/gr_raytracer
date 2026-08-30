@@ -76,10 +76,6 @@ impl Disc {
 }
 
 impl Hittable for Disc {
-    // TODO: explicitly construct the ray. Follow the integration. Some intervals seem to be skipped
-    // here. See with current test setup. Intersection should be at t=7.63. With z=-2.442748091.
-    // The intersection should be with an interval crossing y=0. But it seems to happen near 0 with
-    // both coordinates.
     fn intersects(
         &self,
         y_start: &Step,
@@ -103,7 +99,8 @@ impl Hittable for Disc {
         let z0 = y_start_spatial[2];
         let z1 = y_end_spatial[2];
         if z0.signum() != z1.signum() {
-            // TODO: p2 can be 0 if parallel -> handle
+            // Opposite z signs mean z0 != z1, so point_end = z1 - z0 is never
+            // zero here; the parallel-chord division-by-zero cannot occur.
             let t = point_start / point_end; // plane intersection parameter.
 
             if !(0.0..=1.0).contains(&t) {
@@ -155,9 +152,9 @@ impl Hittable for Disc {
         }
         points.sort_by(f64::total_cmp);
 
-        for points in points.windows(2) {
-            let p1 = points[0];
-            let p2 = points[1];
+        for window in points.windows(2) {
+            let p1 = window[0];
+            let p2 = window[1];
 
             let f = |s: f64| c0 + c1 * s + c2 * s * s + c3 * s * s * s;
             let mut conv = SimpleConvergency {
@@ -317,5 +314,82 @@ mod tests {
         // r_normalized ~ 0 this is ~0.5.
         assert!((intersection.uv.u - 0.5).abs() < 1e-3);
         assert!((intersection.uv.v - 0.5).abs() < 1e-3);
+    }
+
+    /// A step with fixed in-plane position (radius `x`, phi = 0), endpoint
+    /// heights `z0`/`z1` above the disc plane, and Cartesian z-velocities
+    /// `m0`/`m1`. The affine step length is 1, so `get_z_cartesian * d_lambda`
+    /// returns `m0`/`m1` directly as the cubic's endpoint slopes. Used to
+    /// exercise the same-side cubic branch, where both endpoints share a sign
+    /// and the straight chord finds no crossing.
+    fn dip_steps(x: f64, z0: f64, z1: f64, m0: f64, m1: f64) -> (Step, Step) {
+        (
+            Step {
+                x: Point::new_cartesian(0.0, x, 0.0, z0),
+                p: FourVector::new_cartesian(1.0, 0.0, 0.0, m0),
+                t: 0.0,
+                step: 0,
+            },
+            Step {
+                x: Point::new_cartesian(0.0, x, 0.0, z1),
+                p: FourVector::new_cartesian(1.0, 0.0, 0.0, m1),
+                t: 1.0,
+                step: 1,
+            },
+        )
+    }
+
+    #[test]
+    fn test_cubic_detects_symmetric_same_side_dip() {
+        // Both endpoints above the plane (z = 0.1) but the path dips through
+        // it and back (m0 < 0, m1 > 0). The straight chord between them never
+        // crosses, so only the cubic Hermite catches it. Symmetric slopes make
+        // c3 = 0, so this also drives the a -> 0 (parabola) branch of the
+        // numerically stable quadratic solve.
+        let geometry = EuclideanSpace::new();
+        let disc = create_disc(3.0, 8.0);
+        let (start, end) = dip_steps(5.0, 0.1, 0.1, -1.0, 1.0);
+        assert!(disc.intersects(&start, &end, &geometry).is_some());
+    }
+
+    #[test]
+    fn test_cubic_detects_asymmetric_same_side_dip() {
+        // Genuine cubic (c3 != 0): both endpoints positive, asymmetric slopes,
+        // still dips below zero and back.
+        let geometry = EuclideanSpace::new();
+        let disc = create_disc(3.0, 8.0);
+        let (start, end) = dip_steps(5.0, 0.1, 0.3, -2.0, 1.0);
+        assert!(disc.intersects(&start, &end, &geometry).is_some());
+    }
+
+    #[test]
+    fn test_cubic_same_side_no_dip_misses() {
+        // Same-sign endpoints with interior turning points, but the curve
+        // never reaches the far side of zero: no crossing, so None. Exercises
+        // the "turning points exist but no sub-interval brackets a root" path.
+        let geometry = EuclideanSpace::new();
+        let disc = create_disc(3.0, 8.0);
+        let (start, end) = dip_steps(5.0, 0.1, 0.3, 1.0, 1.0);
+        assert!(disc.intersects(&start, &end, &geometry).is_none());
+    }
+
+    #[test]
+    fn test_cubic_same_side_monotone_misses() {
+        // Same-sign, strictly monotone: the derivative has no real roots
+        // (discriminant < 0), so the early-out returns None without a solve.
+        let geometry = EuclideanSpace::new();
+        let disc = create_disc(3.0, 8.0);
+        let (start, end) = dip_steps(5.0, 0.1, 1.0, 1.0, 1.0);
+        assert!(disc.intersects(&start, &end, &geometry).is_none());
+    }
+
+    #[test]
+    fn test_cubic_dip_outside_annulus_misses() {
+        // Same dip geometry, but the in-plane radius (1.0) is inside the disc
+        // inner edge (3.0), so the crossing lands off the gas: None.
+        let geometry = EuclideanSpace::new();
+        let disc = create_disc(3.0, 8.0);
+        let (start, end) = dip_steps(1.0, 0.1, 0.1, -1.0, 1.0);
+        assert!(disc.intersects(&start, &end, &geometry).is_none());
     }
 }
