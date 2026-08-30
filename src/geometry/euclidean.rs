@@ -46,7 +46,7 @@ impl HasCoordinateSystem for EuclideanSpacedSolver {
 impl GeodesicSolver for EuclideanSpacedSolver {
     fn geodesic(&self, _: f64, y_state: &EquationOfMotionState) -> EquationOfMotionState {
         trace!("y_state = {:?}", y_state);
-        EquationOfMotionState::from_column_slice(&[
+        EquationOfMotionState::from([
             y_state[4], y_state[5], y_state[6], y_state[7], 0.0, 0.0, 0.0, 0.0,
         ])
     }

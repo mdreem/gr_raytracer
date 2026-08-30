@@ -76,7 +76,9 @@ impl Hittable for Disc {
             // cos/sin of the in-plane angle, taken straight from the
             // normalized components rather than round-tripping through
             // atan2 and back (identical result, no transcendentals).
-            let planar_radius = vector_in_plane[0].hypot(vector_in_plane[1]);
+            let planar_radius = (vector_in_plane[0] * vector_in_plane[0]
+                + vector_in_plane[1] * vector_in_plane[1])
+                .sqrt();
             let (cos_phi, sin_phi) = if planar_radius > 0.0 {
                 (
                     vector_in_plane[0] / planar_radius,

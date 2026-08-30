@@ -247,7 +247,7 @@ impl GeodesicSolver for KerrSolver {
         let hamiltonian = 0.5 * (p.transpose() * contravariant_metric * p)[(0, 0)];
         trace!("Hamiltonian H = {}", hamiltonian);
 
-        EquationOfMotionState::from_column_slice(&[dt, dx, dy, dz, a_t, a_x, a_y, a_z])
+        EquationOfMotionState::from([dt, dx, dy, dz, a_t, a_x, a_y, a_z])
     }
 
     fn create_initial_state(&self, ray: &Ray) -> EquationOfMotionState {
@@ -257,7 +257,7 @@ impl GeodesicSolver for KerrSolver {
 
         let momentum_covariant = covariant_metric * ray.momentum.vector;
 
-        EquationOfMotionState::from_column_slice(&[
+        EquationOfMotionState::from([
             ray.position[0],
             ray.position[1],
             ray.position[2],

@@ -177,7 +177,7 @@ impl GeodesicSolver for KerrBLSolver {
         let dv_theta =
             potential_theta_derivative_from_sin_cos(sin_t, cos_t, self.a, self.e, self.l_z) / 2.0;
 
-        EquationOfMotionState::from_column_slice(&[
+        EquationOfMotionState::from([
             dt, v_r, v_theta, dphi, dv_r, dv_theta, 0.0, 0.0,
         ])
     }
@@ -228,7 +228,7 @@ impl GeodesicSolver for KerrBLSolver {
         let v_r = sign_r * r_pot.max(0.0).sqrt();
         let v_theta = sign_theta * th_pot.max(0.0).sqrt();
 
-        EquationOfMotionState::from_column_slice(&[t, r, theta, phi, v_r, v_theta, 0.0, 0.0])
+        EquationOfMotionState::from([t, r, theta, phi, v_r, v_theta, 0.0, 0.0])
     }
 
     fn momentum_from_state(&self, y: &EquationOfMotionState) -> FourVector {
@@ -1605,7 +1605,7 @@ mod tests {
         let v_r = 0.1;
         let v_theta = -0.05;
         let y =
-            EquationOfMotionState::from_column_slice(&[0.0, r, theta, 0.0, v_r, v_theta, 0.0, 0.0]);
+            EquationOfMotionState::from([0.0, r, theta, 0.0, v_r, v_theta, 0.0, 0.0]);
 
         let rhs = solver.geodesic(0.0, &y);
 
