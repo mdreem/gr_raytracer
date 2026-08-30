@@ -25,8 +25,8 @@ pub struct ColorComputationData<'a> {
 pub trait Hittable: Sync {
     fn intersects(
         &self,
-        y_start: &Point,
-        y_end: &Point,
+        y_start: &Step,
+        y_end: &Step,
         geometry: &dyn Geometry,
     ) -> Option<Intersection>;
     fn color_at_uv(

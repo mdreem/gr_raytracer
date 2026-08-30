@@ -44,12 +44,15 @@ fn solve_for_t(y_start_spatial: Vector3<f64>, direction: Vector3<f64>, r: f64) -
         None
     } else {
         let sqrt_disc = discriminant.sqrt();
-        let t1 = (-b + sqrt_disc) / (2.0 * a);
-        let t2 = (-b - sqrt_disc) / (2.0 * a);
-        if (0.0..=1.0).contains(&t1) {
-            Some(t1)
-        } else if (0.0..=1.0).contains(&t2) {
-            Some(t2)
+        // t_near <= t_far since a = |direction|^2 > 0. Return the nearest
+        // surface crossing inside the segment: t_near for an entering or
+        // tunnelling ray, t_far when the segment starts inside the sphere.
+        let t_near = (-b - sqrt_disc) / (2.0 * a);
+        let t_far = (-b + sqrt_disc) / (2.0 * a);
+        if (0.0..=1.0).contains(&t_near) {
+            Some(t_near)
+        } else if (0.0..=1.0).contains(&t_far) {
+            Some(t_far)
         } else {
             None
         }
@@ -60,74 +63,65 @@ impl Hittable for Sphere {
     // y_start and y_end have to be Cartesian.
     fn intersects(
         &self,
-        y_start: &Point,
-        y_end: &Point,
+        y_start: &Step,
+        y_end: &Step,
         _geometry: &dyn Geometry,
     ) -> Option<Intersection> {
         debug_assert_eq!(self.position.coordinate_system, CoordinateSystem::Cartesian);
 
-        let y_start_cartesian = y_start.to_cartesian();
-        let y_end_cartesian = y_end.to_cartesian();
+        let y_start_cartesian = y_start.x.to_cartesian();
+        let y_end_cartesian = y_end.x.to_cartesian();
 
         let neg_position = -self.position;
         let y_start_shifted = y_start_cartesian + neg_position;
         let y_end_shifted = y_end_cartesian + neg_position;
-        let r_start = y_start_shifted.radial_distance_spatial_part_squared();
-        let r_end = y_end_shifted.radial_distance_spatial_part_squared();
 
-        // Checks if the line element intersects the surface of the sphere.
-        if (r_start >= self.radius.powi(2) && r_end <= self.radius.powi(2))
-            || (r_start <= self.radius.powi(2) && r_end >= self.radius.powi(2))
-        {
-            let y_start_spatial = y_start_shifted.get_spatial_vector_cartesian();
-            let y_end_spatial = y_end_shifted.get_spatial_vector_cartesian();
-            let direction = y_end_spatial - y_start_spatial;
+        let y_start_spatial = y_start_shifted.get_spatial_vector_cartesian();
+        let y_end_spatial = y_end_shifted.get_spatial_vector_cartesian();
+        let direction = y_end_spatial - y_start_spatial;
 
-            let t = match solve_for_t(y_start_spatial, direction, self.radius) {
-                None => {
-                    return None;
-                }
-                Some(t) => t,
-            };
+        // Solve the ray-sphere quadratic over the whole segment rather than
+        // gating on the endpoints' radii: a step that passes fully through the
+        // sphere leaves both endpoints outside, so an endpoint-inside/outside
+        // test would tunnel straight through it. The quadratic classifies every
+        // case (no hit -> negative discriminant or roots outside [0,1]).
+        let t = solve_for_t(y_start_spatial, direction, self.radius)?;
 
-            // UV mapping needs the hit point in the sphere's own local frame
-            // (so e.g. the texture's north pole is always the sphere's own
-            // north pole, regardless of where the sphere sits in the scene).
-            let point_on_sphere_spatial = y_start_spatial + t * direction;
-            let point_on_sphere_local = cartesian_to_spherical(&Point::new(
-                0.0,
-                point_on_sphere_spatial[0],
-                point_on_sphere_spatial[1],
-                point_on_sphere_spatial[2],
-                CoordinateSystem::Cartesian,
-            ));
+        // UV mapping needs the hit point in the sphere's own local frame
+        // (so e.g. the texture's north pole is always the sphere's own
+        // north pole, regardless of where the sphere sits in the scene).
+        let point_on_sphere_spatial = y_start_spatial + t * direction;
+        let point_on_sphere_local = cartesian_to_spherical(&Point::new(
+            0.0,
+            point_on_sphere_spatial[0],
+            point_on_sphere_spatial[1],
+            point_on_sphere_spatial[2],
+            CoordinateSystem::Cartesian,
+        ));
 
-            let theta = point_on_sphere_local[2];
-            let phi = point_on_sphere_local[3];
-            let u = (PI + phi) / (2.0 * PI);
-            let v = theta / PI;
+        let theta = point_on_sphere_local[2];
+        let phi = point_on_sphere_local[3];
+        let u = (PI + phi) / (2.0 * PI);
+        let v = theta / PI;
 
-            // `Intersection::intersection_point` itself must be world-space:
-            // it's used (via `energy_of_emitter`) to evaluate the geometry's
-            // fields (e.g. the stationary observer's velocity) at the
-            // emitter's actual location relative to the black hole, not
-            // relative to the sphere's own center.
-            let position_spatial = self.position.get_spatial_vector_cartesian();
-            let point_on_sphere_world = Point::new_cartesian(
-                0.0,
-                point_on_sphere_spatial[0] + position_spatial[0],
-                point_on_sphere_spatial[1] + position_spatial[1],
-                point_on_sphere_spatial[2] + position_spatial[2],
-            );
+        // `Intersection::intersection_point` itself must be world-space:
+        // it's used (via `energy_of_emitter`) to evaluate the geometry's
+        // fields (e.g. the stationary observer's velocity) at the
+        // emitter's actual location relative to the black hole, not
+        // relative to the sphere's own center.
+        let position_spatial = self.position.get_spatial_vector_cartesian();
+        let point_on_sphere_world = Point::new_cartesian(
+            0.0,
+            point_on_sphere_spatial[0] + position_spatial[0],
+            point_on_sphere_spatial[1] + position_spatial[1],
+            point_on_sphere_spatial[2] + position_spatial[2],
+        );
 
-            return Some(Intersection {
-                uv: UVCoordinates { u: 1.0 - u, v },
-                intersection_point: point_on_sphere_world,
-                t,
-            });
-        }
-
-        None
+        Some(Intersection {
+            uv: UVCoordinates { u: 1.0 - u, v },
+            intersection_point: point_on_sphere_world,
+            t,
+        })
     }
 
     fn color_at_uv(
@@ -167,12 +161,24 @@ impl SceneObject for Sphere {}
 mod tests {
     use super::*;
     use crate::geometry::euclidean::EuclideanSpace;
+    use crate::geometry::four_vector::FourVector;
     use crate::geometry::point::Point;
     use crate::rendering::color::Color;
     use crate::rendering::texture::CheckerMapper;
     use crate::scene_objects::hittable::Hittable;
     use approx::assert_abs_diff_eq;
     use std::sync::Arc;
+
+    // Sphere intersection only reads the endpoint positions; the momentum is
+    // a placeholder so the tests can build `Step`s.
+    fn as_step(p: Point) -> Step {
+        Step {
+            x: p,
+            p: FourVector::new_cartesian(1.0, 0.0, 0.0, 0.0),
+            t: 0.0,
+            step: 0,
+        }
+    }
 
     fn create_sphere_at(x: f64, y: f64, z: f64) -> Sphere {
         Sphere::new(
@@ -197,7 +203,7 @@ mod tests {
 
         assert!(
             sphere
-                .intersects(&y_start, &y_end, &EuclideanSpace::new())
+                .intersects(&as_step(y_start), &as_step(y_end), &EuclideanSpace::new())
                 .is_some()
         );
     }
@@ -210,7 +216,7 @@ mod tests {
 
         assert!(
             sphere
-                .intersects(&y_start, &y_end, &EuclideanSpace::new())
+                .intersects(&as_step(y_start), &as_step(y_end), &EuclideanSpace::new())
                 .is_none()
         );
     }
@@ -223,7 +229,7 @@ mod tests {
 
         assert!(
             sphere
-                .intersects(&y_start, &y_end, &EuclideanSpace::new())
+                .intersects(&as_step(y_start), &as_step(y_end), &EuclideanSpace::new())
                 .is_some()
         );
     }
@@ -236,7 +242,7 @@ mod tests {
 
         assert!(
             sphere
-                .intersects(&y_start, &y_end, &EuclideanSpace::new())
+                .intersects(&as_step(y_start), &as_step(y_end), &EuclideanSpace::new())
                 .is_none()
         );
     }
@@ -253,7 +259,7 @@ mod tests {
         let y_end = Point::new_cartesian(0.0, 0.0, 0.0, 19.5);
 
         let intersection = sphere
-            .intersects(&y_start, &y_end, &EuclideanSpace::new())
+            .intersects(&as_step(y_start), &as_step(y_end), &EuclideanSpace::new())
             .expect("ray should hit sphere");
         let hit = intersection
             .intersection_point

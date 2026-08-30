@@ -652,11 +652,11 @@ impl VolumetricDisc {
 impl Hittable for VolumetricDisc {
     fn intersects(
         &self,
-        y_start: &Point,
-        y_end: &Point,
+        y_start: &Step,
+        y_end: &Step,
         _geometry: &dyn Geometry,
     ) -> Option<Intersection> {
-        self.intersects_internal(y_start, y_end)
+        self.intersects_internal(&y_start.x, &y_end.x)
     }
 
     fn color_at_uv(
