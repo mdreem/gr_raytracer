@@ -10,6 +10,7 @@ Run commands from the repository root.
 ```text
 scripts/
   animate-rays/           # Manim scene + config for ray animations
+  gaia/                   # Gaia DR3 star-catalogue download helper
   plotting/               # Trajectory and direction plotting tools
   rays/                   # Ray export scripts
   rendering/              # Camera paths, frame rendering, movie/Kerr batch generation
@@ -184,4 +185,23 @@ uv run scripts/plotting/direction_plotter.py
 
 ```sh
 uv run scripts/textures/create_uv_map.py
+```
+
+### `gaia/download.py`
+
+- Downloads a magnitude-limited subset of the Gaia DR3 catalogue
+  (`gaiadr3.gaia_source`) via ESA's async TAP/ADQL service and writes it as a
+  typed Zstandard-compressed Parquet file (stage 1 of
+  `docs/plan-12-star-catalog.md`).
+- Depends on the opt-in `gaia` dependency group (`astroquery`, `astropy`,
+  `pyarrow`), so it is run with `--group gaia`.
+- Generated catalogue files land in `data/` and are git-ignored.
+- See `scripts/gaia/README.md` for the output schema and full options.
+
+```sh
+# Small test download (~100k stars)
+uv run --group gaia scripts/gaia/download.py download --max-magnitude 12 --limit 100000
+
+# Full magnitude-limited query (no TOP)
+uv run --group gaia scripts/gaia/download.py download --max-magnitude 12
 ```

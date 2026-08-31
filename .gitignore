@@ -29,3 +29,8 @@ extra_resources/
 
 __pycache__/
 *.pyc
+
+# Generated catalogue data (scripts/gaia/). Keep the directory tracked so a
+# build/run can rely on data/ existing, but ignore its generated contents.
+/data/*
+!/data/README.md
