@@ -23,8 +23,15 @@ pub struct RaySample {
 }
 
 #[derive(Debug, Clone, Copy, PartialEq)]
+pub struct EscapeInfo {
+    /// Coordinates on the celestial sphere.
+    pub theta: f64,
+    pub phi: f64,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq)]
 pub enum RayClass {
-    Escaped,
+    Escaped(EscapeInfo),
     Captured,
     Hit,
 }
@@ -175,7 +182,11 @@ impl<'a, G: Geometry> Scene<'a, G> {
                             temperature: self.celestial_temperature,
                         },
                     )?);
-                    ray_class = RayClass::Escaped;
+                    let pos_on_celestial_sphere = last_step.x.get_as_spherical();
+                    ray_class = RayClass::Escaped(EscapeInfo {
+                        theta: pos_on_celestial_sphere[1],
+                        phi: pos_on_celestial_sphere[2],
+                    });
                 }
                 StopReason::CoordinateIsNan => {
                     error!(
@@ -574,7 +585,7 @@ mod tests {
         let ray = scene.camera.get_ray_for(0, 0);
         let sample = scene.color_of_ray(&ray).unwrap();
 
-        assert_eq!(sample.ray_class, RayClass::Escaped);
+        assert!(matches!(sample.ray_class, RayClass::Escaped(_)));
         assert_approx_eq_cie_tristimulus!(sample.color, CELESTIAL_SPHERE_COLOR_2, 1e-6);
     }
 
