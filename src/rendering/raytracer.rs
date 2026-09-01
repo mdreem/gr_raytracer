@@ -7,7 +7,7 @@ use crate::rendering::color::{
 };
 use crate::rendering::integrator::{IntegrationError, StopReason};
 use crate::rendering::ray::IntegratedRay;
-use crate::rendering::scene::{RayClass, RaySample, Scene};
+use crate::rendering::scene::{EscapeInfo, RayClass, RaySample, Scene};
 use crate::rendering::texture::TextureError;
 use image::{ImageBuffer, ImageError, ImageFormat, Rgb};
 use indicatif::style::TemplateError;
@@ -98,11 +98,11 @@ fn should_supersample_pair(
     config: &AdaptiveSamplingConfig,
     minimum_luminance: f64,
 ) -> bool {
-    if pixel.ray_class != neighbor.ray_class {
+    if std::mem::discriminant(&pixel.ray_class) != std::mem::discriminant(&neighbor.ray_class) {
         return true;
     }
 
-    if config.exclude_background_contrast && pixel.ray_class == RayClass::Escaped {
+    if config.exclude_background_contrast && matches!(pixel.ray_class, RayClass::Escaped(_)) {
         return false;
     }
 
@@ -209,7 +209,10 @@ impl<'a, G: Geometry> Raytracer<'a, G> {
         let mut buffer: Vec<RaySample> = vec![
             RaySample {
                 color: CIETristimulus::new(0.0, 0.0, 0.0, 1.0),
-                ray_class: RayClass::Escaped
+                ray_class: RayClass::Escaped(EscapeInfo {
+                    theta: 0.0,
+                    phi: 0.0,
+                }),
             };
             max_count as usize
         ];
@@ -533,7 +536,7 @@ mod tests {
     };
     use crate::configuration::AdaptiveSamplingConfig;
     use crate::rendering::color::CIETristimulus;
-    use crate::rendering::scene::{RayClass, RaySample};
+    use crate::rendering::scene::{EscapeInfo, RayClass, RaySample};
 
     fn sample(y: f64, alpha: f64, ray_class: RayClass) -> RaySample {
         RaySample {
@@ -577,7 +580,14 @@ mod tests {
     #[test]
     fn class_boundaries_are_always_supersampled() {
         let config = AdaptiveSamplingConfig::default();
-        let escaped = sample(0.0, 1.0, RayClass::Escaped);
+        let escaped = sample(
+            0.0,
+            1.0,
+            RayClass::Escaped(EscapeInfo {
+                theta: 0.0,
+                phi: 0.0,
+            }),
+        );
         let captured = sample(0.0, 1.0, RayClass::Captured);
 
         assert!(should_supersample_pair(&escaped, &captured, &config, 100.0));
@@ -591,8 +601,8 @@ mod tests {
             opacity_contrast_threshold: 0.0,
             ..Default::default()
         };
-        let dark = sample(1.0, 0.0, RayClass::Escaped);
-        let bright = sample(100.0, 1.0, RayClass::Escaped);
+        let dark = sample(1.0, 0.0, RayClass::Escaped(EscapeInfo { theta: 0.0, phi: 0.0 }));
+        let bright = sample(100.0, 1.0, RayClass::Escaped(EscapeInfo { theta: 1.0, phi: 1.0 }));
 
         assert!(!should_supersample_pair(&dark, &bright, &config, 0.0));
     }
