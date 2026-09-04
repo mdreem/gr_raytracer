@@ -16,6 +16,25 @@ pub struct RenderConfig {
     /// Adaptive supersampling quality and edge-detection controls.
     #[serde(default)]
     pub adaptive_sampling: AdaptiveSamplingConfig,
+    /// Optional Gaia DR3 star catalogue rendered as point sources on the
+    /// celestial sphere. It is downloaded by scripts/gaia/download.py.
+    /// When omitted, only `celestial_texture` is used.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub star_catalog: Option<StarCatalogConfig>,
+}
+
+#[derive(Deserialize, Serialize, Debug, PartialEq, Clone)]
+pub struct StarCatalogConfig {
+    /// Path to the Parquet catalogue produced by `scripts/gaia/download.py`.
+    pub path: String,
+    /// Linear multiplier applied to each star's flux before it is added to
+    /// the celestial sphere.
+    #[serde(default = "default_star_flux_scale")]
+    pub flux_scale: f64,
+}
+
+fn default_star_flux_scale() -> f64 {
+    1.0
 }
 
 #[derive(Deserialize, Serialize, Clone, Debug, PartialEq)]
@@ -313,6 +332,7 @@ mod tests {
             },
             camera_velocity: Default::default(),
             adaptive_sampling: Default::default(),
+            star_catalog: None,
             objects: vec![
                 ObjectsConfig::Sphere {
                     radius: 1.0,
