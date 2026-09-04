@@ -25,8 +25,9 @@ pub struct RaySample {
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub struct EscapeInfo {
     /// Coordinates on the celestial sphere.
-    pub theta: f64,
-    pub phi: f64,
+    pub x: f64,
+    pub y: f64,
+    pub z: f64,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq)]
@@ -34,6 +35,15 @@ pub enum RayClass {
     Escaped(EscapeInfo),
     Captured,
     Hit,
+}
+
+impl RayClass {
+    pub fn escaped(self) -> Option<EscapeInfo> {
+        match self {
+            RayClass::Escaped(info) => Some(info),
+            _ => None,
+        }
+    }
 }
 
 pub struct Scene<'a, G: Geometry> {
@@ -182,10 +192,11 @@ impl<'a, G: Geometry> Scene<'a, G> {
                             temperature: self.celestial_temperature,
                         },
                     )?);
-                    let pos_on_celestial_sphere = last_step.x.get_as_spherical();
+                    let pos_on_celestial_sphere = last_step.x.get_as_cartesian();
                     ray_class = RayClass::Escaped(EscapeInfo {
-                        theta: pos_on_celestial_sphere[1],
-                        phi: pos_on_celestial_sphere[2],
+                        x: pos_on_celestial_sphere[0],
+                        y: pos_on_celestial_sphere[1],
+                        z: pos_on_celestial_sphere[2],
                     });
                 }
                 StopReason::CoordinateIsNan => {

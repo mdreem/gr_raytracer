@@ -12,6 +12,7 @@ use crate::rendering::texture::TextureError;
 use image::{ImageBuffer, ImageError, ImageFormat, Rgb};
 use indicatif::style::TemplateError;
 use log::{debug, error, info};
+use nalgebra::Vector3;
 use rayon::iter::IndexedParallelIterator;
 use rayon::iter::IntoParallelRefMutIterator;
 use rayon::iter::ParallelIterator;
@@ -162,6 +163,48 @@ fn stratified_sample_offset(
     (dx, dy)
 }
 
+fn to_cartesian(theta: f64, phi: f64) -> nalgebra::Vector3<f64> {
+    let x = theta.sin() * phi.cos();
+    let y = theta.sin() * phi.sin();
+    let z = theta.cos();
+    nalgebra::Vector3::new(x, y, z)
+}
+
+fn solid_angle_from_vecs(a_vec: &Vector3<f64>, b_vec: &Vector3<f64>, c_vec: &Vector3<f64>) -> f64 {
+    let num = a_vec.dot(&b_vec.cross(&c_vec));
+    let denom = 1.0 + a_vec.dot(&b_vec) + b_vec.dot(&c_vec) + c_vec.dot(&a_vec);
+
+    2.0 * num.atan2(denom)
+}
+
+fn compute_traced_tube_solid_angle(
+    a: &EscapeInfo,
+    b: &EscapeInfo,
+    c: &EscapeInfo,
+    d: &EscapeInfo,
+) -> f64 {
+    let a_vec = Vector3::new(a.x, a.y, a.z);
+    let b_vec = Vector3::new(b.x, b.y, b.z);
+    let c_vec = Vector3::new(c.x, c.y, c.z);
+    let d_vec = Vector3::new(d.x, d.y, d.z);
+
+    // See https://en.wikipedia.org/wiki/Solid_angle
+    // |a_vec| = |b_vec| = |c_vec| = 1, so the formula simplifies to:
+
+    let angle_1 = solid_angle_from_vecs(&a_vec, &b_vec, &c_vec);
+    let angle_2 = solid_angle_from_vecs(&b_vec, &c_vec, &d_vec);
+
+    angle_1 + angle_2
+}
+
+fn inside_convex_spherical_triangle(p: &Vector3<f64>, q: &[Vector3<f64>; 3]) -> bool {
+    let centroid = (q[0] + q[1] + q[2]).normalize();
+    (0..3).all(|i| {
+        let n = q[i].cross(&q[(i + 1) % 3]);
+        n.dot(p).signum() == n.dot(&centroid).signum()
+    })
+}
+
 impl<'a, G: Geometry> Raytracer<'a, G> {
     pub fn new(scene: Scene<'a, G>, tone_mapping: ToneMappingMethod, exposure: f64) -> Self {
         Self {
@@ -179,6 +222,45 @@ impl<'a, G: Geometry> Raytracer<'a, G> {
         debug!("sample: {:?}", sample);
     }
 
+    fn find_stars_in(&self, a: &RaySample, b: &RaySample, c: &RaySample, d: &RaySample) -> f64 {
+        let mut stars = Vec::new();
+        for sample in [a, b, c, d] {
+            if let RayClass::Escaped(_) = sample.ray_class {
+                stars.push(sample);
+            }
+        }
+        0.0
+    }
+
+    fn handle_star_map(
+        &self,
+        ray_sample_a: &RaySample,
+        ray_sample_b: &RaySample,
+        ray_sample_c: &RaySample,
+        ray_sample_d: &RaySample,
+    ) -> CIETristimulus {
+        match (
+            ray_sample_a.ray_class,
+            ray_sample_b.ray_class,
+            ray_sample_c.ray_class,
+            ray_sample_d.ray_class,
+        ) {
+            (
+                RayClass::Escaped(a),
+                RayClass::Escaped(b),
+                RayClass::Escaped(c),
+                RayClass::Escaped(d),
+            ) => {
+                let solid_angle = compute_traced_tube_solid_angle(&a, &b, &c, &d);
+                debug!("Solid angle of traced tube: {}", solid_angle);
+                CIETristimulus::new(0.0, 0.0, 0.0, 1.0)
+            }
+            // TODO: Handle corner cases, start with all corners escaped.
+            // After that there need to be subdivisions..
+            _ => ray_sample_a.color,
+        }
+    }
+
     fn render_section_to_cie_buffer(
         &self,
         from_row: u32,
@@ -189,6 +271,34 @@ impl<'a, G: Geometry> Raytracer<'a, G> {
         if self.scene.adaptive_sampling.enabled || self.scene.sampling_mask_color.is_some() {
             self.render_section_to_cie_buffer_supersampled(from_row, from_col, to_row, to_col)
         } else {
+            let samples =
+                self.render_section_to_cie_buffer_raw(from_row, from_col, to_row, to_col)?;
+
+            let mut colors = vec![CIETristimulus::new(0.0, 0.0, 0.0, 1.0); samples.len()];
+            let width = (to_col - from_col) as usize;
+            for col in 0..samples.len() - 1 {
+                for row in 0..samples.len() - 1 {
+                    let idx = row * width + col;
+                    let sample_a = &samples[idx as usize];
+                    let sample_b = &samples[(idx + 1) as usize];
+                    let sample_c = &samples[(idx + width) as usize];
+                    let sample_d = &samples[(idx + width + 1) as usize];
+
+                    let color = self.handle_star_map(sample_a, sample_b, sample_c, sample_d);
+                    colors[idx as usize] = color;
+                }
+            }
+
+            // Fill in the edges of the buffer with the original samples, since they don't have neighbors to compare with.
+            for col in 0..(to_col - from_col) {
+                let idx = (col + (to_row - from_row - 1)) as usize;
+                colors[idx] = samples[idx].color;
+            }
+            for row in 0..(to_row - from_row) {
+                let idx = (row * (to_col - from_col)) as usize;
+                colors[idx] = samples[idx].color;
+            }
+
             Ok(self
                 .render_section_to_cie_buffer_raw(from_row, from_col, to_row, to_col)?
                 .into_iter()
@@ -210,8 +320,9 @@ impl<'a, G: Geometry> Raytracer<'a, G> {
             RaySample {
                 color: CIETristimulus::new(0.0, 0.0, 0.0, 1.0),
                 ray_class: RayClass::Escaped(EscapeInfo {
-                    theta: 0.0,
-                    phi: 0.0,
+                    x: 0.0,
+                    y: 0.0,
+                    z: 0.0,
                 }),
             };
             max_count as usize
@@ -584,8 +695,9 @@ mod tests {
             0.0,
             1.0,
             RayClass::Escaped(EscapeInfo {
-                theta: 0.0,
-                phi: 0.0,
+                x: 0.0,
+                y: 0.0,
+                z: 1.0,
             }),
         );
         let captured = sample(0.0, 1.0, RayClass::Captured);
@@ -601,8 +713,24 @@ mod tests {
             opacity_contrast_threshold: 0.0,
             ..Default::default()
         };
-        let dark = sample(1.0, 0.0, RayClass::Escaped(EscapeInfo { theta: 0.0, phi: 0.0 }));
-        let bright = sample(100.0, 1.0, RayClass::Escaped(EscapeInfo { theta: 1.0, phi: 1.0 }));
+        let dark = sample(
+            1.0,
+            0.0,
+            RayClass::Escaped(EscapeInfo {
+                x: 0.0,
+                y: 0.0,
+                z: 1.0,
+            }),
+        );
+        let bright = sample(
+            100.0,
+            1.0,
+            RayClass::Escaped(EscapeInfo {
+                x: 1.0,
+                y: 0.0,
+                z: 0.0,
+            }),
+        );
 
         assert!(!should_supersample_pair(&dark, &bright, &config, 0.0));
     }

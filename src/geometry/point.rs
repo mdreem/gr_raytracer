@@ -187,6 +187,16 @@ impl Point {
         }
     }
 
+    pub fn get_as_cartesian(self) -> Vector3<f64> {
+        match self.coordinate_system {
+            Cartesian => Vector3::new(self.vector[1], self.vector[2], self.vector[3]),
+            Spherical | BoyerLindquist { .. } => {
+                let v = self.to_cartesian();
+                Vector3::new(v[1], v[2], v[3])
+            }
+        }
+    }
+
     pub fn radial_distance_spatial_part_squared(&self) -> f64 {
         let v = self.vector;
         match self.coordinate_system {
