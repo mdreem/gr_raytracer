@@ -222,16 +222,6 @@ impl<'a, G: Geometry> Raytracer<'a, G> {
         debug!("sample: {:?}", sample);
     }
 
-    fn find_stars_in(&self, a: &RaySample, b: &RaySample, c: &RaySample, d: &RaySample) -> f64 {
-        let mut stars = Vec::new();
-        for sample in [a, b, c, d] {
-            if let RayClass::Escaped(_) = sample.ray_class {
-                stars.push(sample);
-            }
-        }
-        0.0
-    }
-
     fn handle_star_map(
         &self,
         ray_sample_a: &RaySample,
@@ -253,6 +243,25 @@ impl<'a, G: Geometry> Raytracer<'a, G> {
             ) => {
                 let solid_angle = compute_traced_tube_solid_angle(&a, &b, &c, &d);
                 debug!("Solid angle of traced tube: {}", solid_angle);
+
+                let mut total_mag = 0.0;
+                // TODO: Move the collection into scene
+                if let Some(star_catalog) = &self.scene.star_catalog {
+                    for star in &star_catalog.stars {
+                        if inside_convex_spherical_triangle(
+                            &star.direction,
+                            &[a.to_vec(), b.to_vec(), c.to_vec()],
+                        ) {
+                            total_mag += star.g_mag;
+                            debug!("Star {} is inside the traced tube", star.source_id);
+                        }
+                    }
+                }
+
+                if total_mag > 0.0 {
+                    return CIETristimulus::new(1.0, 1.0, 1.0, 1.0);
+                }
+
                 CIETristimulus::new(0.0, 0.0, 0.0, 1.0)
             }
             // TODO: Handle corner cases, start with all corners escaped.
@@ -274,36 +283,22 @@ impl<'a, G: Geometry> Raytracer<'a, G> {
             let samples =
                 self.render_section_to_cie_buffer_raw(from_row, from_col, to_row, to_col)?;
 
-            let mut colors = vec![CIETristimulus::new(0.0, 0.0, 0.0, 1.0); samples.len()];
+            // TODO: this needs more work. It's a rough sweep.
             let width = (to_col - from_col) as usize;
-            for col in 0..samples.len() - 1 {
-                for row in 0..samples.len() - 1 {
+            let height = (to_row - from_row) as usize;
+            let mut colors: Vec<CIETristimulus> = samples.iter().map(|s| s.color).collect();
+            for row in 0..height.saturating_sub(1) {
+                for col in 0..width.saturating_sub(1) {
                     let idx = row * width + col;
-                    let sample_a = &samples[idx as usize];
-                    let sample_b = &samples[(idx + 1) as usize];
-                    let sample_c = &samples[(idx + width) as usize];
-                    let sample_d = &samples[(idx + width + 1) as usize];
-
-                    let color = self.handle_star_map(sample_a, sample_b, sample_c, sample_d);
-                    colors[idx as usize] = color;
+                    let sample_a = &samples[idx];
+                    let sample_b = &samples[idx + 1];
+                    let sample_c = &samples[idx + width];
+                    let sample_d = &samples[idx + width + 1];
+                    colors[idx] = self.handle_star_map(sample_a, sample_b, sample_c, sample_d);
                 }
             }
 
-            // Fill in the edges of the buffer with the original samples, since they don't have neighbors to compare with.
-            for col in 0..(to_col - from_col) {
-                let idx = (col + (to_row - from_row - 1)) as usize;
-                colors[idx] = samples[idx].color;
-            }
-            for row in 0..(to_row - from_row) {
-                let idx = (row * (to_col - from_col)) as usize;
-                colors[idx] = samples[idx].color;
-            }
-
-            Ok(self
-                .render_section_to_cie_buffer_raw(from_row, from_col, to_row, to_col)?
-                .into_iter()
-                .map(|sample| sample.color)
-                .collect())
+            Ok(colors)
         }
     }
 

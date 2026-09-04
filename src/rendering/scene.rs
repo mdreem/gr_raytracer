@@ -13,7 +13,7 @@ use crate::rendering::star_catalog::StarCatalog;
 use crate::rendering::texture::{TemperatureData, TextureData, UVCoordinates};
 use crate::scene_objects::objects::Objects;
 use log::{error, trace};
-use nalgebra::{Const, OVector};
+use nalgebra::{Const, OVector, Vector3};
 use std::f64::consts::PI;
 use std::fs::File;
 
@@ -29,6 +29,12 @@ pub struct EscapeInfo {
     pub x: f64,
     pub y: f64,
     pub z: f64,
+}
+
+impl EscapeInfo {
+    pub fn to_vec(&self) -> Vector3<f64> {
+        Vector3::new(self.x, self.y, self.z)
+    }
 }
 
 #[derive(Debug, Clone, Copy, PartialEq)]
