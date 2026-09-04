@@ -8,5 +8,6 @@ pub mod raytracer;
 pub mod redshift;
 pub mod runge_kutta;
 pub mod scene;
+pub mod star_catalog;
 pub mod temperature;
 pub mod texture;
