@@ -9,6 +9,7 @@ use crate::rendering::integrator::{IntegrationConfiguration, Integrator, Step, S
 use crate::rendering::ray::{IntegratedRay, Ray};
 use crate::rendering::raytracer::RaytracerError;
 use crate::rendering::redshift::RedshiftComputer;
+use crate::rendering::star_catalog::StarCatalog;
 use crate::rendering::texture::{TemperatureData, TextureData, UVCoordinates};
 use crate::scene_objects::objects::Objects;
 use log::{error, trace};
@@ -57,6 +58,11 @@ pub struct Scene<'a, G: Geometry> {
     celestial_temperature: f64,
     pub adaptive_sampling: AdaptiveSamplingConfig,
     pub sampling_mask_color: Option<CIETristimulus>,
+    /// Optional point-source star catalogue gathered on escaped rays
+    /// (plan-12). `None` falls back to the celestial texture alone.
+    pub star_catalog: Option<StarCatalog>,
+    /// Linear flux multiplier applied to catalogue stars.
+    pub star_flux_scale: f64,
 }
 
 pub type EquationOfMotionState = OVector<f64, Const<8>>;
@@ -108,7 +114,20 @@ impl<'a, G: Geometry> Scene<'a, G> {
             celestial_temperature,
             adaptive_sampling: Default::default(),
             sampling_mask_color: None,
+            star_catalog: None,
+            star_flux_scale: 1.0,
         }
+    }
+
+    /// Attach an optional point-source star catalogue and its flux scale.
+    pub fn with_star_catalog(
+        mut self,
+        star_catalog: Option<StarCatalog>,
+        star_flux_scale: f64,
+    ) -> Self {
+        self.star_catalog = star_catalog;
+        self.star_flux_scale = star_flux_scale;
+        self
     }
 
     pub fn with_sampling_options(

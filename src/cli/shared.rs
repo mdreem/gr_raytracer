@@ -9,6 +9,7 @@ use crate::rendering::integrator::IntegrationConfiguration;
 use crate::rendering::raytracer;
 use crate::rendering::raytracer::RaytracerError;
 use crate::rendering::scene::Scene;
+use crate::rendering::star_catalog::StarCatalog;
 use crate::rendering::temperature::{ConstantTemperatureComputer, TemperatureComputer};
 use crate::rendering::texture::{
     BlackBodyMapper, CheckerMapper, TextureData, TextureMapHandle, TextureMapperFactory,
@@ -180,6 +181,25 @@ pub fn create_scene<G: Geometry>(
         celestial_map: texture_mapper_celestial,
     };
 
+    // Load the  Gaia star catalogue.
+    let (star_catalog, star_flux_scale) = match config.star_catalog {
+        Some(catalog_config) => {
+            let catalog = StarCatalog::load_parquet(&catalog_config.path).map_err(|error| {
+                RaytracerError::InvalidConfiguration(format!(
+                    "Failed to load star catalog {:?}: {}",
+                    catalog_config.path, error
+                ))
+            })?;
+            debug!(
+                "Loaded {} stars from {}",
+                catalog.len(),
+                catalog_config.path
+            );
+            (Some(catalog), catalog_config.flux_scale)
+        }
+        None => (None, 1.0),
+    };
+
     let mut objects = Objects::new(geometry);
     for object in config.objects {
         match object {
@@ -339,7 +359,8 @@ pub fn create_scene<G: Geometry>(
         false,
         config.celestial_temperature,
     )
-    .with_sampling_options(adaptive_sampling, sampling_mask_color);
+    .with_sampling_options(adaptive_sampling, sampling_mask_color)
+    .with_star_catalog(star_catalog, star_flux_scale);
     Ok(scene)
 }
 
