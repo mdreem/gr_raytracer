@@ -316,6 +316,7 @@ impl<'a, G: Geometry> Raytracer<'a, G> {
                     y: 0.0,
                     z: 0.0,
                 }),
+                accumulated_angular_distance: 0.0,
             };
             max_count as usize
         ];
@@ -661,6 +662,7 @@ mod tests {
         RaySample {
             color: CIETristimulus::new(0.0, y, 0.0, alpha),
             ray_class,
+            accumulated_angular_distance: 0.0,
         }
     }
 

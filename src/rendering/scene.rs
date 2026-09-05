@@ -21,6 +21,7 @@ use std::fs::File;
 pub struct RaySample {
     pub color: CIETristimulus,
     pub ray_class: RayClass,
+    pub accumulated_angular_distance: f64,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq)]
@@ -95,6 +96,24 @@ pub fn get_position(y: &EquationOfMotionState, coordinate_system: CoordinateSyst
             bl.to_cartesian()
         }
     }
+}
+
+fn compute_accumulated_angular_distance(steps: &[Step]) -> f64 {
+    let mut angular_distance = 0.0;
+    let mut prev: Option<Vector3<f64>> = None;
+    for step in steps {
+        let r = step.x.get_spatial_vector_cartesian();
+        let n = r.norm();
+        if n < 1e-9 {
+            continue; // skip degenerate points
+        }
+        let r_hat = r / n;
+        if let Some(p) = prev {
+            angular_distance += p.dot(&r_hat).clamp(-1.0, 1.0).acos();
+        }
+        prev = Some(r_hat);
+    }
+    angular_distance
 }
 
 impl<'a, G: Geometry> Scene<'a, G> {
@@ -268,9 +287,12 @@ impl<'a, G: Geometry> Scene<'a, G> {
             ray_class = RayClass::Hit;
         }
 
+        let accumulated_angular_distance = compute_accumulated_angular_distance(&steps.steps);
+
         Ok(RaySample {
             color: result,
             ray_class,
+            accumulated_angular_distance,
         })
     }
 
