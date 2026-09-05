@@ -11,3 +11,4 @@ pub mod scene;
 pub mod star_catalog;
 pub mod temperature;
 pub mod texture;
+mod tubetracer;
