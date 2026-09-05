@@ -1,12 +1,14 @@
 use crate::configuration::AdaptiveSamplingConfig;
+use crate::geometry::four_vector::FourVector;
 use crate::geometry::geometry::Geometry;
+use crate::geometry::point::Point;
 use crate::rendering::camera::CameraError;
 use crate::rendering::color::{
     CIETristimulus, ToneMappingMethod, linear_srgb_to_srgb_buffer, xyz_to_linear_srgb,
     xyz_to_linear_srgb_buffer,
 };
 use crate::rendering::integrator::{IntegrationError, StopReason};
-use crate::rendering::ray::IntegratedRay;
+use crate::rendering::ray::{IntegratedRay, Ray};
 use crate::rendering::scene::{EscapeInfo, RayClass, RaySample, Scene};
 use crate::rendering::texture::TextureError;
 use crate::rendering::tubetracer::SampleTube;
@@ -18,7 +20,10 @@ use rayon::iter::IndexedParallelIterator;
 use rayon::iter::IntoParallelRefMutIterator;
 use rayon::iter::ParallelIterator;
 use std::io;
+use std::ops::{Add, Mul};
 use std::sync::atomic::{AtomicUsize, Ordering};
+
+const WINDING_SPREAD_THRESHOLD: f64 = std::f64::consts::PI;
 
 #[derive(Debug, thiserror::Error)]
 pub enum RaytracerError {
@@ -69,6 +74,30 @@ struct PixelToSample {
     pub row: u32,
     pub col: u32,
     pub result: Option<CIETristimulus>,
+}
+
+struct StarCollectionData {
+    pub total_g_mag: f64,
+}
+
+impl Add for StarCollectionData {
+    type Output = Self;
+
+    fn add(self, other: Self) -> Self {
+        StarCollectionData {
+            total_g_mag: self.total_g_mag + other.total_g_mag,
+        }
+    }
+}
+
+impl Mul<StarCollectionData> for f64 {
+    type Output = StarCollectionData;
+
+    fn mul(self, rhs: StarCollectionData) -> Self::Output {
+        StarCollectionData {
+            total_g_mag: self * rhs.total_g_mag,
+        }
+    }
 }
 
 /// Michelson (relative) luminance contrast; relative because HDR radiance is unbounded.
@@ -189,6 +218,15 @@ fn compute_traced_tube_solid_angle(
     let c_vec = Vector3::new(c.x, c.y, c.z);
     let d_vec = Vector3::new(d.x, d.y, d.z);
 
+    compute_solid_angle(&a_vec, &b_vec, &c_vec, &d_vec)
+}
+
+fn compute_solid_angle(
+    a_vec: &Vector3<f64>,
+    b_vec: &Vector3<f64>,
+    c_vec: &Vector3<f64>,
+    d_vec: &Vector3<f64>,
+) -> f64 {
     // See https://en.wikipedia.org/wiki/Solid_angle
     // |a_vec| = |b_vec| = |c_vec| = 1, so the formula simplifies to:
 
@@ -223,7 +261,76 @@ impl<'a, G: Geometry> Raytracer<'a, G> {
         debug!("sample: {:?}", sample);
     }
 
-    fn handle_tube(&self, sample_tube: &SampleTube) -> CIETristimulus {
+    fn subdivide(&self, sample_tube: &SampleTube, depth: usize) -> Option<CIETristimulus> {
+        // TODO: make configurable
+        if depth >= 6 {
+            debug!("Maximum subdivision depth reached.");
+            return None;
+        }
+
+        let mid_row = (sample_tube.a.ray.row + sample_tube.c.ray.row) / 2;
+        let mid_col = (sample_tube.a.ray.col + sample_tube.b.ray.col) / 2;
+        let mid_ray = self.scene.camera.get_ray_for(mid_row, mid_col);
+
+        let a_b_mid_ray = self
+            .scene
+            .camera
+            .get_ray_for((sample_tube.a.ray.row + sample_tube.b.ray.row) / 2, mid_col);
+        let a_c_mid_ray = self
+            .scene
+            .camera
+            .get_ray_for(mid_row, (sample_tube.a.ray.col + sample_tube.c.ray.col) / 2);
+
+        let b_d_mid_ray = self
+            .scene
+            .camera
+            .get_ray_for((sample_tube.b.ray.row + sample_tube.d.ray.row) / 2, mid_col);
+        let c_d_mid_ray = self
+            .scene
+            .camera
+            .get_ray_for(mid_row, (sample_tube.c.ray.col + sample_tube.d.ray.col) / 2);
+
+        let mid_ray_sample = self.scene.color_of_ray(&mid_ray).unwrap();
+        let a_b_mid_ray_sample = self.scene.color_of_ray(&a_b_mid_ray).unwrap();
+        let a_c_mid_ray_sample = self.scene.color_of_ray(&a_c_mid_ray).unwrap();
+        let b_d_mid_ray_sample = self.scene.color_of_ray(&b_d_mid_ray).unwrap();
+        let c_d_mid_ray_sample = self.scene.color_of_ray(&c_d_mid_ray).unwrap();
+
+        let top_left_tube = SampleTube::new(
+            sample_tube.a,
+            &a_b_mid_ray_sample,
+            &a_c_mid_ray_sample,
+            &mid_ray_sample,
+        );
+        let top_right_tube = SampleTube::new(
+            &a_b_mid_ray_sample,
+            sample_tube.b,
+            &mid_ray_sample,
+            &b_d_mid_ray_sample,
+        );
+        let bottom_left_tube = SampleTube::new(
+            &a_c_mid_ray_sample,
+            &mid_ray_sample,
+            sample_tube.c,
+            &c_d_mid_ray_sample,
+        );
+        let bottom_right_tube = SampleTube::new(
+            &mid_ray_sample,
+            &b_d_mid_ray_sample,
+            &c_d_mid_ray_sample,
+            sample_tube.d,
+        );
+
+        // These handle the max depths and will return something usable.
+        let color_top_left = self.compute_color(&top_left_tube, depth);
+        let color_top_right = self.compute_color(&top_right_tube, depth);
+        let color_bottom_left = self.compute_color(&bottom_left_tube, depth);
+        let color_bottom_right = self.compute_color(&bottom_right_tube, depth);
+
+        Some(color_top_left + color_top_right + color_bottom_left + color_bottom_right)
+    }
+
+    fn compute_color(&self, sample_tube: &SampleTube, depth: usize) -> CIETristimulus {
         match (
             sample_tube.a.ray_class,
             sample_tube.b.ray_class,
@@ -236,36 +343,116 @@ impl<'a, G: Geometry> Raytracer<'a, G> {
                 RayClass::Escaped(c),
                 RayClass::Escaped(d),
             ) => {
-                let solid_angle = compute_traced_tube_solid_angle(&a, &b, &c, &d);
-                debug!("Solid angle of traced tube: {}", solid_angle);
+                let angles = [
+                    sample_tube.a.accumulated_angular_distance,
+                    sample_tube.b.accumulated_angular_distance,
+                    sample_tube.c.accumulated_angular_distance,
+                    sample_tube.d.accumulated_angular_distance,
+                ];
+                // TODO: Clean error handling.
+                let min_angle = angles.iter().cloned().reduce(f64::min).unwrap();
+                let max_angle = angles.iter().cloned().reduce(f64::max).unwrap();
+                let spread = max_angle - min_angle;
+                // TODO: Make WINDING_SPREAD_THRESHOLD configurable
+                if spread > WINDING_SPREAD_THRESHOLD {
+                    if let Some(color) = self.subdivide(sample_tube, depth + 1) {
+                        return color;
+                    } else {
+                        let o_a = sample_tube
+                            .a
+                            .ray
+                            .momentum
+                            .get_cartesian_vector(&sample_tube.a.ray.position);
+                        let o_b = sample_tube
+                            .b
+                            .ray
+                            .momentum
+                            .get_cartesian_vector(&sample_tube.b.ray.position);
+                        let o_c = sample_tube
+                            .c
+                            .ray
+                            .momentum
+                            .get_cartesian_vector(&sample_tube.c.ray.position);
+                        let o_d = sample_tube
+                            .d
+                            .ray
+                            .momentum
+                            .get_cartesian_vector(&sample_tube.d.ray.position);
 
-                let mut total_mag = 0.0;
-                // TODO: Move the collection into scene
-                if let Some(star_catalog) = &self.scene.star_catalog {
-                    for star in &star_catalog.stars {
-                        if inside_convex_spherical_triangle(
-                            &star.direction,
-                            &[a.to_vec(), b.to_vec(), c.to_vec()],
-                        ) {
-                            total_mag += star.g_mag;
-                            debug!("Star {} is inside the traced tube", star.source_id);
-                        }
+                        let original_angle = compute_solid_angle(&o_a, &o_b, &o_c, &o_d);
+                        let solid_angle = compute_traced_tube_solid_angle(&a, &b, &c, &d);
+                        let ratio = original_angle / solid_angle;
+
+                        return ratio * self.compute_star_collection_data(&a, &b, &c, &d);
                     }
                 }
+                let o_a = sample_tube
+                    .a
+                    .ray
+                    .momentum
+                    .get_cartesian_vector(&sample_tube.a.ray.position);
+                let o_b = sample_tube
+                    .b
+                    .ray
+                    .momentum
+                    .get_cartesian_vector(&sample_tube.b.ray.position);
+                let o_c = sample_tube
+                    .c
+                    .ray
+                    .momentum
+                    .get_cartesian_vector(&sample_tube.c.ray.position);
+                let o_d = sample_tube
+                    .d
+                    .ray
+                    .momentum
+                    .get_cartesian_vector(&sample_tube.d.ray.position);
 
-                if total_mag > 0.0 {
-                    return CIETristimulus::new(1.0, 1.0, 1.0, 1.0);
-                }
+                let original_angle = compute_solid_angle(&o_a, &o_b, &o_c, &o_d);
+                let solid_angle = compute_traced_tube_solid_angle(&a, &b, &c, &d);
+                let ratio = original_angle / solid_angle;
 
-                CIETristimulus::new(0.0, 0.0, 0.0, 0.0)
+                ratio * self.compute_star_collection_data(&a, &b, &c, &d)
             }
-            // TODO: Handle corner cases, start with all corners escaped.
-            // After that there need to be subdivisions..
-            _ => sample_tube.a.color,
+            _ => CIETristimulus::new(0.0, 0.0, 0.0, 0.0),
         }
     }
 
-    // Basis: render_section_to_cie_buffer_raw
+    fn compute_star_collection_data(
+        &self,
+        a: &EscapeInfo,
+        b: &EscapeInfo,
+        c: &EscapeInfo,
+        d: &EscapeInfo,
+    ) -> CIETristimulus {
+        let mut total_flux = 0.0;
+        // TODO: Move the collection into scene
+        if let Some(star_catalog) = &self.scene.star_catalog {
+            for star in &star_catalog.stars {
+                if inside_convex_spherical_triangle(
+                    &star.direction,
+                    &[a.to_vec(), b.to_vec(), c.to_vec()],
+                ) {
+                    total_flux += 10f64.powf(-0.4 * star.g_mag);
+                    debug!("Star {} is inside the traced tube", star.source_id);
+                }
+                if inside_convex_spherical_triangle(
+                    &star.direction,
+                    &[b.to_vec(), d.to_vec(), c.to_vec()],
+                ) {
+                    total_flux += 10f64.powf(-0.4 * star.g_mag);
+                    debug!("Star {} is inside the traced tube", star.source_id);
+                }
+            }
+        }
+
+        // TODO: Use correct computation, color etc.
+        let scale = 1000.0;
+        CIETristimulus::new(total_flux * scale, total_flux * scale, total_flux * scale, 1.0)
+    }
+
+    fn handle_tube(&self, sample_tube: &SampleTube) -> CIETristimulus {
+        self.compute_color(sample_tube, 0)
+    }
 
     fn render_section_to_cie_buffer(
         &self,
@@ -308,6 +495,7 @@ impl<'a, G: Geometry> Raytracer<'a, G> {
     ) -> Result<Vec<RaySample>, RaytracerError> {
         let count = AtomicUsize::new(0);
         let max_count = (to_row - from_row) * (to_col - from_col);
+        // Create some dummy rays. They will be replaced with the actual rays in the parallel loop below.
         let mut buffer: Vec<RaySample> = vec![
             RaySample {
                 color: CIETristimulus::new(0.0, 0.0, 0.0, 1.0),
@@ -317,6 +505,18 @@ impl<'a, G: Geometry> Raytracer<'a, G> {
                     z: 0.0,
                 }),
                 accumulated_angular_distance: 0.0,
+                ray: Ray::new(
+                    0,
+                    0,
+                    Point::new(
+                        0.0,
+                        0.0,
+                        0.0,
+                        0.0,
+                        crate::geometry::point::CoordinateSystem::Cartesian,
+                    ),
+                    FourVector::new_cartesian(0.0, 0.0, 1.0, 0.0),
+                ),
             };
             max_count as usize
         ];
@@ -434,7 +634,6 @@ impl<'a, G: Geometry> Raytracer<'a, G> {
                     SampleTube::from_buffer(&buffer, row as u32, col as u32, width as u32);
                 let idx = row * width + col;
                 if let Some(sample_tube) = sample_tube_opt {
-                    // TODO: Check if this is the right way round.
                     let new_color = output_buffer[idx].blend(&self.handle_tube(&sample_tube));
                     output_buffer[idx] = new_color;
                 }
@@ -655,7 +854,10 @@ mod tests {
         stratified_sample_offset,
     };
     use crate::configuration::AdaptiveSamplingConfig;
+    use crate::geometry::four_vector::FourVector;
+    use crate::geometry::point::Point;
     use crate::rendering::color::CIETristimulus;
+    use crate::rendering::ray::Ray;
     use crate::rendering::scene::{EscapeInfo, RayClass, RaySample};
 
     fn sample(y: f64, alpha: f64, ray_class: RayClass) -> RaySample {
@@ -663,6 +865,18 @@ mod tests {
             color: CIETristimulus::new(0.0, y, 0.0, alpha),
             ray_class,
             accumulated_angular_distance: 0.0,
+            ray: Ray::new(
+                0,
+                0,
+                Point::new(
+                    0.0,
+                    0.0,
+                    0.0,
+                    0.0,
+                    crate::geometry::point::CoordinateSystem::Cartesian,
+                ),
+                FourVector::new_cartesian(0.0, 0.0, 1.0, 0.0),
+            ),
         }
     }
 
