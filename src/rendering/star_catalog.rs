@@ -169,10 +169,26 @@ mod tests {
     #[test]
     fn radec_maps_to_expected_axes() {
         // (ra=0, dec=0) points along +x; (ra=90, dec=0) along +y; dec=90 along +z.
-        assert_relative_eq!(radec_to_unit_vector(0.0, 0.0), Vector3::new(1.0, 0.0, 0.0), epsilon = 1e-12);
-        assert_relative_eq!(radec_to_unit_vector(90.0, 0.0), Vector3::new(0.0, 1.0, 0.0), epsilon = 1e-12);
-        assert_relative_eq!(radec_to_unit_vector(0.0, 90.0), Vector3::new(0.0, 0.0, 1.0), epsilon = 1e-12);
-        assert_relative_eq!(radec_to_unit_vector(0.0, -90.0), Vector3::new(0.0, 0.0, -1.0), epsilon = 1e-12);
+        assert_relative_eq!(
+            radec_to_unit_vector(0.0, 0.0),
+            Vector3::new(1.0, 0.0, 0.0),
+            epsilon = 1e-12
+        );
+        assert_relative_eq!(
+            radec_to_unit_vector(90.0, 0.0),
+            Vector3::new(0.0, 1.0, 0.0),
+            epsilon = 1e-12
+        );
+        assert_relative_eq!(
+            radec_to_unit_vector(0.0, 90.0),
+            Vector3::new(0.0, 0.0, 1.0),
+            epsilon = 1e-12
+        );
+        assert_relative_eq!(
+            radec_to_unit_vector(0.0, -90.0),
+            Vector3::new(0.0, 0.0, -1.0),
+            epsilon = 1e-12
+        );
     }
 
     #[test]

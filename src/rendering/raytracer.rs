@@ -9,6 +9,7 @@ use crate::rendering::integrator::{IntegrationError, StopReason};
 use crate::rendering::ray::IntegratedRay;
 use crate::rendering::scene::{EscapeInfo, RayClass, RaySample, Scene};
 use crate::rendering::texture::TextureError;
+use crate::rendering::tubetracer::SampleTube;
 use image::{ImageBuffer, ImageError, ImageFormat, Rgb};
 use indicatif::style::TemplateError;
 use log::{debug, error, info};
@@ -222,18 +223,12 @@ impl<'a, G: Geometry> Raytracer<'a, G> {
         debug!("sample: {:?}", sample);
     }
 
-    fn handle_star_map(
-        &self,
-        ray_sample_a: &RaySample,
-        ray_sample_b: &RaySample,
-        ray_sample_c: &RaySample,
-        ray_sample_d: &RaySample,
-    ) -> CIETristimulus {
+    fn handle_tube(&self, sample_tube: &SampleTube) -> CIETristimulus {
         match (
-            ray_sample_a.ray_class,
-            ray_sample_b.ray_class,
-            ray_sample_c.ray_class,
-            ray_sample_d.ray_class,
+            sample_tube.a.ray_class,
+            sample_tube.b.ray_class,
+            sample_tube.c.ray_class,
+            sample_tube.d.ray_class,
         ) {
             (
                 RayClass::Escaped(a),
@@ -262,13 +257,15 @@ impl<'a, G: Geometry> Raytracer<'a, G> {
                     return CIETristimulus::new(1.0, 1.0, 1.0, 1.0);
                 }
 
-                CIETristimulus::new(0.0, 0.0, 0.0, 1.0)
+                CIETristimulus::new(0.0, 0.0, 0.0, 0.0)
             }
             // TODO: Handle corner cases, start with all corners escaped.
             // After that there need to be subdivisions..
-            _ => ray_sample_a.color,
+            _ => sample_tube.a.color,
         }
     }
+
+    // Basis: render_section_to_cie_buffer_raw
 
     fn render_section_to_cie_buffer(
         &self,
@@ -277,24 +274,24 @@ impl<'a, G: Geometry> Raytracer<'a, G> {
         to_row: u32,
         to_col: u32,
     ) -> Result<Vec<CIETristimulus>, RaytracerError> {
+        let buffer = self.render_section_to_cie_buffer_raw(from_row, from_col, to_row, to_col)?;
         if self.scene.adaptive_sampling.enabled || self.scene.sampling_mask_color.is_some() {
-            self.render_section_to_cie_buffer_supersampled(from_row, from_col, to_row, to_col)
+            self.render_section_to_cie_buffer_supersampled(
+                from_row, from_col, to_row, to_col, &buffer,
+            )
         } else {
-            let samples =
-                self.render_section_to_cie_buffer_raw(from_row, from_col, to_row, to_col)?;
-
             // TODO: this needs more work. It's a rough sweep.
             let width = (to_col - from_col) as usize;
             let height = (to_row - from_row) as usize;
-            let mut colors: Vec<CIETristimulus> = samples.iter().map(|s| s.color).collect();
+            let mut colors: Vec<CIETristimulus> = buffer.iter().map(|s| s.color).collect();
             for row in 0..height.saturating_sub(1) {
                 for col in 0..width.saturating_sub(1) {
+                    let sample_tube_opt =
+                        SampleTube::from_buffer(&buffer, row as u32, col as u32, width as u32);
                     let idx = row * width + col;
-                    let sample_a = &samples[idx];
-                    let sample_b = &samples[idx + 1];
-                    let sample_c = &samples[idx + width];
-                    let sample_d = &samples[idx + width + 1];
-                    colors[idx] = self.handle_star_map(sample_a, sample_b, sample_c, sample_d);
+                    if let Some(sample_tube) = sample_tube_opt {
+                        colors[idx] = self.handle_tube(&sample_tube);
+                    }
                 }
             }
 
@@ -374,12 +371,12 @@ impl<'a, G: Geometry> Raytracer<'a, G> {
         from_col: u32,
         to_row: u32,
         to_col: u32,
+        buffer: &[RaySample],
     ) -> Result<Vec<CIETristimulus>, RaytracerError> {
         info!(
             "Rendering section from ({}, {}) to ({}, {}) with supersampling",
             from_row, from_col, to_row, to_col
         );
-        let buffer = self.render_section_to_cie_buffer_raw(from_row, from_col, to_row, to_col)?;
         let samples_per_axis = self.scene.adaptive_sampling.samples_per_axis;
         let minimum_luminance = resolve_minimum_luminance(&self.scene.adaptive_sampling, &buffer);
 
@@ -388,10 +385,11 @@ impl<'a, G: Geometry> Raytracer<'a, G> {
             from_col,
             to_row,
             to_col,
-            &buffer,
+            buffer,
             minimum_luminance,
         );
 
+        // Initialize the output buffer with the base 1-spp colors from the raw buffer.
         let mut output_buffer: Vec<CIETristimulus> =
             buffer.into_iter().map(|sample| sample.color).collect();
 
@@ -424,6 +422,21 @@ impl<'a, G: Geometry> Raytracer<'a, G> {
                     from_col,
                 );
                 output_buffer[pixel_index] = sample_color;
+            }
+        }
+
+        let width = (to_col - from_col) as usize;
+        let height = (to_row - from_row) as usize;
+        for row in 0..height.saturating_sub(1) {
+            for col in 0..width.saturating_sub(1) {
+                let sample_tube_opt =
+                    SampleTube::from_buffer(&buffer, row as u32, col as u32, width as u32);
+                let idx = row * width + col;
+                if let Some(sample_tube) = sample_tube_opt {
+                    // TODO: Check if this is the right way round.
+                    let new_color = output_buffer[idx].blend(&self.handle_tube(&sample_tube));
+                    output_buffer[idx] = new_color;
+                }
             }
         }
 

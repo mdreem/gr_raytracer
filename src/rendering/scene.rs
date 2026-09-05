@@ -210,13 +210,19 @@ impl<'a, G: Geometry> Scene<'a, G> {
                     let redshift = self
                         .redshift_computer
                         .compute_redshift(last_step, frequency.observer_energy);
-                    intersections.push(self.texture_data.celestial_map.color_at_uv(
-                        &uv,
-                        &TemperatureData {
-                            redshift,
-                            temperature: self.celestial_temperature,
-                        },
-                    )?);
+
+                    // If no star catalog is provided, we still want to sample the celestial sphere texture.
+                    // Otherwise, the star catalog will provide the color information for the celestial sphere.
+                    if self.star_catalog.is_none() {
+                        intersections.push(self.texture_data.celestial_map.color_at_uv(
+                            &uv,
+                            &TemperatureData {
+                                redshift,
+                                temperature: self.celestial_temperature,
+                            },
+                        )?);
+                    }
+
                     let pos_on_celestial_sphere = last_step.x.get_as_cartesian();
                     ray_class = RayClass::Escaped(EscapeInfo {
                         x: pos_on_celestial_sphere[0],
