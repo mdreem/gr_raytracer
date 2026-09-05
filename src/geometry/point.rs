@@ -33,7 +33,7 @@ pub enum CoordinateSystem {
     },
 }
 
-#[derive(Clone, Copy, Debug)]
+#[derive(Clone, Copy, Debug, PartialEq)]
 pub struct Point {
     pub coordinate_system: CoordinateSystem,
     pub vector: Vector4<f64>,

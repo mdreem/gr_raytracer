@@ -22,6 +22,7 @@ pub struct RaySample {
     pub color: CIETristimulus,
     pub ray_class: RayClass,
     pub accumulated_angular_distance: f64,
+    pub ray: Ray,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq)]
@@ -293,6 +294,7 @@ impl<'a, G: Geometry> Scene<'a, G> {
             color: result,
             ray_class,
             accumulated_angular_distance,
+            ray: ray.clone(),
         })
     }
 

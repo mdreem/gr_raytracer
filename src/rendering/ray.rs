@@ -5,7 +5,7 @@ use crate::rendering::raytracer::RaytracerError;
 use std::io::Write;
 use std::ops::Index;
 
-#[derive(Debug)]
+#[derive(Debug, Clone, Copy, PartialEq)]
 pub struct Ray {
     pub position: Point,
     pub momentum: FourVector,

@@ -107,6 +107,39 @@ impl FourVector {
         Vector3::new(self.vector[1], self.vector[2], self.vector[3])
     }
 
+    pub fn get_x_cartesian(self, at: &Point) -> f64 {
+        debug_assert_eq!(self.coordinate_system, at.coordinate_system);
+        match self.coordinate_system {
+            CoordinateSystem::Cartesian => self.vector[1],
+            CoordinateSystem::Spherical | CoordinateSystem::BoyerLindquist { .. } => {
+                let r = at.vector[1];
+                let theta = at.vector[2];
+                let phi = at.vector[3];
+                let (st, ct) = (theta.sin(), theta.cos());
+                let (sp, cp) = (phi.sin(), phi.cos());
+                st * cp * self.vector[1] + r * ct * cp * self.vector[2]
+                    - r * st * sp * self.vector[3]
+            }
+        }
+    }
+
+    pub fn get_y_cartesian(self, at: &Point) -> f64 {
+        debug_assert_eq!(self.coordinate_system, at.coordinate_system);
+        match self.coordinate_system {
+            CoordinateSystem::Cartesian => self.vector[2],
+            CoordinateSystem::Spherical | CoordinateSystem::BoyerLindquist { .. } => {
+                let r = at.vector[1];
+                let theta = at.vector[2];
+                let phi = at.vector[3];
+                let (st, ct) = (theta.sin(), theta.cos());
+                let (sp, cp) = (phi.sin(), phi.cos());
+                st * sp * self.vector[1]
+                    + r * ct * sp * self.vector[2]
+                    + r * st * cp * self.vector[3]
+            }
+        }
+    }
+
     pub fn get_z_cartesian(self, at: &Point) -> f64 {
         debug_assert_eq!(self.coordinate_system, at.coordinate_system);
         match self.coordinate_system {
@@ -118,6 +151,14 @@ impl FourVector {
                 ct * self.vector[1] - r * st * self.vector[2]
             }
         }
+    }
+
+    pub fn get_cartesian_vector(self, at: &Point) -> Vector3<f64> {
+        Vector3::new(
+            self.get_x_cartesian(at),
+            self.get_y_cartesian(at),
+            self.get_z_cartesian(at),
+        )
     }
 }
 
