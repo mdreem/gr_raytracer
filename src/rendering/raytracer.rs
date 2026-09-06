@@ -496,7 +496,10 @@ impl<'a, G: Geometry> Raytracer<'a, G> {
                         SampleTube::from_buffer(&buffer, row as u32, col as u32, width as u32);
                     let idx = row * width + col;
                     if let Some(sample_tube) = sample_tube_opt {
-                        colors[idx] = colors[idx].blend(&self.handle_tube(&sample_tube));
+                        // Star layer goes UNDER the foreground: compose the disc
+                        // buffer over the star background, weighted by the disc's
+                        // surviving transmittance (buffer alpha).
+                        colors[idx] = self.handle_tube(&sample_tube).blend(&colors[idx]);
                     }
                 }
             }
@@ -653,7 +656,7 @@ impl<'a, G: Geometry> Raytracer<'a, G> {
                     SampleTube::from_buffer(&buffer, row as u32, col as u32, width as u32);
                 let idx = row * width + col;
                 if let Some(sample_tube) = sample_tube_opt {
-                    let new_color = output_buffer[idx].blend(&self.handle_tube(&sample_tube));
+                    let new_color = self.handle_tube(&sample_tube).blend(&output_buffer[idx]);
                     output_buffer[idx] = new_color;
                 }
             }

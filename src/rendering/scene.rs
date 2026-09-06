@@ -280,7 +280,10 @@ impl<'a, G: Geometry> Scene<'a, G> {
             // No terminal event: default to Captured (see the NaN case above).
             ray_class = RayClass::Captured;
         }
-        let mut result = CIETristimulus::new(0.0, 0.0, 0.0, 1.0);
+        // Start transparent so the foreground's accumulated transmittance
+        // survives in the alpha. In this way we can add the stars on the
+        // celestial sphere later.
+        let mut result = CIETristimulus::new(0.0, 0.0, 0.0, 0.0);
 
         for color in intersections.iter().rev() {
             result = result.blend(color)
