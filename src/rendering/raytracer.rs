@@ -427,7 +427,25 @@ impl<'a, G: Geometry> Raytracer<'a, G> {
 
                 ratio * self.compute_star_collection_data(&a, &b, &c, &d)
             }
-            _ => CIETristimulus::new(0.0, 0.0, 0.0, 0.0),
+            // all four corners captured  or all four hitting an opaque object:
+            // Just return the color of corner a, no need to subdivide.
+            (RayClass::Captured, RayClass::Captured, RayClass::Captured, RayClass::Captured)
+            | (RayClass::Hit, RayClass::Hit, RayClass::Hit, RayClass::Hit) => sample_tube.a.color,
+            // Catch mixed cases.
+            // If mixed but not-escaped: return the color of corner a, no need to subdivide.
+            // If any corner escaped: subdivide. Of maximum is reached, just return the color of corner a.
+            _ => {
+                let any_escaped = matches!(sample_tube.a.ray_class, RayClass::Escaped(_))
+                    || matches!(sample_tube.b.ray_class, RayClass::Escaped(_))
+                    || matches!(sample_tube.c.ray_class, RayClass::Escaped(_))
+                    || matches!(sample_tube.d.ray_class, RayClass::Escaped(_));
+                if any_escaped {
+                    self.subdivide(sample_tube, depth + 1)
+                        .unwrap_or(sample_tube.a.color)
+                } else {
+                    sample_tube.a.color
+                }
+            }
         }
     }
 
