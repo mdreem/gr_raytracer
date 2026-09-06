@@ -10,7 +10,7 @@ use crate::rendering::ray::{IntegratedRay, Ray};
 use crate::rendering::raytracer::RaytracerError;
 use crate::rendering::redshift::RedshiftComputer;
 use crate::rendering::star_catalog::StarCatalog;
-use crate::rendering::texture::{TemperatureData, TextureData, UVCoordinates};
+use crate::rendering::texture::{BlackBodyMapper, TemperatureData, TextureData, UVCoordinates};
 use crate::scene_objects::objects::Objects;
 use log::{error, trace};
 use nalgebra::{Const, OVector, Vector3};
@@ -31,6 +31,11 @@ pub struct EscapeInfo {
     pub x: f64,
     pub y: f64,
     pub z: f64,
+    /// Frequency ratio g = nu_obs / nu_emit for a stationary emitter at
+    /// infinity (the star) as seen by this camera, along this ray. 1.0 means
+    /// no shift. Used by the star gather to tint (T_obs = g * T) and boost
+    /// (flux * g^4) each star. Same value the celestial texture is given.
+    pub redshift: f64,
 }
 
 impl EscapeInfo {
@@ -75,6 +80,9 @@ pub struct Scene<'a, G: Geometry> {
     pub winding_spread_threshold: f64,
     /// Maximum recursive subdivision depth for a star tube.
     pub max_subdivision_depth: usize,
+    /// Blackbody colour LUT for re-tinting stars at their redshifted
+    /// temperature `g * T` in the gather. Present iff a star catalogue is.
+    pub star_blackbody: Option<BlackBodyMapper>,
 }
 
 pub type EquationOfMotionState = OVector<f64, Const<8>>;
@@ -148,6 +156,7 @@ impl<'a, G: Geometry> Scene<'a, G> {
             star_flux_scale: 1.0,
             winding_spread_threshold: std::f64::consts::PI,
             max_subdivision_depth: 6,
+            star_blackbody: None,
         }
     }
 
@@ -160,6 +169,9 @@ impl<'a, G: Geometry> Scene<'a, G> {
         winding_spread_threshold: f64,
         max_subdivision_depth: usize,
     ) -> Self {
+        // A physically exact LUT (beaming_exponent 0): the star gather imposes
+        // its own g^4 boost, so no extra artistic beaming here.
+        self.star_blackbody = star_catalog.as_ref().map(|_| BlackBodyMapper::new(0.0));
         self.star_catalog = star_catalog;
         self.star_flux_scale = star_flux_scale;
         self.winding_spread_threshold = winding_spread_threshold;
@@ -261,6 +273,7 @@ impl<'a, G: Geometry> Scene<'a, G> {
                         x: escape_direction[0],
                         y: escape_direction[1],
                         z: escape_direction[2],
+                        redshift,
                     });
                 }
                 StopReason::CoordinateIsNan => {
