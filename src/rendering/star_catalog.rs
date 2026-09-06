@@ -8,6 +8,8 @@
 //! coordinate singularities (pole and phi-seam): every membership / solid-angle
 //! test is then a plain dot / cross product.
 
+use crate::rendering::black_body_radiation::get_cie_xyz_of_black_body_redshifted;
+use crate::rendering::color::CIETristimulus;
 use arrow::array::{Float32Array, Float64Array, Int64Array};
 use nalgebra::Vector3;
 use parquet::arrow::arrow_reader::ParquetRecordBatchReaderBuilder;
@@ -41,6 +43,15 @@ pub struct Star {
     pub bp_rp: f64,
     /// Unit direction on the celestial sphere (ICRS), precomputed from ra/dec.
     pub direction: Vector3<f64>,
+    /// Colour temperature (K) derived from `bp_rp` (see
+    /// `colour_temperature_from_bp_rp`). Kept so a later redshifted re-tint
+    /// (`T_obs = z * T`) can recompute the chroma per tube.
+    pub temperature: f64,
+    /// Per-star XYZ radiance the gather sums: the G-band flux (Pogson) times
+    /// the star's Y-normalised blackbody chromaticity, so the vector's
+    /// luminance (Y) equals the observed flux while X and Z carry its hue.
+    /// Precomputed once because it depends only on `g_mag` and `bp_rp`.
+    pub emission_xyz: CIETristimulus,
 }
 
 impl Star {
@@ -48,8 +59,53 @@ impl Star {
     /// magnitude 0 maps to flux 1. Absolute calibration (magnitude 0 -> chosen
     /// linear luminance at unit exposure) is a later concern of the gather.
     pub fn relative_flux(&self) -> f64 {
-        10f64.powf(-0.4 * self.g_mag)
+        pogson_flux(self.g_mag)
     }
+}
+
+/// Relative linear flux from a magnitude (Pogson's law): magnitude 0 -> 1,
+/// each 5 magnitudes a factor of 100.
+fn pogson_flux(magnitude: f64) -> f64 {
+    10f64.powf(-0.4 * magnitude)
+}
+
+/// Colour temperature (K) from the Gaia BP-RP colour index.
+///
+/// Uses a Ballesteros-style reciprocal `T = a / (bp_rp + b) + c`. The
+/// reciprocal form (rather than a plain polynomial in `bp_rp`) follows from
+/// Wien's law, where the colour index runs roughly as `1/T`; a polynomial fit
+/// misbehaves at the blue and red ends. The three constants are fit to
+/// reference `(BP-RP, Teff)` points spanning the sequence: the hot end
+/// (`bp_rp = 0 -> ~9500 K`), the Sun (`0.82 -> 5772 K`), and the cool end
+/// (`3.0 -> ~3300 K`), taken from the Pecaut & Mamajek dwarf colour-temperature
+/// table plus the solar anchor. It reproduces those points exactly and stays
+/// within a few percent across O..M, which is ample for a *display* colour.
+///
+/// This is deliberately the simple first cut. The more accurate route is a
+/// synthetic-passband "colour temperature" (invert the BP-RP a blackbody would
+/// show through the real Gaia BP/RP filters); see `docs/star-colour.md`.
+fn colour_temperature_from_bp_rp(bp_rp: f64) -> f64 {
+    const A: f64 = 8235.0;
+    const B: f64 = 0.997;
+    const C: f64 = 1240.0;
+    // Clamp the index to the range the fit was anchored over so a stray very
+    // blue value can't drive the denominator toward zero (and T to infinity).
+    let bp_rp = bp_rp.clamp(-0.5, 5.0);
+    A / (bp_rp + B) + C
+}
+
+/// The XYZ radiance a single star contributes to the gather: its Pogson flux
+/// scaled by its Y-normalised blackbody chromaticity, so `Y == flux` and X, Z
+/// carry the hue. `redshift = 1.0` here (rest-frame); the black-hole redshift
+/// is applied later at the tube via `temperature`.
+fn star_emission_xyz(g_mag: f64, temperature: f64) -> CIETristimulus {
+    let flux = pogson_flux(g_mag);
+    let bb = get_cie_xyz_of_black_body_redshifted(temperature, 1.0);
+    // Normalise out the absolute Planck amplitude (which for the disc encodes
+    // brightness, but for a star must come from its magnitude, not its
+    // temperature): keep only the chromaticity by dividing through by Y.
+    let inv_y = if bb.y > 0.0 { 1.0 / bb.y } else { 0.0 };
+    CIETristimulus::new(bb.x * inv_y * flux, flux, bb.z * inv_y * flux, 1.0)
 }
 
 pub struct StarCatalog {
@@ -85,15 +141,20 @@ impl StarCatalog {
             for i in 0..batch.num_rows() {
                 let ra_deg = ra.value(i);
                 let dec_deg = dec.value(i);
+                let g_mag = g.value(i) as f64;
+                let bp_rp_value = bp_rp.value(i) as f64;
+                let temperature = colour_temperature_from_bp_rp(bp_rp_value);
                 stars.push(Star {
                     source_id: source_id.value(i),
                     ra_deg,
                     dec_deg,
-                    g_mag: g.value(i) as f64,
+                    g_mag,
                     bp_mag: bp.value(i) as f64,
                     rp_mag: rp.value(i) as f64,
-                    bp_rp: bp_rp.value(i) as f64,
+                    bp_rp: bp_rp_value,
                     direction: radec_to_unit_vector(ra_deg, dec_deg),
+                    temperature,
+                    emission_xyz: star_emission_xyz(g_mag, temperature),
                 });
             }
         }
@@ -209,9 +270,32 @@ mod tests {
             rp_mag: 5.0,
             bp_rp: 0.0,
             direction: Vector3::new(1.0, 0.0, 0.0),
+            temperature: 5772.0,
+            emission_xyz: CIETristimulus::new(0.0, 0.0, 0.0, 1.0),
         };
         // A 5-magnitude difference is exactly a factor of 100 in flux.
         assert_relative_eq!(star.relative_flux() * 100.0, 1.0, epsilon = 1e-12);
+    }
+
+    #[test]
+    fn colour_temperature_hits_reference_anchors() {
+        // The reciprocal fit is pinned to these three (BP-RP, Teff) points.
+        assert_relative_eq!(colour_temperature_from_bp_rp(0.0), 9500.0, epsilon = 5.0);
+        assert_relative_eq!(colour_temperature_from_bp_rp(0.82), 5772.0, epsilon = 5.0);
+        assert_relative_eq!(colour_temperature_from_bp_rp(3.0), 3300.0, epsilon = 5.0);
+        // Monotone: bluer (smaller bp_rp) is hotter.
+        assert!(colour_temperature_from_bp_rp(0.4) > colour_temperature_from_bp_rp(1.5));
+    }
+
+    #[test]
+    fn emission_luminance_equals_flux_and_carries_hue() {
+        // Y must equal the Pogson flux (brightness comes from the magnitude),
+        // and a hot star must be bluer (Z/X larger) than a cool one.
+        let hot = star_emission_xyz(0.0, 9000.0);
+        let cool = star_emission_xyz(0.0, 3500.0);
+        assert_relative_eq!(hot.y, pogson_flux(0.0), epsilon = 1e-12);
+        assert_relative_eq!(cool.y, pogson_flux(0.0), epsilon = 1e-12);
+        assert!((hot.z / hot.x) > (cool.z / cool.x));
     }
 
     /// Loads the real downloaded catalogue if present. Ignored by default
