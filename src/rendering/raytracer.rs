@@ -230,10 +230,16 @@ fn compute_solid_angle(
     // See https://en.wikipedia.org/wiki/Solid_angle
     // |a_vec| = |b_vec| = |c_vec| = 1, so the formula simplifies to:
 
+    // Triangulate the quad as tri(a,b,c) + tri(b,d,c): both traversed with the
+    // same orientation (corners are TL,TR,BL,BR). Using (b,c,d) instead flips
+    // the second triangle's orientation, so the two nearly cancel and the sum
+    // is a twist residual rather than the quad area. Matches the gather's split.
     let angle_1 = solid_angle_from_vecs(&a_vec, &b_vec, &c_vec);
-    let angle_2 = solid_angle_from_vecs(&b_vec, &c_vec, &d_vec);
+    let angle_2 = solid_angle_from_vecs(&b_vec, &d_vec, &c_vec);
 
-    angle_1 + angle_2
+    // Sum the absolute triangle areas: robust to a per-triangle sign flip at a
+    // fold (where the signed sum would cancel), and gives the true magnitude.
+    angle_1.abs() + angle_2.abs()
 }
 
 fn inside_convex_spherical_triangle(p: &Vector3<f64>, q: &[Vector3<f64>; 3]) -> bool {
@@ -362,26 +368,30 @@ impl<'a, G: Geometry> Raytracer<'a, G> {
                             .a
                             .ray
                             .momentum
-                            .get_cartesian_vector(&sample_tube.a.ray.position);
+                            .get_cartesian_vector(&sample_tube.a.ray.position)
+                            .normalize();
                         let o_b = sample_tube
                             .b
                             .ray
                             .momentum
-                            .get_cartesian_vector(&sample_tube.b.ray.position);
+                            .get_cartesian_vector(&sample_tube.b.ray.position)
+                            .normalize();
                         let o_c = sample_tube
                             .c
                             .ray
                             .momentum
-                            .get_cartesian_vector(&sample_tube.c.ray.position);
+                            .get_cartesian_vector(&sample_tube.c.ray.position)
+                            .normalize();
                         let o_d = sample_tube
                             .d
                             .ray
                             .momentum
-                            .get_cartesian_vector(&sample_tube.d.ray.position);
+                            .get_cartesian_vector(&sample_tube.d.ray.position)
+                            .normalize();
 
                         let original_angle = compute_solid_angle(&o_a, &o_b, &o_c, &o_d);
                         let solid_angle = compute_traced_tube_solid_angle(&a, &b, &c, &d);
-                        let ratio = original_angle / solid_angle;
+                        let ratio = original_angle.abs() / solid_angle.abs();
 
                         return ratio * self.compute_star_collection_data(&a, &b, &c, &d);
                     }
@@ -390,26 +400,30 @@ impl<'a, G: Geometry> Raytracer<'a, G> {
                     .a
                     .ray
                     .momentum
-                    .get_cartesian_vector(&sample_tube.a.ray.position);
+                    .get_cartesian_vector(&sample_tube.a.ray.position)
+                    .normalize();
                 let o_b = sample_tube
                     .b
                     .ray
                     .momentum
-                    .get_cartesian_vector(&sample_tube.b.ray.position);
+                    .get_cartesian_vector(&sample_tube.b.ray.position)
+                    .normalize();
                 let o_c = sample_tube
                     .c
                     .ray
                     .momentum
-                    .get_cartesian_vector(&sample_tube.c.ray.position);
+                    .get_cartesian_vector(&sample_tube.c.ray.position)
+                    .normalize();
                 let o_d = sample_tube
                     .d
                     .ray
                     .momentum
-                    .get_cartesian_vector(&sample_tube.d.ray.position);
+                    .get_cartesian_vector(&sample_tube.d.ray.position)
+                    .normalize();
 
                 let original_angle = compute_solid_angle(&o_a, &o_b, &o_c, &o_d);
                 let solid_angle = compute_traced_tube_solid_angle(&a, &b, &c, &d);
-                let ratio = original_angle / solid_angle;
+                let ratio = original_angle.abs() / solid_angle.abs();
 
                 ratio * self.compute_star_collection_data(&a, &b, &c, &d)
             }
@@ -447,7 +461,12 @@ impl<'a, G: Geometry> Raytracer<'a, G> {
 
         // TODO: Use correct computation, color etc.
         let scale = 1000.0;
-        CIETristimulus::new(total_flux * scale, total_flux * scale, total_flux * scale, 1.0)
+        CIETristimulus::new(
+            total_flux * scale,
+            total_flux * scale,
+            total_flux * scale,
+            1.0,
+        )
     }
 
     fn handle_tube(&self, sample_tube: &SampleTube) -> CIETristimulus {
@@ -477,7 +496,7 @@ impl<'a, G: Geometry> Raytracer<'a, G> {
                         SampleTube::from_buffer(&buffer, row as u32, col as u32, width as u32);
                     let idx = row * width + col;
                     if let Some(sample_tube) = sample_tube_opt {
-                        colors[idx] = self.handle_tube(&sample_tube);
+                        colors[idx] = colors[idx].blend(&self.handle_tube(&sample_tube));
                     }
                 }
             }

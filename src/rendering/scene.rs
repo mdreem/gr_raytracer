@@ -243,11 +243,13 @@ impl<'a, G: Geometry> Scene<'a, G> {
                         )?);
                     }
 
-                    let pos_on_celestial_sphere = last_step.x.get_as_cartesian();
+                    // Take asymptotic travel direction (momentum) that spans the end of the tube.
+                    let escape_direction =
+                        last_step.p.get_cartesian_vector(&last_step.x).normalize();
                     ray_class = RayClass::Escaped(EscapeInfo {
-                        x: pos_on_celestial_sphere[0],
-                        y: pos_on_celestial_sphere[1],
-                        z: pos_on_celestial_sphere[2],
+                        x: escape_direction[0],
+                        y: escape_direction[1],
+                        z: escape_direction[2],
                     });
                 }
                 StopReason::CoordinateIsNan => {
