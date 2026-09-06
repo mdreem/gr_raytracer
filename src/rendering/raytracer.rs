@@ -452,7 +452,10 @@ impl<'a, G: Geometry> Raytracer<'a, G> {
         c: &EscapeInfo,
         d: &EscapeInfo,
     ) -> CIETristimulus {
-        let mut total_flux = 0.0;
+        // Accumulate each in-tube star's XYZ radiance (flux times its blackbody
+        // chromaticity), so hues sum in linear light. Y carries the summed
+        // flux; X and Z carry the colour.
+        let mut total = CIETristimulus::new(0.0, 0.0, 0.0, 1.0);
         // TODO: Move the collection into scene
         if let Some(star_catalog) = &self.scene.star_catalog {
             for star in &star_catalog.stars {
@@ -460,27 +463,25 @@ impl<'a, G: Geometry> Raytracer<'a, G> {
                     &star.direction,
                     &[a.to_vec(), b.to_vec(), c.to_vec()],
                 ) {
-                    total_flux += 10f64.powf(-0.4 * star.g_mag);
+                    total.x += star.emission_xyz.x;
+                    total.y += star.emission_xyz.y;
+                    total.z += star.emission_xyz.z;
                     debug!("Star {} is inside the traced tube", star.source_id);
                 }
                 if inside_convex_spherical_triangle(
                     &star.direction,
                     &[b.to_vec(), d.to_vec(), c.to_vec()],
                 ) {
-                    total_flux += 10f64.powf(-0.4 * star.g_mag);
+                    total.x += star.emission_xyz.x;
+                    total.y += star.emission_xyz.y;
+                    total.z += star.emission_xyz.z;
                     debug!("Star {} is inside the traced tube", star.source_id);
                 }
             }
         }
 
-        // TODO: Use correct computation, color etc.
         let scale = self.scene.star_flux_scale;
-        CIETristimulus::new(
-            total_flux * scale,
-            total_flux * scale,
-            total_flux * scale,
-            1.0,
-        )
+        CIETristimulus::new(total.x * scale, total.y * scale, total.z * scale, 1.0)
     }
 
     fn handle_tube(&self, sample_tube: &SampleTube) -> CIETristimulus {
