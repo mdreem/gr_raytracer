@@ -10,6 +10,7 @@ use crate::rendering::color::{
 use crate::rendering::integrator::{IntegrationError, StopReason};
 use crate::rendering::ray::{IntegratedRay, Ray};
 use crate::rendering::scene::{EscapeInfo, RayClass, RaySample, Scene};
+use crate::rendering::star_catalog::Star;
 use crate::rendering::texture::TextureError;
 use crate::rendering::tubetracer::SampleTube;
 use image::{ImageBuffer, ImageError, ImageFormat, Rgb};
@@ -456,32 +457,62 @@ impl<'a, G: Geometry> Raytracer<'a, G> {
         // chromaticity), so hues sum in linear light. Y carries the summed
         // flux; X and Z carry the colour.
         let mut total = CIETristimulus::new(0.0, 0.0, 0.0, 1.0);
+        // One frequency shift per tube: the four corners share nearly the same
+        // sky direction, so average their g. (Away from the photon ring g is
+        // near-uniform; the winding subdivision already splits the tubes where
+        // it is not.)
+        let redshift = 0.25 * (a.redshift + b.redshift + c.redshift + d.redshift);
         // TODO: Move the collection into scene
         if let Some(star_catalog) = &self.scene.star_catalog {
+            let tri_1 = [a.to_vec(), b.to_vec(), c.to_vec()];
+            let tri_2 = [b.to_vec(), d.to_vec(), c.to_vec()];
             for star in &star_catalog.stars {
-                if inside_convex_spherical_triangle(
-                    &star.direction,
-                    &[a.to_vec(), b.to_vec(), c.to_vec()],
-                ) {
-                    total.x += star.emission_xyz.x;
-                    total.y += star.emission_xyz.y;
-                    total.z += star.emission_xyz.z;
-                    debug!("Star {} is inside the traced tube", star.source_id);
+                let mut hits = 0.0;
+                if inside_convex_spherical_triangle(&star.direction, &tri_1) {
+                    hits += 1.0;
                 }
-                if inside_convex_spherical_triangle(
-                    &star.direction,
-                    &[b.to_vec(), d.to_vec(), c.to_vec()],
-                ) {
-                    total.x += star.emission_xyz.x;
-                    total.y += star.emission_xyz.y;
-                    total.z += star.emission_xyz.z;
-                    debug!("Star {} is inside the traced tube", star.source_id);
+                if inside_convex_spherical_triangle(&star.direction, &tri_2) {
+                    hits += 1.0;
                 }
+                if hits == 0.0 {
+                    continue;
+                }
+                let emission = self.redshifted_star_emission(star, redshift);
+                total.x += hits * emission.x;
+                total.y += hits * emission.y;
+                total.z += hits * emission.z;
+                debug!("Star {} is inside the traced tube", star.source_id);
             }
         }
 
         let scale = self.scene.star_flux_scale;
         CIETristimulus::new(total.x * scale, total.y * scale, total.z * scale, 1.0)
+    }
+
+    /// One star's observed XYZ radiance under the frequency shift `g`.
+    ///
+    /// A blackbody at `T` seen with shift `g` is a blackbody at `g * T` (Wien),
+    /// so the hue comes from the LUT at `g * T`, Y-normalised. Brightness comes
+    /// from the catalogue flux boosted by `g^4` (the bolometric surface-
+    /// brightness law `I_obs = g^4 I_emit`); the solid-angle magnification is
+    /// applied separately by the tube `ratio`, so it is not double-counted
+    /// here. `g == 1` (or no LUT) returns the precomputed rest-frame emission.
+    fn redshifted_star_emission(&self, star: &Star, g: f64) -> CIETristimulus {
+        if (g - 1.0).abs() < 1e-6 {
+            return star.emission_xyz;
+        }
+        let Some(mapper) = &self.scene.star_blackbody else {
+            return star.emission_xyz;
+        };
+        let bb = mapper.blackbody_xyz(g * star.temperature, 1.0);
+        let inv_y = if bb.y > 0.0 { 1.0 / bb.y } else { 0.0 };
+        let luminance = star.relative_flux() * g.powi(4);
+        CIETristimulus::new(
+            bb.x * inv_y * luminance,
+            luminance,
+            bb.z * inv_y * luminance,
+            1.0,
+        )
     }
 
     fn handle_tube(&self, sample_tube: &SampleTube) -> CIETristimulus {
@@ -540,6 +571,7 @@ impl<'a, G: Geometry> Raytracer<'a, G> {
                     x: 0.0,
                     y: 0.0,
                     z: 0.0,
+                    redshift: 1.0,
                 }),
                 accumulated_angular_distance: 0.0,
                 ray: Ray::new(
@@ -959,6 +991,7 @@ mod tests {
                 x: 0.0,
                 y: 0.0,
                 z: 1.0,
+                redshift: 1.0,
             }),
         );
         let captured = sample(0.0, 1.0, RayClass::Captured);
@@ -981,6 +1014,7 @@ mod tests {
                 x: 0.0,
                 y: 0.0,
                 z: 1.0,
+                redshift: 1.0,
             }),
         );
         let bright = sample(
@@ -990,6 +1024,7 @@ mod tests {
                 x: 1.0,
                 y: 0.0,
                 z: 0.0,
+                redshift: 1.0,
             }),
         );
 
