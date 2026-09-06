@@ -71,6 +71,10 @@ pub struct Scene<'a, G: Geometry> {
     pub star_catalog: Option<StarCatalog>,
     /// Linear flux multiplier applied to catalogue stars.
     pub star_flux_scale: f64,
+    /// Winding spread (radians) above which a traced star tube is subdivided.
+    pub winding_spread_threshold: f64,
+    /// Maximum recursive subdivision depth for a star tube.
+    pub max_subdivision_depth: usize,
 }
 
 pub type EquationOfMotionState = OVector<f64, Const<8>>;
@@ -142,17 +146,24 @@ impl<'a, G: Geometry> Scene<'a, G> {
             sampling_mask_color: None,
             star_catalog: None,
             star_flux_scale: 1.0,
+            winding_spread_threshold: std::f64::consts::PI,
+            max_subdivision_depth: 6,
         }
     }
 
-    /// Attach an optional point-source star catalogue and its flux scale.
+    /// Attach an optional point-source star catalogue and its tube-tracing
+    /// parameters (flux scale, winding subdivision threshold, depth cap).
     pub fn with_star_catalog(
         mut self,
         star_catalog: Option<StarCatalog>,
         star_flux_scale: f64,
+        winding_spread_threshold: f64,
+        max_subdivision_depth: usize,
     ) -> Self {
         self.star_catalog = star_catalog;
         self.star_flux_scale = star_flux_scale;
+        self.winding_spread_threshold = winding_spread_threshold;
+        self.max_subdivision_depth = max_subdivision_depth;
         self
     }
 

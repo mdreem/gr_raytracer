@@ -27,14 +27,36 @@ pub struct RenderConfig {
 pub struct StarCatalogConfig {
     /// Path to the Parquet catalogue produced by `scripts/gaia/download.py`.
     pub path: String,
-    /// Linear multiplier applied to each star's flux before it is added to
-    /// the celestial sphere.
+    /// Linear multiplier applied to each star's summed flux before it is
+    /// written to the celestial sphere. Raise it to make the star field
+    /// brighter relative to the tone-mapping exposure.
     #[serde(default = "default_star_flux_scale")]
     pub flux_scale: f64,
+    /// Winding spread (in radians) across a traced tube's four corners above
+    /// which the tube is subdivided before gathering stars. A tube whose
+    /// corners have wound past this much relative angle straddles a caustic
+    /// (photon ring), where the solid-angle magnification is unreliable, so it
+    /// is split into four sub-tubes instead. Defaults to π.
+    #[serde(default = "default_winding_spread_threshold")]
+    pub winding_spread_threshold: f64,
+    /// Maximum recursive subdivision depth for a tube near the photon ring.
+    /// Each level splits a tube into four, so the worst case is
+    /// `4^max_subdivision_depth` rays for a single base tube; the cap bounds
+    /// that cost. Beyond it the tube falls back to its corner-`a` colour.
+    #[serde(default = "default_max_subdivision_depth")]
+    pub max_subdivision_depth: usize,
 }
 
 fn default_star_flux_scale() -> f64 {
     1.0
+}
+
+fn default_winding_spread_threshold() -> f64 {
+    std::f64::consts::PI
+}
+
+fn default_max_subdivision_depth() -> usize {
+    6
 }
 
 #[derive(Deserialize, Serialize, Clone, Debug, PartialEq)]

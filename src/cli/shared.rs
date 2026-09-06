@@ -182,23 +182,30 @@ pub fn create_scene<G: Geometry>(
     };
 
     // Load the  Gaia star catalogue.
-    let (star_catalog, star_flux_scale) = match config.star_catalog {
-        Some(catalog_config) => {
-            let catalog = StarCatalog::load_parquet(&catalog_config.path).map_err(|error| {
-                RaytracerError::InvalidConfiguration(format!(
-                    "Failed to load star catalog {:?}: {}",
-                    catalog_config.path, error
-                ))
-            })?;
-            debug!(
-                "Loaded {} stars from {}",
-                catalog.len(),
-                catalog_config.path
-            );
-            (Some(catalog), catalog_config.flux_scale)
-        }
-        None => (None, 1.0),
-    };
+    let (star_catalog, star_flux_scale, winding_spread_threshold, max_subdivision_depth) =
+        match config.star_catalog {
+            Some(catalog_config) => {
+                let catalog =
+                    StarCatalog::load_parquet(&catalog_config.path).map_err(|error| {
+                        RaytracerError::InvalidConfiguration(format!(
+                            "Failed to load star catalog {:?}: {}",
+                            catalog_config.path, error
+                        ))
+                    })?;
+                debug!(
+                    "Loaded {} stars from {}",
+                    catalog.len(),
+                    catalog_config.path
+                );
+                (
+                    Some(catalog),
+                    catalog_config.flux_scale,
+                    catalog_config.winding_spread_threshold,
+                    catalog_config.max_subdivision_depth,
+                )
+            }
+            None => (None, 1.0, std::f64::consts::PI, 6),
+        };
 
     let mut objects = Objects::new(geometry);
     for object in config.objects {
@@ -360,7 +367,12 @@ pub fn create_scene<G: Geometry>(
         config.celestial_temperature,
     )
     .with_sampling_options(adaptive_sampling, sampling_mask_color)
-    .with_star_catalog(star_catalog, star_flux_scale);
+    .with_star_catalog(
+        star_catalog,
+        star_flux_scale,
+        winding_spread_threshold,
+        max_subdivision_depth,
+    );
     Ok(scene)
 }
 

@@ -23,8 +23,6 @@ use std::io;
 use std::ops::{Add, Mul};
 use std::sync::atomic::{AtomicUsize, Ordering};
 
-const WINDING_SPREAD_THRESHOLD: f64 = std::f64::consts::PI;
-
 #[derive(Debug, thiserror::Error)]
 pub enum RaytracerError {
     #[error("Integration error: {0}")]
@@ -268,8 +266,7 @@ impl<'a, G: Geometry> Raytracer<'a, G> {
     }
 
     fn subdivide(&self, sample_tube: &SampleTube, depth: usize) -> Option<CIETristimulus> {
-        // TODO: make configurable
-        if depth >= 6 {
+        if depth >= self.scene.max_subdivision_depth {
             debug!("Maximum subdivision depth reached.");
             return None;
         }
@@ -359,8 +356,7 @@ impl<'a, G: Geometry> Raytracer<'a, G> {
                 let min_angle = angles.iter().cloned().reduce(f64::min).unwrap();
                 let max_angle = angles.iter().cloned().reduce(f64::max).unwrap();
                 let spread = max_angle - min_angle;
-                // TODO: Make WINDING_SPREAD_THRESHOLD configurable
-                if spread > WINDING_SPREAD_THRESHOLD {
+                if spread > self.scene.winding_spread_threshold {
                     if let Some(color) = self.subdivide(sample_tube, depth + 1) {
                         return color;
                     } else {
@@ -478,7 +474,7 @@ impl<'a, G: Geometry> Raytracer<'a, G> {
         }
 
         // TODO: Use correct computation, color etc.
-        let scale = 1000.0;
+        let scale = self.scene.star_flux_scale;
         CIETristimulus::new(
             total_flux * scale,
             total_flux * scale,
