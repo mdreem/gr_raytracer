@@ -39,10 +39,12 @@ pub struct StarCatalogConfig {
     /// is split into four sub-tubes instead. Defaults to π.
     #[serde(default = "default_winding_spread_threshold")]
     pub winding_spread_threshold: f64,
-    /// Maximum recursive subdivision depth for a tube near the photon ring.
-    /// Each level splits a tube into four, so the worst case is
-    /// `4^max_subdivision_depth` rays for a single base tube; the cap bounds
-    /// that cost. Beyond it the tube falls back to its corner-`a` colour.
+    /// Maximum number of subdivision levels for a tube near the photon ring
+    /// (0 disables subdivision, 1 permits one split). Each split traces five
+    /// shared samples and creates four children; at most `4^depth` leaves.
+    /// At the limit, escaped tubes use their finite area ratio and mixed
+    /// tubes retain the corner-`a` fallback. Invalid areas or failed child
+    /// rays are reported as render errors.
     #[serde(default = "default_max_subdivision_depth")]
     pub max_subdivision_depth: usize,
 }

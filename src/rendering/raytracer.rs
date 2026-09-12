@@ -58,6 +58,8 @@ pub enum RaytracerError {
     NumberBelowZero,
     #[error("Denominator is close to zero")]
     DenominatorCloseToZero,
+    #[error("Invalid star tube: {0}")]
+    InvalidStarTube(&'static str),
 }
 
 pub struct Raytracer<'a, G: Geometry> {
@@ -199,11 +201,34 @@ fn to_cartesian(theta: f64, phi: f64) -> nalgebra::Vector3<f64> {
     nalgebra::Vector3::new(x, y, z)
 }
 
-fn solid_angle_from_vecs(a_vec: &Vector3<f64>, b_vec: &Vector3<f64>, c_vec: &Vector3<f64>) -> f64 {
-    let num = a_vec.dot(&b_vec.cross(&c_vec));
-    let denom = 1.0 + a_vec.dot(&b_vec) + b_vec.dot(&c_vec) + c_vec.dot(&a_vec);
+fn solid_angle_from_vecs(
+    a_vec: &Vector3<f64>,
+    b_vec: &Vector3<f64>,
+    c_vec: &Vector3<f64>,
+) -> Result<f64, RaytracerError> {
+    let num = a_vec.dot(&b_vec.cross(c_vec));
+    let denom = 1.0 + a_vec.dot(b_vec) + b_vec.dot(c_vec) + c_vec.dot(a_vec);
 
-    2.0 * num.atan2(denom)
+    let angle = 2.0 * num.atan2(denom);
+    // Check each triangle, not just the total quad area: one collapsed
+    // triangle must not reach the star-membership test even if the other
+    // has a valid area. Equal vertices can leave a tiny nonzero determinant
+    // through cancellation, so check them explicitly too.
+    if a_vec == b_vec
+        || b_vec == c_vec
+        || c_vec == a_vec
+        || !num.is_finite()
+        || num == 0.0
+        || !denom.is_finite()
+        || !angle.is_finite()
+        || angle == 0.0
+    {
+        Err(RaytracerError::InvalidStarTube(
+            "nonfinite or degenerate spherical triangle",
+        ))
+    } else {
+        Ok(angle)
+    }
 }
 
 fn compute_traced_tube_solid_angle(
@@ -211,7 +236,7 @@ fn compute_traced_tube_solid_angle(
     b: &EscapeInfo,
     c: &EscapeInfo,
     d: &EscapeInfo,
-) -> f64 {
+) -> Result<f64, RaytracerError> {
     let a_vec = Vector3::new(a.x, a.y, a.z);
     let b_vec = Vector3::new(b.x, b.y, b.z);
     let c_vec = Vector3::new(c.x, c.y, c.z);
@@ -225,7 +250,7 @@ fn compute_solid_angle(
     b_vec: &Vector3<f64>,
     c_vec: &Vector3<f64>,
     d_vec: &Vector3<f64>,
-) -> f64 {
+) -> Result<f64, RaytracerError> {
     // See https://en.wikipedia.org/wiki/Solid_angle
     // |a_vec| = |b_vec| = |c_vec| = 1, so the formula simplifies to:
 
@@ -233,12 +258,12 @@ fn compute_solid_angle(
     // same orientation (corners are TL,TR,BL,BR). Using (b,c,d) instead flips
     // the second triangle's orientation, so the two nearly cancel and the sum
     // is a twist residual rather than the quad area. Matches the gather's split.
-    let angle_1 = solid_angle_from_vecs(&a_vec, &b_vec, &c_vec);
-    let angle_2 = solid_angle_from_vecs(&b_vec, &d_vec, &c_vec);
+    let angle_1 = solid_angle_from_vecs(a_vec, b_vec, c_vec)?;
+    let angle_2 = solid_angle_from_vecs(b_vec, d_vec, c_vec)?;
 
     // Sum the absolute triangle areas: robust to a per-triangle sign flip at a
     // fold (where the signed sum would cancel), and gives the true magnitude.
-    angle_1.abs() + angle_2.abs()
+    Ok(angle_1.abs() + angle_2.abs())
 }
 
 fn inside_convex_spherical_triangle(p: &Vector3<f64>, q: &[Vector3<f64>; 3]) -> bool {
@@ -247,6 +272,17 @@ fn inside_convex_spherical_triangle(p: &Vector3<f64>, q: &[Vector3<f64>; 3]) -> 
         let n = q[i].cross(&q[(i + 1) % 3]);
         n.dot(p).signum() == n.dot(&centroid).signum()
     })
+}
+
+fn finite_tube_color(color: CIETristimulus) -> Result<CIETristimulus, RaytracerError> {
+    if [color.x, color.y, color.z, color.alpha]
+        .iter()
+        .all(|v| v.is_finite())
+    {
+        Ok(color)
+    } else {
+        Err(RaytracerError::InvalidStarTube("nonfinite gathered color"))
+    }
 }
 
 impl<'a, G: Geometry> Raytracer<'a, G> {
@@ -266,76 +302,64 @@ impl<'a, G: Geometry> Raytracer<'a, G> {
         debug!("sample: {:?}", sample);
     }
 
-    fn subdivide(&self, sample_tube: &SampleTube, depth: usize) -> Option<CIETristimulus> {
+    /// `depth` counts splits already made: zero is the base tube, and a
+    /// configured maximum of one permits exactly one split.
+    fn subdivide(
+        &self,
+        sample_tube: &SampleTube,
+        depth: usize,
+    ) -> Result<Option<CIETristimulus>, RaytracerError> {
         if depth >= self.scene.max_subdivision_depth {
             debug!("Maximum subdivision depth reached.");
-            return None;
+            return Ok(None);
         }
 
-        let mid_row = (sample_tube.a.ray.row + sample_tube.c.ray.row) / 2;
-        let mid_col = (sample_tube.a.ray.col + sample_tube.b.ray.col) / 2;
-        let mid_ray = self.scene.camera.get_ray_for(mid_row, mid_col);
-
-        let a_b_mid_ray = self
-            .scene
-            .camera
-            .get_ray_for((sample_tube.a.ray.row + sample_tube.b.ray.row) / 2, mid_col);
-        let a_c_mid_ray = self
-            .scene
-            .camera
-            .get_ray_for(mid_row, (sample_tube.a.ray.col + sample_tube.c.ray.col) / 2);
-
-        let b_d_mid_ray = self
-            .scene
-            .camera
-            .get_ray_for((sample_tube.b.ray.row + sample_tube.d.ray.row) / 2, mid_col);
-        let c_d_mid_ray = self
-            .scene
-            .camera
-            .get_ray_for(mid_row, (sample_tube.c.ray.col + sample_tube.d.ray.col) / 2);
-
-        let mid_ray_sample = self.scene.color_of_ray(&mid_ray).unwrap();
-        let a_b_mid_ray_sample = self.scene.color_of_ray(&a_b_mid_ray).unwrap();
-        let a_c_mid_ray_sample = self.scene.color_of_ray(&a_c_mid_ray).unwrap();
-        let b_d_mid_ray_sample = self.scene.color_of_ray(&b_d_mid_ray).unwrap();
-        let c_d_mid_ray_sample = self.scene.color_of_ray(&c_d_mid_ray).unwrap();
-
-        let top_left_tube = SampleTube::new(
-            sample_tube.a,
-            &a_b_mid_ray_sample,
-            &a_c_mid_ray_sample,
-            &mid_ray_sample,
-        );
-        let top_right_tube = SampleTube::new(
-            &a_b_mid_ray_sample,
-            sample_tube.b,
-            &mid_ray_sample,
-            &b_d_mid_ray_sample,
-        );
-        let bottom_left_tube = SampleTube::new(
-            &a_c_mid_ray_sample,
-            &mid_ray_sample,
-            sample_tube.c,
-            &c_d_mid_ray_sample,
-        );
-        let bottom_right_tube = SampleTube::new(
-            &mid_ray_sample,
-            &b_d_mid_ray_sample,
-            &c_d_mid_ray_sample,
-            sample_tube.d,
-        );
-
-        // These handle the max depths and will return something usable.
-        let color_top_left = self.compute_color(&top_left_tube, depth);
-        let color_top_right = self.compute_color(&top_right_tube, depth);
-        let color_bottom_left = self.compute_color(&bottom_left_tube, depth);
-        let color_bottom_right = self.compute_color(&bottom_right_tube, depth);
-
-        Some(color_top_left + color_top_right + color_bottom_left + color_bottom_right)
+        let samples = self.trace_subdivision(sample_tube)?;
+        let mut color = CIETristimulus::new(0.0, 0.0, 0.0, 0.0);
+        for child in sample_tube.children(&samples) {
+            color = color + self.compute_color(&child, depth + 1)?;
+        }
+        Ok(Some(finite_tube_color(color)?))
     }
 
-    fn compute_color(&self, sample_tube: &SampleTube, depth: usize) -> CIETristimulus {
-        match (
+    fn trace_subdivision(
+        &self,
+        sample_tube: &SampleTube,
+    ) -> Result<[RaySample; 5], RaytracerError> {
+        let points = sample_tube
+            .subdivision_points()
+            .ok_or(RaytracerError::InvalidStarTube(
+                "tube screen bounds cannot be subdivided",
+            ))?;
+        let trace = |(row, col): (f64, f64)| {
+            // The integer labels stay attached to the owning pixel; only
+            // the tube's screen bounds determine the actual sampling position.
+            let pixel_row = sample_tube.a.ray.row;
+            let pixel_col = sample_tube.a.ray.col;
+            let ray = self.scene.camera.get_ray_for_offset(
+                pixel_row,
+                pixel_col,
+                col - pixel_col as f64 + 0.5,
+                row - pixel_row as f64 + 0.5,
+            );
+            self.scene.color_of_ray(&ray)
+        };
+        // Five traces, with their results borrowed by all four children.
+        Ok([
+            trace(points[0])?,
+            trace(points[1])?,
+            trace(points[2])?,
+            trace(points[3])?,
+            trace(points[4])?,
+        ])
+    }
+
+    fn compute_color(
+        &self,
+        sample_tube: &SampleTube,
+        depth: usize,
+    ) -> Result<CIETristimulus, RaytracerError> {
+        let color = match (
             sample_tube.a.ray_class,
             sample_tube.b.ray_class,
             sample_tube.c.ray_class,
@@ -353,45 +377,16 @@ impl<'a, G: Geometry> Raytracer<'a, G> {
                     sample_tube.c.accumulated_angular_distance,
                     sample_tube.d.accumulated_angular_distance,
                 ];
-                // TODO: Clean error handling.
-                let min_angle = angles.iter().cloned().reduce(f64::min).unwrap();
-                let max_angle = angles.iter().cloned().reduce(f64::max).unwrap();
+                if !angles.iter().all(|angle| angle.is_finite()) {
+                    return Err(RaytracerError::InvalidStarTube("nonfinite winding angle"));
+                }
+                let min_angle = angles.iter().copied().fold(f64::INFINITY, f64::min);
+                let max_angle = angles.iter().copied().fold(f64::NEG_INFINITY, f64::max);
                 let spread = max_angle - min_angle;
-                if spread > self.scene.winding_spread_threshold {
-                    if let Some(color) = self.subdivide(sample_tube, depth + 1) {
-                        return color;
-                    } else {
-                        let o_a = sample_tube
-                            .a
-                            .ray
-                            .momentum
-                            .get_cartesian_vector(&sample_tube.a.ray.position)
-                            .normalize();
-                        let o_b = sample_tube
-                            .b
-                            .ray
-                            .momentum
-                            .get_cartesian_vector(&sample_tube.b.ray.position)
-                            .normalize();
-                        let o_c = sample_tube
-                            .c
-                            .ray
-                            .momentum
-                            .get_cartesian_vector(&sample_tube.c.ray.position)
-                            .normalize();
-                        let o_d = sample_tube
-                            .d
-                            .ray
-                            .momentum
-                            .get_cartesian_vector(&sample_tube.d.ray.position)
-                            .normalize();
-
-                        let original_angle = compute_solid_angle(&o_a, &o_b, &o_c, &o_d);
-                        let solid_angle = compute_traced_tube_solid_angle(&a, &b, &c, &d);
-                        let ratio = original_angle.abs() / solid_angle.abs();
-
-                        return ratio * self.compute_star_collection_data(&a, &b, &c, &d);
-                    }
+                if spread > self.scene.winding_spread_threshold
+                    && let Some(color) = self.subdivide(sample_tube, depth)?
+                {
+                    return Ok(color);
                 }
                 let o_a = sample_tube
                     .a
@@ -418,9 +413,12 @@ impl<'a, G: Geometry> Raytracer<'a, G> {
                     .get_cartesian_vector(&sample_tube.d.ray.position)
                     .normalize();
 
-                let original_angle = compute_solid_angle(&o_a, &o_b, &o_c, &o_d);
-                let solid_angle = compute_traced_tube_solid_angle(&a, &b, &c, &d);
-                let ratio = original_angle.abs() / solid_angle.abs();
+                let original_angle = compute_solid_angle(&o_a, &o_b, &o_c, &o_d)?;
+                let solid_angle = compute_traced_tube_solid_angle(&a, &b, &c, &d)?;
+                let ratio = original_angle / solid_angle;
+                if !ratio.is_finite() || ratio <= 0.0 {
+                    return Err(RaytracerError::InvalidStarTube("invalid magnification"));
+                }
 
                 ratio * self.compute_star_collection_data(&a, &b, &c, &d)
             }
@@ -437,13 +435,14 @@ impl<'a, G: Geometry> Raytracer<'a, G> {
                     || matches!(sample_tube.c.ray_class, RayClass::Escaped(_))
                     || matches!(sample_tube.d.ray_class, RayClass::Escaped(_));
                 if any_escaped {
-                    self.subdivide(sample_tube, depth + 1)
+                    self.subdivide(sample_tube, depth)?
                         .unwrap_or(sample_tube.a.color)
                 } else {
                     sample_tube.a.color
                 }
             }
-        }
+        };
+        finite_tube_color(color)
     }
 
     fn compute_star_collection_data(
@@ -515,8 +514,47 @@ impl<'a, G: Geometry> Raytracer<'a, G> {
         )
     }
 
-    fn handle_tube(&self, sample_tube: &SampleTube) -> CIETristimulus {
+    fn handle_tube(&self, sample_tube: &SampleTube) -> Result<CIETristimulus, RaytracerError> {
         self.compute_color(sample_tube, 0)
+    }
+
+    fn add_star_layer(
+        &self,
+        buffer: &[RaySample],
+        width: usize,
+        height: usize,
+        colors: &mut [CIETristimulus],
+    ) -> Result<(), RaytracerError> {
+        if self
+            .scene
+            .star_catalog
+            .as_ref()
+            .is_none_or(|catalog| catalog.is_empty())
+        {
+            return Ok(());
+        }
+        // Retain the current center-to-center base footprints. Moving them
+        // to pixel boundaries is separate from fixing recursive subdivision.
+        for row in 0..height.saturating_sub(1) {
+            for col in 0..width.saturating_sub(1) {
+                if let Some(tube) =
+                    SampleTube::from_buffer(buffer, row as u32, col as u32, width as u32)
+                {
+                    let idx = row * width + col;
+                    let stars = self.handle_tube(&tube).map_err(|err| {
+                        error!(
+                            "Unable to gather stars for {:?}: {}",
+                            tube.screen_bounds, err
+                        );
+                        err
+                    })?;
+                    // Star layer goes UNDER the foreground, weighted by
+                    // the foreground's surviving transmittance.
+                    colors[idx] = stars.blend(&colors[idx]);
+                }
+            }
+        }
+        Ok(())
     }
 
     fn render_section_to_cie_buffer(
@@ -532,23 +570,10 @@ impl<'a, G: Geometry> Raytracer<'a, G> {
                 from_row, from_col, to_row, to_col, &buffer,
             )
         } else {
-            // TODO: this needs more work. It's a rough sweep.
             let width = (to_col - from_col) as usize;
             let height = (to_row - from_row) as usize;
             let mut colors: Vec<CIETristimulus> = buffer.iter().map(|s| s.color).collect();
-            for row in 0..height.saturating_sub(1) {
-                for col in 0..width.saturating_sub(1) {
-                    let sample_tube_opt =
-                        SampleTube::from_buffer(&buffer, row as u32, col as u32, width as u32);
-                    let idx = row * width + col;
-                    if let Some(sample_tube) = sample_tube_opt {
-                        // Star layer goes UNDER the foreground: compose the disc
-                        // buffer over the star background, weighted by the disc's
-                        // surviving transmittance (buffer alpha).
-                        colors[idx] = self.handle_tube(&sample_tube).blend(&colors[idx]);
-                    }
-                }
-            }
+            self.add_star_layer(&buffer, width, height, &mut colors)?;
 
             Ok(colors)
         }
@@ -697,17 +722,7 @@ impl<'a, G: Geometry> Raytracer<'a, G> {
 
         let width = (to_col - from_col) as usize;
         let height = (to_row - from_row) as usize;
-        for row in 0..height.saturating_sub(1) {
-            for col in 0..width.saturating_sub(1) {
-                let sample_tube_opt =
-                    SampleTube::from_buffer(&buffer, row as u32, col as u32, width as u32);
-                let idx = row * width + col;
-                if let Some(sample_tube) = sample_tube_opt {
-                    let new_color = self.handle_tube(&sample_tube).blend(&output_buffer[idx]);
-                    output_buffer[idx] = new_color;
-                }
-            }
-        }
+        self.add_star_layer(buffer, width, height, &mut output_buffer)?;
 
         info!(
             "Finished rendering section from ({}, {}) to ({}, {})",
@@ -915,6 +930,9 @@ impl<'a, G: Geometry> Raytracer<'a, G> {
         self.scene.integrate_ray(&ray)
     }
 }
+
+#[cfg(test)]
+mod tube_tests;
 
 #[cfg(test)]
 mod tests {
