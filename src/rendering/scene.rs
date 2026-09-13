@@ -6,6 +6,7 @@ use crate::rendering::camera::Camera;
 use crate::rendering::color::CIETristimulus;
 use crate::rendering::integrator::StopReason::{CelestialSphereReached, HorizonReached};
 use crate::rendering::integrator::{IntegrationConfiguration, Integrator, Step, StopReason};
+use crate::rendering::radiance::Radiance;
 use crate::rendering::ray::{IntegratedRay, Ray};
 use crate::rendering::raytracer::RaytracerError;
 use crate::rendering::redshift::RedshiftComputer;
@@ -19,7 +20,7 @@ use std::fs::File;
 
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub struct RaySample {
-    pub color: CIETristimulus,
+    pub color: Radiance,
     pub ray_class: RayClass,
     pub accumulated_angular_distance: f64,
     pub ray: Ray,
@@ -233,7 +234,7 @@ impl<'a, G: Geometry> Scene<'a, G> {
                     .intersects(last_step, step, &frequency, remaining_steps)?
             {
                 intersections.push(intersection_color);
-                let alpha = intersection_color.alpha.clamp(0.0, 1.0);
+                let alpha = intersection_color.opacity();
                 object_opacity = alpha + object_opacity * (1.0 - alpha);
             }
         }
@@ -245,7 +246,7 @@ impl<'a, G: Geometry> Scene<'a, G> {
         if let Some(reason) = stop_reason {
             match reason {
                 HorizonReached => {
-                    intersections.push(CIETristimulus::new(0.0, 0.0, 0.0, 1.0));
+                    intersections.push(Radiance::BLACK);
                     ray_class = RayClass::Captured;
                 }
                 CelestialSphereReached => {
@@ -257,13 +258,15 @@ impl<'a, G: Geometry> Scene<'a, G> {
                     // If no star catalog is provided, we still want to sample the celestial sphere texture.
                     // Otherwise, the star catalog will provide the color information for the celestial sphere.
                     if self.star_catalog.is_none() {
-                        intersections.push(self.texture_data.celestial_map.color_at_uv(
-                            &uv,
-                            &TemperatureData {
-                                redshift,
-                                temperature: self.celestial_temperature,
-                            },
-                        )?);
+                        intersections.push(Radiance::from_straight(
+                            self.texture_data.celestial_map.color_at_uv(
+                                &uv,
+                                &TemperatureData {
+                                    redshift,
+                                    temperature: self.celestial_temperature,
+                                },
+                            )?,
+                        ));
                     }
 
                     // Take asymptotic travel direction (momentum) that spans the end of the tube.
@@ -290,7 +293,7 @@ impl<'a, G: Geometry> Scene<'a, G> {
                     ray_class = RayClass::Captured;
                 }
                 StopReason::ClosedOrbitDetected => {
-                    intersections.push(CIETristimulus::new(0.0, 0.0, 0.0, 1.0));
+                    intersections.push(Radiance::BLACK);
                     ray_class = RayClass::Captured;
                 }
             };
@@ -304,13 +307,12 @@ impl<'a, G: Geometry> Scene<'a, G> {
             // No terminal event: default to Captured (see the NaN case above).
             ray_class = RayClass::Captured;
         }
-        // Start transparent so the foreground's accumulated transmittance
-        // survives in the alpha. In this way we can add the stars on the
-        // celestial sphere later.
-        let mut result = CIETristimulus::new(0.0, 0.0, 0.0, 0.0);
+        // Preserve foreground light and transmittance independently so the
+        // catalogue background can be composed later without reweighting emission.
+        let mut result = Radiance::TRANSPARENT;
 
         for color in intersections.iter().rev() {
-            result = result.blend(color)
+            result = color.over(result)
         }
 
         if object_opacity >= self.adaptive_sampling.object_hit_opacity_threshold {
@@ -527,7 +529,7 @@ mod tests {
             approx::assert_abs_diff_eq!($x.x, $y.x, epsilon = $e);
             approx::assert_abs_diff_eq!($x.y, $y.y, epsilon = $e);
             approx::assert_abs_diff_eq!($x.z, $y.z, epsilon = $e);
-            approx::assert_abs_diff_eq!($x.alpha, $y.alpha, epsilon = $e);
+            approx::assert_abs_diff_eq!($x.opacity(), $y.alpha, epsilon = $e);
         };
     }
 
@@ -751,7 +753,7 @@ mod tests {
         let sample = scene.color_of_ray(&ray).unwrap();
 
         assert_eq!(sample.ray_class, RayClass::Captured);
-        assert_eq!(sample.color, CIETristimulus::new(0.0, 0.0, 0.0, 1.0));
+        assert_eq!(sample.color, crate::rendering::radiance::Radiance::BLACK);
     }
 
     #[test]

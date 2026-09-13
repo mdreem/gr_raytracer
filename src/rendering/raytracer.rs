@@ -8,6 +8,7 @@ use crate::rendering::color::{
     xyz_to_linear_srgb_buffer,
 };
 use crate::rendering::integrator::{IntegrationError, StopReason};
+use crate::rendering::radiance::{Radiance, RadianceMean};
 use crate::rendering::ray::{IntegratedRay, Ray};
 use crate::rendering::scene::{EscapeInfo, RayClass, RaySample, Scene};
 use crate::rendering::star_catalog::Star;
@@ -74,7 +75,7 @@ const MICHELSON_DENOMINATOR_EPSILON: f64 = 1e-4;
 struct PixelToSample {
     pub row: u32,
     pub col: u32,
-    pub result: Option<CIETristimulus>,
+    pub result: Option<Radiance>,
 }
 
 struct StarCollectionData {
@@ -102,15 +103,15 @@ impl Mul<StarCollectionData> for f64 {
 }
 
 /// Michelson (relative) luminance contrast; relative because HDR radiance is unbounded.
-fn luminance_contrast(p: &CIETristimulus, q: &CIETristimulus) -> f64 {
+fn luminance_contrast(p: &Radiance, q: &Radiance) -> f64 {
     let l_p = p.y;
     let l_q = q.y;
     (l_p - l_q).abs() / (l_p + l_q + MICHELSON_DENOMINATOR_EPSILON)
 }
 
-/// Absolute opacity difference; absolute because alpha is already normalized to [0, 1].
-fn opacity_contrast(p: &CIETristimulus, q: &CIETristimulus) -> f64 {
-    (p.alpha - q.alpha).abs()
+/// Absolute opacity difference equals the absolute transmittance difference.
+fn opacity_contrast(p: &Radiance, q: &Radiance) -> f64 {
+    (p.transmittance - q.transmittance).abs()
 }
 
 /// Faintness gate for the contrast triggers: true if the brighter of the pair
@@ -120,7 +121,7 @@ fn opacity_contrast(p: &CIETristimulus, q: &CIETristimulus) -> f64 {
 /// but stops the high-frequency background from flooding the contrast trigger
 /// (it would otherwise flag ~all pixels). Class-change edges are not gated, so
 /// silhouettes and the shadow rim are unaffected.
-fn visible(p: &CIETristimulus, q: &CIETristimulus, minimum_luminance: f64) -> bool {
+fn visible(p: &Radiance, q: &Radiance, minimum_luminance: f64) -> bool {
     p.y.max(q.y) > minimum_luminance
 }
 
@@ -274,11 +275,8 @@ fn inside_convex_spherical_triangle(p: &Vector3<f64>, q: &[Vector3<f64>; 3]) -> 
     })
 }
 
-fn finite_tube_color(color: CIETristimulus) -> Result<CIETristimulus, RaytracerError> {
-    if [color.x, color.y, color.z, color.alpha]
-        .iter()
-        .all(|v| v.is_finite())
-    {
+fn finite_tube_flux(color: Vector3<f64>) -> Result<Vector3<f64>, RaytracerError> {
+    if color.iter().all(|v| v.is_finite()) {
         Ok(color)
     } else {
         Err(RaytracerError::InvalidStarTube("nonfinite gathered color"))
@@ -308,18 +306,18 @@ impl<'a, G: Geometry> Raytracer<'a, G> {
         &self,
         sample_tube: &SampleTube,
         depth: usize,
-    ) -> Result<Option<CIETristimulus>, RaytracerError> {
+    ) -> Result<Option<Vector3<f64>>, RaytracerError> {
         if depth >= self.scene.max_subdivision_depth {
             debug!("Maximum subdivision depth reached.");
             return Ok(None);
         }
 
         let samples = self.trace_subdivision(sample_tube)?;
-        let mut color = CIETristimulus::new(0.0, 0.0, 0.0, 0.0);
+        let mut color = Vector3::zeros();
         for child in sample_tube.children(&samples) {
-            color = color + self.compute_color(&child, depth + 1)?;
+            color += self.compute_color(&child, depth + 1)?;
         }
-        Ok(Some(finite_tube_color(color)?))
+        Ok(Some(finite_tube_flux(color)?))
     }
 
     fn trace_subdivision(
@@ -358,7 +356,7 @@ impl<'a, G: Geometry> Raytracer<'a, G> {
         &self,
         sample_tube: &SampleTube,
         depth: usize,
-    ) -> Result<CIETristimulus, RaytracerError> {
+    ) -> Result<Vector3<f64>, RaytracerError> {
         let color = match (
             sample_tube.a.ray_class,
             sample_tube.b.ray_class,
@@ -422,10 +420,15 @@ impl<'a, G: Geometry> Raytracer<'a, G> {
 
                 ratio * self.compute_star_collection_data(&a, &b, &c, &d)
             }
-            // all four corners captured  or all four hitting an opaque object:
+            // C06 remains separate: these legacy branches still use corner
+            // foreground light as a flux fallback. The return type only fixes
+            // the compositing contract; it does not fix physical classification.
+            // all four corners captured or all four hitting an opaque object:
             // Just return the color of corner a, no need to subdivide.
             (RayClass::Captured, RayClass::Captured, RayClass::Captured, RayClass::Captured)
-            | (RayClass::Hit, RayClass::Hit, RayClass::Hit, RayClass::Hit) => sample_tube.a.color,
+            | (RayClass::Hit, RayClass::Hit, RayClass::Hit, RayClass::Hit) => {
+                sample_tube.a.color.as_vector()
+            }
             // Catch mixed cases.
             // If mixed but not-escaped: return the color of corner a, no need to subdivide.
             // If any corner escaped: subdivide. Of maximum is reached, just return the color of corner a.
@@ -436,13 +439,13 @@ impl<'a, G: Geometry> Raytracer<'a, G> {
                     || matches!(sample_tube.d.ray_class, RayClass::Escaped(_));
                 if any_escaped {
                     self.subdivide(sample_tube, depth)?
-                        .unwrap_or(sample_tube.a.color)
+                        .unwrap_or(sample_tube.a.color.as_vector())
                 } else {
-                    sample_tube.a.color
+                    sample_tube.a.color.as_vector()
                 }
             }
         };
-        finite_tube_color(color)
+        finite_tube_flux(color)
     }
 
     fn compute_star_collection_data(
@@ -451,11 +454,13 @@ impl<'a, G: Geometry> Raytracer<'a, G> {
         b: &EscapeInfo,
         c: &EscapeInfo,
         d: &EscapeInfo,
-    ) -> CIETristimulus {
+    ) -> Vector3<f64> {
         // Accumulate each in-tube star's XYZ radiance (flux times its blackbody
         // chromaticity), so hues sum in linear light. Y carries the summed
         // flux; X and Z carry the colour.
-        let mut total = CIETristimulus::new(0.0, 0.0, 0.0, 1.0);
+        // Flux has no opacity: magnification and subdivision must scale/sum
+        // light only, never an alpha that later weights that same light again.
+        let mut total = Vector3::zeros();
         // One frequency shift per tube: the four corners share nearly the same
         // sky direction, so average their g. (Away from the photon ring g is
         // near-uniform; the winding subdivision already splits the tubes where
@@ -485,7 +490,7 @@ impl<'a, G: Geometry> Raytracer<'a, G> {
         }
 
         let scale = self.scene.star_flux_scale;
-        CIETristimulus::new(total.x * scale, total.y * scale, total.z * scale, 1.0)
+        total * scale
     }
 
     /// One star's observed XYZ radiance under the frequency shift `g`.
@@ -514,7 +519,7 @@ impl<'a, G: Geometry> Raytracer<'a, G> {
         )
     }
 
-    fn handle_tube(&self, sample_tube: &SampleTube) -> Result<CIETristimulus, RaytracerError> {
+    fn handle_tube(&self, sample_tube: &SampleTube) -> Result<Vector3<f64>, RaytracerError> {
         self.compute_color(sample_tube, 0)
     }
 
@@ -523,7 +528,7 @@ impl<'a, G: Geometry> Raytracer<'a, G> {
         buffer: &[RaySample],
         width: usize,
         height: usize,
-        colors: &mut [CIETristimulus],
+        colors: &mut [Radiance],
     ) -> Result<(), RaytracerError> {
         if self
             .scene
@@ -550,36 +555,37 @@ impl<'a, G: Geometry> Raytracer<'a, G> {
                     })?;
                     // Star layer goes UNDER the foreground, weighted by
                     // the foreground's surviving transmittance.
-                    colors[idx] = stars.blend(&colors[idx]);
+                    colors[idx] = colors[idx].over(Radiance::new(stars.x, stars.y, stars.z, 0.0));
                 }
             }
         }
         Ok(())
     }
 
-    fn render_section_to_cie_buffer(
+    fn render_section_to_radiance_buffer(
         &self,
         from_row: u32,
         from_col: u32,
         to_row: u32,
         to_col: u32,
-    ) -> Result<Vec<CIETristimulus>, RaytracerError> {
-        let buffer = self.render_section_to_cie_buffer_raw(from_row, from_col, to_row, to_col)?;
+    ) -> Result<Vec<Radiance>, RaytracerError> {
+        let buffer =
+            self.render_section_to_radiance_buffer_raw(from_row, from_col, to_row, to_col)?;
         if self.scene.adaptive_sampling.enabled || self.scene.sampling_mask_color.is_some() {
-            self.render_section_to_cie_buffer_supersampled(
+            self.render_section_to_radiance_buffer_supersampled(
                 from_row, from_col, to_row, to_col, &buffer,
             )
         } else {
             let width = (to_col - from_col) as usize;
             let height = (to_row - from_row) as usize;
-            let mut colors: Vec<CIETristimulus> = buffer.iter().map(|s| s.color).collect();
+            let mut colors: Vec<Radiance> = buffer.iter().map(|s| s.color).collect();
             self.add_star_layer(&buffer, width, height, &mut colors)?;
 
             Ok(colors)
         }
     }
 
-    fn render_section_to_cie_buffer_raw(
+    fn render_section_to_radiance_buffer_raw(
         &self,
         from_row: u32,
         from_col: u32,
@@ -591,7 +597,7 @@ impl<'a, G: Geometry> Raytracer<'a, G> {
         // Create some dummy rays. They will be replaced with the actual rays in the parallel loop below.
         let mut buffer: Vec<RaySample> = vec![
             RaySample {
-                color: CIETristimulus::new(0.0, 0.0, 0.0, 1.0),
+                color: Radiance::BLACK,
                 ray_class: RayClass::Escaped(EscapeInfo {
                     x: 0.0,
                     y: 0.0,
@@ -660,20 +666,20 @@ impl<'a, G: Geometry> Raytracer<'a, G> {
         ((row - offset_row) * width + (col - offset_col)) as usize
     }
 
-    fn render_section_to_cie_buffer_supersampled(
+    fn render_section_to_radiance_buffer_supersampled(
         &self,
         from_row: u32,
         from_col: u32,
         to_row: u32,
         to_col: u32,
         buffer: &[RaySample],
-    ) -> Result<Vec<CIETristimulus>, RaytracerError> {
+    ) -> Result<Vec<Radiance>, RaytracerError> {
         info!(
             "Rendering section from ({}, {}) to ({}, {}) with supersampling",
             from_row, from_col, to_row, to_col
         );
         let samples_per_axis = self.scene.adaptive_sampling.samples_per_axis;
-        let minimum_luminance = resolve_minimum_luminance(&self.scene.adaptive_sampling, &buffer);
+        let minimum_luminance = resolve_minimum_luminance(&self.scene.adaptive_sampling, buffer);
 
         let mut pixels_to_sample = self.collect_pixels_to_supersample(
             from_row,
@@ -685,8 +691,7 @@ impl<'a, G: Geometry> Raytracer<'a, G> {
         );
 
         // Initialize the output buffer with the base 1-spp colors from the raw buffer.
-        let mut output_buffer: Vec<CIETristimulus> =
-            buffer.into_iter().map(|sample| sample.color).collect();
+        let mut output_buffer: Vec<Radiance> = buffer.iter().map(|sample| sample.color).collect();
 
         if let Some(mask_color) = self.scene.sampling_mask_color {
             // The mask is a fixed diagnostic color; pre-divide by the
@@ -701,7 +706,7 @@ impl<'a, G: Geometry> Raytracer<'a, G> {
                     from_row,
                     from_col,
                 );
-                output_buffer[pixel_index] = mask_color;
+                output_buffer[pixel_index] = Radiance::from_straight(mask_color);
             }
         } else {
             self.supersample(samples_per_axis, &mut pixels_to_sample)?;
@@ -749,8 +754,7 @@ impl<'a, G: Geometry> Raytracer<'a, G> {
             count.fetch_add(1, Ordering::SeqCst);
             pb.set_position(count.load(Ordering::Relaxed) as u64);
 
-            let mut sample_color = CIETristimulus::new(0.0, 0.0, 0.0, 0.0);
-            let mut valid_samples = 0u32;
+            let mut sample_colors = RadianceMean::default();
             for stratum_row in 0..samples_per_axis {
                 for stratum_col in 0..samples_per_axis {
                     let (dx, dy) = stratified_sample_offset(
@@ -768,8 +772,7 @@ impl<'a, G: Geometry> Raytracer<'a, G> {
                     );
                     match self.scene.color_of_ray(&ray) {
                         Ok(sample) => {
-                            sample_color = sample_color + sample.color;
-                            valid_samples += 1;
+                            sample_colors.add(sample.color, 1.0);
                         }
                         Err(err) => {
                             error!(
@@ -783,14 +786,7 @@ impl<'a, G: Geometry> Raytracer<'a, G> {
             // Divide by the number of rays that actually returned a colour, so
             // a failed sub-sample does not bias the pixel toward black. If all
             // failed, leave result = None and keep the base 1-spp colour.
-            if valid_samples > 0 {
-                let inv = 1.0 / valid_samples as f64;
-                sample_color.x *= inv;
-                sample_color.y *= inv;
-                sample_color.z *= inv;
-                sample_color.alpha *= inv;
-                pixel.result = Some(sample_color);
-            }
+            pixel.result = sample_colors.mean();
         });
         pb.finish();
 
@@ -881,10 +877,11 @@ impl<'a, G: Geometry> Raytracer<'a, G> {
     ) -> Result<(), RaytracerError> {
         if filename.ends_with(".hdr") {
             info!("Creating HDR image");
-            let raw_cie = self.render_section_to_cie_buffer(from_row, from_col, to_row, to_col)?;
+            let raw_cie =
+                self.render_section_to_radiance_buffer(from_row, from_col, to_row, to_col)?;
             let buffer: Vec<f32> = raw_cie
                 .into_iter()
-                .map(|c| xyz_to_linear_srgb(&c))
+                .map(|c| xyz_to_linear_srgb(&c.to_xyz_over_black()))
                 .flat_map(|c| {
                     [
                         c.x.max(0.0) as f32,
@@ -906,7 +903,11 @@ impl<'a, G: Geometry> Raytracer<'a, G> {
                 self.tone_mapping, self.exposure
             );
             let cie_pixels =
-                self.render_section_to_cie_buffer(from_row, from_col, to_row, to_col)?;
+                self.render_section_to_radiance_buffer(from_row, from_col, to_row, to_col)?;
+            let cie_pixels = cie_pixels
+                .into_iter()
+                .map(Radiance::to_xyz_over_black)
+                .collect();
             let linear_srgb = xyz_to_linear_srgb_buffer(&cie_pixels);
             let colors = linear_srgb_to_srgb_buffer(&linear_srgb, self.exposure, self.tone_mapping);
             let buffer: Vec<u8> = colors.iter().flat_map(|c| [c.r, c.g, c.b]).collect();
@@ -935,6 +936,9 @@ impl<'a, G: Geometry> Raytracer<'a, G> {
 mod tube_tests;
 
 #[cfg(test)]
+mod compositing_tests;
+
+#[cfg(test)]
 mod tests {
     use super::{
         MICHELSON_DENOMINATOR_EPSILON, luminance_contrast, should_supersample_pair,
@@ -943,13 +947,13 @@ mod tests {
     use crate::configuration::AdaptiveSamplingConfig;
     use crate::geometry::four_vector::FourVector;
     use crate::geometry::point::Point;
-    use crate::rendering::color::CIETristimulus;
+    use crate::rendering::radiance::Radiance;
     use crate::rendering::ray::Ray;
     use crate::rendering::scene::{EscapeInfo, RayClass, RaySample};
 
     fn sample(y: f64, alpha: f64, ray_class: RayClass) -> RaySample {
         RaySample {
-            color: CIETristimulus::new(0.0, y, 0.0, alpha),
+            color: Radiance::new(0.0, y, 0.0, 1.0 - alpha),
             ray_class,
             accumulated_angular_distance: 0.0,
             ray: Ray::new(
@@ -993,8 +997,8 @@ mod tests {
 
     #[test]
     fn michelson_contrast_uses_the_named_epsilon() {
-        let black = CIETristimulus::new(0.0, 0.0, 0.0, 1.0);
-        let faint = CIETristimulus::new(0.0, MICHELSON_DENOMINATOR_EPSILON, 0.0, 1.0);
+        let black = Radiance::BLACK;
+        let faint = Radiance::new(0.0, MICHELSON_DENOMINATOR_EPSILON, 0.0, 0.0);
         assert_eq!(luminance_contrast(&black, &black), 0.0);
         assert_eq!(luminance_contrast(&black, &faint), 0.5);
     }
