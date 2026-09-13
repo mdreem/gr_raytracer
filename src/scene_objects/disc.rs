@@ -1,7 +1,7 @@
 use crate::geometry::geometry::Geometry;
 use crate::geometry::point::{CoordinateSystem, Point};
-use crate::rendering::color::CIETristimulus;
 use crate::rendering::integrator::Step;
+use crate::rendering::radiance::Radiance;
 use crate::rendering::raytracer::RaytracerError;
 use crate::rendering::temperature::TemperatureComputer;
 use crate::rendering::texture::{TextureMapHandle, UVCoordinates};
@@ -208,11 +208,13 @@ impl Hittable for Disc {
         &self,
         color_computation_data: &ColorComputationData,
         _geometry: &dyn Geometry,
-    ) -> Result<CIETristimulus, RaytracerError> {
-        self.texture_mapper.color_at_uv(
-            &color_computation_data.uv,
-            &color_computation_data.temperature_data,
-        )
+    ) -> Result<Radiance, RaytracerError> {
+        self.texture_mapper
+            .color_at_uv(
+                &color_computation_data.uv,
+                &color_computation_data.temperature_data,
+            )
+            .map(Radiance::from_straight)
     }
 
     fn energy_of_emitter(

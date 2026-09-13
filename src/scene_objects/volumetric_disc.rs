@@ -1,7 +1,7 @@
 use crate::geometry::geometry::Geometry;
 use crate::geometry::point::Point;
-use crate::rendering::color::CIETristimulus;
 use crate::rendering::integrator::Step;
+use crate::rendering::radiance::Radiance;
 use crate::rendering::raytracer::RaytracerError;
 use crate::rendering::redshift::RayFrequencyData;
 use crate::rendering::temperature::TemperatureComputer;
@@ -46,10 +46,7 @@ pub struct VolumetricDisc {
 
 struct SegmentState {
     distance_accumulated: f64,
-    transparency: f64,
-    alpha_weighted_sum: f64,
-    alpha_weight_total: f64,
-    color_accumulated: CIETristimulus,
+    radiance: Radiance,
 }
 
 #[derive(PartialEq)]
@@ -191,17 +188,14 @@ impl VolumetricDisc {
         geometry: &dyn Geometry,
         frequency: &RayFrequencyData,
         remaining_steps: &[Step],
-    ) -> Result<CIETristimulus, RaytracerError> {
+    ) -> Result<Radiance, RaytracerError> {
         let first = remaining_steps
             .first()
             .expect("raymarch requires the fired step window");
         trace!("Start raymarching at {:?} ", first);
         let mut segment_state = SegmentState {
             distance_accumulated: 0.0,
-            transparency: 1.0,
-            alpha_weighted_sum: 0.0,
-            alpha_weight_total: 0.0,
-            color_accumulated: CIETristimulus::new(0.0, 0.0, 0.0, 0.0),
+            radiance: Radiance::TRANSPARENT,
         };
 
         // If the first point is outside of the disc it is an entering ray, otherwise it is an exiting ray.
@@ -212,7 +206,7 @@ impl VolumetricDisc {
             // and is suppressed here; supporting that case needs the window
             // index (entry-guard exception for the ray's first window).
             trace!("Ray is exiting the disc, skipping raymarching.");
-            return Ok(CIETristimulus::new(0.0, 0.0, 0.0, 0.0));
+            return Ok(Radiance::TRANSPARENT);
         }
 
         // One call owns exactly one gas episode: it ends at the first
@@ -251,17 +245,8 @@ impl VolumetricDisc {
             entered_gas |= end_inside;
         }
 
-        // Final alpha combines physical opacity with texture alpha, applied once at the end.
-        let physical_opacity = 1.0 - segment_state.transparency;
-        let texture_alpha = if segment_state.alpha_weight_total > 0.0 {
-            segment_state.alpha_weighted_sum / segment_state.alpha_weight_total
-        } else {
-            1.0
-        };
-        segment_state.color_accumulated.alpha = physical_opacity * texture_alpha;
-
-        trace!("  resulting color: {:?}", segment_state.color_accumulated);
-        Ok(segment_state.color_accumulated)
+        trace!("  resulting radiance: {:?}", segment_state.radiance);
+        Ok(segment_state.radiance)
     }
 
     fn march_constant_step(
@@ -278,8 +263,8 @@ impl VolumetricDisc {
 
         if density > 0.0 {
             let sigma_t = sigma_a + sigma_s;
-            let tau_cell = step_size * density * sigma_t;
-            let cell_transmittance = (-tau_cell).exp();
+            let mut texture_density = 1.0;
+            let mut source = Vector3::zeros();
 
             // Per-sample redshift from the ray's conserved (p_t, p_phi)
             // and the local circular-orbit Killing coefficients:
@@ -306,43 +291,34 @@ impl VolumetricDisc {
                     },
                 )?;
 
-                // Stefan-Boltzmann law: emission intensity scales with T^4.
-                // Use a reference temperature for normalization to boost brightness.
+                // Retain the configured artistic temperature weighting (C09).
                 let intensity_factor =
                     (temperature / self.brightness_reference_temperature).powi(4);
-
-                // Kirchhoff: thermal emissivity couples to absorption,
-                // j = sigma_a * rho * B(T). With scattering present but
-                // no external illumination the source function is the
-                // albedo-weighted Planck function S = (sigma_a/sigma_t) B;
-                // integrating a constant source across the cell gives the
-                // exact per-cell weight transparency * (S/B) * (1 - e^-tau)
-                // (~ sigma_a * rho * ds for thin cells), evaluated BEFORE
-                // this cell's own transmittance is applied so the cell
-                // does not absorb its own emission twice.
-                let emission_weight = if sigma_t > 0.0 {
-                    segment_state.transparency * (sigma_a / sigma_t) * (1.0 - cell_transmittance)
-                } else {
-                    0.0
-                };
-                let step_emission = light_color.mul_color_part(emission_weight * intensity_factor);
-
-                // Keep texture alpha influence separate from per-step emission accumulation.
-                let alpha_sample_weight = density * step_size;
-                segment_state.alpha_weighted_sum +=
-                    light_color.alpha.clamp(0.0, 1.0) * alpha_sample_weight;
-                segment_state.alpha_weight_total += alpha_sample_weight;
-
-                segment_state.color_accumulated.x += step_emission.x;
-                segment_state.color_accumulated.y += step_emission.y;
-                segment_state.color_accumulated.z += step_emission.z;
+                // In a volume, texture alpha is a local density mask, not an
+                // extra surface opacity. It scales extinction and emission
+                // together; alpha=0 leaves no gas interaction in this cell.
+                texture_density = light_color.alpha.clamp(0.0, 1.0);
+                if sigma_t > 0.0 {
+                    source = light_color.as_vector() * (sigma_a / sigma_t) * intensity_factor;
+                }
             } else {
                 // No timelike circular orbit here: unphysical gas; it
                 // attenuates (below) but emits nothing.
                 trace!("  no timelike circular orbit at {:?}; emission skipped", p);
             }
 
-            segment_state.transparency *= cell_transmittance;
+            let tau_cell = step_size * density * texture_density * sigma_t;
+            let cell_transmittance = (-tau_cell).exp();
+            // Kirchhoff source integrated across the cell. exp_m1 avoids
+            // cancellation in optically thin gas. over() supplies only the
+            // transmittance of preceding cells, never this cell's opacity twice.
+            let emission = source * -(-tau_cell).exp_m1();
+            segment_state.radiance = segment_state.radiance.over(Radiance::new(
+                emission.x,
+                emission.y,
+                emission.z,
+                cell_transmittance,
+            ));
         }
         Ok(())
     }
@@ -376,7 +352,7 @@ impl VolumetricDisc {
 
             self.march_constant_step(&p, geometry, frequency, segment_state)?;
 
-            if segment_state.transparency <= TRANSPARENCY_EARLY_EXIT {
+            if segment_state.radiance.transmittance <= TRANSPARENCY_EARLY_EXIT {
                 return Ok(RaymarchResult::AlreadyOpaque);
             }
 
@@ -663,7 +639,7 @@ impl Hittable for VolumetricDisc {
         &self,
         color_computation_data: &ColorComputationData,
         geometry: &dyn Geometry,
-    ) -> Result<CIETristimulus, RaytracerError> {
+    ) -> Result<Radiance, RaytracerError> {
         self.raymarch(
             geometry,
             &color_computation_data.frequency,
@@ -702,7 +678,7 @@ mod tests {
     use super::*;
     use crate::geometry::euclidean::EuclideanSpace;
     use crate::geometry::four_vector::FourVector;
-    use crate::rendering::color::Color;
+    use crate::rendering::color::{CIETristimulus, Color};
     use crate::rendering::texture::{CheckerMapper, TemperatureData, TextureMap};
     use approx::assert_abs_diff_eq;
     use std::sync::Arc;
@@ -765,6 +741,69 @@ mod tests {
     }
 
     #[test]
+    fn marched_uniform_cells_match_analytic_transfer_and_step_refinement() {
+        let geometry = EuclideanSpace::new();
+        let p = Vector3::new(2.0, 0.0, 0.0);
+        // Sampling at a fixed point isolates a genuinely uniform medium while
+        // exercising the production density, source, and cell integration code.
+        for mask in [0.0, 0.25, 0.7, 1.0] {
+            for cells in [1, 4, 64] {
+                let mut disc = create_disc();
+                disc.absorption = 0.4;
+                disc.scattering = 0.0;
+                disc.step_size = 1.0 / cells as f64;
+                disc.texture_mapper = Arc::new(FixedTextureMap {
+                    color: CIETristimulus::new(2.0, 1.0, 0.5, mask),
+                });
+                let mut state = SegmentState {
+                    distance_accumulated: 0.0,
+                    radiance: Radiance::TRANSPARENT,
+                };
+                for _ in 0..cells {
+                    disc.march_constant_step(&p, &geometry, &unit_frequency(), &mut state)
+                        .unwrap();
+                }
+                let tau = disc.compute_density(&p) * disc.absorption * mask;
+                let expected_light = Vector3::new(2.0, 1.0, 0.5) * -(-tau).exp_m1();
+                assert_abs_diff_eq!(state.radiance.transmittance, (-tau).exp(), epsilon = 1e-13);
+                assert_abs_diff_eq!(state.radiance.as_vector(), expected_light, epsilon = 1e-13);
+                for background in [Radiance::BLACK, Radiance::new(4.0, 6.0, 8.0, 0.0)] {
+                    assert_abs_diff_eq!(
+                        state.radiance.over(background).as_vector(),
+                        expected_light + (-tau).exp() * background.as_vector(),
+                        epsilon = 1e-12
+                    );
+                }
+                if mask == 0.0 {
+                    assert_eq!(state.radiance, Radiance::TRANSPARENT);
+                }
+            }
+        }
+    }
+
+    #[test]
+    fn marched_volume_is_not_attenuated_by_its_own_opacity_again() {
+        let mut disc = create_disc();
+        disc.absorption = 0.4;
+        disc.scattering = 0.0;
+        disc.texture_mapper = Arc::new(FixedTextureMap {
+            color: CIETristimulus::new(1.0, 1.0, 1.0, 1.0),
+        });
+        let steps = straight_steps(Vector3::new(0.2, 0.0, 0.0), Vector3::new(5.0, 0.0, 0.0));
+        let volume = disc
+            .raymarch(&EuclideanSpace::new(), &unit_frequency(), &steps)
+            .unwrap();
+        assert!(volume.opacity() > 0.01 && volume.opacity() < 0.9);
+        assert_abs_diff_eq!(volume.y, volume.opacity(), epsilon = 1e-13);
+        assert_abs_diff_eq!(
+            volume.over(Radiance::BLACK).y,
+            volume.opacity(),
+            epsilon = 1e-13
+        );
+        assert_eq!(volume.over(Radiance::TRANSPARENT), volume);
+    }
+
+    #[test]
     fn test_volumetric_disc_intersection_exists() {
         let disc = create_disc();
         let y_start = Point::new_cartesian(0.0, 0.5, 0.0, 0.0);
@@ -816,8 +855,8 @@ mod tests {
             .raymarch(&EuclideanSpace::new(), &unit_frequency(), &steps)
             .expect("raymarch should succeed");
 
-        assert!(color.alpha > 0.0);
-        assert!(color.alpha <= 1.0);
+        assert!(color.opacity() > 0.0);
+        assert!(color.opacity() <= 1.0);
     }
 
     /// Kirchhoff's law: a purely scattering medium (sigma_a = 0) redirects
@@ -854,7 +893,7 @@ mod tests {
         assert_eq!(color.x, 0.0);
         assert_eq!(color.y, 0.0);
         assert_eq!(color.z, 0.0);
-        assert!(color.alpha > 0.0);
+        assert!(color.opacity() > 0.0);
     }
 
     /// Fully transparent coefficients (sigma_a = sigma_s = 0) must yield no
@@ -888,7 +927,7 @@ mod tests {
             .expect("raymarch should succeed");
 
         assert!(color.x.is_finite() && color.x == 0.0);
-        assert_eq!(color.alpha, 0.0);
+        assert_eq!(color.opacity(), 0.0);
     }
 
     /// Segmentation invariance: marching the same straight path as ONE
@@ -946,7 +985,7 @@ mod tests {
         assert_abs_diff_eq!(a.x, b.x, epsilon = 1e-9);
         assert_abs_diff_eq!(a.y, b.y, epsilon = 1e-9);
         assert_abs_diff_eq!(a.z, b.z, epsilon = 1e-9);
-        assert_abs_diff_eq!(a.alpha, b.alpha, epsilon = 1e-9);
+        assert_abs_diff_eq!(a.opacity(), b.opacity(), epsilon = 1e-9);
     }
 
     /// Entry guard: a call whose slice starts INSIDE the bounding cylinder
@@ -965,7 +1004,7 @@ mod tests {
         assert_eq!(color.x, 0.0);
         assert_eq!(color.y, 0.0);
         assert_eq!(color.z, 0.0);
-        assert_eq!(color.alpha, 0.0);
+        assert_eq!(color.opacity(), 0.0);
     }
 
     /// Episode protocol: a chord through the inner hole crosses the gas
@@ -1004,9 +1043,9 @@ mod tests {
         // The full slice accumulates ONLY episode 1 (break in the hole).
         assert_eq!(a.x, b.x);
         assert_eq!(a.y, b.y);
-        assert_eq!(a.alpha, b.alpha);
+        assert_eq!(a.opacity(), b.opacity());
         // The re-entry call (starting outside, in the hole) marches episode 2.
-        assert!(c.alpha > 0.0);
+        assert!(c.opacity() > 0.0);
     }
 
     /// PR #121 review (Codex): if the inner hole is narrower than the local
@@ -1047,8 +1086,8 @@ mod tests {
         // The full-slice call ends at the gas -> hole transition; the far
         // episode belongs exclusively to the re-entry call.
         assert_eq!(a.x, b.x);
-        assert_eq!(a.alpha, b.alpha);
-        assert!(c.alpha > 0.0);
+        assert_eq!(a.opacity(), b.opacity());
+        assert!(c.opacity() > 0.0);
     }
 
     /// Optically thick gas saturates: opacity approaches 1 (and the marcher
@@ -1081,6 +1120,6 @@ mod tests {
             .raymarch(&EuclideanSpace::new(), &unit_frequency(), &steps)
             .expect("raymarch should succeed");
 
-        assert!(color.alpha > 0.99, "alpha = {}", color.alpha);
+        assert!(color.opacity() > 0.99, "alpha = {}", color.opacity());
     }
 }

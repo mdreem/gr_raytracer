@@ -1,5 +1,6 @@
 use crate::rendering::black_body_radiation::get_cie_xyz_of_black_body_redshifted;
-use crate::rendering::color::{CIETristimulus, Color, srgb_to_xyz};
+use crate::rendering::color::{CIETristimulus, Color};
+use crate::rendering::radiance::{Radiance, RadianceMean};
 use crate::rendering::raytracer::RaytracerError;
 use crate::rendering::texture::TextureError::DecodeError;
 use image::{DynamicImage, GenericImageView, ImageReader};
@@ -33,6 +34,8 @@ pub struct TemperatureData {
 }
 
 pub trait TextureMap: Sync {
+    /// Straight XYZ source color, with alpha interpreted by the material:
+    /// surface coverage for surfaces, local density mask for volumes.
     fn color_at_uv(
         &self,
         uv: &UVCoordinates,
@@ -89,7 +92,16 @@ impl TextureMapper {
         let w10 = dx * (1.0 - dy);
         let w11 = dx * dy;
 
-        w00 * c00 + w10 * c10 + w01 * c01 + w11 * c11
+        // Filter associated light, so RGB hidden in transparent texels cannot
+        // bleed into visible edges. Return straight color at this API boundary.
+        let mut filtered = RadianceMean::default();
+        for (color, weight) in [(c00, w00), (c10, w10), (c01, w01), (c11, w11)] {
+            filtered.add(Radiance::from_straight(color), weight);
+        }
+        filtered
+            .mean()
+            .unwrap_or(Radiance::TRANSPARENT)
+            .to_straight_surface()
     }
 }
 
@@ -234,8 +246,8 @@ impl CheckerMapper {
             beaming_exponent,
             width,
             height,
-            c1: srgb_to_xyz(&c1),
-            c2: srgb_to_xyz(&c2),
+            c1: CIETristimulus::from_color(&c1),
+            c2: CIETristimulus::from_color(&c2),
         }
     }
 }
@@ -512,9 +524,54 @@ mod tests {
                 },
             )
             .unwrap();
-        assert_eq!(color.x, (get_red().x + get_blue().x) / 2.0);
-        assert_eq!(color.y, (get_red().y + get_blue().y) / 2.0);
-        assert_eq!(color.z, (get_red().z + get_blue().z) / 2.0);
+        // Premultiplication and conversion back to straight texture color
+        // introduce rounding, even when all texels have identical alpha.
+        assert_relative_eq!(color.x, (get_red().x + get_blue().x) / 2.0, epsilon = 1e-14);
+        assert_relative_eq!(color.y, (get_red().y + get_blue().y) / 2.0, epsilon = 1e-14);
+        assert_relative_eq!(color.z, (get_red().z + get_blue().z) / 2.0, epsilon = 1e-14);
         assert_eq!(color.alpha, 128.0 / 255.0);
+    }
+
+    #[test]
+    fn transparent_texels_do_not_bleed_color_into_filtered_edges() {
+        let image = image::RgbaImage::from_fn(2, 2, |x, _| {
+            if x == 0 {
+                image::Rgba([255, 0, 0, 255])
+            } else {
+                image::Rgba([0, 0, 255, 0])
+            }
+        });
+        let mapper = TextureMapper {
+            beaming_exponent: 0.0,
+            image: image::DynamicImage::ImageRgba8(image),
+        };
+        let edge = mapper.bilinear(&UVCoordinates { u: 0.25, v: 0.25 });
+        assert_relative_eq!(edge.as_vector(), get_red().as_vector(), epsilon = 1e-14);
+        assert_eq!(edge.alpha, 0.5);
+        let transparent = mapper.bilinear(&UVCoordinates { u: 0.5, v: 0.0 });
+        assert_eq!(transparent, CIETristimulus::new(0.0, 0.0, 0.0, 0.0));
+    }
+
+    #[test]
+    fn checker_texture_preserves_input_alpha() {
+        let mapper = super::CheckerMapper::new(
+            0.0,
+            1.0,
+            1.0,
+            crate::rendering::color::Color::new(255, 0, 0, 64),
+            crate::rendering::color::Color::new(0, 0, 255, 0),
+        );
+        let data = TemperatureData {
+            temperature: 0.0,
+            redshift: 1.0,
+        };
+        let red = mapper
+            .color_at_uv(&UVCoordinates { u: 0.0, v: 0.0 }, &data)
+            .unwrap();
+        let blue = mapper
+            .color_at_uv(&UVCoordinates { u: 1.0, v: 0.0 }, &data)
+            .unwrap();
+        assert_eq!(red.alpha, 64.0 / 255.0);
+        assert_eq!(blue.alpha, 0.0);
     }
 }

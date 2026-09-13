@@ -1,7 +1,7 @@
 use crate::geometry::geometry::Geometry;
 use crate::geometry::point::Point;
-use crate::rendering::color::CIETristimulus;
 use crate::rendering::integrator::Step;
+use crate::rendering::radiance::Radiance;
 use crate::rendering::raytracer::RaytracerError;
 use crate::rendering::redshift::RayFrequencyData;
 use crate::rendering::texture::{TemperatureData, UVCoordinates};
@@ -29,11 +29,13 @@ pub trait Hittable: Sync {
         y_end: &Step,
         geometry: &dyn Geometry,
     ) -> Option<Intersection>;
+    /// Integrated light and background transmittance. Surface implementations
+    /// convert straight texture colors here; volumes return their marched light.
     fn color_at_uv(
         &self,
         color_computation_data: &ColorComputationData,
         geometry: &dyn Geometry,
-    ) -> Result<CIETristimulus, RaytracerError>;
+    ) -> Result<Radiance, RaytracerError>;
     fn energy_of_emitter(
         &self,
         geometry: &dyn Geometry,

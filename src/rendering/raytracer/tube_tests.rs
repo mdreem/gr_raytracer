@@ -205,8 +205,8 @@ fn tube_subdivision_preserves_flat_space_star_flux() {
     for depth in [1, 2, 3] {
         renderer.scene.max_subdivision_depth = depth;
         let actual = renderer.handle_tube(&tube(&samples)).unwrap();
-        assert_abs_diff_eq!(actual.as_vector(), expected.as_vector(), epsilon = 1e-10);
-        assert!(actual.alpha.is_finite());
+        assert_abs_diff_eq!(actual, expected, epsilon = 1e-10);
+        assert!(actual.iter().all(|v| v.is_finite()));
     }
 }
 
@@ -226,6 +226,63 @@ fn tube_subdivision_depth_limit_counts_actual_splits() {
     assert_eq!(calls.load(Ordering::Relaxed), 5);
     assert!(renderer.subdivide(&parent, 1).unwrap().is_none());
     assert_eq!(calls.load(Ordering::Relaxed), 5);
+}
+
+#[test]
+fn star_magnification_and_foreground_transmittance_are_applied_once() {
+    let g = EuclideanSpace::new();
+    let calls = Arc::new(AtomicUsize::new(0));
+    let mut renderer = renderer(&g, &calls, false);
+    let mut samples = corners(&renderer, 10, 20);
+    let star_ray = renderer.scene.camera.get_ray_for_offset(10, 20, 0.67, 0.73);
+    renderer.scene.star_catalog = Some(StarCatalog {
+        stars: vec![Star {
+            source_id: 1,
+            ra_deg: 0.0,
+            dec_deg: 0.0,
+            g_mag: 0.0,
+            bp_mag: 0.0,
+            rp_mag: 0.0,
+            bp_rp: 0.0,
+            direction: star_ray
+                .momentum
+                .get_cartesian_vector(&star_ray.position)
+                .normalize(),
+            temperature: 5772.0,
+            emission_xyz: CIETristimulus::new(2.0, 1.0, 0.5, 1.0),
+        }],
+    });
+    renderer.scene.max_subdivision_depth = 0;
+    // A smaller image-side footprint with unchanged escaped corners gives
+    // magnification near 1/4. Before C02 that ratio also became star alpha,
+    // causing compositing to multiply the demagnified flux a second time.
+    for (sample, (dx, dy)) in
+        samples
+            .iter_mut()
+            .zip([(0.75, 0.75), (1.25, 0.75), (0.75, 1.25), (1.25, 1.25)])
+    {
+        sample.ray.momentum = renderer
+            .scene
+            .camera
+            .get_ray_for_offset(10, 20, dx, dy)
+            .momentum;
+    }
+    let flux = renderer.handle_tube(&tube(&samples)).unwrap();
+    assert!(flux.y > 0.24 && flux.y < 0.26);
+    for transmittance in [0.0, 0.1, 0.4, 0.75, 1.0] {
+        let foreground = Radiance::new(0.2, 0.1, 0.05, transmittance);
+        let mut colors = [foreground; 4];
+        renderer
+            .add_star_layer(&samples, 2, 2, &mut colors)
+            .unwrap();
+        assert_abs_diff_eq!(
+            colors[0].as_vector(),
+            foreground.as_vector() + transmittance * flux,
+            epsilon = 1e-12
+        );
+        assert_eq!(colors[0].transmittance, 0.0);
+        assert_eq!(&colors[1..], &[foreground; 3]);
+    }
 }
 
 #[test]
@@ -303,7 +360,7 @@ fn tube_mixed_escape_capture_subdivision_stays_finite_and_bounded() {
     renderer.scene.max_subdivision_depth = 2;
     calls.store(0, Ordering::Relaxed);
     let actual = renderer.handle_tube(&tube(&samples)).unwrap();
-    assert!(finite_tube_color(actual).is_ok());
+    assert!(finite_tube_flux(actual).is_ok());
     // Only the child containing the captured corner needs another split.
     assert_eq!(calls.load(Ordering::Relaxed), 10);
 }
@@ -315,7 +372,7 @@ fn tube_pass_is_skipped_without_stars_even_for_invalid_tubes() {
     let mut renderer = renderer(&g, &calls, false);
     let samples = corners(&renderer, 0, 0);
     let invalid = [samples[0]; 4];
-    let expected = [CIETristimulus::new(2.0, 1.0, 0.5, 0.6); 4];
+    let expected = [Radiance::new(2.0, 1.0, 0.5, 0.4); 4];
     calls.store(0, Ordering::Relaxed);
     for catalogue in [None, Some(StarCatalog { stars: vec![] })] {
         renderer.scene.star_catalog = catalogue;
