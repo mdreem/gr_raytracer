@@ -420,9 +420,9 @@ impl<'a, G: Geometry> Raytracer<'a, G> {
 
                 ratio * self.compute_star_collection_data(&a, &b, &c, &d)
             }
-            // C06 remains separate: these legacy branches still use corner
-            // foreground light as a flux fallback. The return type only fixes
-            // the compositing contract; it does not fix physical classification.
+            // TODO: These branches use corner foreground light as a star-flux
+            // fallback. Correct composition does not make this classification
+            // physically correct.
             // all four corners captured or all four hitting an opaque object:
             // Just return the color of corner a, no need to subdivide.
             (RayClass::Captured, RayClass::Captured, RayClass::Captured, RayClass::Captured)

@@ -65,7 +65,7 @@ impl VolumetricDisc {
         num_octaves: usize,
         perlin_seed: u32,
         // Retained for configuration compatibility; the march is bounded
-        // by the ray's step slice since plan 02, not by a step budget.
+        // by the ray's step slice, not by a step budget.
         _max_steps: usize,
         step_size: f64,
         thickness: f64,
@@ -269,7 +269,7 @@ impl VolumetricDisc {
             // Per-sample redshift from the ray's conserved (p_t, p_phi)
             // and the local circular-orbit Killing coefficients:
             // u.p = u^t p_t + u^phi p_phi, exact at every sample with no
-            // parallel transport (see docs/plan-01-per-sample-redshift.md).
+            // parallel transport.
             // Where no timelike circular orbit exists the gas is
             // unphysical anyway: it still attenuates (below) but emits
             // nothing.
@@ -291,7 +291,7 @@ impl VolumetricDisc {
                     },
                 )?;
 
-                // Retain the configured artistic temperature weighting (C09).
+                // Apply the configured artistic temperature weighting.
                 let intensity_factor =
                     (temperature / self.brightness_reference_temperature).powi(4);
                 // In a volume, texture alpha is a local density mask, not an
@@ -326,12 +326,11 @@ impl VolumetricDisc {
     // Constant-step marching with per-cell Beer-Lambert transmittance; the
     // basic pattern follows the classic tutorial treatment
     // (https://www.scratchapixel.com/lessons/3d-basic-rendering/volume-rendering-for-developers/ray-marching-get-it-right.html),
-    // but the emission is the thermal GRRT source term (see the Kirchhoff
-    // comment in march_constant_step and the references in
-    // docs/plan-02-segment-marching.md), and the march walks the ray's
-    // geodesic step windows: step sizes do not align with the segment
-    // boundaries, so the sampling phase (distance_accumulated) carries
-    // across segments to keep one uniform comb along the whole episode.
+    // but the emission is the thermal GRRT source term described in
+    // march_constant_step. The march walks the ray's geodesic step windows:
+    // step sizes do not align with the segment boundaries, so the sampling
+    // phase (distance_accumulated) carries across segments to keep one
+    // uniform comb along the whole episode.
     fn raymarch_segment(
         &self,
         from: &Vector3<f64>,
@@ -1048,9 +1047,9 @@ mod tests {
         assert!(c.opacity() > 0.0);
     }
 
-    /// PR #121 review (Codex): if the inner hole is narrower than the local
-    /// window spacing, NO window lies wholly outside the volume - each one
-    /// starts in gas or crosses a wall. The call must still end at the first
+    /// If the inner hole is narrower than the local window spacing, no window
+    /// lies wholly outside the volume: each one starts in gas or crosses a
+    /// wall. The call must still end at the first
     /// inside-to-outside transition; otherwise it marches the far-side
     /// episode that the re-entry firing marches again (double counting).
     #[test]

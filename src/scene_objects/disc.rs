@@ -122,7 +122,7 @@ impl Hittable for Disc {
         // the equatorial plane, so its steps are too small to straddle a
         // dip-and-back; every real crossing shows up as an endpoint sign change
         // handled by the linear branch above. Instrumenting a full vantage
-        // render produced zero hits here (see docs/known-rendering-behaviors.md).
+        // render produced zero hits here.
         // The reconstruction is kept because it is correct and cheap and would
         // catch a genuine in-step double crossing if a camera ever produced one.
         // The Hermite slopes are dz/ds with s running over the step's own

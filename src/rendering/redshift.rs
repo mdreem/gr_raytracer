@@ -276,12 +276,12 @@ mod tests {
         assert_abs_diff_eq!(redshift, (a_emitter / a_camera).sqrt(), epsilon = 1e-12);
     }
 
-    /// Checks 2 and 3 of docs/redshift-doppler-sign-review.md: flat space,
-    /// camera at x = +10 looking at the origin (center pixel), emitter on the
-    /// line of sight at x = +5 with four-velocity `emitter_velocity`. Parallel
-    /// transport is trivial in flat space, so the transported ray momentum at
-    /// the emitter is the camera-frame momentum itself. The returned value is
-    /// the code's `redshift` variable, i.e. nu_obs / nu_em = 1 / (1 + z).
+    /// Flat-space Doppler test setup: camera at x = +10 looking at the origin
+    /// (center pixel), emitter on the line of sight at x = +5 with four-velocity
+    /// `emitter_velocity`. Parallel transport is trivial in flat space, so the
+    /// transported ray momentum at the emitter is the camera-frame momentum
+    /// itself. The returned value is the code's `redshift` variable,
+    /// i.e. nu_obs / nu_em = 1 / (1 + z).
     fn flat_space_redshift_for(emitter_velocity: FourVector) -> f64 {
         let geometry = EuclideanSpace::new();
         let camera = Camera::new(

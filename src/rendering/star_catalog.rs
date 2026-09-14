@@ -1,12 +1,11 @@
 //! Loader for the Gaia DR3 star-catalogue subset downloaded by
 //! `scripts/gaia/download.py` (a Zstandard-compressed Parquet file).
 //!
-//! This is the renderer-side entry point of the point-source star pipeline
-//! (see `docs/plan-12-star-catalog.md`). It reads the catalogue columns and
-//! precomputes, per star, a unit direction on the celestial sphere. Working in
-//! cartesian unit vectors keeps the later gather free of the (theta, phi)
-//! coordinate singularities (pole and phi-seam): every membership / solid-angle
-//! test is then a plain dot / cross product.
+//! This is the renderer-side entry point of the point-source star pipeline.
+//! It reads the catalogue columns and precomputes, per star, a unit direction
+//! on the celestial sphere. Working in cartesian unit vectors keeps the later
+//! gather free of the (theta, phi) coordinate singularities (pole and phi-seam):
+//! every membership / solid-angle test is then a plain dot / cross product.
 
 use crate::rendering::black_body_radiation::get_cie_xyz_of_black_body_redshifted;
 use crate::rendering::color::CIETristimulus;
@@ -83,7 +82,7 @@ fn pogson_flux(magnitude: f64) -> f64 {
 ///
 /// This is deliberately the simple first cut. The more accurate route is a
 /// synthetic-passband "colour temperature" (invert the BP-RP a blackbody would
-/// show through the real Gaia BP/RP filters); see `docs/star-colour.md`.
+/// show through the real Gaia BP/RP filters).
 fn colour_temperature_from_bp_rp(bp_rp: f64) -> f64 {
     const A: f64 = 8235.0;
     const B: f64 = 0.997;
