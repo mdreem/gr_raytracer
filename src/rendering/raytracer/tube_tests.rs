@@ -254,8 +254,8 @@ fn star_magnification_and_foreground_transmittance_are_applied_once() {
     });
     renderer.scene.max_subdivision_depth = 0;
     // A smaller image-side footprint with unchanged escaped corners gives
-    // magnification near 1/4. Before C02 that ratio also became star alpha,
-    // causing compositing to multiply the demagnified flux a second time.
+    // magnification near 1/4. This ratio must scale only the star flux,
+    // never an additional alpha that attenuates the flux a second time.
     for (sample, (dx, dy)) in
         samples
             .iter_mut()

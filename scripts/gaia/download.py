@@ -1,12 +1,10 @@
 #!/usr/bin/env -S uv run --group gaia python
 """Download a magnitude-limited subset of the Gaia DR3 star catalogue.
 
-This is stage 1 of the star-catalog pipeline (see docs/plan-12-star-catalog.md):
-query ESA's Gaia TAP/ADQL service server-side and save only the requested
-subset locally as a typed Parquet file. A later stage 2 will convert this
-intermediate format into the renderer's binary point-source representation
-(RA/Dec -> Cartesian unit direction -> flux -> colour/temperature -> HEALPix
-spatial index). That conversion is intentionally NOT implemented here.
+Queries ESA's Gaia TAP/ADQL service server-side and saves only the requested
+subset locally as a typed Parquet file. The renderer loads this file to
+compute celestial directions, fluxes, and colour temperatures. Rendering
+and spatial indexing are outside this script's scope.
 
 Usage:
     uv run --group gaia scripts/gaia/download.py download --max-magnitude 12 --limit 100000

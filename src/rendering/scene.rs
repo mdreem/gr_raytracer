@@ -72,8 +72,8 @@ pub struct Scene<'a, G: Geometry> {
     celestial_temperature: f64,
     pub adaptive_sampling: AdaptiveSamplingConfig,
     pub sampling_mask_color: Option<CIETristimulus>,
-    /// Optional point-source star catalogue gathered on escaped rays
-    /// (plan-12). `None` falls back to the celestial texture alone.
+    /// Optional point-source star catalogue gathered on escaped rays.
+    /// `None` falls back to the celestial texture alone.
     pub star_catalog: Option<StarCatalog>,
     /// Linear flux multiplier applied to catalogue stars.
     pub star_flux_scale: f64,
@@ -602,9 +602,9 @@ mod tests {
         let radius = 1.0;
         let r = position[1];
         let a = 1.0 - radius / r;
-        // Future-directed freely falling observer (t component positive);
-        // the past-directed variant used before plan 8b made the emitter
-        // energy negative, which apply_beaming now correctly rejects.
+        // Future-directed freely falling observer (t component positive).
+        // A past-directed velocity produces a nonphysical frequency ratio,
+        // which apply_beaming rejects.
         let velocity = FourVector::new_spherical(1.0 / a, -(radius / r).sqrt(), 0.0, 0.0);
 
         let geometry = Schwarzschild::new(radius, 1e-4);
