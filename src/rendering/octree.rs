@@ -1,9 +1,51 @@
 use crate::rendering::star_catalog::Star;
 use nalgebra::Vector3;
-use nalgebra::{DimMax, DimMin};
+
+pub struct Cone {
+    pub a: Vector3<f64>,
+    pub b: Vector3<f64>,
+    pub c: Vector3<f64>,
+    pub d: Vector3<f64>,
+}
+
+impl Cone {
+    /// Inward-facing normals of the four side planes (all through the origin).
+    /// A point is inside the frustum iff it is on the positive side of all four.
+    fn planes(&self) -> [Vector3<f64>; 4] {
+        let centroid = self.a + self.b + self.c + self.d;
+        let mut normals = [
+            self.a.cross(&self.b),
+            self.b.cross(&self.c),
+            self.c.cross(&self.d),
+            self.d.cross(&self.a),
+        ];
+        // Orient every normal so "inside the frustum" is the positive side.
+        for n in &mut normals {
+            if n.dot(&centroid) < 0.0 {
+                *n = -*n;
+            }
+        }
+        normals
+    }
+}
+
+fn point_in_cone(point: &Vector3<f64>, planes: &[Vector3<f64>; 4]) -> bool {
+    planes.iter().all(|n| n.dot(point) >= 0.0)
+}
+
+/// How an AABB sits relative to the frustum.
+enum Class {
+    /// No overlap; the whole subtree can be pruned.
+    Outside,
+    /// Fully contained; every star beneath can be taken without further tests.
+    Inside,
+    /// Crosses the boundary; recurse or test individual stars.
+    Straddle,
+}
 
 pub struct Octree {
     root: Node,
+    len: usize,
 }
 
 impl Octree {
@@ -14,11 +56,27 @@ impl Octree {
             stars: None,
         };
 
+        let len = stars.len();
         for star in stars {
             root.add_star(star);
         }
 
-        Self { root }
+        Self { root, len }
+    }
+
+    pub fn len(&self) -> usize {
+        self.len
+    }
+
+    pub fn is_empty(&self) -> bool {
+        self.len == 0
+    }
+
+    pub fn get_stars_in_cone(&self, cone: &Cone) -> Vec<Star> {
+        let planes = cone.planes();
+        let mut stars = Vec::new();
+        self.root.gather_in_cone(&planes, &mut stars);
+        stars
     }
 }
 
@@ -33,15 +91,6 @@ impl Node {
     // The minimum half-extent of a node's bounding box before it stops subdividing.
     // Ensures there is not infinite subdivision of the octree when stars are very close together.
     const MIN_HALF_EXTENT: f64 = 1e-5;
-
-    fn contains_point(&self, point: &Vector3<f64>) -> bool {
-        point.x >= self.bounds.min.x
-            && point.x < self.bounds.max.x
-            && point.y >= self.bounds.min.y
-            && point.y < self.bounds.max.y
-            && point.z >= self.bounds.min.z
-            && point.z < self.bounds.max.z
-    }
 
     fn get_child_index(&self, point: &Vector3<f64>) -> usize {
         let mid_x = self.bounds.center.x;
@@ -59,17 +108,6 @@ impl Node {
             index |= 4;
         }
         index
-    }
-
-    fn get_child(&self, point: &Vector3<f64>) -> Option<&Node> {
-        if !self.contains_point(point) {
-            return None;
-        }
-        if let Some(children) = &self.children {
-            Some(children[self.get_child_index(point)].as_ref())
-        } else {
-            None
-        }
     }
 
     fn child_bounds(&self, i: usize) -> AABB {
@@ -118,6 +156,64 @@ impl Node {
             }
         }
     }
+
+    /// Classify this node's box against the frustum's side planes. Uses the same
+    /// projection-radius trick as the SAT test: s is the box centre's signed
+    /// distance to a plane and r is the box's half-width along the plane
+    /// normal, so `[s - r, s + r]` is the box's shadow on that normal.
+    fn classify(&self, planes: &[Vector3<f64>; 4]) -> Class {
+        let c = self.bounds.center;
+        let e = self.bounds.extents;
+        let mut all_inside = true;
+        for n in planes {
+            let s = n.dot(&c);
+            let r = e.x * n.x.abs() + e.y * n.y.abs() + e.z * n.z.abs();
+            if s + r < 0.0 {
+                return Class::Outside; // whole box on the wrong side of this plane
+            }
+            if s - r < 0.0 {
+                all_inside = false; // box crosses this plane
+            }
+        }
+        if all_inside {
+            Class::Inside
+        } else {
+            Class::Straddle
+        }
+    }
+
+    fn collect_all(&self, out: &mut Vec<Star>) {
+        if let Some(stars) = &self.stars {
+            out.extend(stars.iter().cloned());
+        }
+        if let Some(children) = &self.children {
+            for child in children.iter() {
+                child.collect_all(out);
+            }
+        }
+    }
+
+    fn gather_in_cone(&self, planes: &[Vector3<f64>; 4], out: &mut Vec<Star>) {
+        match self.classify(planes) {
+            Class::Outside => {}
+            Class::Inside => self.collect_all(out),
+            Class::Straddle => {
+                if let Some(children) = &self.children {
+                    for child in children.iter() {
+                        child.gather_in_cone(planes, out);
+                    }
+                } else if let Some(stars) = &self.stars {
+                    // Boundary leaf: test each star directly.
+                    out.extend(
+                        stars
+                            .iter()
+                            .filter(|s| point_in_cone(&s.direction, planes))
+                            .cloned(),
+                    );
+                }
+            }
+        }
+    }
 }
 
 struct AABB {
@@ -143,73 +239,6 @@ impl AABB {
             extents,
         }
     }
-}
-
-struct Triangle {
-    vertices: [Vector3<f64>; 3],
-}
-
-// https://gdbooks.gitbooks.io/3dcollisions/content/Chapter4/aabb-triangle.html
-fn intersects_aabb(aabb: &AABB, triangle: &Triangle) -> bool {
-    let v0 = triangle.vertices[0] - aabb.center;
-    let v1 = triangle.vertices[1] - aabb.center;
-    let v2 = triangle.vertices[2] - aabb.center;
-    let e = aabb.extents;
-
-    let f0 = v1 - v0;
-    let f1 = v2 - v1;
-    let f2 = v0 - v2;
-
-    let u0 = Vector3::new(1.0, 0.0, 0.0);
-    let u1 = Vector3::new(0.0, 1.0, 0.0);
-    let u2 = Vector3::new(0.0, 0.0, 1.0);
-
-    let axis_u0_f0 = u0.cross(&f0);
-    let axis_u0_f1 = u0.cross(&f1);
-    let axis_u0_f2 = u0.cross(&f2);
-
-    let axis_u1_f0 = u1.cross(&f0);
-    let axis_u1_f1 = u1.cross(&f1);
-    let axis_u1_f2 = u1.cross(&f2);
-
-    let axis_u2_f0 = u2.cross(&f0);
-    let axis_u2_f1 = u2.cross(&f1);
-    let axis_u2_f2 = u2.cross(&f2);
-
-    let triangle_normal = f0.cross(&f1);
-    let axes = [
-        axis_u0_f0,
-        axis_u0_f1,
-        axis_u0_f2,
-        axis_u1_f0,
-        axis_u1_f1,
-        axis_u1_f2,
-        axis_u2_f0,
-        axis_u2_f1,
-        axis_u2_f2,
-        Vector3::new(1.0, 0.0, 0.0),
-        Vector3::new(0.0, 1.0, 0.0),
-        Vector3::new(0.0, 0.0, 1.0),
-        triangle_normal,
-    ];
-
-    // SAT tests for the edges of the triangle and the axes of the AABB
-    for axis in axes.iter() {
-        let p0 = v0.dot(axis);
-        let p1 = v1.dot(axis);
-        let p2 = v2.dot(axis);
-
-        //  e.x * axis.dot(u0).abs() =  e.x * axis.x.abs()
-        let r = e.x * axis.x.abs() + e.y * axis.y.abs() + e.z * axis.z.abs();
-
-        let p_min = p0.min(p1).min(p2);
-        let p_max = p0.max(p1).max(p2);
-
-        if (-p_max).max(p_min) > r {
-            return false;
-        }
-    }
-    true
 }
 
 #[cfg(test)]
@@ -239,11 +268,21 @@ mod tests {
     }
 
     fn leaf(bounds: AABB) -> Node {
-        Node { bounds, children: None, stars: None }
+        Node {
+            bounds,
+            children: None,
+            stars: None,
+        }
     }
 
-    fn tri(a: Vector3<f64>, b: Vector3<f64>, c: Vector3<f64>) -> Triangle {
-        Triangle { vertices: [a, b, c] }
+    /// Square pyramid frustum around +z with a wide half-angle.
+    fn pyramid_cone() -> Cone {
+        Cone {
+            a: Vector3::new(1.0, 1.0, 1.0),
+            b: Vector3::new(-1.0, 1.0, 1.0),
+            c: Vector3::new(-1.0, -1.0, 1.0),
+            d: Vector3::new(1.0, -1.0, 1.0),
+        }
     }
 
     /// Total stars stored anywhere in the subtree.
@@ -268,15 +307,6 @@ mod tests {
     }
 
     // ---- Node geometry ----------------------------------------------------
-
-    #[test]
-    fn contains_point_is_min_inclusive_max_exclusive() {
-        let n = leaf(unit_box());
-        assert!(n.contains_point(&Vector3::new(0.0, 0.0, 0.0)));
-        assert!(n.contains_point(&Vector3::new(-1.0, -1.0, -1.0))); // min inclusive
-        assert!(!n.contains_point(&Vector3::new(1.0, 0.0, 0.0))); // max exclusive
-        assert!(!n.contains_point(&Vector3::new(2.0, 0.0, 0.0)));
-    }
 
     #[test]
     fn child_index_maps_octant_bits() {
@@ -305,93 +335,86 @@ mod tests {
         }
     }
 
-    // ---- SAT triangle/box test -------------------------------------------
+    // ---- Cone query -------------------------------------------------------
 
     #[test]
-    fn triangle_overlapping_box_intersects() {
-        let t = tri(
-            Vector3::new(-0.5, -0.5, 0.0),
-            Vector3::new(0.5, -0.5, 0.0),
-            Vector3::new(0.0, 0.5, 0.0),
-        );
-        assert!(intersects_aabb(&unit_box(), &t));
+    fn point_in_cone_axis_and_behind() {
+        let planes = pyramid_cone().planes();
+        assert!(point_in_cone(&Vector3::new(0.0, 0.0, 1.0), &planes)); // on axis
+        assert!(point_in_cone(&Vector3::new(0.3, -0.2, 1.0), &planes)); // inside
+        assert!(!point_in_cone(&Vector3::new(0.0, 0.0, -1.0), &planes)); // behind apex
+        assert!(!point_in_cone(&Vector3::new(2.0, 0.0, 0.1), &planes)); // off to +x
     }
 
     #[test]
-    fn triangle_fully_inside_intersects() {
-        let t = tri(
-            Vector3::new(-0.2, -0.2, 0.0),
-            Vector3::new(0.2, -0.2, 0.0),
-            Vector3::new(0.0, 0.2, 0.1),
-        );
-        assert!(intersects_aabb(&unit_box(), &t));
+    fn classify_box_inside_outside_straddle() {
+        let planes = pyramid_cone().planes();
+
+        // Small box well inside the frustum, above the apex on the +z axis.
+        let inside = AABB::new(Vector3::new(-0.1, -0.1, 0.5), Vector3::new(0.1, 0.1, 0.7));
+        assert!(matches!(leaf(inside).classify(&planes), Class::Inside));
+
+        // Box entirely behind the apex.
+        let outside = AABB::new(Vector3::new(-0.1, -0.1, -0.7), Vector3::new(0.1, 0.1, -0.5));
+        assert!(matches!(leaf(outside).classify(&planes), Class::Outside));
+
+        // The root box spans everything, so it crosses the boundary.
+        assert!(matches!(
+            leaf(unit_box()).classify(&planes),
+            Class::Straddle
+        ));
     }
 
     #[test]
-    fn triangle_above_box_is_separated() {
-        let t = tri(
-            Vector3::new(0.0, 0.0, 2.0),
-            Vector3::new(1.0, 0.0, 2.0),
-            Vector3::new(0.0, 1.0, 2.0),
-        );
-        assert!(!intersects_aabb(&unit_box(), &t));
+    fn cone_query_returns_only_stars_in_cone() {
+        let inside = [
+            Vector3::new(0.0, 0.0, 1.0),
+            Vector3::new(0.2, 0.1, 1.0),
+            Vector3::new(-0.3, 0.2, 1.0),
+        ];
+        let outside = [
+            Vector3::new(0.0, 0.0, -1.0),
+            Vector3::new(1.0, 0.0, 0.0),
+            Vector3::new(0.0, -1.0, 0.0),
+            Vector3::new(-1.0, 0.0, -0.5),
+        ];
+        let stars: Vec<Star> = inside
+            .iter()
+            .chain(outside.iter())
+            .map(|d| star_at(d.normalize()))
+            .collect();
+
+        let tree = Octree::new(stars);
+        let found = tree.get_stars_in_cone(&pyramid_cone());
+
+        assert_eq!(found.len(), inside.len());
+        let planes = pyramid_cone().planes();
+        assert!(found.iter().all(|s| point_in_cone(&s.direction, &planes)));
     }
 
     #[test]
-    fn triangle_below_box_is_separated() {
-        // Regression for the negative-side case: the original test used
-        // max(p_max, p_min) and missed a triangle below the box.
-        let t = tri(
-            Vector3::new(0.0, 0.0, -2.0),
-            Vector3::new(1.0, 0.0, -2.0),
-            Vector3::new(0.0, 1.0, -2.0),
-        );
-        assert!(!intersects_aabb(&unit_box(), &t));
-    }
+    fn cone_query_across_subdivided_tree_keeps_all_inside_stars() {
+        // Enough clustered stars to force subdivision, exercising the recursive
+        // Inside/Straddle branches rather than a single leaf.
+        let mut stars = Vec::new();
+        let mut expected_inside = 0;
+        for i in 0..50 {
+            let t = i as f64 / 50.0;
+            // A fan around +z, all comfortably inside the wide frustum.
+            let d = Vector3::new(0.4 * (t - 0.5), 0.4 * (0.5 - t), 1.0);
+            stars.push(star_at(d.normalize()));
+            expected_inside += 1;
+        }
+        // A handful clearly outside (behind the apex).
+        for _ in 0..5 {
+            stars.push(star_at(Vector3::new(0.0, 0.0, -1.0)));
+        }
 
-    #[test]
-    fn triangle_off_to_the_side_is_separated() {
-        let t = tri(
-            Vector3::new(5.0, 0.0, 0.0),
-            Vector3::new(6.0, 0.0, 0.0),
-            Vector3::new(5.0, 1.0, 0.0),
-        );
-        assert!(!intersects_aabb(&unit_box(), &t));
-    }
+        let tree = Octree::new(stars);
+        assert!(tree.root.children.is_some(), "test should subdivide");
 
-    #[test]
-    fn triangle_parallel_touching_top_face_intersects() {
-        // Triangle lies in the plane z = 1 (the box's top face). Touching counts
-        // as intersecting under SAT (the gap test is strict).
-        let t = tri(
-            Vector3::new(-0.5, -0.5, 1.0),
-            Vector3::new(0.5, -0.5, 1.0),
-            Vector3::new(0.0, 0.5, 1.0),
-        );
-        assert!(intersects_aabb(&unit_box(), &t));
-    }
-
-    #[test]
-    fn triangle_straddling_a_face_intersects() {
-        // One vertex inside the box, the rest outside past +x.
-        let t = tri(
-            Vector3::new(0.5, 0.0, 0.0),
-            Vector3::new(2.0, 0.5, 0.0),
-            Vector3::new(2.0, -0.5, 0.0),
-        );
-        assert!(intersects_aabb(&unit_box(), &t));
-    }
-
-    #[test]
-    fn triangle_separated_by_edge_cross_axis() {
-        // A diagonal box, triangle tucked past a corner so only an edge-edge
-        // cross-product axis separates them (not a face normal).
-        let t = tri(
-            Vector3::new(2.0, 2.0, 0.0),
-            Vector3::new(1.4, 2.0, 0.0),
-            Vector3::new(2.0, 1.4, 0.0),
-        );
-        assert!(!intersects_aabb(&unit_box(), &t));
+        let found = tree.get_stars_in_cone(&pyramid_cone());
+        assert_eq!(found.len(), expected_inside);
     }
 
     // ---- Adaptive insertion ----------------------------------------------
@@ -402,7 +425,10 @@ mod tests {
             .map(|i| star_at(Vector3::new(0.9 - 0.05 * i as f64, 0.1, 0.1)))
             .collect();
         let tree = Octree::new(stars);
-        assert!(tree.root.children.is_none(), "should not subdivide at capacity");
+        assert!(
+            tree.root.children.is_none(),
+            "should not subdivide at capacity"
+        );
         assert_eq!(count_stars(&tree.root), Node::LEAF_CAPACITY);
     }
 
@@ -427,8 +453,15 @@ mod tests {
         let n = stars.len();
 
         let tree = Octree::new(stars);
-        assert!(tree.root.children.is_some(), "should subdivide past capacity");
-        assert_eq!(count_stars(&tree.root), n, "no stars lost during subdivision");
+        assert!(
+            tree.root.children.is_some(),
+            "should subdivide past capacity"
+        );
+        assert_eq!(
+            count_stars(&tree.root),
+            n,
+            "no stars lost during subdivision"
+        );
     }
 
     #[test]

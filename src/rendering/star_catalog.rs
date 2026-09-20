@@ -9,6 +9,7 @@
 
 use crate::rendering::black_body_radiation::get_cie_xyz_of_black_body_redshifted;
 use crate::rendering::color::CIETristimulus;
+use crate::rendering::octree::Octree;
 use arrow::array::{Float32Array, Float64Array, Int64Array};
 use nalgebra::Vector3;
 use parquet::arrow::arrow_reader::ParquetRecordBatchReaderBuilder;
@@ -108,7 +109,7 @@ fn star_emission_xyz(g_mag: f64, temperature: f64) -> CIETristimulus {
 }
 
 pub struct StarCatalog {
-    pub stars: Vec<Star>,
+    pub stars: Octree,
 }
 
 impl StarCatalog {
@@ -123,7 +124,7 @@ impl StarCatalog {
             .with_batch_size(8192)
             .build()?;
 
-        let mut stars = Vec::new();
+        let mut stars_vec = Vec::new();
         for batch in batch_reader {
             let batch = batch?;
             // Columns are looked up by name (not position) so a change in query
@@ -136,14 +137,14 @@ impl StarCatalog {
             let rp = float32_column(&batch, "phot_rp_mean_mag")?;
             let bp_rp = float32_column(&batch, "bp_rp")?;
 
-            stars.reserve(batch.num_rows());
+            stars_vec.reserve(batch.num_rows());
             for i in 0..batch.num_rows() {
                 let ra_deg = ra.value(i);
                 let dec_deg = dec.value(i);
                 let g_mag = g.value(i) as f64;
                 let bp_rp_value = bp_rp.value(i) as f64;
                 let temperature = colour_temperature_from_bp_rp(bp_rp_value);
-                stars.push(Star {
+                stars_vec.push(Star {
                     source_id: source_id.value(i),
                     ra_deg,
                     dec_deg,
@@ -157,6 +158,8 @@ impl StarCatalog {
                 });
             }
         }
+
+        let stars = Octree::new(stars_vec);
 
         Ok(Self { stars })
     }
@@ -224,6 +227,7 @@ fn float32_column<'a>(
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::rendering::octree::Cone;
     use approx::assert_relative_eq;
 
     #[test]
@@ -303,9 +307,23 @@ mod tests {
     #[ignore]
     fn loads_downloaded_catalogue() {
         let catalog = StarCatalog::load_parquet("data/gaia_dr3.parquet").unwrap();
-        assert!(!catalog.is_empty());
-        for star in &catalog.stars {
-            assert_relative_eq!(star.direction.norm(), 1.0, epsilon = 1e-9);
+
+        // A wide frustum around +z. In this cone every interior point satisfies
+        // z >= |x| and z >= |y|, so a returned star's direction must have z > 0.
+        let cone = Cone {
+            a: Vector3::new(1.0, 1.0, 1.0),
+            b: Vector3::new(-1.0, 1.0, 1.0),
+            c: Vector3::new(-1.0, -1.0, 1.0),
+            d: Vector3::new(1.0, -1.0, 1.0),
+        };
+        let stars = catalog.stars.get_stars_in_cone(&cone);
+
+        assert!(
+            !stars.is_empty(),
+            "all-sky catalogue should have stars in the +z cone"
+        );
+        for star in &stars {
+            assert!(star.direction.z > 0.0, "star outside the queried cone");
         }
     }
 }
