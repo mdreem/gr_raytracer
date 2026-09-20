@@ -211,3 +211,235 @@ fn intersects_aabb(aabb: &AABB, triangle: &Triangle) -> bool {
     }
     true
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::rendering::color::CIETristimulus;
+
+    /// A star at `direction`; every other field is a placeholder, since the
+    /// octree only ever looks at `direction`.
+    fn star_at(direction: Vector3<f64>) -> Star {
+        Star {
+            source_id: 0,
+            ra_deg: 0.0,
+            dec_deg: 0.0,
+            g_mag: 0.0,
+            bp_mag: 0.0,
+            rp_mag: 0.0,
+            bp_rp: 0.0,
+            direction,
+            temperature: 5000.0,
+            emission_xyz: CIETristimulus::new(0.0, 0.0, 0.0, 1.0),
+        }
+    }
+
+    fn unit_box() -> AABB {
+        AABB::new(Vector3::new(-1.0, -1.0, -1.0), Vector3::new(1.0, 1.0, 1.0))
+    }
+
+    fn leaf(bounds: AABB) -> Node {
+        Node { bounds, children: None, stars: None }
+    }
+
+    fn tri(a: Vector3<f64>, b: Vector3<f64>, c: Vector3<f64>) -> Triangle {
+        Triangle { vertices: [a, b, c] }
+    }
+
+    /// Total stars stored anywhere in the subtree.
+    fn count_stars(node: &Node) -> usize {
+        let here = node.stars.as_ref().map_or(0, Vec::len);
+        let below = node
+            .children
+            .as_ref()
+            .map_or(0, |c| c.iter().map(|n| count_stars(n)).sum());
+        here + below
+    }
+
+    // ---- AABB -------------------------------------------------------------
+
+    #[test]
+    fn aabb_center_and_extents() {
+        let b = AABB::new(Vector3::new(0.0, 0.0, 0.0), Vector3::new(2.0, 4.0, 6.0));
+        assert_eq!(b.center, Vector3::new(1.0, 2.0, 3.0));
+        assert_eq!(b.extents, Vector3::new(1.0, 2.0, 3.0));
+        // extents == max - center
+        assert_eq!(b.extents, b.max - b.center);
+    }
+
+    // ---- Node geometry ----------------------------------------------------
+
+    #[test]
+    fn contains_point_is_min_inclusive_max_exclusive() {
+        let n = leaf(unit_box());
+        assert!(n.contains_point(&Vector3::new(0.0, 0.0, 0.0)));
+        assert!(n.contains_point(&Vector3::new(-1.0, -1.0, -1.0))); // min inclusive
+        assert!(!n.contains_point(&Vector3::new(1.0, 0.0, 0.0))); // max exclusive
+        assert!(!n.contains_point(&Vector3::new(2.0, 0.0, 0.0)));
+    }
+
+    #[test]
+    fn child_index_maps_octant_bits() {
+        let n = leaf(unit_box());
+        assert_eq!(n.get_child_index(&Vector3::new(-0.5, -0.5, -0.5)), 0);
+        assert_eq!(n.get_child_index(&Vector3::new(0.5, -0.5, -0.5)), 1); // +x
+        assert_eq!(n.get_child_index(&Vector3::new(-0.5, 0.5, -0.5)), 2); // +y
+        assert_eq!(n.get_child_index(&Vector3::new(-0.5, -0.5, 0.5)), 4); // +z
+        assert_eq!(n.get_child_index(&Vector3::new(0.5, 0.5, 0.5)), 7); // +x+y+z
+    }
+
+    #[test]
+    fn child_bounds_partition_the_parent() {
+        let n = leaf(unit_box());
+        let c0 = n.child_bounds(0);
+        assert_eq!(c0.min, Vector3::new(-1.0, -1.0, -1.0));
+        assert_eq!(c0.max, Vector3::new(0.0, 0.0, 0.0));
+
+        let c7 = n.child_bounds(7);
+        assert_eq!(c7.min, Vector3::new(0.0, 0.0, 0.0));
+        assert_eq!(c7.max, Vector3::new(1.0, 1.0, 1.0));
+
+        // A child's index is exactly the octant its own center falls in.
+        for i in 0..8 {
+            assert_eq!(n.get_child_index(&n.child_bounds(i).center), i);
+        }
+    }
+
+    // ---- SAT triangle/box test -------------------------------------------
+
+    #[test]
+    fn triangle_overlapping_box_intersects() {
+        let t = tri(
+            Vector3::new(-0.5, -0.5, 0.0),
+            Vector3::new(0.5, -0.5, 0.0),
+            Vector3::new(0.0, 0.5, 0.0),
+        );
+        assert!(intersects_aabb(&unit_box(), &t));
+    }
+
+    #[test]
+    fn triangle_fully_inside_intersects() {
+        let t = tri(
+            Vector3::new(-0.2, -0.2, 0.0),
+            Vector3::new(0.2, -0.2, 0.0),
+            Vector3::new(0.0, 0.2, 0.1),
+        );
+        assert!(intersects_aabb(&unit_box(), &t));
+    }
+
+    #[test]
+    fn triangle_above_box_is_separated() {
+        let t = tri(
+            Vector3::new(0.0, 0.0, 2.0),
+            Vector3::new(1.0, 0.0, 2.0),
+            Vector3::new(0.0, 1.0, 2.0),
+        );
+        assert!(!intersects_aabb(&unit_box(), &t));
+    }
+
+    #[test]
+    fn triangle_below_box_is_separated() {
+        // Regression for the negative-side case: the original test used
+        // max(p_max, p_min) and missed a triangle below the box.
+        let t = tri(
+            Vector3::new(0.0, 0.0, -2.0),
+            Vector3::new(1.0, 0.0, -2.0),
+            Vector3::new(0.0, 1.0, -2.0),
+        );
+        assert!(!intersects_aabb(&unit_box(), &t));
+    }
+
+    #[test]
+    fn triangle_off_to_the_side_is_separated() {
+        let t = tri(
+            Vector3::new(5.0, 0.0, 0.0),
+            Vector3::new(6.0, 0.0, 0.0),
+            Vector3::new(5.0, 1.0, 0.0),
+        );
+        assert!(!intersects_aabb(&unit_box(), &t));
+    }
+
+    #[test]
+    fn triangle_parallel_touching_top_face_intersects() {
+        // Triangle lies in the plane z = 1 (the box's top face). Touching counts
+        // as intersecting under SAT (the gap test is strict).
+        let t = tri(
+            Vector3::new(-0.5, -0.5, 1.0),
+            Vector3::new(0.5, -0.5, 1.0),
+            Vector3::new(0.0, 0.5, 1.0),
+        );
+        assert!(intersects_aabb(&unit_box(), &t));
+    }
+
+    #[test]
+    fn triangle_straddling_a_face_intersects() {
+        // One vertex inside the box, the rest outside past +x.
+        let t = tri(
+            Vector3::new(0.5, 0.0, 0.0),
+            Vector3::new(2.0, 0.5, 0.0),
+            Vector3::new(2.0, -0.5, 0.0),
+        );
+        assert!(intersects_aabb(&unit_box(), &t));
+    }
+
+    #[test]
+    fn triangle_separated_by_edge_cross_axis() {
+        // A diagonal box, triangle tucked past a corner so only an edge-edge
+        // cross-product axis separates them (not a face normal).
+        let t = tri(
+            Vector3::new(2.0, 2.0, 0.0),
+            Vector3::new(1.4, 2.0, 0.0),
+            Vector3::new(2.0, 1.4, 0.0),
+        );
+        assert!(!intersects_aabb(&unit_box(), &t));
+    }
+
+    // ---- Adaptive insertion ----------------------------------------------
+
+    #[test]
+    fn at_capacity_stays_a_single_leaf() {
+        let stars: Vec<Star> = (0..Node::LEAF_CAPACITY)
+            .map(|i| star_at(Vector3::new(0.9 - 0.05 * i as f64, 0.1, 0.1)))
+            .collect();
+        let tree = Octree::new(stars);
+        assert!(tree.root.children.is_none(), "should not subdivide at capacity");
+        assert_eq!(count_stars(&tree.root), Node::LEAF_CAPACITY);
+    }
+
+    #[test]
+    fn over_capacity_subdivides_and_keeps_all_stars() {
+        // One star per octant plus extras: exceeds capacity and spreads out.
+        let dirs = [
+            Vector3::new(1.0, 1.0, 1.0),
+            Vector3::new(-1.0, 1.0, 1.0),
+            Vector3::new(1.0, -1.0, 1.0),
+            Vector3::new(1.0, 1.0, -1.0),
+            Vector3::new(-1.0, -1.0, 1.0),
+            Vector3::new(-1.0, 1.0, -1.0),
+            Vector3::new(1.0, -1.0, -1.0),
+            Vector3::new(-1.0, -1.0, -1.0),
+            Vector3::new(0.5, 0.5, 0.5),
+            Vector3::new(-0.5, -0.5, -0.5),
+            Vector3::new(0.3, -0.3, 0.3),
+        ];
+        assert!(dirs.len() > Node::LEAF_CAPACITY);
+        let stars: Vec<Star> = dirs.iter().map(|d| star_at(d.normalize())).collect();
+        let n = stars.len();
+
+        let tree = Octree::new(stars);
+        assert!(tree.root.children.is_some(), "should subdivide past capacity");
+        assert_eq!(count_stars(&tree.root), n, "no stars lost during subdivision");
+    }
+
+    #[test]
+    fn coincident_directions_terminate_and_keep_all_stars() {
+        // Far more identical directions than capacity. Without the MIN_HALF_EXTENT
+        // guard this would recurse forever (they never separate); it must instead
+        // stop splitting and pile them all into one deep leaf.
+        let dir = Vector3::new(0.3, 0.4, 0.5).normalize();
+        let stars: Vec<Star> = (0..100).map(|_| star_at(dir)).collect();
+
+        let tree = Octree::new(stars); // must not stack-overflow
+        assert_eq!(count_stars(&tree.root), 100);
+    }
+}
