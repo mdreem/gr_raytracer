@@ -8,6 +8,7 @@ use crate::rendering::color::{
     xyz_to_linear_srgb_buffer,
 };
 use crate::rendering::integrator::{IntegrationError, StopReason};
+use crate::rendering::octree::Cone;
 use crate::rendering::radiance::{Radiance, RadianceMean};
 use crate::rendering::ray::{IntegratedRay, Ray};
 use crate::rendering::scene::{EscapeInfo, RayClass, RaySample, Scene};
@@ -470,7 +471,19 @@ impl<'a, G: Geometry> Raytracer<'a, G> {
         if let Some(star_catalog) = &self.scene.star_catalog {
             let tri_1 = [a.to_vec(), b.to_vec(), c.to_vec()];
             let tri_2 = [b.to_vec(), d.to_vec(), c.to_vec()];
-            for star in &star_catalog.stars {
+            // Prune to the stars inside the tube's frustum (apex at the origin,
+            // corners a,b,d,c around the quad) instead of scanning the whole
+            // catalogue. The four side planes are great circles through the
+            // corners, so the cone is exactly the spherical quad the two
+            // triangles tile; the per-star triangle test below is unchanged.
+            let cone = Cone {
+                a: a.to_vec(),
+                b: b.to_vec(),
+                c: d.to_vec(),
+                d: c.to_vec(),
+            };
+            let candidates = star_catalog.stars.get_stars_in_cone(&cone);
+            for star in &candidates {
                 let mut hits = 0.0;
                 if inside_convex_spherical_triangle(&star.direction, &tri_1) {
                     hits += 1.0;

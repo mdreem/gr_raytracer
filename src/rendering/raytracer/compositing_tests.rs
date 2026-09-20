@@ -2,6 +2,7 @@ use super::*;
 use crate::geometry::euclidean::EuclideanSpace;
 use crate::rendering::camera::Camera;
 use crate::rendering::integrator::IntegrationConfiguration;
+use crate::rendering::octree::Octree;
 use crate::rendering::star_catalog::StarCatalog;
 use crate::rendering::temperature::TemperatureComputer;
 use crate::rendering::texture::{TemperatureData, TextureData, TextureMap, UVCoordinates};
@@ -135,7 +136,9 @@ fn scene_volume_preserves_marched_light_with_or_without_a_background() {
         CIETristimulus::new(4.0, 4.0, 4.0, 1.0),
     );
     // Defer the sky exactly as catalogue rendering does, retaining gas T.
-    renderer.scene.star_catalog = Some(StarCatalog { stars: vec![] });
+    renderer.scene.star_catalog = Some(StarCatalog {
+        stars: Octree::new(vec![]),
+    });
     let foreground = renderer.scene.color_of_ray(&ray).unwrap().color;
     assert!(foreground.opacity() > 0.01 && foreground.opacity() < 0.9);
     assert_abs_diff_eq!(

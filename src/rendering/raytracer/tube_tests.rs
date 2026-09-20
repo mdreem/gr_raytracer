@@ -2,6 +2,7 @@ use super::*;
 use crate::geometry::euclidean::EuclideanSpace;
 use crate::rendering::camera::Camera;
 use crate::rendering::integrator::IntegrationConfiguration;
+use crate::rendering::octree::Octree;
 use crate::rendering::star_catalog::StarCatalog;
 use crate::rendering::texture::{TemperatureData, TextureData, TextureMap, UVCoordinates};
 use crate::rendering::tubetracer::TubeScreenBounds;
@@ -195,7 +196,9 @@ fn tube_subdivision_preserves_flat_space_star_flux() {
         temperature: 5772.0,
         emission_xyz: CIETristimulus::new(2.0, 1.0, 0.5, 1.0),
     };
-    renderer.scene.star_catalog = Some(StarCatalog { stars: vec![star] });
+    renderer.scene.star_catalog = Some(StarCatalog {
+        stars: Octree::new(vec![star]),
+    });
     // Force the real winding-triggered branch. One corner retains the
     // winding discontinuity into successive children, exercising depth.
     samples[0].accumulated_angular_distance = 10.0;
@@ -236,7 +239,7 @@ fn star_magnification_and_foreground_transmittance_are_applied_once() {
     let mut samples = corners(&renderer, 10, 20);
     let star_ray = renderer.scene.camera.get_ray_for_offset(10, 20, 0.67, 0.73);
     renderer.scene.star_catalog = Some(StarCatalog {
-        stars: vec![Star {
+        stars: Octree::new(vec![Star {
             source_id: 1,
             ra_deg: 0.0,
             dec_deg: 0.0,
@@ -250,7 +253,7 @@ fn star_magnification_and_foreground_transmittance_are_applied_once() {
                 .normalize(),
             temperature: 5772.0,
             emission_xyz: CIETristimulus::new(2.0, 1.0, 0.5, 1.0),
-        }],
+        }]),
     });
     renderer.scene.max_subdivision_depth = 0;
     // A smaller image-side footprint with unchanged escaped corners gives
@@ -374,7 +377,12 @@ fn tube_pass_is_skipped_without_stars_even_for_invalid_tubes() {
     let invalid = [samples[0]; 4];
     let expected = [Radiance::new(2.0, 1.0, 0.5, 0.4); 4];
     calls.store(0, Ordering::Relaxed);
-    for catalogue in [None, Some(StarCatalog { stars: vec![] })] {
+    for catalogue in [
+        None,
+        Some(StarCatalog {
+            stars: Octree::new(vec![]),
+        }),
+    ] {
         renderer.scene.star_catalog = catalogue;
         let mut colors = expected;
         renderer
