@@ -3,6 +3,7 @@ pub mod camera;
 pub mod color;
 pub mod debug;
 pub mod integrator;
+mod octree;
 pub mod radiance;
 pub mod ray;
 pub mod raytracer;

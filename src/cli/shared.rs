@@ -185,13 +185,12 @@ pub fn create_scene<G: Geometry>(
     let (star_catalog, star_flux_scale, winding_spread_threshold, max_subdivision_depth) =
         match config.star_catalog {
             Some(catalog_config) => {
-                let catalog =
-                    StarCatalog::load_parquet(&catalog_config.path).map_err(|error| {
-                        RaytracerError::InvalidConfiguration(format!(
-                            "Failed to load star catalog {:?}: {}",
-                            catalog_config.path, error
-                        ))
-                    })?;
+                let catalog = StarCatalog::load_parquet(&catalog_config.path).map_err(|error| {
+                    RaytracerError::InvalidConfiguration(format!(
+                        "Failed to load star catalog {:?}: {}",
+                        catalog_config.path, error
+                    ))
+                })?;
                 debug!(
                     "Loaded {} stars from {}",
                     catalog.len(),
