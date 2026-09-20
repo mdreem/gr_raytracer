@@ -7,7 +7,7 @@ pub struct Octree {
 }
 
 impl Octree {
-    pub fn new(stars: Vec<Star>, depth: usize) -> Self {
+    pub fn new(stars: Vec<Star>) -> Self {
         let mut root = Node {
             bounds: AABB::new(Vector3::new(-1.0, -1.0, -1.0), Vector3::new(1.0, 1.0, 1.0)),
             children: None,
@@ -15,7 +15,7 @@ impl Octree {
         };
 
         for star in stars {
-            root.add_star(star, depth);
+            root.add_star(star);
         }
 
         Self { root }
@@ -29,6 +29,11 @@ struct Node {
 }
 
 impl Node {
+    const LEAF_CAPACITY: usize = 10;
+    // The minimum half-extent of a node's bounding box before it stops subdividing.
+    // Ensures there is not infinite subdivision of the octree when stars are very close together.
+    const MIN_HALF_EXTENT: f64 = 1e-5;
+
     fn contains_point(&self, point: &Vector3<f64>) -> bool {
         point.x >= self.bounds.min.x
             && point.x < self.bounds.max.x
@@ -93,23 +98,24 @@ impl Node {
         self.children = Some(children);
     }
 
-    fn add_star(&mut self, star: Star, max_depth: usize) {
-        if max_depth == 0 {
-            if let Some(stars) = &mut self.stars {
-                stars.push(star);
-            } else {
-                self.stars = Some(vec![star]);
-            }
+    fn add_star(&mut self, star: Star) {
+        if self.children.is_some() {
+            let index = self.get_child_index(&star.direction);
+            self.children.as_mut().unwrap()[index].add_star(star);
             return;
         }
 
-        if self.children.is_none() {
-            self.subdivide();
-        }
+        self.stars.get_or_insert_with(Vec::new).push(star);
 
-        let index = self.get_child_index(&star.direction);
-        if let Some(children) = &mut self.children {
-            children[index].add_star(star, max_depth - 1);
+        if self.stars.as_ref().map_or(0, Vec::len) > Self::LEAF_CAPACITY
+            && self.bounds.extents.x > Self::MIN_HALF_EXTENT
+        {
+            self.subdivide();
+            let stars = self.stars.take().unwrap();
+            for s in stars {
+                let index = self.get_child_index(&s.direction);
+                self.children.as_mut().unwrap()[index].add_star(s);
+            }
         }
     }
 }
