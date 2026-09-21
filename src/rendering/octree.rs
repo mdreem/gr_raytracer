@@ -1,35 +1,22 @@
 use crate::rendering::star_catalog::Star;
 use nalgebra::Vector3;
 
-pub struct Cone {
-    pub a: Vector3<f64>,
-    pub b: Vector3<f64>,
-    pub c: Vector3<f64>,
-    pub d: Vector3<f64>,
-}
-
-impl Cone {
-    /// Inward-facing normals of the four side planes (all through the origin).
-    /// A point is inside the frustum iff it is on the positive side of all four.
-    fn planes(&self) -> [Vector3<f64>; 4] {
-        let centroid = self.a + self.b + self.c + self.d;
-        let mut normals = [
-            self.a.cross(&self.b),
-            self.b.cross(&self.c),
-            self.c.cross(&self.d),
-            self.d.cross(&self.a),
-        ];
-        // Orient every normal so "inside the frustum" is the positive side.
-        for n in &mut normals {
-            if n.dot(&centroid) < 0.0 {
-                *n = -*n;
-            }
+/// Inward-facing normals of a spherical triangle's three edge planes (each
+/// through the origin), oriented by the opposite vertex so "inside" is the
+/// positive side. Three points always share a hemisphere, so unlike a quad this
+/// is always a well-formed convex region.
+fn triangle_planes(t: &[Vector3<f64>; 3]) -> [Vector3<f64>; 3] {
+    let mut n = [t[0].cross(&t[1]), t[1].cross(&t[2]), t[2].cross(&t[0])];
+    let opposite = [t[2], t[0], t[1]];
+    for (ni, opp) in n.iter_mut().zip(opposite) {
+        if ni.dot(&opp) < 0.0 {
+            *ni = -*ni;
         }
-        normals
     }
+    n
 }
 
-fn point_in_cone(point: &Vector3<f64>, planes: &[Vector3<f64>; 4]) -> bool {
+fn point_in_triangle(point: &Vector3<f64>, planes: &[Vector3<f64>; 3]) -> bool {
     planes.iter().all(|n| n.dot(point) >= 0.0)
 }
 
@@ -72,11 +59,10 @@ impl Octree {
         self.len == 0
     }
 
-    pub fn get_stars_in_cone(&self, cone: &Cone) -> Vec<Star> {
-        let planes = cone.planes();
-        let mut stars = Vec::new();
-        self.root.gather_in_cone(&planes, &mut stars);
-        stars
+    /// Append every star whose direction lies inside the spherical triangle.
+    pub fn gather_triangle(&self, triangle: &[Vector3<f64>; 3], out: &mut Vec<Star>) {
+        let planes = triangle_planes(triangle);
+        self.root.gather(&planes, out);
     }
 }
 
@@ -157,11 +143,11 @@ impl Node {
         }
     }
 
-    /// Classify this node's box against the frustum's side planes. Uses the same
+    /// Classify this node's box against the triangle's side planes. Uses the same
     /// projection-radius trick as the SAT test: s is the box centre's signed
     /// distance to a plane and r is the box's half-width along the plane
     /// normal, so `[s - r, s + r]` is the box's shadow on that normal.
-    fn classify(&self, planes: &[Vector3<f64>; 4]) -> Class {
+    fn classify(&self, planes: &[Vector3<f64>; 3]) -> Class {
         let c = self.bounds.center;
         let e = self.bounds.extents;
         let mut all_inside = true;
@@ -193,21 +179,21 @@ impl Node {
         }
     }
 
-    fn gather_in_cone(&self, planes: &[Vector3<f64>; 4], out: &mut Vec<Star>) {
+    fn gather(&self, planes: &[Vector3<f64>; 3], out: &mut Vec<Star>) {
         match self.classify(planes) {
             Class::Outside => {}
             Class::Inside => self.collect_all(out),
             Class::Straddle => {
                 if let Some(children) = &self.children {
                     for child in children.iter() {
-                        child.gather_in_cone(planes, out);
+                        child.gather(planes, out);
                     }
                 } else if let Some(stars) = &self.stars {
                     // Boundary leaf: test each star directly.
                     out.extend(
                         stars
                             .iter()
-                            .filter(|s| point_in_cone(&s.direction, planes))
+                            .filter(|s| point_in_triangle(&s.direction, planes))
                             .cloned(),
                     );
                 }
@@ -275,14 +261,13 @@ mod tests {
         }
     }
 
-    /// Square pyramid frustum around +z with a wide half-angle.
-    fn pyramid_cone() -> Cone {
-        Cone {
-            a: Vector3::new(1.0, 1.0, 1.0),
-            b: Vector3::new(-1.0, 1.0, 1.0),
-            c: Vector3::new(-1.0, -1.0, 1.0),
-            d: Vector3::new(1.0, -1.0, 1.0),
-        }
+    /// A wide spherical triangle around +z.
+    fn plus_z_triangle() -> [Vector3<f64>; 3] {
+        [
+            Vector3::new(1.0, 1.0, 1.0),
+            Vector3::new(-1.0, 1.0, 1.0),
+            Vector3::new(0.0, -1.0, 1.0),
+        ]
     }
 
     /// Total stars stored anywhere in the subtree.
@@ -335,22 +320,22 @@ mod tests {
         }
     }
 
-    // ---- Cone query -------------------------------------------------------
+    // ---- Triangle query ---------------------------------------------------
 
     #[test]
-    fn point_in_cone_axis_and_behind() {
-        let planes = pyramid_cone().planes();
-        assert!(point_in_cone(&Vector3::new(0.0, 0.0, 1.0), &planes)); // on axis
-        assert!(point_in_cone(&Vector3::new(0.3, -0.2, 1.0), &planes)); // inside
-        assert!(!point_in_cone(&Vector3::new(0.0, 0.0, -1.0), &planes)); // behind apex
-        assert!(!point_in_cone(&Vector3::new(2.0, 0.0, 0.1), &planes)); // off to +x
+    fn point_in_triangle_axis_and_behind() {
+        let planes = triangle_planes(&plus_z_triangle());
+        assert!(point_in_triangle(&Vector3::new(0.0, 0.0, 1.0), &planes)); // on axis
+        assert!(point_in_triangle(&Vector3::new(0.1, 0.1, 1.0), &planes)); // inside
+        assert!(!point_in_triangle(&Vector3::new(0.0, 0.0, -1.0), &planes)); // behind apex
+        assert!(!point_in_triangle(&Vector3::new(2.0, 0.0, 0.1), &planes)); // off to +x
     }
 
     #[test]
     fn classify_box_inside_outside_straddle() {
-        let planes = pyramid_cone().planes();
+        let planes = triangle_planes(&plus_z_triangle());
 
-        // Small box well inside the frustum, above the apex on the +z axis.
+        // Small box well inside the triangle, above the apex on the +z axis.
         let inside = AABB::new(Vector3::new(-0.1, -0.1, 0.5), Vector3::new(0.1, 0.1, 0.7));
         assert!(matches!(leaf(inside).classify(&planes), Class::Inside));
 
@@ -366,11 +351,11 @@ mod tests {
     }
 
     #[test]
-    fn cone_query_returns_only_stars_in_cone() {
+    fn triangle_query_returns_only_inside_stars() {
         let inside = [
             Vector3::new(0.0, 0.0, 1.0),
             Vector3::new(0.2, 0.1, 1.0),
-            Vector3::new(-0.3, 0.2, 1.0),
+            Vector3::new(-0.2, 0.1, 1.0),
         ];
         let outside = [
             Vector3::new(0.0, 0.0, -1.0),
@@ -385,36 +370,36 @@ mod tests {
             .collect();
 
         let tree = Octree::new(stars);
-        let found = tree.get_stars_in_cone(&pyramid_cone());
+        let mut found = Vec::new();
+        tree.gather_triangle(&plus_z_triangle(), &mut found);
 
         assert_eq!(found.len(), inside.len());
-        let planes = pyramid_cone().planes();
-        assert!(found.iter().all(|s| point_in_cone(&s.direction, &planes)));
+        let planes = triangle_planes(&plus_z_triangle());
+        assert!(found.iter().all(|s| point_in_triangle(&s.direction, &planes)));
     }
 
     #[test]
-    fn cone_query_across_subdivided_tree_keeps_all_inside_stars() {
-        // Enough clustered stars to force subdivision, exercising the recursive
-        // Inside/Straddle branches rather than a single leaf.
-        let mut stars = Vec::new();
-        let mut expected_inside = 0;
-        for i in 0..50 {
-            let t = i as f64 / 50.0;
-            // A fan around +z, all comfortably inside the wide frustum.
-            let d = Vector3::new(0.4 * (t - 0.5), 0.4 * (0.5 - t), 1.0);
-            stars.push(star_at(d.normalize()));
-            expected_inside += 1;
-        }
-        // A handful clearly outside (behind the apex).
-        for _ in 0..5 {
-            stars.push(star_at(Vector3::new(0.0, 0.0, -1.0)));
-        }
-
+    fn triangle_query_across_subdivided_tree_matches_bruteforce() {
+        // Enough spread stars to force subdivision, exercising the recursive
+        // Inside/Straddle branches; the gather must equal the exact filter.
+        let dirs: Vec<Vector3<f64>> = (0..200)
+            .map(|i| {
+                let t = i as f64;
+                Vector3::new((t * 1.1).sin(), (t * 1.7).cos(), (t * 0.9).sin() + 0.3).normalize()
+            })
+            .collect();
+        let stars: Vec<Star> = dirs.iter().map(|d| star_at(*d)).collect();
         let tree = Octree::new(stars);
         assert!(tree.root.children.is_some(), "test should subdivide");
 
-        let found = tree.get_stars_in_cone(&pyramid_cone());
-        assert_eq!(found.len(), expected_inside);
+        let planes = triangle_planes(&plus_z_triangle());
+        let expected = dirs.iter().filter(|d| point_in_triangle(d, &planes)).count();
+        let mut found = Vec::new();
+        tree.gather_triangle(&plus_z_triangle(), &mut found);
+
+        assert!(expected > 0 && expected < dirs.len(), "triangle should split the set");
+        assert_eq!(found.len(), expected);
+        assert!(found.iter().all(|s| point_in_triangle(&s.direction, &planes)));
     }
 
     // ---- Adaptive insertion ----------------------------------------------

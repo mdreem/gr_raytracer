@@ -227,7 +227,6 @@ fn float32_column<'a>(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::rendering::octree::Cone;
     use approx::assert_relative_eq;
 
     #[test]
@@ -308,22 +307,22 @@ mod tests {
     fn loads_downloaded_catalogue() {
         let catalog = StarCatalog::load_parquet("data/gaia_dr3.parquet").unwrap();
 
-        // A wide frustum around +z. In this cone every interior point satisfies
-        // z >= |x| and z >= |y|, so a returned star's direction must have z > 0.
-        let cone = Cone {
-            a: Vector3::new(1.0, 1.0, 1.0),
-            b: Vector3::new(-1.0, 1.0, 1.0),
-            c: Vector3::new(-1.0, -1.0, 1.0),
-            d: Vector3::new(1.0, -1.0, 1.0),
-        };
-        let stars = catalog.stars.get_stars_in_cone(&cone);
+        // A triangle whose corners all have z > 0. It lies in the convex +z
+        // hemisphere, so every returned star's direction must have z > 0.
+        let triangle = [
+            Vector3::new(1.0, 1.0, 1.0),
+            Vector3::new(-1.0, 1.0, 1.0),
+            Vector3::new(0.0, -1.0, 1.0),
+        ];
+        let mut stars = Vec::new();
+        catalog.stars.gather_triangle(&triangle, &mut stars);
 
         assert!(
             !stars.is_empty(),
-            "all-sky catalogue should have stars in the +z cone"
+            "all-sky catalogue should have stars in the +z triangle"
         );
         for star in &stars {
-            assert!(star.direction.z > 0.0, "star outside the queried cone");
+            assert!(star.direction.z > 0.0, "star outside the queried triangle");
         }
     }
 }

@@ -8,7 +8,6 @@ use crate::rendering::color::{
     xyz_to_linear_srgb_buffer,
 };
 use crate::rendering::integrator::{IntegrationError, StopReason};
-use crate::rendering::octree::Cone;
 use crate::rendering::radiance::{Radiance, RadianceMean};
 use crate::rendering::ray::{IntegratedRay, Ray};
 use crate::rendering::scene::{EscapeInfo, RayClass, RaySample, Scene};
@@ -17,7 +16,7 @@ use crate::rendering::texture::TextureError;
 use crate::rendering::tubetracer::SampleTube;
 use image::{ImageBuffer, ImageError, ImageFormat, Rgb};
 use indicatif::style::TemplateError;
-use log::{debug, error, info};
+use log::{debug, error, info, warn};
 use nalgebra::Vector3;
 use rayon::iter::IndexedParallelIterator;
 use rayon::iter::IntoParallelRefMutIterator;
@@ -268,14 +267,6 @@ fn compute_solid_angle(
     Ok(angle_1.abs() + angle_2.abs())
 }
 
-fn inside_convex_spherical_triangle(p: &Vector3<f64>, q: &[Vector3<f64>; 3]) -> bool {
-    let centroid = (q[0] + q[1] + q[2]).normalize();
-    (0..3).all(|i| {
-        let n = q[i].cross(&q[(i + 1) % 3]);
-        n.dot(p).signum() == n.dot(&centroid).signum()
-    })
-}
-
 fn finite_tube_flux(color: Vector3<f64>) -> Result<Vector3<f64>, RaytracerError> {
     if color.iter().all(|v| v.is_finite()) {
         Ok(color)
@@ -469,36 +460,24 @@ impl<'a, G: Geometry> Raytracer<'a, G> {
         let redshift = 0.25 * (a.redshift + b.redshift + c.redshift + d.redshift);
         // TODO: Move the collection into scene
         if let Some(star_catalog) = &self.scene.star_catalog {
-            let tri_1 = [a.to_vec(), b.to_vec(), c.to_vec()];
-            let tri_2 = [b.to_vec(), d.to_vec(), c.to_vec()];
-            // Prune to the stars inside the tube's frustum (apex at the origin,
-            // corners a,b,d,c around the quad) instead of scanning the whole
-            // catalogue. The four side planes are great circles through the
-            // corners, so the cone is exactly the spherical quad the two
-            // triangles tile; the per-star triangle test below is unchanged.
-            let cone = Cone {
-                a: a.to_vec(),
-                b: b.to_vec(),
-                c: d.to_vec(),
-                d: c.to_vec(),
-            };
-            let candidates = star_catalog.stars.get_stars_in_cone(&cone);
-            for star in &candidates {
-                let mut hits = 0.0;
-                if inside_convex_spherical_triangle(&star.direction, &tri_1) {
-                    hits += 1.0;
+            // The two triangles tile the tube's quad. The octree returns exactly
+            // the stars inside each (its plane test is the spherical-triangle
+            // test), so a star shared on the diagonal is gathered by both, which
+            // reproduces the old double-hit weighting.
+            let triangles = [
+                [a.to_vec(), b.to_vec(), c.to_vec()],
+                [b.to_vec(), d.to_vec(), c.to_vec()],
+            ];
+            let mut stars = Vec::new();
+            for triangle in &triangles {
+                stars.clear();
+                star_catalog.stars.gather_triangle(triangle, &mut stars);
+                for star in &stars {
+                    let emission = self.redshifted_star_emission(star, redshift);
+                    total.x += emission.x;
+                    total.y += emission.y;
+                    total.z += emission.z;
                 }
-                if inside_convex_spherical_triangle(&star.direction, &tri_2) {
-                    hits += 1.0;
-                }
-                if hits == 0.0 {
-                    continue;
-                }
-                let emission = self.redshifted_star_emission(star, redshift);
-                total.x += hits * emission.x;
-                total.y += hits * emission.y;
-                total.z += hits * emission.z;
-                debug!("Star {} is inside the traced tube", star.source_id);
             }
         }
 
@@ -553,24 +532,43 @@ impl<'a, G: Geometry> Raytracer<'a, G> {
         }
         // Retain the current center-to-center base footprints. Moving them
         // to pixel boundaries is separate from fixing recursive subdivision.
+        let mut tubes = 0usize;
+        let mut skipped = 0usize;
         for row in 0..height.saturating_sub(1) {
             for col in 0..width.saturating_sub(1) {
                 if let Some(tube) =
                     SampleTube::from_buffer(buffer, row as u32, col as u32, width as u32)
                 {
+                    tubes += 1;
                     let idx = row * width + col;
-                    let stars = self.handle_tube(&tube).map_err(|err| {
-                        error!(
-                            "Unable to gather stars for {:?}: {}",
-                            tube.screen_bounds, err
-                        );
-                        err
-                    })?;
-                    // Star layer goes UNDER the foreground, weighted by
-                    // the foreground's surviving transmittance.
-                    colors[idx] = colors[idx].over(Radiance::new(stars.x, stars.y, stars.z, 0.0));
+                    // Skip a tube whose gather fails rather than aborting the whole
+                    // section; it just contributes no star flux.
+                    match self.handle_tube(&tube) {
+                        Ok(stars) => {
+                            // Star layer goes UNDER the foreground, weighted by
+                            // the foreground's surviving transmittance.
+                            colors[idx] =
+                                colors[idx].over(Radiance::new(stars.x, stars.y, stars.z, 0.0));
+                        }
+                        Err(err) => {
+                            skipped += 1;
+                            debug!(
+                                "Skipping star gather for {:?}: {}",
+                                tube.screen_bounds, err
+                            );
+                        }
+                    }
                 }
             }
+        }
+        if skipped > 0 {
+            warn!(
+                "Star gather skipped {} of {} tubes ({:.2}%) in this section; \
+                 those tubes contributed no star flux",
+                skipped,
+                tubes,
+                100.0 * skipped as f64 / tubes as f64
+            );
         }
         Ok(())
     }
