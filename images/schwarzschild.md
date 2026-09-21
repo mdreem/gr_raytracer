@@ -14,6 +14,19 @@
   <p>Schwarzschild black hole visualization with volumetric disc (background image: <a href="https://commons.wikimedia.org/wiki/File:NGC6355_-_HST_-_Potw2301a.jpg">NGC 6355</a>)</p>
 </div>
 
+### Gaia star field
+
+A Schwarzschild black hole lensing the real Gaia DR3 catalogue (G &le; 12) as
+point-source stars, no accretion disc. The shadow and photon ring are perfectly
+circular; the ring glow is clumpy only because the real sky is uneven (recipe:
+`images/gaia-mag12-schwarzschild-no-disc-1920x1080-2026-09-21.toml`; rendered to
+linear HDR and graded with bloom + an ACES tone map at exposure 69).
+
+<div align="center">
+  <img src="gaia-mag12-schwarzschild-no-disc-1920x1080-2026-09-21.png" alt="A Schwarzschild black hole gravitationally lensing the real Gaia DR3 star field">
+  <p>Gaia DR3 stars (G &le; 12) lensed by a Schwarzschild black hole; 1920&times;1080 HDR, bloom + ACES.</p>
+</div>
+
 ### Close vantages
 
 First-person views from a static observer close to the hole (recipes:
