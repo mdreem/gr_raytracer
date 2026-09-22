@@ -278,6 +278,7 @@ pub fn create_scene<G: Geometry>(
                 scattering,
                 noise_scale,
                 noise_offset,
+                flux_scale,
             } => {
                 if outer_radius <= inner_radius {
                     return Err(RaytracerError::InvalidConfiguration(format!(
@@ -352,7 +353,8 @@ pub fn create_scene<G: Geometry>(
                     scattering,
                     Vector3::new(noise_scale.0, noise_scale.1, noise_scale.2),
                     noise_offset,
-                );
+                )
+                .with_flux_scale(flux_scale);
                 objects.add_object(Box::new(disc));
             }
         }

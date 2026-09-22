@@ -264,6 +264,8 @@ pub enum ObjectsConfig {
         scattering: f64,
         noise_scale: (f64, f64, f64),
         noise_offset: f64,
+        #[serde(default = "default_disc_flux_scale")]
+        flux_scale: f64,
     },
 }
 

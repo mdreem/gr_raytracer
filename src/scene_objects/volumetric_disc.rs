@@ -61,6 +61,10 @@ pub struct VolumetricDisc {
     scattering: f64,
     noise_scale: Vector3<f64>,
     noise_offset: f64,
+    /// Linear multiplier on emitted light only (opacity/extinction untouched),
+    /// so the disc can be dialed into a star field's brightness range. Defaults
+    /// to 1.0; set via `with_flux_scale`.
+    flux_scale: f64,
 }
 
 struct SegmentState {
@@ -127,7 +131,15 @@ impl VolumetricDisc {
             scattering,
             noise_scale,
             noise_offset,
+            flux_scale: 1.0,
         }
+    }
+
+    /// Scale the emitted light (not the opacity), so the disc can be dimmed
+    /// into a star field's brightness range for a single-exposure render.
+    pub fn with_flux_scale(mut self, flux_scale: f64) -> Self {
+        self.flux_scale = flux_scale;
+        self
     }
 
     /// Cheap bounding test for whether a point is inside the disc's support region.
@@ -327,7 +339,10 @@ impl VolumetricDisc {
                 // together; alpha=0 leaves no gas interaction in this cell.
                 texture_density = light_color.alpha.clamp(0.0, 1.0);
                 if sigma_t > 0.0 {
-                    source = light_color.as_vector() * (sigma_a / sigma_t) * intensity_factor;
+                    source = light_color.as_vector()
+                        * (sigma_a / sigma_t)
+                        * intensity_factor
+                        * self.flux_scale;
                 }
             } else {
                 // No timelike circular orbit here: unphysical gas; it
