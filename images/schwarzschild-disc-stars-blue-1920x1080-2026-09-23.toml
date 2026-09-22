@@ -1,0 +1,43 @@
+# Schwarzschild black hole: flat Novikov-Thorne blackbody accretion disc
+# (hot 15000 K, blue) over the real Gaia DR3 G<=12 star field, in a single pass.
+#
+# The disc's flux_scale dims the emitted light (opacity untouched, so the disc
+# still fully occludes the stars behind it) into the star field's brightness
+# range, so one exposure shows both. HDR export bypasses tone mapping; grade the
+# linear HDR externally with bloom + a luminance-preserving ACES tone map.
+#
+# Reproduce from the repository root:
+# RUST_LOG=info RAYON_NUM_THREADS=16 target/release/gr_raytracer \
+#   --width=1920 --height=1080 --camera-position=0,-24,6.5 \
+#   --theta=3.14159265 --phi=0 --psi=0 --max-radius=200 \
+#   --config-file=images/schwarzschild-disc-stars-blue-1920x1080-2026-09-23.toml \
+#   render --filename=out.hdr
+# then grade out.hdr with bloom + ACES at exposure ~86.
+
+celestial_temperature = 0.0
+
+[adaptive_sampling]
+enabled = true
+samples_per_axis = 4
+minimum_luminance = 0.0
+
+[celestial_texture.BlackBody]
+beaming_exponent = 0.0
+
+[geometry_type.Schwarzschild]
+radius = 1.0
+horizon_epsilon = 1e-4
+
+[[objects]]
+[objects.Disc]
+inner_radius = 3.0
+outer_radius = 12.0
+temperature = 15000.0
+flux_scale = 1.05e-10
+[objects.Disc.texture.BlackBody]
+beaming_exponent = 0.0
+
+[star_catalog]
+path = "data/gaia_mag12.parquet"
+flux_scale = 3.0
+max_subdivision_depth = 6
