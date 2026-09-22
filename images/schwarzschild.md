@@ -27,6 +27,29 @@ linear HDR and graded with bloom + an ACES tone map at exposure 69).
   <p>Gaia DR3 stars (G &le; 12) lensed by a Schwarzschild black hole; 1920&times;1080 HDR, bloom + ACES.</p>
 </div>
 
+### Accretion disc over the Gaia star field
+
+A flat Novikov-Thorne blackbody accretion disc rendered together with the real
+Gaia DR3 (G &le; 12) star field in a single pass. The disc's `flux_scale` dims
+its emitted light into the star field's brightness range while leaving its
+opacity untouched, so the disc still fully occludes the stars behind it and one
+exposure captures both. Rendered to linear HDR and graded with bloom and a
+luminance-preserving ACES tone map (grading brightness while keeping
+chromaticity, so the disc holds its colour instead of washing to white). Same
+camera and star field in both; only the disc temperature differs
+(recipes: `images/schwarzschild-disc-stars-yellow-1920x1080-2026-09-23.toml`,
+`images/schwarzschild-disc-stars-blue-1920x1080-2026-09-23.toml`; exposure 86).
+
+<div align="center">
+  <img src="schwarzschild-disc-stars-yellow-1920x1080-2026-09-23.png" alt="A warm 4500 K blackbody accretion disc lensed around a Schwarzschild black hole over the Gaia star field">
+  <p>Warm disc (4500 K): the bright left rim is the Doppler-boosted approaching side; the thin arc over the shadow is the lensed far side plus the photon ring.</p>
+</div>
+
+<div align="center">
+  <img src="schwarzschild-disc-stars-blue-1920x1080-2026-09-23.png" alt="A hot 15000 K blue-white blackbody accretion disc lensed around a Schwarzschild black hole over the Gaia star field">
+  <p>Hot disc (15000 K): a blackbody this hot glows blue-white (it never reaches a saturated blue), so a brighter, more energetic-looking disc than the warm one.</p>
+</div>
+
 ### Close vantages
 
 First-person views from a static observer close to the hole (recipes:
