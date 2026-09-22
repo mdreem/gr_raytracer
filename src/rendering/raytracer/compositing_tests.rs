@@ -85,6 +85,7 @@ fn scene_surface_and_sky_apply_straight_alpha_once() {
                     source.x, source.y, source.z, opacity,
                 ))),
                 Box::new(ConstantTemperature),
+                1.0,
             )));
             let sky = CIETristimulus::new(4.0, 6.0, 8.0, sky_opacity);
             let renderer = renderer(&geometry, objects, position, sky);
@@ -181,6 +182,7 @@ fn actual_supersampling_averages_covered_light_and_transmitted_sky() {
         100.0,
         Arc::new(HalfCoveredTexture),
         Box::new(ConstantTemperature),
+        1.0,
     )));
     let renderer = renderer(
         &geometry,

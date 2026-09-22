@@ -249,6 +249,7 @@ mod tests {
                 Color::new(200, 200, 200, 255),
             )),
             Box::new(ConstantTemperatureComputer::new(5000.0)),
+            1.0,
         )));
 
         // r = 6 (inside the disc annulus), phi = 0, theta straddling the
