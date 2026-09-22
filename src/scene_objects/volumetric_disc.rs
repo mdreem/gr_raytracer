@@ -23,6 +23,25 @@ const CAPTURE_HEIGHT_FACTOR: f64 = 3.0;
 /// radiance is unbounded (boosted inner-disc regions reach ~1e5 linear) and
 /// the threshold is chosen conservatively small rather than the classic 1e-3.
 const TRANSPARENCY_EARLY_EXIT: f64 = 1e-5;
+/// Frequency of the fbm's first octave; each further octave doubles it.
+const FBM_BASE_FREQUENCY: f64 = 4.0;
+
+/// Fbm octaves that stay below `nyquist` when one world unit maps to
+/// `noise_scale` noise units. Octave `i` sits at
+/// `FBM_BASE_FREQUENCY * 2^i * noise_scale` features per world unit; dropping
+/// the finer ones keeps the density field the same at any image resolution.
+fn resolvable_octaves(noise_scale: f64, nyquist: f64, max_octaves: usize) -> usize {
+    let base_frequency = FBM_BASE_FREQUENCY * noise_scale.abs();
+    if base_frequency <= 0.0 {
+        return max_octaves;
+    }
+    let doublings = nyquist / base_frequency;
+    if doublings < 1.0 {
+        0
+    } else {
+        (doublings.log2().floor() as usize + 1).min(max_octaves)
+    }
+}
 
 pub struct VolumetricDisc {
     center_disk_inner_radius: f64,
@@ -157,12 +176,21 @@ impl VolumetricDisc {
         let noise_phi_x = phi.cos() * self.noise_scale.y;
         let noise_phi_y = phi.sin() * self.noise_scale.y;
 
+        // Band-limit the noise to what the ray march can sample: octaves finer
+        // than two step sizes turn into sample-position-dependent aliasing that
+        // shifts with the image resolution. The radial axis carries the finest
+        // detail, so it sets the cap.
+        let nyquist = 1.0 / (2.0 * self.step_size);
+        let radial_octaves = resolvable_octaves(self.noise_scale.x, nyquist, self.num_octaves);
+
         // Use a 3D noise sample where phi-components are coordinates
         let noise_p = Vector3::new(r * self.noise_scale.x, noise_phi_x, noise_phi_y);
-        let mut n = self.fbm(noise_p, 0.5);
+        let mut n = self.fbm(noise_p, 0.5, radial_octaves);
 
-        // Add vertical variation separately
-        n += self.noise(Vector3::new(r * 0.5, h * self.noise_scale.z, phi.cos())) * 0.5;
+        // Add vertical variation separately, only when it too resolves.
+        if self.noise_scale.z.abs() <= nyquist {
+            n += self.noise(Vector3::new(r * 0.5, h * self.noise_scale.z, phi.cos())) * 0.5;
+        }
 
         let n = (n + self.noise_offset).max(0.0) * self.density_multiplier;
 
@@ -364,13 +392,13 @@ impl VolumetricDisc {
         Ok(RaymarchResult::Continue)
     }
 
-    fn fbm(&self, x: Vector3<f64>, h: f64) -> f64 {
+    fn fbm(&self, x: Vector3<f64>, h: f64, octaves: usize) -> f64 {
         let g = (-h).exp2();
-        let mut frequency = 4.0;
+        let mut frequency = FBM_BASE_FREQUENCY;
         let mut amplitude = 1.0;
         let mut t = 0.0;
 
-        for _ in 0..self.num_octaves {
+        for _ in 0..octaves {
             t += amplitude * self.noise(x * frequency);
             frequency *= 2.0;
             amplitude *= g;
@@ -688,6 +716,19 @@ mod tests {
             p_t: 1.0,
             p_phi: 0.0,
         }
+    }
+
+    #[test]
+    fn octave_band_limit_depends_only_on_step_and_scale() {
+        let nyquist = 100.0;
+        // Scale 60 puts even octave 0 (freq 240) past Nyquist: nothing resolves.
+        assert_eq!(resolvable_octaves(60.0, nyquist, 8), 0);
+        // Scale 1.5 keeps octaves 0..=4 (top freq 96 < 100), then the request caps.
+        assert_eq!(resolvable_octaves(1.5, nyquist, 8), 5);
+        assert_eq!(resolvable_octaves(1.5, nyquist, 3), 3);
+        assert!(resolvable_octaves(1.5, 400.0, 8) > resolvable_octaves(1.5, 100.0, 8));
+        // A vanishing scale carries no detail, so every requested octave is safe.
+        assert_eq!(resolvable_octaves(0.0, nyquist, 8), 8);
     }
 
     struct DummyTemperatureComputer;
