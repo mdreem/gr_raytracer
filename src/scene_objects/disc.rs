@@ -15,6 +15,10 @@ pub struct Disc {
     center_disk_outer_radius: f64,
     texture_mapper: TextureMapHandle,
     temperature_computer: Box<dyn TemperatureComputer>,
+    /// Linear multiplier on the emitted light only (opacity is untouched), so
+    /// the disc can be dialed into the same brightness range as a starfield and
+    /// both survive a single exposure.
+    flux_scale: f64,
 }
 
 impl Disc {
@@ -23,12 +27,14 @@ impl Disc {
         center_disk_outer_radius: f64,
         texture_mapper: TextureMapHandle,
         temperature_computer: Box<dyn TemperatureComputer>,
+        flux_scale: f64,
     ) -> Self {
         Self {
             center_disk_inner_radius,
             center_disk_outer_radius,
             texture_mapper,
             temperature_computer,
+            flux_scale,
         }
     }
 
@@ -209,12 +215,16 @@ impl Hittable for Disc {
         color_computation_data: &ColorComputationData,
         _geometry: &dyn Geometry,
     ) -> Result<Radiance, RaytracerError> {
-        self.texture_mapper
-            .color_at_uv(
-                &color_computation_data.uv,
-                &color_computation_data.temperature_data,
-            )
-            .map(Radiance::from_straight)
+        let mut color = self.texture_mapper.color_at_uv(
+            &color_computation_data.uv,
+            &color_computation_data.temperature_data,
+        )?;
+        // Scale the emitted light, leaving alpha (opacity) intact so the disc
+        // still fully occludes whatever is behind it.
+        color.x *= self.flux_scale;
+        color.y *= self.flux_scale;
+        color.z *= self.flux_scale;
+        Ok(Radiance::from_straight(color))
     }
 
     fn energy_of_emitter(
@@ -264,6 +274,7 @@ mod tests {
                 Color::new(0, 100, 0, 255),
             )),
             Box::new(ConstantTemperatureComputer::new(1000.0)),
+            1.0,
         )
     }
 

@@ -464,6 +464,7 @@ pub mod test_scene {
                 center_disk_inner_radius,
                 center_disk_outer_radius,
             )?,
+            1.0,
         )));
 
         let scene = Scene::new(

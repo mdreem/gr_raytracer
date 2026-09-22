@@ -227,6 +227,10 @@ impl Default for TextureConfig {
     }
 }
 
+fn default_disc_flux_scale() -> f64 {
+    1.0
+}
+
 #[derive(Deserialize, Serialize, Debug, Clone)]
 pub enum ObjectsConfig {
     Sphere {
@@ -240,6 +244,8 @@ pub enum ObjectsConfig {
         outer_radius: f64,
         texture: TextureConfig,
         temperature: f64,
+        #[serde(default = "default_disc_flux_scale")]
+        flux_scale: f64,
     },
     VolumetricDisc {
         inner_radius: f64,
@@ -378,6 +384,7 @@ mod tests {
                         color2: (0, 0, 255),
                     },
                     temperature: 5500.0,
+                    flux_scale: 1.0,
                 },
                 ObjectsConfig::Sphere {
                     radius: 0.5,
@@ -488,6 +495,7 @@ mod tests {
             outer_radius,
             texture: _,
             temperature,
+            ..
         } = &config.objects[1]
         {
             assert_eq!(*inner_radius, 1.0);

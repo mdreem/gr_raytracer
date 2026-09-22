@@ -235,6 +235,7 @@ pub fn create_scene<G: Geometry>(
                 outer_radius,
                 texture,
                 temperature,
+                flux_scale,
             } => {
                 debug!(
                     "Adding disc with inner radius: {}, outer radius: {}",
@@ -256,6 +257,7 @@ pub fn create_scene<G: Geometry>(
                     outer_radius,
                     texture_mapper_disc,
                     temperature_computer,
+                    flux_scale,
                 );
                 objects.add_object(Box::new(disc));
             }
