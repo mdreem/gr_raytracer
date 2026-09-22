@@ -202,6 +202,21 @@ fn to_cartesian(theta: f64, phi: f64) -> nalgebra::Vector3<f64> {
     nalgebra::Vector3::new(x, y, z)
 }
 
+/// Clamp a linear channel to what the Radiance RGBE HDR format can store.
+/// RGBE shares one 8-bit exponent (bias 128) across the three channels, so a
+/// magnitude below 2^-128 underflows the exponent byte; once it wraps, that
+/// pixel decodes as a spuriously enormous or infinite value (the disc-edge
+/// "fireflies"). Such values are black anyway, so flush them (and negatives)
+/// to zero.
+fn flush_to_hdr(value: f64) -> f32 {
+    const RGBE_MIN_MAGNITUDE: f64 = 2.938_735_877_055_719e-39; // 2^-128
+    if value < RGBE_MIN_MAGNITUDE {
+        0.0
+    } else {
+        value as f32
+    }
+}
+
 fn solid_angle_from_vecs(
     a_vec: &Vector3<f64>,
     b_vec: &Vector3<f64>,
@@ -894,11 +909,7 @@ impl<'a, G: Geometry> Raytracer<'a, G> {
                 .into_iter()
                 .map(|c| xyz_to_linear_srgb(&c.to_xyz_over_black()))
                 .flat_map(|c| {
-                    [
-                        c.x.max(0.0) as f32,
-                        c.y.max(0.0) as f32,
-                        c.z.max(0.0) as f32,
-                    ]
+                    [flush_to_hdr(c.x), flush_to_hdr(c.y), flush_to_hdr(c.z)]
                 })
                 .collect();
             let imgbuf_hdr: ImageBuffer<Rgb<f32>, Vec<f32>> =
@@ -952,7 +963,7 @@ mod compositing_tests;
 #[cfg(test)]
 mod tests {
     use super::{
-        MICHELSON_DENOMINATOR_EPSILON, luminance_contrast, should_supersample_pair,
+        MICHELSON_DENOMINATOR_EPSILON, flush_to_hdr, luminance_contrast, should_supersample_pair,
         stratified_sample_offset,
     };
     use crate::configuration::AdaptiveSamplingConfig;
@@ -961,6 +972,18 @@ mod tests {
     use crate::rendering::radiance::Radiance;
     use crate::rendering::ray::Ray;
     use crate::rendering::scene::{EscapeInfo, RayClass, RaySample};
+
+    #[test]
+    fn flush_to_hdr_zeroes_rgbe_underflow_but_keeps_representable_values() {
+        // Below 2^-128 the shared RGBE exponent byte underflows and wraps,
+        // decoding as a spurious huge/inf pixel: those must flush to zero.
+        assert_eq!(flush_to_hdr(2.25e-45), 0.0); // the disc-edge "firefly" value
+        assert_eq!(flush_to_hdr(1e-121), 0.0);
+        assert_eq!(flush_to_hdr(-3.0), 0.0); // negatives clamp too
+        // At and above the representable magnitude the value passes through.
+        assert_eq!(flush_to_hdr(1e-30), 1e-30_f64 as f32);
+        assert_eq!(flush_to_hdr(50_000.0), 50_000.0_f32);
+    }
 
     fn sample(y: f64, alpha: f64, ray_class: RayClass) -> RaySample {
         RaySample {
