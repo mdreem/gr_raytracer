@@ -152,6 +152,9 @@ pub fn create_scene<G: Geometry>(
         .show_sampling_mask
         .then(|| CIETristimulus::from_color(&opts.sampling_mask_color));
 
+    // Steer the spherical coordinate pole off the field of view (0 = identity).
+    crate::geometry::spherical_coordinates_helper::set_frame_rotation_deg(opts.pole_rotation_deg);
+
     let integration_configuration = IntegrationConfiguration::new(
         opts.max_steps,
         opts.max_radius,
@@ -360,7 +363,7 @@ pub fn create_scene<G: Geometry>(
         }
     }
 
-    let scene = Scene::new(
+    let mut scene = Scene::new(
         integration_configuration,
         objects,
         texture_data,
@@ -376,6 +379,7 @@ pub fn create_scene<G: Geometry>(
         winding_spread_threshold,
         max_subdivision_depth,
     );
+    scene.curved_star_membership = opts.curved_star_membership;
     Ok(scene)
 }
 

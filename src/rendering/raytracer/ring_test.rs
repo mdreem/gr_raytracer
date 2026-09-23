@@ -132,6 +132,13 @@ fn single_star_directly_behind_forms_einstein_ring() {
     renderer.scene.star_catalog = Some(StarCatalog {
         stars: Octree::new(vec![star_directly_behind()]),
     });
+    // The production toggles are the --curved-star-membership and
+    // --pole-rotation-deg flags; honour the same knobs here via env vars so
+    // this test can exercise both paths without a CLI.
+    renderer.scene.curved_star_membership = std::env::var_os("CURVED_MEMBERSHIP").is_some();
+    if let Some(deg) = std::env::var("POLE_ROT_DEG").ok().and_then(|s| s.parse().ok()) {
+        crate::geometry::spherical_coordinates_helper::set_frame_rotation_deg(deg);
+    }
 
     let buffer = renderer
         .render_section_to_radiance_buffer(0, 0, height as u32, width as u32)

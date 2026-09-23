@@ -81,6 +81,9 @@ pub struct Scene<'a, G: Geometry> {
     pub winding_spread_threshold: f64,
     /// Maximum recursive subdivision depth for a star tube.
     pub max_subdivision_depth: usize,
+    /// Gather stars against a curved (arc-following) tube boundary instead of
+    /// the flat-quad corners. Experimental; fills lensed-ring gaps.
+    pub curved_star_membership: bool,
     /// Blackbody colour LUT for re-tinting stars at their redshifted
     /// temperature `g * T` in the gather. Present iff a star catalogue is.
     pub star_blackbody: Option<BlackBodyMapper>,
@@ -157,6 +160,7 @@ impl<'a, G: Geometry> Scene<'a, G> {
             star_flux_scale: 1.0,
             winding_spread_threshold: std::f64::consts::PI,
             max_subdivision_depth: 6,
+            curved_star_membership: false,
             star_blackbody: None,
         }
     }
