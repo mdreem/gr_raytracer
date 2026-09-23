@@ -21,7 +21,7 @@ point-source stars, no accretion disc. The shadow and photon ring are perfectly
 circular; the ring glow is clumpy only because the real sky is uneven (recipe:
 `images/gaia-mag12-schwarzschild-no-disc-1920x1080-2026-09-21.toml`; rendered to
 linear HDR and graded with bloom + a luminance-preserving ACES tone map at
-exposure 86, the same grade as the disc finals below so the star fields match).
+exposure 86).
 
 <div align="center">
   <img src="gaia-mag12-schwarzschild-no-disc-1920x1080-2026-09-21.png" alt="A Schwarzschild black hole gravitationally lensing the real Gaia DR3 star field">
