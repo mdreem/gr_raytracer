@@ -11,11 +11,11 @@
 #   --theta=-3.14159 --psi=0 --phi=0 --max-radius=200 \
 #   --config-file=images/gaia-mag12-schwarzschild-no-disc-1920x1080-2026-09-21.toml \
 #   render --filename=blackhole-1080p.hdr
-# 2. Grade to PNG with bloom + ACES. Exposure scales with pixel solid angle, so
-#    it is resolution-dependent; 69 matches the earlier 1600x900 look at 48
-#    (69 ~= 48 * (1920*1080)/(1600*900)). Any HDR grader works (Blender glare +
-#    AgX, darktable filmic + bloom, or a small numpy pass); the committed PNG
-#    used exposure 69.
+# 2. Grade to PNG with bloom + a luminance-preserving ACES tone map, the same
+#    recipe as the disc + star-field finals, so the star field matches them.
+#    Exposure scales with pixel solid angle, so it is resolution-dependent; the
+#    committed PNG used exposure 86 (matching the disc set). Any HDR grader works
+#    (Blender glare + AgX, darktable filmic + bloom, or a small numpy pass).
 
 celestial_temperature = 0.0
 objects = []
