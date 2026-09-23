@@ -427,28 +427,27 @@ impl<'a, G: Geometry> Raytracer<'a, G> {
 
                 ratio * self.compute_star_collection_data(&a, &b, &c, &d)
             }
-            // TODO: These branches use corner foreground light as a star-flux
-            // fallback. Correct composition does not make this classification
-            // physically correct.
-            // all four corners captured or all four hitting an opaque object:
-            // Just return the color of corner a, no need to subdivide.
+            // The star layer only carries background starlight. A tube with no
+            // escaped corner sees no background (the hole or an opaque object
+            // fills it), so it contributes zero star flux; the object/shadow
+            // itself already comes from the base pass. Returning the corner's
+            // foreground colour here instead would leak that colour (e.g. the
+            // disc) into the star layer and paint a spurious rim along a
+            // silhouette, resolution-dependently.
             (RayClass::Captured, RayClass::Captured, RayClass::Captured, RayClass::Captured)
-            | (RayClass::Hit, RayClass::Hit, RayClass::Hit, RayClass::Hit) => {
-                sample_tube.a.color.as_vector()
-            }
-            // Catch mixed cases.
-            // If mixed but not-escaped: return the color of corner a, no need to subdivide.
-            // If any corner escaped: subdivide. Of maximum is reached, just return the color of corner a.
+            | (RayClass::Hit, RayClass::Hit, RayClass::Hit, RayClass::Hit) => Vector3::zeros(),
+            // Mixed corners: subdivide so the escaped sub-tubes still gather
+            // their stars; if subdivision is capped, contribute no star flux
+            // rather than leaking foreground colour.
             _ => {
                 let any_escaped = matches!(sample_tube.a.ray_class, RayClass::Escaped(_))
                     || matches!(sample_tube.b.ray_class, RayClass::Escaped(_))
                     || matches!(sample_tube.c.ray_class, RayClass::Escaped(_))
                     || matches!(sample_tube.d.ray_class, RayClass::Escaped(_));
                 if any_escaped {
-                    self.subdivide(sample_tube, depth)?
-                        .unwrap_or(sample_tube.a.color.as_vector())
+                    self.subdivide(sample_tube, depth)?.unwrap_or(Vector3::zeros())
                 } else {
-                    sample_tube.a.color.as_vector()
+                    Vector3::zeros()
                 }
             }
         };
