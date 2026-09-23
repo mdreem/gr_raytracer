@@ -537,18 +537,32 @@ impl<'a, G: Geometry> Raytracer<'a, G> {
         // critical curve crosses this tube. Split (reusing the subdivider, whose
         // children re-enter this path) until each piece is unfolded or capped.
         let folded = va.dot(&vb.cross(&vc)) * vb.dot(&vd.cross(&vc)) < 0.0;
-        if folded
-            && depth < self.scene.max_subdivision_depth
-            && let Some(color) = self.subdivide(tube, depth)?
-        {
-            return Ok(color);
-        }
-
         let original_angle = compute_solid_angle(o_a, o_b, o_c, o_d)?;
+        if folded {
+            // The critical curve crosses this tube. Split it so each piece is a
+            // single sheet; but subdivision can still drop a star into a sliver
+            // between child polygons, so never gather less than the flat path:
+            // take whichever of the split result and the flat gather is larger.
+            if depth < self.scene.max_subdivision_depth
+                && let Some(color) = self.subdivide(tube, depth)?
+            {
+                let flat = self.flat_gather(a, b, c, d, original_angle)?;
+                return Ok(if color.norm() >= flat.norm() { color } else { flat });
+            }
+            // Could not split (depth cap): the curved polygon would
+            // self-intersect and its fan gather can drop stars, so use flat.
+            return self.flat_gather(a, b, c, d, original_angle);
+        }
         match self.tube_boundary(tube, &va, &vb, &vd, &vc) {
             Some(boundary) if boundary.len() >= 3 => {
                 let redshift = 0.25 * (a.redshift + b.redshift + c.redshift + d.redshift);
-                let (flux, footprint) = self.gather_polygon(&boundary, redshift);
+                let (flux, footprint, signed_area) = self.gather_polygon(&boundary, redshift);
+                // Hidden fold: an even number of critical-curve crossings the
+                // corner parity test misses, so the polygon still self-intersects
+                // and the signed area cancels. Fall back to the flat gather.
+                if footprint > 0.0 && signed_area.abs() < 0.5 * footprint {
+                    return self.flat_gather(a, b, c, d, original_angle);
+                }
                 if footprint > 0.0 && footprint.is_finite() {
                     return Ok((original_angle / footprint) * flux);
                 }
@@ -556,14 +570,7 @@ impl<'a, G: Geometry> Raytracer<'a, G> {
             }
             // An edge crossed the shadow (a corner failed to escape) or the
             // bounds could not be refined: fall back to the flat-quad gather.
-            _ => {
-                let solid_angle = compute_traced_tube_solid_angle(a, b, c, d)?;
-                let ratio = original_angle / solid_angle;
-                if !ratio.is_finite() || ratio <= 0.0 {
-                    return Err(RaytracerError::InvalidStarTube("invalid magnification"));
-                }
-                Ok(ratio * self.compute_star_collection_data(a, b, c, d))
-            }
+            _ => self.flat_gather(a, b, c, d, original_angle),
         }
     }
 
@@ -639,7 +646,12 @@ impl<'a, G: Geometry> Raytracer<'a, G> {
 
     /// Fan-triangulate the boundary polygon from its centroid; sum star flux
     /// (each star once) and the enclosed solid angle (the true footprint area).
-    fn gather_polygon(&self, poly: &[Vector3<f64>], redshift: f64) -> (Vector3<f64>, f64) {
+    /// Returns `(flux, footprint, signed_area)`: the summed star flux, the
+    /// footprint solid angle (sum of |triangle areas|), and the signed area sum.
+    /// A simple polygon has `|signed_area| == footprint`; a self-intersecting
+    /// (folded) one has the signs cancel, so `|signed_area| << footprint` flags
+    /// a fold the fan gather cannot be trusted on.
+    fn gather_polygon(&self, poly: &[Vector3<f64>], redshift: f64) -> (Vector3<f64>, f64, f64) {
         let n = poly.len();
         let mut centroid = Vector3::zeros();
         for p in poly {
@@ -648,6 +660,7 @@ impl<'a, G: Geometry> Raytracer<'a, G> {
         let centroid = centroid.normalize();
         let mut flux = Vector3::zeros();
         let mut footprint = 0.0;
+        let mut signed_area = 0.0;
         if let Some(catalog) = &self.scene.star_catalog {
             let mut seen = std::collections::HashSet::new();
             let mut stars = Vec::new();
@@ -656,6 +669,7 @@ impl<'a, G: Geometry> Raytracer<'a, G> {
                 let p1 = poly[(i + 1) % n];
                 if let Ok(area) = solid_angle_from_vecs(&centroid, &p0, &p1) {
                     footprint += area.abs();
+                    signed_area += area;
                 }
                 stars.clear();
                 catalog.stars.gather_triangle(&[centroid, p0, p1], &mut stars);
@@ -669,7 +683,27 @@ impl<'a, G: Geometry> Raytracer<'a, G> {
                 }
             }
         }
-        (flux * self.scene.star_flux_scale, footprint)
+        (flux * self.scene.star_flux_scale, footprint, signed_area)
+    }
+
+    /// The original flat-quad gather: the star flux inside the tube's four
+    /// corners, magnified by the corner solid-angle ratio. Used as the fallback
+    /// for tubes whose fold cannot be resolved, so the curved path never gathers
+    /// less than the flat path.
+    fn flat_gather(
+        &self,
+        a: &EscapeInfo,
+        b: &EscapeInfo,
+        c: &EscapeInfo,
+        d: &EscapeInfo,
+        original_angle: f64,
+    ) -> Result<Vector3<f64>, RaytracerError> {
+        let solid_angle = compute_traced_tube_solid_angle(a, b, c, d)?;
+        let ratio = original_angle / solid_angle;
+        if !ratio.is_finite() || ratio <= 0.0 {
+            return Err(RaytracerError::InvalidStarTube("invalid magnification"));
+        }
+        Ok(ratio * self.compute_star_collection_data(a, b, c, d))
     }
 
     /// One star's observed XYZ radiance under the frequency shift `g`.
