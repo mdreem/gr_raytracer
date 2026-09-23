@@ -50,6 +50,31 @@ camera and star field in both; only the disc temperature differs
   <p>Hot disc (15000 K): a blackbody this hot glows blue-white (it never reaches a saturated blue), so a brighter, more energetic-looking disc than the warm one.</p>
 </div>
 
+### Volumetric accretion disc over the Gaia star field
+
+A thick (volumetric) blackbody accretion disc over the Gaia DR3 (G &le; 12) star
+field, single pass. Unlike the razor-thin flat disc, the gas has real thickness,
+so its edge is a soft, fluffy falloff (no sharp outer rim) and its opacity comes
+from the local gas density: the dim receding side still fully occludes the stars
+behind it (dim in emission, unchanged in opacity), while only the tenuous outer
+gas lets starlight bleed through. The disc's `flux_scale` dims its emitted light
+into the star field's range so one exposure holds both. Graded from linear HDR
+with bloom + ACES (recipes:
+`images/schwarzschild-voldisc-stars-yellow-1920x1080-2026-09-23.toml`,
+`images/schwarzschild-voldisc-stars-blue-1920x1080-2026-09-23.toml`). An HDR
+(Rec.2100 PQ) AVIF sits beside each PNG for display on HDR screens, where the
+disc glows brighter than white.
+
+<div align="center">
+  <img src="schwarzschild-voldisc-stars-yellow-1920x1080-2026-09-23.png" alt="A warm volumetric blackbody accretion disc around a Schwarzschild black hole over the Gaia star field">
+  <p>Warm volumetric disc (4500 K). HDR version: <code>schwarzschild-voldisc-stars-yellow-1920x1080-2026-09-23-hdr.avif</code>.</p>
+</div>
+
+<div align="center">
+  <img src="schwarzschild-voldisc-stars-blue-1920x1080-2026-09-23.png" alt="A hot blue-white volumetric blackbody accretion disc around a Schwarzschild black hole over the Gaia star field">
+  <p>Hot volumetric disc (15000 K, blue-white). HDR version: <code>schwarzschild-voldisc-stars-blue-1920x1080-2026-09-23-hdr.avif</code>.</p>
+</div>
+
 ### Close vantages
 
 First-person views from a static observer close to the hole (recipes:

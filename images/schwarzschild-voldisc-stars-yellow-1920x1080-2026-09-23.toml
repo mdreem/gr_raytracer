@@ -1,0 +1,52 @@
+# Schwarzschild black hole: volumetric (thick) blackbody accretion disc
+# (warm 4500 K, golden) over the real Gaia DR3 G<=12 star field, single pass.
+#
+# The disc's flux_scale dims emitted light (opacity/extinction untouched) into
+# the star field's range so one exposure captures both. Volumetric thickness
+# gives a soft, fluffy edge (no razor-thin outer rim). HDR export bypasses tone
+# mapping; grade the linear HDR with bloom + ACES.
+#
+# Reproduce from the repository root:
+# RUST_LOG=info RAYON_NUM_THREADS=16 target/release/gr_raytracer \
+#   --width=1920 --height=1080 --camera-position=0,-24,6.5 \
+#   --theta=3.14159265 --phi=0 --psi=0 --max-radius=200 \
+#   --config-file=images/schwarzschild-voldisc-stars-yellow-1920x1080-2026-09-23.toml render --filename=out.hdr
+# then grade out.hdr with bloom + ACES at exposure ~86.
+
+celestial_temperature = 0.0
+
+[adaptive_sampling]
+enabled = true
+samples_per_axis = 4
+minimum_luminance = 0.0
+
+[celestial_texture.BlackBody]
+beaming_exponent = 0.0
+
+[geometry_type.Schwarzschild]
+radius = 1.0
+horizon_epsilon = 1e-4
+
+[[objects]]
+[objects.VolumetricDisc]
+inner_radius = 3.0
+outer_radius = 12.0
+temperature = 4500.0
+num_octaves = 8
+max_steps = 20000
+step_size = 0.005
+thickness = 0.18
+density_multiplier = 300.0
+brightness_reference_temperature = 4000.0
+absorption = 0.4
+scattering = 0.2
+noise_scale = [1.5, 2.0, 8.0]
+noise_offset = 0.2
+flux_scale = 5e-8
+[objects.VolumetricDisc.texture.BlackBody]
+beaming_exponent = 0.0
+
+[star_catalog]
+path = "data/gaia_mag12.parquet"
+flux_scale = 3.0
+max_subdivision_depth = 6
