@@ -1,4 +1,5 @@
 use crate::geometry::point::{CoordinateSystem, Point};
+use crate::geometry::spherical_coordinates_helper::{frame_rotation_deg, rotate_about_x};
 use nalgebra::{Vector3, Vector4};
 use std::ops::{Add, Div, Index, Mul, Neg};
 
@@ -154,11 +155,22 @@ impl FourVector {
     }
 
     pub fn get_cartesian_vector(self, at: &Point) -> Vector3<f64> {
-        Vector3::new(
+        let v = Vector3::new(
             self.get_x_cartesian(at),
             self.get_y_cartesian(at),
             self.get_z_cartesian(at),
-        )
+        );
+        // The spherical->cartesian components come out in the (possibly rotated)
+        // coordinate frame; rotate directions back to physical space so they
+        // match positions, star directions, and the texture lookup. Kerr (BL)
+        // is left untouched here.
+        match self.coordinate_system {
+            CoordinateSystem::Spherical => {
+                let (x, y, z) = rotate_about_x(v.x, v.y, v.z, -frame_rotation_deg());
+                Vector3::new(x, y, z)
+            }
+            _ => v,
+        }
     }
 }
 

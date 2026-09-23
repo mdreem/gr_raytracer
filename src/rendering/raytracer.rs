@@ -290,6 +290,21 @@ fn finite_tube_flux(color: Vector3<f64>) -> Result<Vector3<f64>, RaytracerError>
     }
 }
 
+/// Experimental curved-boundary star membership, gated by the
+/// CURVED_MEMBERSHIP env var so it can be A/B'd against the flat-quad path.
+fn curved_membership_enabled() -> bool {
+    static FLAG: std::sync::OnceLock<bool> = std::sync::OnceLock::new();
+    *FLAG.get_or_init(|| std::env::var_os("CURVED_MEMBERSHIP").is_some())
+}
+
+/// Angular flatness tolerance (radians) for refining a tube edge into a polyline
+/// that follows the true sky arc: refine an edge segment while its traced
+/// midpoint deviates from the straight chord by more than this.
+const EDGE_FLATNESS_TOLERANCE: f64 = 0.003;
+
+/// Recursion cap for edge refinement (a 1-D subdivision, so 2^depth points).
+const MAX_EDGE_REFINE_DEPTH: u32 = 12;
+
 impl<'a, G: Geometry> Raytracer<'a, G> {
     pub fn new(scene: Scene<'a, G>, tone_mapping: ToneMappingMethod, exposure: f64) -> Self {
         Self {
@@ -418,6 +433,12 @@ impl<'a, G: Geometry> Raytracer<'a, G> {
                     .get_cartesian_vector(&sample_tube.d.ray.position)
                     .normalize();
 
+                if curved_membership_enabled() {
+                    return finite_tube_flux(self.gather_curved(
+                        sample_tube, &a, &b, &c, &d, &o_a, &o_b, &o_c, &o_d, depth,
+                    )?);
+                }
+
                 let original_angle = compute_solid_angle(&o_a, &o_b, &o_c, &o_d)?;
                 let solid_angle = compute_traced_tube_solid_angle(&a, &b, &c, &d)?;
                 let ratio = original_angle / solid_angle;
@@ -497,6 +518,165 @@ impl<'a, G: Geometry> Raytracer<'a, G> {
 
         let scale = self.scene.star_flux_scale;
         total * scale
+    }
+
+    /// Curved-boundary star gather for an all-escaped tube. Splits a folded tube
+    /// (the critical curve passes through it) so each piece is single-sheet,
+    /// then gathers against a boundary polygon whose edges follow the true sky
+    /// arcs instead of straight chords. One gather per tube (no re-gather into
+    /// sub-tubes), so it fills ring gaps without concentrating or thinning flux.
+    #[allow(clippy::too_many_arguments)]
+    fn gather_curved(
+        &self,
+        tube: &SampleTube,
+        a: &EscapeInfo,
+        b: &EscapeInfo,
+        c: &EscapeInfo,
+        d: &EscapeInfo,
+        o_a: &Vector3<f64>,
+        o_b: &Vector3<f64>,
+        o_c: &Vector3<f64>,
+        o_d: &Vector3<f64>,
+        depth: usize,
+    ) -> Result<Vector3<f64>, RaytracerError> {
+        let (va, vb, vc, vd) = (a.to_vec(), b.to_vec(), c.to_vec(), d.to_vec());
+        // Fold test: the two tiling triangles wind opposite ways when the
+        // critical curve crosses this tube. Split (reusing the subdivider, whose
+        // children re-enter this path) until each piece is unfolded or capped.
+        let folded = va.dot(&vb.cross(&vc)) * vb.dot(&vd.cross(&vc)) < 0.0;
+        if folded
+            && depth < self.scene.max_subdivision_depth
+            && let Some(color) = self.subdivide(tube, depth)?
+        {
+            return Ok(color);
+        }
+
+        let original_angle = compute_solid_angle(o_a, o_b, o_c, o_d)?;
+        match self.tube_boundary(tube, &va, &vb, &vd, &vc) {
+            Some(boundary) if boundary.len() >= 3 => {
+                let redshift = 0.25 * (a.redshift + b.redshift + c.redshift + d.redshift);
+                let (flux, footprint) = self.gather_polygon(&boundary, redshift);
+                if footprint > 0.0 && footprint.is_finite() {
+                    return Ok((original_angle / footprint) * flux);
+                }
+                Ok(Vector3::zeros())
+            }
+            // An edge crossed the shadow (a corner failed to escape) or the
+            // bounds could not be refined: fall back to the flat-quad gather.
+            _ => {
+                let solid_angle = compute_traced_tube_solid_angle(a, b, c, d)?;
+                let ratio = original_angle / solid_angle;
+                if !ratio.is_finite() || ratio <= 0.0 {
+                    return Err(RaytracerError::InvalidStarTube("invalid magnification"));
+                }
+                Ok(ratio * self.compute_star_collection_data(a, b, c, d))
+            }
+        }
+    }
+
+    /// Trace a single screen point of the owning pixel; Some(dir) if it escapes.
+    fn trace_escape(&self, pixel_row: i64, pixel_col: i64, row: f64, col: f64) -> Option<Vector3<f64>> {
+        let ray = self.scene.camera.get_ray_for_offset(
+            pixel_row,
+            pixel_col,
+            col - pixel_col as f64 + 0.5,
+            row - pixel_row as f64 + 0.5,
+        );
+        match self.scene.color_of_ray(&ray).ok()?.ray_class {
+            RayClass::Escaped(e) => Some(e.to_vec()),
+            _ => None,
+        }
+    }
+
+    /// Points strictly after `d0` up to and including `d1`, following the true
+    /// arc: recurse while the traced midpoint deviates from the chord.
+    fn refine_edge(
+        &self,
+        pr: i64,
+        pc: i64,
+        p0: (f64, f64),
+        d0: Vector3<f64>,
+        p1: (f64, f64),
+        d1: Vector3<f64>,
+        depth: u32,
+    ) -> Option<Vec<Vector3<f64>>> {
+        if depth >= MAX_EDGE_REFINE_DEPTH {
+            return Some(vec![d1]);
+        }
+        let pm = ((p0.0 + p1.0) * 0.5, (p0.1 + p1.1) * 0.5);
+        let dm = self.trace_escape(pr, pc, pm.0, pm.1)?;
+        let chord_mid = (d0 + d1).normalize();
+        let deviation = dm.dot(&chord_mid).clamp(-1.0, 1.0).acos();
+        if deviation <= EDGE_FLATNESS_TOLERANCE {
+            return Some(vec![d1]);
+        }
+        let mut left = self.refine_edge(pr, pc, p0, d0, pm, dm, depth + 1)?;
+        left.extend(self.refine_edge(pr, pc, pm, dm, p1, d1, depth + 1)?);
+        Some(left)
+    }
+
+    /// Refined boundary polygon of a tube (corners in order TL, TR, BR, BL, i.e.
+    /// `va, vb, vd, vc`), each edge a polyline hugging the true sky arc.
+    fn tube_boundary(
+        &self,
+        tube: &SampleTube,
+        va: &Vector3<f64>,
+        vb: &Vector3<f64>,
+        vd: &Vector3<f64>,
+        vc: &Vector3<f64>,
+    ) -> Option<Vec<Vector3<f64>>> {
+        let sb = tube.screen_bounds;
+        let pr = tube.a.ray.row;
+        let pc = tube.a.ray.col;
+        let corners = [
+            ((sb.top, sb.left), *va),
+            ((sb.top, sb.right), *vb),
+            ((sb.bottom, sb.right), *vd),
+            ((sb.bottom, sb.left), *vc),
+        ];
+        let mut poly = vec![corners[0].1];
+        for i in 0..4 {
+            let (p0, d0) = corners[i];
+            let (p1, d1) = corners[(i + 1) % 4];
+            poly.extend(self.refine_edge(pr, pc, p0, d0, p1, d1, 0)?);
+        }
+        poly.pop(); // drop the closing duplicate of corner a
+        Some(poly)
+    }
+
+    /// Fan-triangulate the boundary polygon from its centroid; sum star flux
+    /// (each star once) and the enclosed solid angle (the true footprint area).
+    fn gather_polygon(&self, poly: &[Vector3<f64>], redshift: f64) -> (Vector3<f64>, f64) {
+        let n = poly.len();
+        let mut centroid = Vector3::zeros();
+        for p in poly {
+            centroid += p;
+        }
+        let centroid = centroid.normalize();
+        let mut flux = Vector3::zeros();
+        let mut footprint = 0.0;
+        if let Some(catalog) = &self.scene.star_catalog {
+            let mut seen = std::collections::HashSet::new();
+            let mut stars = Vec::new();
+            for i in 0..n {
+                let p0 = poly[i];
+                let p1 = poly[(i + 1) % n];
+                if let Ok(area) = solid_angle_from_vecs(&centroid, &p0, &p1) {
+                    footprint += area.abs();
+                }
+                stars.clear();
+                catalog.stars.gather_triangle(&[centroid, p0, p1], &mut stars);
+                for star in &stars {
+                    if seen.insert(star.source_id) {
+                        let emission = self.redshifted_star_emission(star, redshift);
+                        flux.x += emission.x;
+                        flux.y += emission.y;
+                        flux.z += emission.z;
+                    }
+                }
+            }
+        }
+        (flux * self.scene.star_flux_scale, footprint)
     }
 
     /// One star's observed XYZ radiance under the frequency shift `g`.
