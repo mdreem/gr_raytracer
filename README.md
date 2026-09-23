@@ -82,8 +82,10 @@ enabled = true
 samples_per_axis = 4
 luminance_contrast_threshold = 0.15
 opacity_contrast_threshold = 0.1
-minimum_luminance = 1.0
+# minimum_luminance is optional; omit it (the default) to derive the floor
+# per frame from the 99th-percentile luminance, or set an explicit value.
 object_hit_opacity_threshold = 0.5
+exclude_background_contrast = true
 ```
 
 `samples_per_axis = 4` traces a jittered 4×4 grid for each selected pixel. To
