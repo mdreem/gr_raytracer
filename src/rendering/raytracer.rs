@@ -1140,6 +1140,9 @@ mod tube_tests;
 mod compositing_tests;
 
 #[cfg(test)]
+mod ring_test;
+
+#[cfg(test)]
 mod tests {
     use super::{
         MICHELSON_DENOMINATOR_EPSILON, flush_to_hdr, luminance_contrast, should_supersample_pair,
