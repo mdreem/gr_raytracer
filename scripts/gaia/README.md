@@ -1,18 +1,12 @@
 # Gaia DR3 star-catalogue helper
 
-Stage 1 of the point-source star-catalog pipeline (see
-`docs/plan-12-star-catalog.md`): query ESA's Gaia TAP/ADQL service
-server-side and save a magnitude-limited subset locally as a typed Parquet
-file. Only the requested subset is downloaded, not the Gaia bulk archive.
+Query ESA's Gaia TAP/ADQL service server-side and save a magnitude-limited
+subset locally as a typed Parquet file (see `docs/plan-12-star-catalog.md`).
+Only the requested subset is downloaded, not the Gaia bulk archive.
 
-A later stage 2 (not yet implemented) will convert this Parquet into the
-renderer's binary point-source format:
-
-```text
-RA/Dec -> Cartesian unit direction -> physical/relative flux
-       -> stellar colour/temperature -> HEALPix spatial index
-       -> compact renderer-specific binary
-```
+The renderer loads this Parquet file directly: point it at the file with the
+`path` key of the `[star_catalog]` section in a scene TOML. There is no
+separate binary-conversion step.
 
 ## Dependencies
 
