@@ -39,6 +39,8 @@ chromaticity, so the disc holds its colour instead of washing to white). Same
 camera and star field in both; only the disc temperature differs
 (recipes: `images/schwarzschild-disc-stars-yellow-1920x1080-2026-09-23.toml`,
 `images/schwarzschild-disc-stars-blue-1920x1080-2026-09-23.toml`; exposure 86).
+An HDR (Rec.2100 PQ) AVIF sits beside each PNG (`*-hdr.avif`) for display on HDR
+screens, where the disc glows brighter than white.
 
 <div align="center">
   <img src="schwarzschild-disc-stars-yellow-1920x1080-2026-09-23.png" alt="A warm 4500 K blackbody accretion disc lensed around a Schwarzschild black hole over the Gaia star field">
