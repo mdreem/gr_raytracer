@@ -2,18 +2,6 @@
 
 [← Back to the gallery index](images.md)
 
-### Checkerboard Accretion Disk
-<div align="center">
-  <img src="render_schwarzschild_checker_texture.png" alt="Schwarzschild black hole with a checkerboard accretion disk showing gravitational lensing effects">
-  <p>Schwarzschild black hole with a checkerboard accretion disk showing gravitational lensing effects</p>
-</div>
-
-### Volumetric Rendering
-<div align="center">
-  <img src="render_schwarzschild_volumetric.png" alt="Schwarzschild black hole visualization with volumetric light disc effects">
-  <p>Schwarzschild black hole visualization with volumetric disc (background image: <a href="https://commons.wikimedia.org/wiki/File:NGC6355_-_HST_-_Potw2301a.jpg">NGC 6355</a>)</p>
-</div>
-
 ### Gaia star field
 
 A Schwarzschild black hole lensing the real Gaia DR3 catalogue (G &le; 12) as
@@ -36,6 +24,18 @@ same grade and exposure).
 <div align="center">
   <img src="gaia-mag12-schwarzschild-no-disc-discview-1920x1080-2026-09-23.png" alt="The Gaia DR3 star field lensed by a Schwarzschild black hole, seen from the accretion-disc vantage point">
   <p>Same catalogue from the disc images' vantage: the sky patch here is the one the disc renders below sit in front of.</p>
+</div>
+
+### Checkerboard Accretion Disk
+<div align="center">
+  <img src="render_schwarzschild_checker_texture.png" alt="Schwarzschild black hole with a checkerboard accretion disk showing gravitational lensing effects">
+  <p>Schwarzschild black hole with a checkerboard accretion disk showing gravitational lensing effects</p>
+</div>
+
+### Volumetric Rendering
+<div align="center">
+  <img src="render_schwarzschild_volumetric.png" alt="Schwarzschild black hole visualization with volumetric light disc effects">
+  <p>Schwarzschild black hole visualization with volumetric disc (background image: <a href="https://commons.wikimedia.org/wiki/File:NGC6355_-_HST_-_Potw2301a.jpg">NGC 6355</a>)</p>
 </div>
 
 ### Accretion disc over the Gaia star field
