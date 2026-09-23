@@ -39,8 +39,9 @@ chromaticity, so the disc holds its colour instead of washing to white). Same
 camera and star field in both; only the disc temperature differs
 (recipes: `images/schwarzschild-disc-stars-yellow-1920x1080-2026-09-23.toml`,
 `images/schwarzschild-disc-stars-blue-1920x1080-2026-09-23.toml`; exposure 86).
-An HDR (Rec.2100 PQ) AVIF sits beside each PNG (`*-hdr.avif`) for display on HDR
-screens, where the disc glows brighter than white.
+An HDR gain-map JPEG sits beside each PNG (`*-hdr.jpg`): an ordinary SDR JPEG
+carrying a hidden gain map, so it shows the SDR image everywhere and brightens
+the disc past white on an HDR screen (built with the macOS CoreImage HDR API).
 
 <div align="center">
   <img src="schwarzschild-disc-stars-yellow-1920x1080-2026-09-23.png" alt="A warm 4500 K blackbody accretion disc lensed around a Schwarzschild black hole over the Gaia star field">
@@ -64,17 +65,18 @@ into the star field's range so one exposure holds both. Graded from linear HDR
 with bloom + ACES (recipes:
 `images/schwarzschild-voldisc-stars-yellow-1920x1080-2026-09-23.toml`,
 `images/schwarzschild-voldisc-stars-blue-1920x1080-2026-09-23.toml`). An HDR
-(Rec.2100 PQ) AVIF sits beside each PNG for display on HDR screens, where the
-disc glows brighter than white.
+gain-map JPEG (`*-hdr.jpg`) sits beside each PNG: an ordinary SDR JPEG carrying a
+hidden gain map, so it shows SDR everywhere and brightens the disc past white on
+an HDR screen.
 
 <div align="center">
   <img src="schwarzschild-voldisc-stars-yellow-1920x1080-2026-09-23.png" alt="A warm volumetric blackbody accretion disc around a Schwarzschild black hole over the Gaia star field">
-  <p>Warm volumetric disc (4500 K). HDR version: <code>schwarzschild-voldisc-stars-yellow-1920x1080-2026-09-23-hdr.avif</code>.</p>
+  <p>Warm volumetric disc (4500 K). HDR version: <code>schwarzschild-voldisc-stars-yellow-1920x1080-2026-09-23-hdr.jpg</code>.</p>
 </div>
 
 <div align="center">
   <img src="schwarzschild-voldisc-stars-blue-1920x1080-2026-09-23.png" alt="A hot blue-white volumetric blackbody accretion disc around a Schwarzschild black hole over the Gaia star field">
-  <p>Hot volumetric disc (15000 K, blue-white). HDR version: <code>schwarzschild-voldisc-stars-blue-1920x1080-2026-09-23-hdr.avif</code>.</p>
+  <p>Hot volumetric disc (15000 K, blue-white). HDR version: <code>schwarzschild-voldisc-stars-blue-1920x1080-2026-09-23-hdr.jpg</code>.</p>
 </div>
 
 ### Close vantages
