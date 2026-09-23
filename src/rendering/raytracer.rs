@@ -290,13 +290,6 @@ fn finite_tube_flux(color: Vector3<f64>) -> Result<Vector3<f64>, RaytracerError>
     }
 }
 
-/// Experimental curved-boundary star membership, gated by the
-/// CURVED_MEMBERSHIP env var so it can be A/B'd against the flat-quad path.
-fn curved_membership_enabled() -> bool {
-    static FLAG: std::sync::OnceLock<bool> = std::sync::OnceLock::new();
-    *FLAG.get_or_init(|| std::env::var_os("CURVED_MEMBERSHIP").is_some())
-}
-
 /// Angular flatness tolerance (radians) for refining a tube edge into a polyline
 /// that follows the true sky arc: refine an edge segment while its traced
 /// midpoint deviates from the straight chord by more than this.
@@ -433,7 +426,7 @@ impl<'a, G: Geometry> Raytracer<'a, G> {
                     .get_cartesian_vector(&sample_tube.d.ray.position)
                     .normalize();
 
-                if curved_membership_enabled() {
+                if self.scene.curved_star_membership {
                     return finite_tube_flux(self.gather_curved(
                         sample_tube, &a, &b, &c, &d, &o_a, &o_b, &o_c, &o_d, depth,
                     )?);

@@ -50,6 +50,17 @@ pub struct GlobalOpts {
     /// Sampling-mask color as comma-separated 8-bit sRGB values.
     #[arg(long, default_value = "255,0,255", value_name = "R,G,B")]
     pub sampling_mask_color: Color,
+    /// Gather catalogue stars against a curved, arc-following tube boundary
+    /// instead of the flat-quad corners, which fills gaps in the lensed star
+    /// ring. Experimental; costs more near the critical curve.
+    #[arg(long)]
+    pub curved_star_membership: bool,
+    /// Rotate the spherical coordinate frame by this many degrees (about the
+    /// x-axis) to steer the polar-axis singularity off the field of view.
+    /// 0 (default) is the identity. Schwarzschild-family scenes only; a flat
+    /// disc is misplaced under a nonzero value (its plane test is not rotated).
+    #[arg(long, default_value = "0.0")]
+    pub pole_rotation_deg: f64,
 }
 
 #[derive(Parser)]

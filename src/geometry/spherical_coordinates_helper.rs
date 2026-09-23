@@ -2,21 +2,22 @@ use crate::geometry::point::{CoordinateSystem, Point};
 use log::trace;
 use std::sync::OnceLock;
 
+static FRAME_ROTATION_DEG: OnceLock<f64> = OnceLock::new();
+
+/// Set the coordinate-frame rotation (degrees, about the x-axis) once, before
+/// rendering, from the `--pole-rotation-deg` CLI flag. A later call is ignored.
+pub fn set_frame_rotation_deg(deg: f64) {
+    let _ = FRAME_ROTATION_DEG.set(deg);
+}
+
 /// Fixed rotation (degrees, about the x-axis) inserted between physical
 /// Cartesian space and the integration's spherical frame, so the coordinate
 /// pole (theta = 0/pi, where 1/sin(theta) blows up) can be steered off the
 /// field of view. 0 (the default) is the identity and leaves every render
-/// byte-identical; set POLE_ROT_DEG to move the pole. Schwarzschild is
-/// spherically symmetric, so this cannot change the physics, only where the
-/// coordinate singularity sits.
+/// byte-identical. Schwarzschild is spherically symmetric, so this cannot
+/// change the physics, only where the coordinate singularity sits.
 pub fn frame_rotation_deg() -> f64 {
-    static DEG: OnceLock<f64> = OnceLock::new();
-    *DEG.get_or_init(|| {
-        std::env::var("POLE_ROT_DEG")
-            .ok()
-            .and_then(|s| s.parse().ok())
-            .unwrap_or(0.0)
-    })
+    *FRAME_ROTATION_DEG.get_or_init(|| 0.0)
 }
 
 /// Rotate the spatial vector `(x, y, z)` about the x-axis by `deg` degrees.
