@@ -47,6 +47,12 @@ pub struct StarCatalogConfig {
     /// rays are reported as render errors.
     #[serde(default = "default_max_subdivision_depth")]
     pub max_subdivision_depth: usize,
+    /// Gather stars against a curved, arc-following tube boundary instead of
+    /// the flat-quad corners, which fills gaps in the lensed star ring. Costs
+    /// more near the critical curve, so it is opt-in for ring-heavy scenes. The
+    /// `--curved-star-membership` CLI flag forces it on regardless of this.
+    #[serde(default)]
+    pub curved_star_membership: bool,
 }
 
 fn default_star_flux_scale() -> f64 {

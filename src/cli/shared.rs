@@ -185,8 +185,13 @@ pub fn create_scene<G: Geometry>(
     };
 
     // Load the  Gaia star catalogue.
-    let (star_catalog, star_flux_scale, winding_spread_threshold, max_subdivision_depth) =
-        match config.star_catalog {
+    let (
+        star_catalog,
+        star_flux_scale,
+        winding_spread_threshold,
+        max_subdivision_depth,
+        curved_star_membership_config,
+    ) = match config.star_catalog {
             Some(catalog_config) => {
                 let catalog = StarCatalog::load_parquet(&catalog_config.path).map_err(|error| {
                     RaytracerError::InvalidConfiguration(format!(
@@ -204,9 +209,10 @@ pub fn create_scene<G: Geometry>(
                     catalog_config.flux_scale,
                     catalog_config.winding_spread_threshold,
                     catalog_config.max_subdivision_depth,
+                    catalog_config.curved_star_membership,
                 )
             }
-            None => (None, 1.0, std::f64::consts::PI, 6),
+            None => (None, 1.0, std::f64::consts::PI, 6, false),
         };
 
     let mut objects = Objects::new(geometry);
@@ -379,7 +385,8 @@ pub fn create_scene<G: Geometry>(
         winding_spread_threshold,
         max_subdivision_depth,
     );
-    scene.curved_star_membership = opts.curved_star_membership;
+    // Enabled by either the per-scene TOML flag or the CLI override.
+    scene.curved_star_membership = opts.curved_star_membership || curved_star_membership_config;
     Ok(scene)
 }
 

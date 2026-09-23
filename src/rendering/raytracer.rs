@@ -719,35 +719,39 @@ impl<'a, G: Geometry> Raytracer<'a, G> {
         }
         // Retain the current center-to-center base footprints. Moving them
         // to pixel boundaries is separate from fixing recursive subdivision.
-        let mut tubes = 0usize;
-        let mut skipped = 0usize;
-        for row in 0..height.saturating_sub(1) {
-            for col in 0..width.saturating_sub(1) {
-                if let Some(tube) =
-                    SampleTube::from_buffer(buffer, row as u32, col as u32, width as u32)
-                {
-                    tubes += 1;
-                    let idx = row * width + col;
-                    // Skip a tube whose gather fails rather than aborting the whole
-                    // section; it just contributes no star flux.
-                    match self.handle_tube(&tube) {
-                        Ok(stars) => {
-                            // Star layer goes UNDER the foreground, weighted by
-                            // the foreground's surviving transmittance.
-                            colors[idx] =
-                                colors[idx].over(Radiance::new(stars.x, stars.y, stars.z, 0.0));
-                        }
-                        Err(err) => {
-                            skipped += 1;
-                            debug!(
-                                "Skipping star gather for {:?}: {}",
-                                tube.screen_bounds, err
-                            );
-                        }
+        // Each tube writes only its own pixel and reads the shared buffer, so
+        // the gather parallelizes over pixels like the geodesic pass. This
+        // matters most for the curved-membership path, whose per-tube cost near
+        // the critical curve would otherwise pin one core.
+        let tubes = AtomicUsize::new(0);
+        let skipped = AtomicUsize::new(0);
+        colors.par_iter_mut().enumerate().for_each(|(idx, color)| {
+            let (row, col) = (idx / width, idx % width);
+            // The base tube spans (row, col)..(row+1, col+1); the last row and
+            // column own no tube and keep their foreground colour.
+            if row + 1 >= height || col + 1 >= width {
+                return;
+            }
+            if let Some(tube) = SampleTube::from_buffer(buffer, row as u32, col as u32, width as u32)
+            {
+                tubes.fetch_add(1, Ordering::Relaxed);
+                // Skip a tube whose gather fails rather than aborting the whole
+                // section; it just contributes no star flux.
+                match self.handle_tube(&tube) {
+                    Ok(stars) => {
+                        // Star layer goes UNDER the foreground, weighted by the
+                        // foreground's surviving transmittance.
+                        *color = color.over(Radiance::new(stars.x, stars.y, stars.z, 0.0));
+                    }
+                    Err(err) => {
+                        skipped.fetch_add(1, Ordering::Relaxed);
+                        debug!("Skipping star gather for {:?}: {}", tube.screen_bounds, err);
                     }
                 }
             }
-        }
+        });
+        let tubes = tubes.into_inner();
+        let skipped = skipped.into_inner();
         if skipped > 0 {
             warn!(
                 "Star gather skipped {} of {} tubes ({:.2}%) in this section; \
