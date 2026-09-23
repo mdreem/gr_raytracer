@@ -25,7 +25,17 @@ exposure 86).
 
 <div align="center">
   <img src="gaia-mag12-schwarzschild-no-disc-1920x1080-2026-09-21.png" alt="A Schwarzschild black hole gravitationally lensing the real Gaia DR3 star field">
-  <p>Gaia DR3 stars (G &le; 12) lensed by a Schwarzschild black hole; 1920&times;1080 HDR, bloom + ACES.</p>
+  <p>Gaia DR3 stars (G &le; 12) lensed by a Schwarzschild black hole, viewed edge-on from the &minus;x axis; 1920&times;1080 HDR, bloom + ACES.</p>
+</div>
+
+The same star field from the vantage the disc images use (camera `0,-24,6.5`,
+looking back at the hole), so the lensed sky patch matches those below (recipe:
+`images/gaia-mag12-schwarzschild-no-disc-discview-1920x1080-2026-09-23.toml`;
+same grade and exposure).
+
+<div align="center">
+  <img src="gaia-mag12-schwarzschild-no-disc-discview-1920x1080-2026-09-23.png" alt="The Gaia DR3 star field lensed by a Schwarzschild black hole, seen from the accretion-disc vantage point">
+  <p>Same catalogue from the disc images' vantage: the sky patch here is the one the disc renders below sit in front of.</p>
 </div>
 
 ### Accretion disc over the Gaia star field
