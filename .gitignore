@@ -34,3 +34,6 @@ __pycache__/
 # build/run can rely on data/ existing, but ignore its generated contents.
 /data/*
 !/data/README.md
+
+# Local design notes and future-work scratch (not committed)
+future-work-and-notes/
