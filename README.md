@@ -93,6 +93,32 @@ inspect which pixels the adaptive pass selects, add
 `--show-sampling-mask`. The default mask color is magenta and can be changed
 with an 8-bit sRGB value such as `--sampling-mask-color=255,128,0`.
 
+### Star catalogue (lensed point-source stars)
+
+A scene can render the real Gaia DR3 catalogue as gravitationally lensed
+point-source stars through a `[star_catalog]` section (fetch the Parquet with
+`scripts/gaia/download.py`):
+
+```toml
+[star_catalog]
+path = "data/gaia_mag12.parquet"
+flux_scale = 3.0                # linear multiplier on the summed star flux
+# Optional, for the lensed ring:
+curved_star_membership = false  # gather against arc-following tube boundaries
+                                # instead of the flat corners; fills gaps in the
+                                # lensed ring, costs more near the critical curve
+magnification_cap = 50.0        # clamp the lensing magnification A/B to bound
+                                # caustic fireflies on the ring (omit for no cap)
+```
+
+Two CLI flags override or complement the scene:
+
+- `--curved-star-membership` forces curved membership on regardless of the config.
+- `--pole-rotation-deg <deg>` rotates the spherical coordinate frame (default `0`,
+  a no-op) so the polar-axis coordinate singularity is steered off the field of
+  view. Schwarzschild-family scenes only; keep it `0` for scenes with a flat disc
+  (its plane test is not rotated).
+
 ## Scripts
 
 This repository includes helper scripts for rendering workflows, ray export, plotting, and animation.
