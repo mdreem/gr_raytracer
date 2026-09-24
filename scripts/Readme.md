@@ -191,8 +191,8 @@ uv run scripts/textures/create_uv_map.py
 
 - Downloads a magnitude-limited subset of the Gaia DR3 catalogue
   (`gaiadr3.gaia_source`) via ESA's async TAP/ADQL service and writes it as a
-  typed Zstandard-compressed Parquet file (stage 1 of
-  `docs/plan-12-star-catalog.md`).
+  typed Zstandard-compressed Parquet file that the renderer loads through a
+  scene's `[star_catalog]` section.
 - Depends on the opt-in `gaia` dependency group (`astroquery`, `astropy`,
   `pyarrow`), so it is run with `--group gaia`.
 - Generated catalogue files land in `data/` and are git-ignored.

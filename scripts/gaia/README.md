@@ -1,8 +1,8 @@
 # Gaia DR3 star-catalogue helper
 
 Query ESA's Gaia TAP/ADQL service server-side and save a magnitude-limited
-subset locally as a typed Parquet file (see `docs/plan-12-star-catalog.md`).
-Only the requested subset is downloaded, not the Gaia bulk archive.
+subset locally as a typed Parquet file. Only the requested subset is
+downloaded, not the Gaia bulk archive.
 
 The renderer loads this Parquet file directly: point it at the file with the
 `path` key of the `[star_catalog]` section in a scene TOML. There is no

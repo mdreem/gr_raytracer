@@ -7,7 +7,7 @@ git-ignored and must not be committed (see the repo `.gitignore`).
 
 ## Gaia DR3 star catalogue
 
-The star-catalog helper (`docs/plan-12-star-catalog.md`) writes its Parquet
+The star-catalogue helper (`scripts/gaia/download.py`) writes its Parquet
 download here by default:
 
 ```sh
