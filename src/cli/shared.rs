@@ -191,6 +191,7 @@ pub fn create_scene<G: Geometry>(
         winding_spread_threshold,
         max_subdivision_depth,
         curved_star_membership_config,
+        magnification_cap_config,
     ) = match config.star_catalog {
             Some(catalog_config) => {
                 let catalog = StarCatalog::load_parquet(&catalog_config.path).map_err(|error| {
@@ -210,9 +211,10 @@ pub fn create_scene<G: Geometry>(
                     catalog_config.winding_spread_threshold,
                     catalog_config.max_subdivision_depth,
                     catalog_config.curved_star_membership,
+                    catalog_config.magnification_cap,
                 )
             }
-            None => (None, 1.0, std::f64::consts::PI, 6, false),
+            None => (None, 1.0, std::f64::consts::PI, 6, false, None),
         };
 
     let mut objects = Objects::new(geometry);
@@ -387,6 +389,7 @@ pub fn create_scene<G: Geometry>(
     );
     // Enabled by either the per-scene TOML flag or the CLI override.
     scene.curved_star_membership = opts.curved_star_membership || curved_star_membership_config;
+    scene.star_magnification_cap = magnification_cap_config.unwrap_or(f64::INFINITY);
     Ok(scene)
 }
 
