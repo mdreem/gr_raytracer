@@ -104,16 +104,18 @@ echo "started $(date -u +%FT%TZ), args=${RENDER_ARGS}, $(nproc) vCPU, pod ${RUNP
 # Heartbeat: overwrite jobs/$JOB/progress with elapsed seconds every 30s while
 # rendering. The renderer's indicatif progress bar only draws on a TTY, so on a
 # headless pod this is how `status` sees the job is alive and how long it has run.
+: > render.log
 ( t0=$(date +%s); while :; do sleep 30; \
-    echo "rendering, elapsed $(( $(date +%s) - t0 ))s" \
+    line="$(grep 'progress:' render.log | tail -1)"; \
+    echo "elapsed $(( $(date +%s) - t0 ))s${line:+ | ${line}}" \
     | rclone rcat "b2:${B2_BUCKET}/jobs/${JOB}/progress"; done ) & HB=$!
 set +e
-RAYON_NUM_THREADS="$(nproc)" ./gr_raytracer ${RENDER_ARGS} --config-file scene.toml render --filename out.hdr
+RAYON_NUM_THREADS="$(nproc)" RUST_LOG=off ./gr_raytracer ${RENDER_ARGS} --config-file scene.toml render --filename "${OUT}" 2> render.log
 rc=$?
 set -e
 kill "$HB" 2>/dev/null || true
-if [ $rc -eq 0 ] && [ -f out.hdr ]; then
-  rclone copyto out.hdr "b2:${B2_BUCKET}/jobs/${JOB}/out.hdr"
+if [ $rc -eq 0 ] && [ -f "${OUT}" ]; then
+  rclone copyto "${OUT}" "b2:${B2_BUCKET}/jobs/${JOB}/${OUT}"
   echo "done $(date -u +%FT%TZ)" | rclone rcat "b2:${B2_BUCKET}/jobs/${JOB}/DONE"
 else
   echo "render failed rc=$rc" | rclone rcat "b2:${B2_BUCKET}/jobs/${JOB}/FAILED"
@@ -137,8 +139,9 @@ cmd_render() {  # render <job> <scene.toml> <gr_raytracer args...>
   env_json=$(jq -n \
     --arg JOB "$job" --arg RENDER_ARGS "$render_args" --arg B2_BUCKET "$B2_BUCKET" \
     --arg PARQUET "$PARQUET" --arg RUNPOD_API_KEY "$RUNPOD_API_KEY" \
+    --arg OUT "${OUT:-out.hdr}" \
     --arg T "$RCLONE_CONFIG_B2_TYPE" --arg A "$RCLONE_CONFIG_B2_ACCOUNT" --arg K "$RCLONE_CONFIG_B2_KEY" \
-    '{JOB:$JOB, RENDER_ARGS:$RENDER_ARGS, B2_BUCKET:$B2_BUCKET, PARQUET:$PARQUET,
+    '{JOB:$JOB, RENDER_ARGS:$RENDER_ARGS, B2_BUCKET:$B2_BUCKET, PARQUET:$PARQUET, OUT:$OUT,
       RUNPOD_API_KEY:$RUNPOD_API_KEY,
       RCLONE_CONFIG_B2_TYPE:$T, RCLONE_CONFIG_B2_ACCOUNT:$A, RCLONE_CONFIG_B2_KEY:$K}')
 
@@ -158,20 +161,23 @@ cmd_render() {  # render <job> <scene.toml> <gr_raytracer args...>
   echo "Creating CPU pod..."
   local resp; resp=$(rp POST "/pods" "$body")
   echo "$resp" | jq . 2>/dev/null || echo "$resp"
-  echo "Pod launching. It will render, push to b2:$B2_BUCKET/jobs/$job/out.hdr, and self-terminate."
+  echo "Pod launching. It will render, push to b2:$B2_BUCKET/jobs/$job/${OUT:-out.hdr}, and self-terminate."
   echo "Fetch when ready:  $0 fetch $job"
 }
 
-cmd_fetch() {  # fetch <job> [local-out.hdr]
+cmd_fetch() {  # fetch <job> [local-name] : downloads whatever out.* the pod wrote
   load_env
-  local job="$1" out="${2:-out_${1}.hdr}"
+  local job="$1"
   if b2_has "$job" FAILED; then
     echo "job $job FAILED on the pod; check its logs. FAILED marker present."; exit 1
   fi
   if ! b2_has "$job" DONE; then
     echo "not done yet (no DONE marker). Re-run later."; exit 2
   fi
-  rclone copyto "b2:$B2_BUCKET/jobs/$job/out.hdr" "$out" -P
+  local remote; remote=$(rclone lsf "b2:$B2_BUCKET/jobs/$job/" 2>/dev/null | grep -E '^out\.' | head -1)
+  [ -n "$remote" ] || { echo "DONE but no out.* found in jobs/$job/"; exit 1; }
+  local out="${2:-${job}_${remote}}"
+  rclone copyto "b2:$B2_BUCKET/jobs/$job/$remote" "$out" -P
   echo "Fetched -> $out"
 }
 
