@@ -434,7 +434,7 @@ impl<'a, G: Geometry> Raytracer<'a, G> {
 
                 let original_angle = compute_solid_angle(&o_a, &o_b, &o_c, &o_d)?;
                 let solid_angle = compute_traced_tube_solid_angle(&a, &b, &c, &d)?;
-                let ratio = original_angle / solid_angle;
+                let ratio = self.magnification(original_angle, solid_angle);
                 if !ratio.is_finite() || ratio <= 0.0 {
                     return Err(RaytracerError::InvalidStarTube("invalid magnification"));
                 }
@@ -466,6 +466,13 @@ impl<'a, G: Geometry> Raytracer<'a, G> {
             }
         };
         finite_tube_flux(color)
+    }
+
+    /// Lensing magnification `A/B` of a tube (screen solid angle over footprint
+    /// solid angle), clamped to `star_magnification_cap`. The clamp bounds the
+    /// caustic blow-up where `B` collapses toward zero.
+    fn magnification(&self, original_angle: f64, footprint: f64) -> f64 {
+        (original_angle / footprint).min(self.scene.star_magnification_cap)
     }
 
     fn compute_star_collection_data(
@@ -564,7 +571,7 @@ impl<'a, G: Geometry> Raytracer<'a, G> {
                     return self.flat_gather(a, b, c, d, original_angle);
                 }
                 if footprint > 0.0 && footprint.is_finite() {
-                    return Ok((original_angle / footprint) * flux);
+                    return Ok(self.magnification(original_angle, footprint) * flux);
                 }
                 Ok(Vector3::zeros())
             }
@@ -699,7 +706,7 @@ impl<'a, G: Geometry> Raytracer<'a, G> {
         original_angle: f64,
     ) -> Result<Vector3<f64>, RaytracerError> {
         let solid_angle = compute_traced_tube_solid_angle(a, b, c, d)?;
-        let ratio = original_angle / solid_angle;
+        let ratio = self.magnification(original_angle, solid_angle);
         if !ratio.is_finite() || ratio <= 0.0 {
             return Err(RaytracerError::InvalidStarTube("invalid magnification"));
         }

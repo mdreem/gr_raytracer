@@ -84,6 +84,10 @@ pub struct Scene<'a, G: Geometry> {
     /// Gather stars against a curved (arc-following) tube boundary instead of
     /// the flat-quad corners. Experimental; fills lensed-ring gaps.
     pub curved_star_membership: bool,
+    /// Upper bound on a tube's lensing magnification `A/B`. Near a caustic the
+    /// footprint `B` collapses and the ratio blows up (resolution-dependent
+    /// fireflies at the ring); clamping bounds it. `f64::INFINITY` = unbounded.
+    pub star_magnification_cap: f64,
     /// Blackbody colour LUT for re-tinting stars at their redshifted
     /// temperature `g * T` in the gather. Present iff a star catalogue is.
     pub star_blackbody: Option<BlackBodyMapper>,
@@ -161,6 +165,7 @@ impl<'a, G: Geometry> Scene<'a, G> {
             winding_spread_threshold: std::f64::consts::PI,
             max_subdivision_depth: 6,
             curved_star_membership: false,
+            star_magnification_cap: f64::INFINITY,
             star_blackbody: None,
         }
     }

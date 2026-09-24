@@ -53,6 +53,12 @@ pub struct StarCatalogConfig {
     /// `--curved-star-membership` CLI flag forces it on regardless of this.
     #[serde(default)]
     pub curved_star_membership: bool,
+    /// Optional upper bound on a tube's lensing magnification `A/B`. Near a
+    /// caustic (the photon/Einstein ring) the footprint collapses and the ratio
+    /// blows up into resolution-dependent fireflies; a cap bounds it. Omit for
+    /// no cap.
+    #[serde(default)]
+    pub magnification_cap: Option<f64>,
 }
 
 fn default_star_flux_scale() -> f64 {
