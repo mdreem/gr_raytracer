@@ -94,14 +94,19 @@ def read_image(path):
 
 
 def gaussian_blur(a, sigma):
-    """Separable Gaussian via an FFT (cheap at these radii, wraps at the edges)."""
+    """Gaussian blur via an FFT, zero-padded to twice the size so the circular
+    convolution does not wrap a bright source across the opposite edge (which
+    otherwise shows up as horizontal/vertical streaks off a very bright core)."""
     h, w = a.shape[:2]
-    fy = np.fft.fftfreq(h)[:, None]
-    fx = np.fft.fftfreq(w)[None, :]
+    ph, pw = 2 * h, 2 * w
+    fy = np.fft.fftfreq(ph)[:, None]
+    fx = np.fft.fftfreq(pw)[None, :]
     kernel = np.exp(-2 * np.pi ** 2 * sigma ** 2 * (fx ** 2 + fy ** 2))
     out = np.empty_like(a)
     for c in range(3):
-        out[..., c] = np.fft.ifft2(np.fft.fft2(a[..., c]) * kernel).real
+        padded = np.zeros((ph, pw))
+        padded[:h, :w] = a[..., c]
+        out[..., c] = np.fft.ifft2(np.fft.fft2(padded) * kernel).real[:h, :w]
     return out
 
 
@@ -111,14 +116,33 @@ def aces(x):
     return np.clip((x * (a * x + b)) / (x * (c * x + d) + e), 0.0, 1.0)
 
 
-def grade(img, exposure, bloom_strength, threshold):
-    img = img * exposure
+# Cap the bloom source at this multiple of white, so a single very bright core
+# (a hot disc pixel can be 10^6x the sky) cannot dump unbounded energy into the
+# blur and swamp the frame. Highlights still bloom, just not without limit.
+BLOOM_SOURCE_CAP = 8.0
+
+
+def grade(img, exposure, bloom_strength, threshold, white=None):
+    # Normalize to a white point BEFORE anything else, so the bloom threshold and
+    # the ACES knee are relative to the scene's own brightness, not its absolute
+    # radiance scale. A raw disc render peaks in the millions; the gallery HDRs
+    # were near unity. Auto white = a high luminance percentile (the disc level,
+    # not the single brightest firefly). Exposure is then the user's knob on top.
+    lum = (img * LUMA).sum(2)
+    if white is None:
+        white = float(np.percentile(lum, 99.0))
+    if not (white > 0.0):
+        white = 1.0
+    img = img / white * exposure
+
     if bloom_strength > 0.0:
-        lum = img.sum(2, keepdims=True) / 3.0
-        bright = img * np.clip((lum - threshold) / threshold, 0.0, 1.0)
+        lum = (img * LUMA).sum(2, keepdims=True)
+        source = np.minimum(img, BLOOM_SOURCE_CAP)
+        bright = source * np.clip((lum - threshold) / threshold, 0.0, 1.0)
         s = img.shape[1] / 1600.0
         bloom = sum(w * gaussian_blur(bright, sigma * s) for sigma, w in BLOOM_SCALES)
         img = img + bloom_strength * bloom
+
     lum = (img * LUMA).sum(2)
     # Luminance-preserving ACES: map luminance through the curve, scale RGB by
     # the same factor so chromaticity is untouched. Divide only where lum > 0.
@@ -131,15 +155,18 @@ def main():
     ap = argparse.ArgumentParser(description="Grade a linear HDR to PNG (bloom + ACES).")
     ap.add_argument("input", help="linear .hdr (Radiance) or .pfm")
     ap.add_argument("output", help="output .png")
-    ap.add_argument("--exposure", type=float, default=1.0, help="linear pre-scale")
+    ap.add_argument("--exposure", type=float, default=1.0,
+                    help="brightness on top of the white-point normalization (1 puts the disc near white)")
+    ap.add_argument("--white", type=float, default=None,
+                    help="white point in linear units (default: auto, the 99th luminance percentile)")
     ap.add_argument("--bloom", type=float, default=0.7, help="bloom strength (0 disables)")
-    ap.add_argument("--threshold", type=float, default=0.12, help="bloom luminance threshold")
+    ap.add_argument("--threshold", type=float, default=0.12, help="bloom luminance threshold (relative to white)")
     ap.add_argument("--no-bloom", action="store_true", help="skip bloom entirely")
     args = ap.parse_args()
 
     img = read_image(args.input)
     strength = 0.0 if args.no_bloom else args.bloom
-    out = grade(img, args.exposure, strength, args.threshold)
+    out = grade(img, args.exposure, strength, args.threshold, args.white)
     Image.fromarray(out).save(args.output)
     print(f"wrote {args.output} ({out.shape[1]}x{out.shape[0]})")
 
