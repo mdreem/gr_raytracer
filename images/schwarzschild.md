@@ -26,18 +26,6 @@ same grade and exposure).
   <p>Same catalogue from the disc images' vantage: the sky patch here is the one the disc renders below sit in front of.</p>
 </div>
 
-### Checkerboard Accretion Disk
-<div align="center">
-  <img src="render_schwarzschild_checker_texture.png" alt="Schwarzschild black hole with a checkerboard accretion disk showing gravitational lensing effects">
-  <p>Schwarzschild black hole with a checkerboard accretion disk showing gravitational lensing effects</p>
-</div>
-
-### Volumetric Rendering
-<div align="center">
-  <img src="render_schwarzschild_volumetric.png" alt="Schwarzschild black hole visualization with volumetric light disc effects">
-  <p>Schwarzschild black hole visualization with volumetric disc (background image: <a href="https://commons.wikimedia.org/wiki/File:NGC6355_-_HST_-_Potw2301a.jpg">NGC 6355</a>)</p>
-</div>
-
 ### Accretion disc over the Gaia star field
 
 A flat Novikov-Thorne blackbody accretion disc rendered together with the real
@@ -88,6 +76,18 @@ an HDR screen.
 <div align="center">
   <img src="schwarzschild-voldisc-stars-blue-1920x1080-2026-09-23.png" alt="A hot blue-white volumetric blackbody accretion disc around a Schwarzschild black hole over the Gaia star field">
   <p>Hot volumetric disc (15000 K, blue-white). HDR version: <code>schwarzschild-voldisc-stars-blue-1920x1080-2026-09-23-hdr.jpg</code>.</p>
+</div>
+
+### Checkerboard Accretion Disk
+<div align="center">
+  <img src="render_schwarzschild_checker_texture.png" alt="Schwarzschild black hole with a checkerboard accretion disk showing gravitational lensing effects">
+  <p>Schwarzschild black hole with a checkerboard accretion disk showing gravitational lensing effects</p>
+</div>
+
+### Volumetric Rendering
+<div align="center">
+  <img src="render_schwarzschild_volumetric.png" alt="Schwarzschild black hole visualization with volumetric light disc effects">
+  <p>Schwarzschild black hole visualization with volumetric disc (background image: <a href="https://commons.wikimedia.org/wiki/File:NGC6355_-_HST_-_Potw2301a.jpg">NGC 6355</a>)</p>
 </div>
 
 ### Close vantages
