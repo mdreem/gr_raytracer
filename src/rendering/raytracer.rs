@@ -23,7 +23,9 @@ use rayon::iter::IntoParallelRefMutIterator;
 use rayon::iter::ParallelIterator;
 use std::io;
 use std::ops::{Add, Mul};
-use std::sync::atomic::{AtomicUsize, Ordering};
+use std::io::IsTerminal;
+use std::sync::atomic::{AtomicU64, AtomicUsize, Ordering};
+use indicatif::{ProgressBar, ProgressDrawTarget, ProgressStyle};
 
 #[derive(Debug, thiserror::Error)]
 pub enum RaytracerError {
@@ -76,6 +78,72 @@ struct PixelToSample {
     pub row: u32,
     pub col: u32,
     pub result: Option<Radiance>,
+}
+
+/// Render progress that adapts to where it runs: the indicatif bar on an
+/// interactive terminal, and plain `progress: <label> NN% (done/total)` lines
+/// when stderr is not a TTY (e.g. a headless render pod, where indicatif draws
+/// nothing at all). The plain lines use eprintln, not the log crate, so they
+/// are not gated by RUST_LOG.
+struct Progress {
+    bar: ProgressBar,
+    is_tty: bool,
+    total: u64,
+    label: &'static str,
+    last_percent: AtomicU64,
+}
+
+impl Progress {
+    fn new(total: u64, label: &'static str) -> Result<Self, RaytracerError> {
+        let is_tty = io::stderr().is_terminal();
+        let bar = ProgressBar::new(total);
+        if is_tty {
+            bar.set_style(
+                ProgressStyle::with_template("🎨 {spinner:.green} [{elapsed_precise}] [{wide_bar:.blue}] {pos}/{len} ({percent_precise}%, {eta})")
+                    .map_err(RaytracerError::ProgressBarTemplateError)?
+                    .progress_chars("█▇▆▅▄▃▂▁  "),
+            );
+        } else {
+            bar.set_draw_target(ProgressDrawTarget::hidden());
+        }
+        Ok(Self {
+            bar,
+            is_tty,
+            total,
+            label,
+            last_percent: AtomicU64::new(0),
+        })
+    }
+
+    /// Record that `done` units are complete. Safe to call from many threads;
+    /// in the plain path each whole percent is printed at most once.
+    fn set(&self, done: u64) {
+        if self.is_tty {
+            self.bar.set_position(done);
+            return;
+        }
+        if self.total == 0 {
+            return;
+        }
+        let percent = done * 100 / self.total;
+        let prev = self.last_percent.load(Ordering::Relaxed);
+        if percent > prev
+            && self
+                .last_percent
+                .compare_exchange(prev, percent, Ordering::SeqCst, Ordering::Relaxed)
+                .is_ok()
+        {
+            eprintln!("progress: {} {}% ({}/{})", self.label, percent, done, self.total);
+        }
+    }
+
+    fn finish(&self) {
+        if self.is_tty {
+            self.bar.finish();
+        } else {
+            eprintln!("progress: {} 100% ({}/{})", self.label, self.total, self.total);
+        }
+    }
 }
 
 struct StarCollectionData {
@@ -864,15 +932,11 @@ impl<'a, G: Geometry> Raytracer<'a, G> {
             max_count as usize
         ];
 
-        use indicatif::{ProgressBar, ProgressStyle};
-        let pb = ProgressBar::new(max_count as u64);
-        pb.set_style(ProgressStyle::with_template("🎨 {spinner:.green} [{elapsed_precise}] [{wide_bar:.blue}] {pos}/{len} ({percent_precise}%, {eta})")
-            .map_err(RaytracerError::ProgressBarTemplateError)?
-            .progress_chars("█▇▆▅▄▃▂▁  "));
+        let progress = Progress::new(max_count as u64, "render")?;
 
         buffer.par_iter_mut().enumerate().for_each(|(i, p)| {
-            count.fetch_add(1, Ordering::SeqCst);
-            pb.set_position(count.load(Ordering::Relaxed) as u64);
+            let done = count.fetch_add(1, Ordering::SeqCst) + 1;
+            progress.set(done as u64);
 
             let y = i as u32 / (to_col - from_col);
             let x = i as u32 % (to_col - from_col);
@@ -894,7 +958,7 @@ impl<'a, G: Geometry> Raytracer<'a, G> {
                 }
             }
         });
-        pb.finish();
+        progress.finish();
         Ok(buffer)
     }
 
@@ -987,15 +1051,11 @@ impl<'a, G: Geometry> Raytracer<'a, G> {
         info!("Supersampling {} pixels", pixels_to_sample.len());
 
         let count = AtomicUsize::new(0);
-        use indicatif::{ProgressBar, ProgressStyle};
-        let pb = ProgressBar::new(pixels_to_sample.len() as u64);
-        pb.set_style(ProgressStyle::with_template("🎨 {spinner:.green} [{elapsed_precise}] [{wide_bar:.blue}] {pos}/{len} ({percent_precise}%, {eta})")
-            .map_err(RaytracerError::ProgressBarTemplateError)?
-            .progress_chars("█▇▆▅▄▃▂▁  "));
+        let progress = Progress::new(pixels_to_sample.len() as u64, "supersample")?;
 
         pixels_to_sample.par_iter_mut().for_each(|pixel| {
-            count.fetch_add(1, Ordering::SeqCst);
-            pb.set_position(count.load(Ordering::Relaxed) as u64);
+            let done = count.fetch_add(1, Ordering::SeqCst) + 1;
+            progress.set(done as u64);
 
             let mut sample_colors = RadianceMean::default();
             for stratum_row in 0..samples_per_axis {
@@ -1031,7 +1091,7 @@ impl<'a, G: Geometry> Raytracer<'a, G> {
             // failed, leave result = None and keep the base 1-spp colour.
             pixel.result = sample_colors.mean();
         });
-        pb.finish();
+        progress.finish();
 
         Ok(())
     }
