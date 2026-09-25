@@ -15,3 +15,14 @@ dependencies = [
 
 [tool.uv]
 package = false
+
+# Opt-in dependencies for the Gaia DR3 star-catalogue helper
+# (scripts/gaia/). Kept out of the default dependency set so that the
+# heavy astro stack is only pulled in when actually downloading a catalog.
+# Run with:  uv run --group gaia scripts/gaia/download.py download ...
+[dependency-groups]
+gaia = [
+    "astroquery>=0.4.7",
+    "astropy>=6.0",
+    "pyarrow>=15.0",
+]

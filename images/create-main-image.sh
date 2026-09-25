@@ -1,63 +1,73 @@
 #!/usr/bin/env bash
 # Reproduces the README main image (kerr_black_hole_with_stars.png):
-# a near-extremal Kerr black hole (a/M = 0.998) with an ISCO-hugging
-# volumetric accretion disc in front of the M25 open-cluster star field.
+# a near-extremal Kerr black hole (a/M = 0.998; here a = 0.499 with r_s = 1) with
+# an ISCO-hugging volumetric accretion disc in front of the real Gaia DR3 star
+# field, graded with bloom + a luminance-preserving ACES tone map.
 #
-# The star-field background is NOT checked into the repository; this script
-# downloads it from Wikimedia Commons on first use
-# (https://commons.wikimedia.org/wiki/File:Messier_object_025.jpg).
+# The star field is the real Gaia DR3 catalogue (G <= 12). It is NOT checked into
+# the repository; this script downloads it to data/gaia_mag12.parquet on first
+# use via scripts/gaia/download.py.
 #
 # Usage:  images/create-main-image.sh [output.png]
 #   WIDTH/HEIGHT env vars override the resolution (default 1280x720).
-#   TEMPERATURE/EXPOSURE env vars override the peak disc temperature and
-#   exposure (defaults 10000.0 / 2.0); the temperature series in
-#   images/kerr.md is this same recipe at TEMPERATURE=8000 EXPOSURE=5,
-#   TEMPERATURE=12000 EXPOSURE=1, and TEMPERATURE=20000 EXPOSURE=0.13.
+#   TEMPERATURE overrides the peak disc temperature (default 10000.0).
+#   WHITE/EXPOSURE/BLOOM override the grade (defaults 1.2 / 1.0 / 0.12): lower
+#   WHITE lifts the star field but brightens the disc; BLOOM is the glow strength.
 #   Rendering takes roughly half an hour at the default resolution.
 set -euo pipefail
 
 REPO_ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 cd "$REPO_ROOT"
 
-BACKGROUND="resources/tmp/Messier_object_025.jpg"
+CATALOGUE="data/gaia_mag12.parquet"
 OUTPUT="${1:-kerr_black_hole_with_stars.png}"
 WIDTH="${WIDTH:-1280}"
 HEIGHT="${HEIGHT:-720}"
 TEMPERATURE="${TEMPERATURE:-10000.0}"
-EXPOSURE="${EXPOSURE:-2.0}"
+WHITE="${WHITE:-1.2}"
+EXPOSURE="${EXPOSURE:-1.0}"
+BLOOM="${BLOOM:-0.12}"
 
-if [ ! -f "$BACKGROUND" ]; then
-    echo "Downloading M25 star-field background from Wikimedia Commons..."
-    mkdir -p "$(dirname "$BACKGROUND")"
-    curl -L --fail -o "$BACKGROUND" \
-        "https://commons.wikimedia.org/wiki/Special:FilePath/Messier_object_025.jpg"
+if [ ! -f "$CATALOGUE" ]; then
+    echo "Downloading Gaia DR3 (G <= 12) star catalogue to $CATALOGUE ..."
+    uv run --group gaia scripts/gaia/download.py download \
+        --max-magnitude 12 --output "$CATALOGUE"
 fi
 
 SCENE="$(mktemp -t kerr-main-image-XXXXXX).toml"
-trap 'rm -f "$SCENE"' EXIT
+HDR="$SCENE.hdr"
+trap 'rm -f "$SCENE" "$HDR"' EXIT
 
-# Frozen recipe (2026-08-29): scene-definitions/kerr-volumetric-streaky.toml
-# with the inner edge pulled to just outside the prograde ISCO (0.618 r_s at
-# this spin), the star-field background, and the brightness reference chosen
-# so the Reinhard tone mapping does not clip away the Perlin texture. Peak
-# temperature 10000 K with --exposure 2: after the 2026-08 physics fixes
-# (Novikov-Thorne r^-3/4 profile, Kirchhoff emission, geodesic segment
-# marching) the whole disc stays visible at lower temperatures, and 10000 K
-# keeps a golden-orange palette instead of 12000 K's paler gold; the exposure
-# flag compensates the (T/T_ref)^4 brightness drop. The bright side of the
-# disc is the approaching (left) side; renders made before the redshift-sign
-# fix show it mirrored. See images/kerr.md for the temperature series.
+# Frozen recipe: KerrBL a = 0.499 with the volumetric disc inner edge just outside
+# the prograde ISCO. The disc is dimmed (density_multiplier 180, down from the
+# earlier 500) and the star flux scaled up (flux_scale 120) so the real Gaia field
+# reads alongside the disc rather than being washed out. Peak temperature 10000 K
+# keeps a golden-orange palette. The bright side of the disc is the approaching
+# (left) side.
+#
+# The in-engine tone map (Reinhard/GlobalLinear in src/rendering/color.rs) has no
+# bloom, so we render a LINEAR .hdr and grade it with scripts/grade.py, which adds
+# multi-scale bloom and a luminance-preserving ACES filmic curve.
 cat > "$SCENE" <<EOF
 celestial_temperature = 0.0
 
-[celestial_texture.Bitmap]
-beaming_exponent = 3.0
-path = "resources/tmp/Messier_object_025.jpg"
+[adaptive_sampling]
+enabled = true
+samples_per_axis = 2
+minimum_luminance = 0.0
+
+[celestial_texture.BlackBody]
+beaming_exponent = 0.0
 
 [geometry_type.KerrBL]
 radius = 1.0
 a = 0.499
 horizon_epsilon = 1e-4
+
+[star_catalog]
+path = "$CATALOGUE"
+flux_scale = 120.0
+max_subdivision_depth = 6
 
 [[objects]]
 
@@ -69,7 +79,7 @@ num_octaves = 8
 max_steps = 50000
 step_size = 0.0002
 thickness = 0.03
-density_multiplier = 500.0
+density_multiplier = 180.0
 brightness_reference_temperature = 7000.0
 absorption = 0.3
 scattering = 0.4
@@ -82,11 +92,14 @@ EOF
 
 cargo build --release
 
+# Render a linear HDR (writing .hdr bypasses the in-engine tone map), then grade.
 ./target/release/gr_raytracer \
     --width="$WIDTH" --height="$HEIGHT" \
-    --exposure="$EXPOSURE" \
     --camera-position=-17,0,1.5 --theta=-3.14159 --psi=0.0 --phi=0 \
     --config-file "$SCENE" \
-    render --filename="$OUTPUT"
+    render --filename="$HDR"
+
+uv run scripts/grade.py "$HDR" "$OUTPUT" \
+    --white "$WHITE" --exposure "$EXPOSURE" --bloom "$BLOOM"
 
 echo "Wrote $OUTPUT (${WIDTH}x${HEIGHT})"

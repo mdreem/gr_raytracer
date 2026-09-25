@@ -16,6 +16,90 @@ pub struct RenderConfig {
     /// Adaptive supersampling quality and edge-detection controls.
     #[serde(default)]
     pub adaptive_sampling: AdaptiveSamplingConfig,
+    /// Optional Gaia DR3 star catalogue rendered as point sources on the
+    /// celestial sphere. It is downloaded by scripts/gaia/download.py.
+    /// When omitted, only `celestial_texture` is used.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub star_catalog: Option<StarCatalogConfig>,
+}
+
+#[derive(Deserialize, Serialize, Debug, PartialEq, Clone)]
+pub struct StarCatalogConfig {
+    /// Path to the Parquet catalogue produced by `scripts/gaia/download.py`.
+    pub path: String,
+    /// Linear multiplier applied to each star's summed flux before it is
+    /// written to the celestial sphere. Raise it to make the star field
+    /// brighter relative to the tone-mapping exposure.
+    #[serde(default = "default_star_flux_scale")]
+    pub flux_scale: f64,
+    /// Winding spread (in radians) across a traced tube's four corners above
+    /// which the tube is subdivided before gathering stars. A tube whose
+    /// corners have wound past this much relative angle straddles a caustic
+    /// (photon ring), where the solid-angle magnification is unreliable, so it
+    /// is split into four sub-tubes instead. Defaults to π.
+    #[serde(default = "default_winding_spread_threshold")]
+    pub winding_spread_threshold: f64,
+    /// Maximum number of subdivision levels for a tube near the photon ring
+    /// (0 disables subdivision, 1 permits one split). Each split traces five
+    /// shared samples and creates four children; at most `4^depth` leaves.
+    /// At the limit, escaped tubes use their finite area ratio and mixed
+    /// tubes retain the corner-`a` fallback. Invalid areas or failed child
+    /// rays are reported as render errors.
+    #[serde(default = "default_max_subdivision_depth")]
+    pub max_subdivision_depth: usize,
+    /// Gather stars against a curved, arc-following tube boundary instead of
+    /// the flat-quad corners, which fills gaps in the lensed star ring. Costs
+    /// more near the critical curve, so it is opt-in for ring-heavy scenes. The
+    /// `--curved-star-membership` CLI flag forces it on regardless of this.
+    #[serde(default)]
+    pub curved_star_membership: bool,
+    /// Optional upper bound on a tube's lensing magnification `A/B`. Near a
+    /// caustic (the photon/Einstein ring) the footprint collapses and the ratio
+    /// blows up into resolution-dependent fireflies; a cap bounds it. Omit for
+    /// no cap.
+    #[serde(default)]
+    pub magnification_cap: Option<f64>,
+}
+
+impl StarCatalogConfig {
+    /// Reject parameter values that would silently corrupt the render: a
+    /// non-finite or negative flux, a non-positive winding threshold, or a cap
+    /// that is not strictly positive (a cap of 0 zeroes every tube's ratio and
+    /// drops all stars).
+    pub fn validate(&self) -> Result<(), String> {
+        if !self.flux_scale.is_finite() || self.flux_scale < 0.0 {
+            return Err(format!(
+                "star_catalog.flux_scale must be finite and non-negative (got {})",
+                self.flux_scale
+            ));
+        }
+        if !self.winding_spread_threshold.is_finite() || self.winding_spread_threshold <= 0.0 {
+            return Err(format!(
+                "star_catalog.winding_spread_threshold must be finite and positive (got {})",
+                self.winding_spread_threshold
+            ));
+        }
+        if let Some(cap) = self.magnification_cap
+            && (!cap.is_finite() || cap <= 0.0)
+        {
+            return Err(format!(
+                "star_catalog.magnification_cap must be finite and positive (got {cap})"
+            ));
+        }
+        Ok(())
+    }
+}
+
+fn default_star_flux_scale() -> f64 {
+    1.0
+}
+
+fn default_winding_spread_threshold() -> f64 {
+    std::f64::consts::PI
+}
+
+fn default_max_subdivision_depth() -> usize {
+    6
 }
 
 #[derive(Deserialize, Serialize, Clone, Debug, PartialEq)]
@@ -184,6 +268,10 @@ impl Default for TextureConfig {
     }
 }
 
+fn default_disc_flux_scale() -> f64 {
+    1.0
+}
+
 #[derive(Deserialize, Serialize, Debug, Clone)]
 pub enum ObjectsConfig {
     Sphere {
@@ -197,6 +285,8 @@ pub enum ObjectsConfig {
         outer_radius: f64,
         texture: TextureConfig,
         temperature: f64,
+        #[serde(default = "default_disc_flux_scale")]
+        flux_scale: f64,
     },
     VolumetricDisc {
         inner_radius: f64,
@@ -215,6 +305,8 @@ pub enum ObjectsConfig {
         scattering: f64,
         noise_scale: (f64, f64, f64),
         noise_offset: f64,
+        #[serde(default = "default_disc_flux_scale")]
+        flux_scale: f64,
     },
 }
 
@@ -313,6 +405,7 @@ mod tests {
             },
             camera_velocity: Default::default(),
             adaptive_sampling: Default::default(),
+            star_catalog: None,
             objects: vec![
                 ObjectsConfig::Sphere {
                     radius: 1.0,
@@ -334,6 +427,7 @@ mod tests {
                         color2: (0, 0, 255),
                     },
                     temperature: 5500.0,
+                    flux_scale: 1.0,
                 },
                 ObjectsConfig::Sphere {
                     radius: 0.5,
@@ -444,6 +538,7 @@ mod tests {
             outer_radius,
             texture: _,
             temperature,
+            ..
         } = &config.objects[1]
         {
             assert_eq!(*inner_radius, 1.0);

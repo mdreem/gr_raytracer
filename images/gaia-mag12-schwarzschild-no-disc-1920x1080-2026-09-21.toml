@@ -1,0 +1,40 @@
+# Schwarzschild, Gaia DR3 G <= 12, no disc or background photograph, at 1080p.
+# Same scene as gaia-mag12-schwarzschild-no-disc-2026-09-15.toml; this recipe
+# renders a linear HDR and grades it externally with bloom + an ACES filmic
+# tone map (the in-engine Reinhard path has no bloom).
+#
+# Reproduce from the repository root:
+# 1. Render the linear HDR (HDR export bypasses exposure/tone mapping; the
+#    star flux scale of 3 is baked in):
+# RUST_LOG=info RAYON_NUM_THREADS=16 target/release/gr_raytracer \
+#   --width=1920 --height=1080 --camera-position=-17,0,1.5 \
+#   --theta=-3.14159 --psi=0 --phi=0 --max-radius=200 \
+#   --config-file=images/gaia-mag12-schwarzschild-no-disc-1920x1080-2026-09-21.toml \
+#   render --filename=blackhole-1080p.hdr
+# 2. Grade to PNG with bloom + a luminance-preserving ACES tone map, the same
+#    recipe as the disc + star-field finals, so the star field matches them.
+#    Exposure scales with pixel solid angle, so it is resolution-dependent; the
+#    committed PNG used exposure 86 (matching the disc set). Any HDR grader works
+#    (Blender glare + AgX, darktable filmic + bloom, or a small numpy pass).
+
+celestial_temperature = 0.0
+objects = []
+# The tiny offset from exact pi avoids exact meridional/polar ray alignment.
+
+[adaptive_sampling]
+enabled = true
+samples_per_axis = 2
+# Keep section rendering independent of section-local luminance statistics.
+minimum_luminance = 0.0
+
+[celestial_texture.BlackBody]
+beaming_exponent = 0.0
+
+[geometry_type.Schwarzschild]
+radius = 1.0
+horizon_epsilon = 1e-4
+
+[star_catalog]
+path = "data/gaia_mag12.parquet"
+flux_scale = 3.0
+max_subdivision_depth = 6

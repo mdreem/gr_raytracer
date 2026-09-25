@@ -21,6 +21,8 @@ pub enum ToneMappingMethod {
     GlobalLinear,
 }
 
+/// Straight (unassociated) linear XYZ source/texture color and surface alpha.
+/// Traced, opacity-weighted light uses Radiance instead; do not composite this type.
 #[derive(Debug, PartialEq, Copy, Clone)]
 pub struct CIETristimulus {
     pub x: f64,
@@ -45,28 +47,6 @@ impl CIETristimulus {
 
     pub fn as_vector(&self) -> Vector3<f64> {
         Vector3::new(self.x, self.y, self.z)
-    }
-
-    pub fn blend(&self, other: &CIETristimulus) -> CIETristimulus {
-        // background = self, foreground = other  (“other over self”)
-        let ab = self.alpha.clamp(0.0, 1.0);
-        let af = other.alpha.clamp(0.0, 1.0);
-
-        let ao = af + ab * (1.0 - af);
-        if ao <= 0.0 {
-            return CIETristimulus {
-                x: 0.0,
-                y: 0.0,
-                z: 0.0,
-                alpha: 0.0,
-            };
-        }
-
-        let x = (other.x * af + self.x * ab * (1.0 - af)) / ao;
-        let y = (other.y * af + self.y * ab * (1.0 - af)) / ao;
-        let z = (other.z * af + self.z * ab * (1.0 - af)) / ao;
-
-        CIETristimulus { x, y, z, alpha: ao }
     }
 
     /// Applies relativistic beaming effect based on redshift and beaming exponent.
@@ -341,7 +321,6 @@ pub fn srgb_to_xyz(color: &Color) -> CIETristimulus {
 #[cfg(test)]
 pub mod tests {
     use super::*;
-    use approx::assert_abs_diff_eq;
 
     /// Exposure scales linear radiance before the tone map: Reinhard
     /// responds (dim pixels brighten ~linearly), while GlobalLinear's
@@ -412,41 +391,5 @@ pub mod tests {
                 "{value} should be rejected"
             );
         }
-    }
-
-    #[test]
-    fn cie_blend_retains_background_when_foreground_transparent() {
-        let background = CIETristimulus::new(0.2, 0.4, 0.6, 1.0);
-        let foreground = CIETristimulus::new(0.8, 0.1, 0.3, 0.0);
-        let blended = background.blend(&foreground);
-
-        assert_abs_diff_eq!(blended.x, background.x);
-        assert_abs_diff_eq!(blended.y, background.y);
-        assert_abs_diff_eq!(blended.z, background.z);
-        assert_abs_diff_eq!(blended.alpha, background.alpha);
-    }
-
-    #[test]
-    fn cie_blend_two_fully_transparent_colors() {
-        let background = CIETristimulus::new(0.2, 0.4, 0.6, 0.0);
-        let foreground = CIETristimulus::new(0.8, 0.1, 0.3, 0.0);
-        let blended = background.blend(&foreground);
-
-        assert_abs_diff_eq!(blended.x, 0.0);
-        assert_abs_diff_eq!(blended.y, 0.0);
-        assert_abs_diff_eq!(blended.z, 0.0);
-        assert_abs_diff_eq!(blended.alpha, 0.0);
-    }
-
-    #[test]
-    fn cie_blend_mixes_channels() {
-        let background = CIETristimulus::new(0.2, 0.4, 0.6, 1.0);
-        let foreground = CIETristimulus::new(0.6, 0.4, 0.2, 0.5);
-        let blended = background.blend(&foreground);
-
-        assert_abs_diff_eq!(blended.x, 0.4);
-        assert_abs_diff_eq!(blended.y, 0.4);
-        assert_abs_diff_eq!(blended.z, 0.4);
-        assert_abs_diff_eq!(blended.alpha, 1.0);
     }
 }

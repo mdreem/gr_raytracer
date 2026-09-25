@@ -33,7 +33,19 @@ pub enum CoordinateSystem {
     },
 }
 
-#[derive(Clone, Copy, Debug)]
+impl CoordinateSystem {
+    /// Spin parameter `a` of the coordinate frame: the Kerr spin for
+    /// `BoyerLindquist`, and `0` for the non-rotating frames (so the oblate
+    /// embedding reduces to the ordinary spherical one).
+    pub fn spin(self) -> f64 {
+        match self {
+            CoordinateSystem::BoyerLindquist { a } => a,
+            _ => 0.0,
+        }
+    }
+}
+
+#[derive(Clone, Copy, Debug, PartialEq)]
 pub struct Point {
     pub coordinate_system: CoordinateSystem,
     pub vector: Vector4<f64>,
@@ -184,6 +196,16 @@ impl Point {
                 wrap_theta(self.vector[2]),
                 wrap_phi(self.vector[3]),
             ),
+        }
+    }
+
+    pub fn get_as_cartesian(self) -> Vector3<f64> {
+        match self.coordinate_system {
+            Cartesian => Vector3::new(self.vector[1], self.vector[2], self.vector[3]),
+            Spherical | BoyerLindquist { .. } => {
+                let v = self.to_cartesian();
+                Vector3::new(v[1], v[2], v[3])
+            }
         }
     }
 

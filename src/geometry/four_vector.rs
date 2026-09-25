@@ -1,4 +1,5 @@
 use crate::geometry::point::{CoordinateSystem, Point};
+use crate::geometry::spherical_coordinates_helper::{frame_rotation_deg, rotate_about_x};
 use nalgebra::{Vector3, Vector4};
 use std::ops::{Add, Div, Index, Mul, Neg};
 
@@ -107,6 +108,45 @@ impl FourVector {
         Vector3::new(self.vector[1], self.vector[2], self.vector[3])
     }
 
+    pub fn get_x_cartesian(self, at: &Point) -> f64 {
+        debug_assert_eq!(self.coordinate_system, at.coordinate_system);
+        match self.coordinate_system {
+            CoordinateSystem::Cartesian => self.vector[1],
+            // Spatial Jacobian of the oblate embedding x = sinθ (r cosφ − a sinφ)
+            // used throughout kerr_bl.rs. Spherical is the a = 0 special case.
+            CoordinateSystem::Spherical | CoordinateSystem::BoyerLindquist { .. } => {
+                let a = self.coordinate_system.spin();
+                let r = at.vector[1];
+                let theta = at.vector[2];
+                let phi = at.vector[3];
+                let (st, ct) = (theta.sin(), theta.cos());
+                let (sp, cp) = (phi.sin(), phi.cos());
+                st * cp * self.vector[1]
+                    + ct * (r * cp - a * sp) * self.vector[2]
+                    + st * (-r * sp - a * cp) * self.vector[3]
+            }
+        }
+    }
+
+    pub fn get_y_cartesian(self, at: &Point) -> f64 {
+        debug_assert_eq!(self.coordinate_system, at.coordinate_system);
+        match self.coordinate_system {
+            CoordinateSystem::Cartesian => self.vector[2],
+            // Spatial Jacobian of y = sinθ (r sinφ + a cosφ); a = 0 for Spherical.
+            CoordinateSystem::Spherical | CoordinateSystem::BoyerLindquist { .. } => {
+                let a = self.coordinate_system.spin();
+                let r = at.vector[1];
+                let theta = at.vector[2];
+                let phi = at.vector[3];
+                let (st, ct) = (theta.sin(), theta.cos());
+                let (sp, cp) = (phi.sin(), phi.cos());
+                st * sp * self.vector[1]
+                    + ct * (r * sp + a * cp) * self.vector[2]
+                    + st * (r * cp - a * sp) * self.vector[3]
+            }
+        }
+    }
+
     pub fn get_z_cartesian(self, at: &Point) -> f64 {
         debug_assert_eq!(self.coordinate_system, at.coordinate_system);
         match self.coordinate_system {
@@ -117,6 +157,25 @@ impl FourVector {
                 let (st, ct) = (theta.sin(), theta.cos());
                 ct * self.vector[1] - r * st * self.vector[2]
             }
+        }
+    }
+
+    pub fn get_cartesian_vector(self, at: &Point) -> Vector3<f64> {
+        let v = Vector3::new(
+            self.get_x_cartesian(at),
+            self.get_y_cartesian(at),
+            self.get_z_cartesian(at),
+        );
+        // The spherical->cartesian components come out in the (possibly rotated)
+        // coordinate frame; rotate directions back to physical space so they
+        // match positions, star directions, and the texture lookup. Kerr (BL)
+        // is left untouched here.
+        match self.coordinate_system {
+            CoordinateSystem::Spherical => {
+                let (x, y, z) = rotate_about_x(v.x, v.y, v.z, -frame_rotation_deg());
+                Vector3::new(x, y, z)
+            }
+            _ => v,
         }
     }
 }

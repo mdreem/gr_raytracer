@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # Reproduces the Kerr gallery images in images/kerr.md (frozen recipes,
-# 2026-08-30, post plan-02/NT-fix renderer). Companion to
+# 2026-08-30). Companion to
 # create-main-image.sh (README hero) and create-showcase-images.sh
 # (spin-vs-no-spin diagnostics); the spin-sweep animations come from
 # scripts/rendering/create_kerr_images.sh.

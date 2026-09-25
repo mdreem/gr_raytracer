@@ -82,14 +82,47 @@ enabled = true
 samples_per_axis = 4
 luminance_contrast_threshold = 0.15
 opacity_contrast_threshold = 0.1
-minimum_luminance = 1.0
+# minimum_luminance is optional; omit it (the default) to derive the floor
+# per frame from the 99th-percentile luminance, or set an explicit value.
 object_hit_opacity_threshold = 0.5
+exclude_background_contrast = true
 ```
 
 `samples_per_axis = 4` traces a jittered 4×4 grid for each selected pixel. To
 inspect which pixels the adaptive pass selects, add
 `--show-sampling-mask`. The default mask color is magenta and can be changed
 with an 8-bit sRGB value such as `--sampling-mask-color=255,128,0`.
+
+### Star catalogue (lensed point-source stars)
+
+A scene can render the real Gaia DR3 catalogue as gravitationally lensed
+point-source stars through a `[star_catalog]` section. Fetch the Parquet first,
+writing it to the path the scene loads (`download.py` defaults to
+`data/gaia_dr3.parquet`, so pass `--output` to match):
+
+```sh
+uv run --group gaia scripts/gaia/download.py download --max-magnitude 12 --output data/gaia_mag12.parquet
+```
+
+```toml
+[star_catalog]
+path = "data/gaia_mag12.parquet"
+flux_scale = 3.0                # linear multiplier on the summed star flux
+# Optional, for the lensed ring:
+curved_star_membership = false  # gather against arc-following tube boundaries
+                                # instead of the flat corners; fills gaps in the
+                                # lensed ring, costs more near the critical curve
+magnification_cap = 50.0        # clamp the lensing magnification A/B to bound
+                                # caustic fireflies on the ring (omit for no cap)
+```
+
+Two CLI flags override or complement the scene:
+
+- `--curved-star-membership` forces curved membership on regardless of the config.
+- `--pole-rotation-deg <deg>` rotates the spherical coordinate frame (default `0`,
+  a no-op) so the polar-axis coordinate singularity is steered off the field of
+  view. Schwarzschild-family scenes only; keep it `0` for scenes with a flat disc
+  (its plane test is not rotated).
 
 ## Scripts
 
