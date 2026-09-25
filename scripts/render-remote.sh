@@ -110,7 +110,7 @@ echo "started $(date -u +%FT%TZ), args=${RENDER_ARGS}, $(nproc) vCPU, pod ${RUNP
     echo "elapsed $(( $(date +%s) - t0 ))s${line:+ | ${line}}" \
     | rclone rcat "b2:${B2_BUCKET}/jobs/${JOB}/progress"; done ) & HB=$!
 set +e
-RAYON_NUM_THREADS="$(nproc)" RUST_LOG=off ./gr_raytracer ${RENDER_ARGS} --config-file scene.toml render --filename "${OUT}" 2> render.log
+RAYON_NUM_THREADS="$(nproc)" RUST_LOG=off ./gr_raytracer ${RENDER_ARGS} --config-file scene.toml render --filename "${OUT}" ${RENDER_SUBARGS} 2> render.log
 rc=$?
 set -e
 kill "$HB" 2>/dev/null || true
@@ -139,9 +139,9 @@ cmd_render() {  # render <job> <scene.toml> <gr_raytracer args...>
   env_json=$(jq -n \
     --arg JOB "$job" --arg RENDER_ARGS "$render_args" --arg B2_BUCKET "$B2_BUCKET" \
     --arg PARQUET "$PARQUET" --arg RUNPOD_API_KEY "$RUNPOD_API_KEY" \
-    --arg OUT "${OUT:-out.hdr}" \
+    --arg OUT "${OUT:-out.hdr}" --arg RENDER_SUBARGS "${RENDER_SUBARGS:-}" \
     --arg T "$RCLONE_CONFIG_B2_TYPE" --arg A "$RCLONE_CONFIG_B2_ACCOUNT" --arg K "$RCLONE_CONFIG_B2_KEY" \
-    '{JOB:$JOB, RENDER_ARGS:$RENDER_ARGS, B2_BUCKET:$B2_BUCKET, PARQUET:$PARQUET, OUT:$OUT,
+    '{JOB:$JOB, RENDER_ARGS:$RENDER_ARGS, B2_BUCKET:$B2_BUCKET, PARQUET:$PARQUET, OUT:$OUT, RENDER_SUBARGS:$RENDER_SUBARGS,
       RUNPOD_API_KEY:$RUNPOD_API_KEY,
       RCLONE_CONFIG_B2_TYPE:$T, RCLONE_CONFIG_B2_ACCOUNT:$A, RCLONE_CONFIG_B2_KEY:$K}')
 
