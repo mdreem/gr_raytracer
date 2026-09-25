@@ -576,6 +576,12 @@ Ranked by how likely it is to bite and how hard it is to notice.
     are right, but the star *brightness* field is not, because the tube
     magnification ignores the camera's aberration (4.2). Before this branch,
     a fast camera in flat space was also aberrated the wrong way (4.11).
+12. A camera inside the horizon, an over-extremal Kerr scene, or any future
+    metric without a guarding stop: rays that asymptote to a coordinate
+    singularity (the past horizon in ingoing Kerr–Schild, the ring for
+    |a| > M) collapse the step to `H_MIN`, are then accepted regardless of
+    error, and either explode to r ≈ 10²⁴ or burn the whole step budget.
+    Today the `horizon_epsilon` stop hides this (§11).
 
 ## 8. Extensions, with the concepts to look up
 
@@ -847,6 +853,107 @@ the obstacle. What decides it:
    form is both the correctness fix and GPU-friendly (polynomial right-hand
    sides). The star gather and adaptive supersampling stay on the CPU either
    way; they are not the bottleneck.
+
+## 11. Is the Kerr–Schild chart numerically viable inside the horizon?
+
+Question raised after the review: if a camera is placed inside the black
+hole, does the Kerr–Schild (KS) chart hold up numerically, or does one need
+an atlas with chart transitions along the geodesic?
+
+**Answer: KS is viable for every ray that crosses the future horizon, in
+either parameter direction, at the default tolerance. The rays that do not
+cross are the ones that asymptote to the *past* horizon, which ingoing KS
+does not cover; those need a stop condition, and the current one only works
+from outside.** No atlas is needed for interior renders.
+
+### 11.1 Experiment
+
+Rays were seeded from the Eulerian tetrad (`Kerr::get_tetrad_at`, which is
+regular inside since the KS time slices stay spacelike there) as
+p = ±e_t + n, with n a unit spatial direction in the tetrad. The sign −e_t
+is the past-directed ray the camera actually traces; +e_t is its
+future-directed twin. Each ray was integrated with the production `rkf45`
+and `KerrSolver` right-hand side, with the horizon stop disabled, until it
+reached r = 60 ("escaped"), an inner stop just outside r₋ (or r = 0.05 for
+a = 0), a NaN, or 400 000 steps. Spins a/r_s ∈ {0, 0.4, 0.499}, camera at
+r₀ between the horizons, tolerances ε ∈ {10⁻⁵, 10⁻⁹}. Quality measures: the
+Hamiltonian constraint |ΔH|/|p|² (should stay ≈ 0), and drift of E = −p_t
+and L_z. The scratch test is kept in the session scratchpad
+(`ks_interior_scratch.rs`); it is 120 lines and could become a regression
+test.
+
+### 11.2 Results
+
+Past-directed rays (what the camera sees) from r₀ inside, that leave through
+r₊:
+
+| a/r_s | direction | ε | steps to r₊ | steps to r = 60 | |ΔH|/|p|² | ΔL_z |
+|---|---|---|---|---|---|---|
+| 0 | outward | 1e-5 | 5 | 42 | 1.5e-12 | 0 |
+| 0 | tangential | 1e-5 | 7 | 104 | 9.8e-6 | 1.3e-6 |
+| 0.4 | outward | 1e-5 | 5 | 45 | 8.9e-8 | 5.7e-8 |
+| 0.4 | oblique | 1e-5 | 5 | 59 | 1.1e-6 | 6e-10 |
+| 0.499 | outward | 1e-5 | 3 | 46 | 1.8e-7 | 7.1e-8 |
+| 0.499 | oblique | 1e-9 | 4 | 100 | 4.5e-10 | 7e-13 |
+
+Future-directed rays falling in from r = 10 through r₊ to the inner stop
+behave the same way (18–435 steps total, |ΔH|/|p|² ≤ 2e-4 at ε = 1e-5,
+≤ 1e-7 at ε = 1e-9). The step size never drops below 1e-5 on any crossing
+ray; the horizon is simply not there numerically, which is the whole point
+of the chart.
+
+The other family: past-directed rays whose spatial direction points *inward*
+in the interior tetrad. Traced to the past they move outward toward r₊ but
+never cross it; coordinate time runs to −∞ (t ≈ −40 to −160 at abort) and
+the step collapses to `H_MIN`:
+
+| a/r_s | ε | outcome |
+|---|---|---|
+| 0 | 1e-5 | tunnels through r₊ after ≈1000 steps at H_MIN, then explodes: r → 10²⁴, |ΔH|/|p|² ≈ 10⁷² |
+| 0 | 1e-9 | 400 000 steps burnt at h = 10⁻¹² sitting on r = 1.000 |
+| 0.4 | 1e-5 | NaN after ≈9000 steps |
+| 0.499 | 1e-5 | NaN after ≈72 000 steps |
+
+Exactly the same happens to the ordinary exterior shadow rays if the
+`r ≤ r₊ + horizon_epsilon` stop is removed. These rays are physical: they
+are the ones that would show the collapsing star (or the white-hole region
+in the eternal solution) and they are correctly rendered as "frozen at the
+horizon" black. The chart is not at fault; the stop condition is. Ingoing
+KS covers the future horizon only, so the past horizon shows up as t → −∞
+at r = r₊, and no step-size controller can integrate through it.
+
+### 11.3 Consequences for the code
+
+1. **Interior camera needs a two-sided horizon stop.** Today's
+   `inside_horizon` fires for every point with r ≤ r₊ + ε, so an interior
+   camera would stop every ray at step 0. Replace it by a *stall* criterion
+   that is chart-independent: N consecutive steps at `H_MIN` (or
+   Δr < ε over the last N steps while |r − r₊| < ε) ⇒ `HorizonReached`. A
+   plain band |r − r₊| < ε is not safe, because crossing rays step through
+   r₊ at finite dr/dλ and can land inside the band by chance, giving black
+   speckles.
+2. **Accepting a step at `H_MIN` regardless of error is dangerous**
+   (`runge_kutta.rs:148ff`). It is what turns the stall into a tunnel and
+   an explosion to r ≈ 10²⁴ at the default ε. The horizon stop masks this
+   today. It is unmasked for any geometry without a guarding stop:
+   over-extremal Kerr (`inside_horizon` returns `false` for |a| > M, so
+   rays approaching the ring have no stop at all), and any future wormhole
+   or space-only metric. Recommendation: treat "error still above ε at
+   H_MIN" as a stop reason, not as an accepted step. This belongs in the
+   premortem list (§7) as item 12.
+3. **BL cannot do this at all.** The ZAMO tetrad has an imaginary lapse
+   inside r₊ and the Mino-time solver has Δ → 0 at both horizons. So an
+   interior camera is a KS-only feature unless an atlas is added; the
+   hybrid "BL outside, KS inside r_switch" is a speed optimisation, not a
+   requirement.
+4. **Between r₋ and r₊ every past-directed ray moves outward** (r never
+   decreased on any of the past-directed runs), so the inner horizon needs
+   no stop for a camera in that region. A camera inside r₋ is a different
+   problem (Cauchy horizon, mass inflation) and out of scope.
+
+Concepts to look up: ingoing versus outgoing Eddington–Finkelstein
+coordinates and which horizon each covers; the Penrose diagram of
+Schwarzschild and Kerr (regions I–IV); the Cauchy horizon at r₋.
 
 ## Appendix: reproducing the numbers
 
