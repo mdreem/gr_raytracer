@@ -98,6 +98,11 @@ frames stay comparable.
 </div>
 
 <div align="center">
+  <img src="kerr_photon_ring_windings_soft.png" alt="The same photon-ring windings under a softer Reinhard grade">
+  <p>The same frame under a gentler Reinhard grade: the disc band is pulled down off the clip, so more of the individual nested windings read through the bright core.</p>
+</div>
+
+<div align="center">
   <img src="kerr_critical_curve_starfield.png" alt="The same crop with the disc removed: the bare critical curve against wound starlight">
   <p>The control: the identical crop with the disc removed. The smooth boundary is the critical curve (its long straight stretch is the near-extremal "D-shape" flattening of the prograde limb at a/M = 0.998), and the faint concentric striations hugging it are the photon ring itself with only starlight as its source. Every winding in the image above slots into this scaffolding; same geometry, hot gas instead of faint stars as the paint.</p>
 </div>

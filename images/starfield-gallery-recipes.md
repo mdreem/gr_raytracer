@@ -52,3 +52,30 @@ Scene: the main-image volumetric disc + `[star_catalog]`, camera `-17,0,1.5`,
 | image | camera | res | white | bloom | tonemap |
 |-------|--------|-----|-------|-------|---------|
 | `render_kerr_stars_volumetric` | -20,0,-0.6 | 1500² | 0.5 | 0.12 | aces |
+
+## Photon-ring pair (KerrBL a = 0.499, `--curved-star-membership`)
+
+6x zoom crop onto the shadow's limb. Both render at 7680x4320 with the crop
+`--from-row=1476 --to-row=2652 --from-col=3504 --to-col=4176` (a 672x1176
+region), camera `-17,0,1.5`, `flux_scale = 200`, and
+**`max_subdivision_depth = 2`**. Depth 2 is essential: at the default depth 6
+every pixel of a ring-centered crop sits on the caustic and the star gather does
+4⁶ sub-gathers per pixel, so it effectively never finishes (see
+`future-work-and-notes/curved-membership-ring-performance.md`).
+
+| image | scene | white | bloom | tonemap |
+|-------|-------|-------|-------|---------|
+| `kerr_photon_ring_windings` | 12000 K disc (inner 0.8) | 125000 | 0.08 | aces |
+| `kerr_photon_ring_windings_soft` | same HDR | 300000 | 0.06 | reinhard |
+| `kerr_critical_curve_starfield` | disc removed (`objects = []`) | 0.02 | 0.05 | aces |
+
+## Einstein-ring sphere (`schwarzschild.md`, Kerr a = 0)
+
+A 5000 K blackbody sphere (radius 3) on the camera axis, `radius 11` from the
+origin behind the hole (`position = [-5.987, -1.438, 9.115]`); star catalogue at
+`flux_scale = 30`. Camera `9.2529,2.2228,-14.0870`, `--theta=0.59419
+--phi=-2.90576 --psi=0`, 1280x720.
+
+| image | white | bloom | tonemap |
+|-------|-------|-------|---------|
+| `einstein-ring-sphere-2026-09-25` | 0.05 | 0.04 | aces |
