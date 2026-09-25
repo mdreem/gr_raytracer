@@ -96,8 +96,13 @@ with an 8-bit sRGB value such as `--sampling-mask-color=255,128,0`.
 ### Star catalogue (lensed point-source stars)
 
 A scene can render the real Gaia DR3 catalogue as gravitationally lensed
-point-source stars through a `[star_catalog]` section (fetch the Parquet with
-`scripts/gaia/download.py`):
+point-source stars through a `[star_catalog]` section. Fetch the Parquet first,
+writing it to the path the scene loads (`download.py` defaults to
+`data/gaia_dr3.parquet`, so pass `--output` to match):
+
+```sh
+uv run --group gaia scripts/gaia/download.py download --max-magnitude 12 --output data/gaia_mag12.parquet
+```
 
 ```toml
 [star_catalog]

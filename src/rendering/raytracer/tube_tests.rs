@@ -278,13 +278,18 @@ fn star_magnification_and_foreground_transmittance_are_applied_once() {
         renderer
             .add_star_layer(&samples, 2, 2, &mut colors)
             .unwrap();
-        assert_abs_diff_eq!(
-            colors[0].as_vector(),
-            foreground.as_vector() + transmittance * flux,
-            epsilon = 1e-12
-        );
-        assert_eq!(colors[0].transmittance, 0.0);
-        assert_eq!(&colors[1..], &[foreground; 3]);
+        // In a 2x2 image every pixel's stencil clamps to the single base tube
+        // (the boundary-coverage edge clamp), so all four receive the same star
+        // flux. The point of this test is that each pixel gets it applied ONCE:
+        // foreground.over(flux), with no second alpha attenuation.
+        for color in &colors {
+            assert_abs_diff_eq!(
+                color.as_vector(),
+                foreground.as_vector() + transmittance * flux,
+                epsilon = 1e-12
+            );
+            assert_eq!(color.transmittance, 0.0);
+        }
     }
 }
 

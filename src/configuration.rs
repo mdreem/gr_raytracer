@@ -61,6 +61,35 @@ pub struct StarCatalogConfig {
     pub magnification_cap: Option<f64>,
 }
 
+impl StarCatalogConfig {
+    /// Reject parameter values that would silently corrupt the render: a
+    /// non-finite or negative flux, a non-positive winding threshold, or a cap
+    /// that is not strictly positive (a cap of 0 zeroes every tube's ratio and
+    /// drops all stars).
+    pub fn validate(&self) -> Result<(), String> {
+        if !self.flux_scale.is_finite() || self.flux_scale < 0.0 {
+            return Err(format!(
+                "star_catalog.flux_scale must be finite and non-negative (got {})",
+                self.flux_scale
+            ));
+        }
+        if !self.winding_spread_threshold.is_finite() || self.winding_spread_threshold <= 0.0 {
+            return Err(format!(
+                "star_catalog.winding_spread_threshold must be finite and positive (got {})",
+                self.winding_spread_threshold
+            ));
+        }
+        if let Some(cap) = self.magnification_cap
+            && (!cap.is_finite() || cap <= 0.0)
+        {
+            return Err(format!(
+                "star_catalog.magnification_cap must be finite and positive (got {cap})"
+            ));
+        }
+        Ok(())
+    }
+}
+
 fn default_star_flux_scale() -> f64 {
     1.0
 }
