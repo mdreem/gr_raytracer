@@ -38,7 +38,10 @@ Three medium findings follow: the star layer is not radiometrically consistent
 with the disc (it multiplies by a coordinate-basis pixel solid angle), the two
 Kerr backends disagree on what a "Cartesian" position means by an r-dependent
 azimuth twist, and the Novikov–Thorne temperature calibration overshoots by 18 %
-at high spin. Everything else is documentation, robustness or scope.
+at high spin. A fourth, confined to the two flat-space geometries, was found
+and fixed while checking the camera boost: they boosted a moving camera to
+the reflected velocity or not at all (4.11). Everything else is documentation,
+robustness or scope.
 
 ## 2. What was verified as correct
 
@@ -56,8 +59,20 @@ Analytic checks (by hand, against the references named):
   Carter constant `Q = p_θ² + cos²θ (L²/sin²θ − a²E²)`.
 - The BL→KS Jacobian including the `dt = r_s r/Δ dr`, `dφ = a/Δ dr` twist
   (also pinned by an existing exact test).
-- Lorentz boost: identical to Riazuelo eq. (6), with the sign flip for the
-  (−,+,+,+) geometries handled correctly.
+- Lorentz boost: identical to Riazuelo eq. (6) in Schwarzschild, Kerr and
+  KerrBL, with the sign flip for the (−,+,+,+) geometries handled correctly.
+  The two flat-space geometries had it wrong (finding 4.11, fixed on this
+  branch).
+- Momentum construction and frequency bookkeeping under a boost: the traced
+  momentum is `p = N − u` with `N` a unit direction in the boosted tetrad, so
+  `u·p = ∓1` by construction and the emitter energy `u_em·p` carries the
+  whole shift. A boosted flat-space camera reproduces
+  `ν_obs/ν_em = 1/(γ(1 − v cos θ_cam))` and the aberration formula to 10⁻¹²
+  (regression test `boosted_camera_matches_special_relativity_in_flat_space`).
+  The camera angles are applied to the reference tetrad before the boost,
+  which is equivalent to Riazuelo's boost-then-rotate: the configured tilt is
+  exactly the tilt in the camera's rest frame (checked numerically in
+  Schwarzschild at `r = 4, 18, 50`).
 - Camera: `w = e_z + i' e_x + j' e_y`, `n = −e_z + 2w/(w·w)` is exactly
   Riazuelo eqs. (4)–(5). See finding 4.5 for what that implies.
 - Redshift `g = (u_obs·p)/(u_em·p)` with the emitter velocity assembled from
@@ -343,6 +358,20 @@ a visibly wrong debug colour.
 not exist inside the ergosphere (NaN → `UnphysicalRedshift` → the whole pixel
 errors). Use the ZAMO, as the camera already can.
 
+### 4.11 Medium (flat space only): both Euclidean geometries boosted the camera wrongly — fixed on this branch
+
+`EuclideanSpace::lorentz_transformation` had the last term of the boost as
+`2 T^μ u_ν` instead of `2 u^μ T_ν`, which maps `T` to `2γT − u`: the camera
+was boosted to **−v**. A camera configured to move toward a source saw it
+redshifted and aberrated the wrong way. `EuclideanSpaceSpherical`'s boost was
+the identity matrix, so a moving camera there was rendered as static. Neither
+affects the black-hole geometries, which have their own correct
+implementations, and every existing flat-space test used a static camera, so
+nothing caught it. Both are fixed in this branch (one line and a ~20-line
+generic boost respectively) and pinned by a test that checks the boosted
+tetrad's time axis equals the velocity and that the rendered frequency ratio
+and source directions match special relativity for every probed pixel.
+
 ### 4.10 Informational
 
 - `kerr.rs` evaluates the metric 36 times per right-hand side for numerical
@@ -543,6 +572,10 @@ Ranked by how likely it is to bite and how hard it is to notice.
    set of them on that side is the symptom of 4.1.
 10. Volumetric disc at high spin: temperature edge and ISCO test at the wrong
     radius (4.6); small but systematic.
+11. A fast camera in a black-hole scene: the redshift and star *positions*
+    are right, but the star *brightness* field is not, because the tube
+    magnification ignores the camera's aberration (4.2). Before this branch,
+    a fast camera in flat space was also aberrated the wrong way (4.11).
 
 ## 8. Extensions, with the concepts to look up
 

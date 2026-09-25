@@ -133,7 +133,10 @@ impl Geometry for EuclideanSpace {
                 let c = g * (t_tetrad[j] + velocity[j]);
                 res += a * b * c;
 
-                res += 2.0 * g * t_tetrad[i] * velocity[j];
+                // Lambda^mu_nu = delta - (T+u)^mu (T+u)_nu / (1+gamma) + 2 u^mu T_nu
+                // (Riazuelo 2018, eq. 6). The last term must be u^mu T_nu, not
+                // T^mu u_nu: the latter boosts to the reflected velocity -v.
+                res += 2.0 * g * velocity[i] * t_tetrad[j];
 
                 matrix[(i, j)] = res;
             }
