@@ -305,12 +305,35 @@ four-corner stencil to a small fraction of a pixel around the centre so it
 measures J at the centre; needs tight tolerance. Filter and footprint are
 independent; do the filter first.
 
+**DNGR equation (A.23) decoded.** With dots = d/dζ along the reference ray:
+
+```
+ü = −Ψ (g cos ψ + h sin ψ)     v̈ = −Ψ (g sin ψ − h cos ψ)
+g̈ = −Ψ (u cos ψ + v sin ψ)     ḧ = −Ψ (u sin ψ − v cos ψ)
+χ̇ = M,   Ψ = |Ψ₀*|,   ψ = arg Ψ₀* − 2χ                    (A.23, A.24)
+start: u̇ = 1, rest 0 (A.22); end: δ± = δ′(√(u̇²+v̇²) ± √(ġ²+ḣ²)),
+μ = χ + ½ arg[(u̇+iv̇)(ġ+iḣ)]                              (A.25, A.27)
+```
+
+Geodesic deviation in the transverse plane, complex form: ξ = u+iv (size),
+η = g+ih (shear); bundle edge Y = (ξe^{iσ} + ηe^{−iσ})e^{iχ}, an ellipse
+with semi-axes |ξ| ± |η|. The four real equations are ξ̈ = −Ψ₀* η̄,
+η̈ = −Ψ₀* ξ̄ with Ψ₀* = C(k, m, k, m) the Weyl scalar on the ray (closed form
+in Kerr, A.19–A.21); vacuum ⇒ no Ricci focusing term. χ tracks the twist of
+the coordinate transverse basis relative to parallel transport (χ̇ = M,
+A.18); −2χ because Ψ₀ has spin weight 2. Same Jacobi equation as the
+Hamiltonian variational form: DNGR = 9 transverse components + closed-form
+Weyl (Kerr-specific); variational = 16 components, metric-agnostic via AD.
+Sky Jacobian singular values = δ±/2, rotation = μ, magnification
+δ_cs²/(δ₊δ₋). Checks: principal-null-direction bundle stays circular
+(Ψ₀ = 0); far-field magnification (u²+2)/(u√(u²+4)).
+
 Concepts: point spread function; pullback of a pixel footprint through the
 lens map; point-source vs extended-source magnification; partition of unity
 for flux-conserving resampling; critical curves, caustics and the fold
 catastrophe; integrable singularities; geodesic deviation / Jacobi fields;
 image parity; Einstein radius vs lens distance; lensing ring vs photon ring
-(Gralla–Holz–Wald); stereographic vs gnomonic projection.
+(Gralla–Holz–Wald); stereographic vs gnomonic projection; Weyl scalars and the Newman–Penrose tetrad; spin-weighted quantities; Sachs optical scalars; Fermi–Walker transport of a screen basis; Pineault–Roeder complex bundle representation.
 
 ## 9. Interior camera and the Kerr–Schild chart
 
