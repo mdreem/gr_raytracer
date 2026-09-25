@@ -50,7 +50,7 @@ cargo run --release -- \
 
 ## Notes
 
-- `--max-steps=1000000` is used here for safety, but the default (15000) works fine for all
+- `--max-steps=1000000` is used here for safety, but the default (20000) works fine for all
   three geometries at this camera position. Increase it if rays near the horizon terminate
   early with a `MaxSteps` stop reason.
 - KerrBL is significantly faster than Kerr (~8-9× at 500×500) because it uses separated

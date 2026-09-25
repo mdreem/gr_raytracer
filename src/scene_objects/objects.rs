@@ -1,8 +1,8 @@
 use crate::geometry::four_vector::FourVector;
 use crate::geometry::geometry::Geometry;
 use crate::geometry::point::Point;
-use crate::rendering::color::CIETristimulus;
 use crate::rendering::integrator::Step;
+use crate::rendering::radiance::Radiance;
 use crate::rendering::raytracer::RaytracerError;
 use crate::rendering::redshift::{RayFrequencyData, RedshiftComputer};
 use crate::rendering::texture::TemperatureData;
@@ -68,7 +68,7 @@ impl<'a, G: Geometry> Objects<'a, G> {
         y_end: &Step,
         frequency: &RayFrequencyData,
         remaining_steps: &[Step],
-    ) -> Result<Option<CIETristimulus>, RaytracerError> {
+    ) -> Result<Option<Radiance>, RaytracerError> {
         let redshift_computer = RedshiftComputer::new(self.geometry);
         let mut resulting_color = None;
         let mut shortest_distance = f64::MAX;
@@ -249,6 +249,7 @@ mod tests {
                 Color::new(200, 200, 200, 255),
             )),
             Box::new(ConstantTemperatureComputer::new(5000.0)),
+            1.0,
         )));
 
         // r = 6 (inside the disc annulus), phi = 0, theta straddling the

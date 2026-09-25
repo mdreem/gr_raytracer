@@ -9,6 +9,7 @@ use crate::rendering::integrator::IntegrationConfiguration;
 use crate::rendering::raytracer;
 use crate::rendering::raytracer::RaytracerError;
 use crate::rendering::scene::Scene;
+use crate::rendering::star_catalog::StarCatalog;
 use crate::rendering::temperature::{ConstantTemperatureComputer, TemperatureComputer};
 use crate::rendering::texture::{
     BlackBodyMapper, CheckerMapper, TextureData, TextureMapHandle, TextureMapperFactory,
@@ -146,10 +147,19 @@ pub fn create_scene<G: Geometry>(
         .adaptive_sampling
         .validate()
         .map_err(RaytracerError::InvalidConfiguration)?;
+    if let Some(star_catalog) = &config.star_catalog {
+        star_catalog
+            .validate()
+            .map_err(RaytracerError::InvalidConfiguration)?;
+    }
     let adaptive_sampling = config.adaptive_sampling.clone();
     let sampling_mask_color = opts
         .show_sampling_mask
         .then(|| CIETristimulus::from_color(&opts.sampling_mask_color));
+
+    // The frame rotation (--pole-rotation-deg) is set in the spherical
+    // geometry wrappers before the camera position is converted, since the
+    // conversion locks the value in; see schwarzschild::create_scene_internal.
 
     let integration_configuration = IntegrationConfiguration::new(
         opts.max_steps,
@@ -180,6 +190,39 @@ pub fn create_scene<G: Geometry>(
         celestial_map: texture_mapper_celestial,
     };
 
+    // Load the  Gaia star catalogue.
+    let (
+        star_catalog,
+        star_flux_scale,
+        winding_spread_threshold,
+        max_subdivision_depth,
+        curved_star_membership_config,
+        magnification_cap_config,
+    ) = match config.star_catalog {
+            Some(catalog_config) => {
+                let catalog = StarCatalog::load_parquet(&catalog_config.path).map_err(|error| {
+                    RaytracerError::InvalidConfiguration(format!(
+                        "Failed to load star catalog {:?}: {}",
+                        catalog_config.path, error
+                    ))
+                })?;
+                debug!(
+                    "Loaded {} stars from {}",
+                    catalog.len(),
+                    catalog_config.path
+                );
+                (
+                    Some(catalog),
+                    catalog_config.flux_scale,
+                    catalog_config.winding_spread_threshold,
+                    catalog_config.max_subdivision_depth,
+                    catalog_config.curved_star_membership,
+                    catalog_config.magnification_cap,
+                )
+            }
+            None => (None, 1.0, std::f64::consts::PI, 6, false, None),
+        };
+
     let mut objects = Objects::new(geometry);
     for object in config.objects {
         match object {
@@ -209,6 +252,7 @@ pub fn create_scene<G: Geometry>(
                 outer_radius,
                 texture,
                 temperature,
+                flux_scale,
             } => {
                 debug!(
                     "Adding disc with inner radius: {}, outer radius: {}",
@@ -230,6 +274,7 @@ pub fn create_scene<G: Geometry>(
                     outer_radius,
                     texture_mapper_disc,
                     temperature_computer,
+                    flux_scale,
                 );
                 objects.add_object(Box::new(disc));
             }
@@ -250,6 +295,7 @@ pub fn create_scene<G: Geometry>(
                 scattering,
                 noise_scale,
                 noise_offset,
+                flux_scale,
             } => {
                 if outer_radius <= inner_radius {
                     return Err(RaytracerError::InvalidConfiguration(format!(
@@ -324,13 +370,14 @@ pub fn create_scene<G: Geometry>(
                     scattering,
                     Vector3::new(noise_scale.0, noise_scale.1, noise_scale.2),
                     noise_offset,
-                );
+                )
+                .with_flux_scale(flux_scale);
                 objects.add_object(Box::new(disc));
             }
         }
     }
 
-    let scene = Scene::new(
+    let mut scene = Scene::new(
         integration_configuration,
         objects,
         texture_data,
@@ -339,7 +386,16 @@ pub fn create_scene<G: Geometry>(
         false,
         config.celestial_temperature,
     )
-    .with_sampling_options(adaptive_sampling, sampling_mask_color);
+    .with_sampling_options(adaptive_sampling, sampling_mask_color)
+    .with_star_catalog(
+        star_catalog,
+        star_flux_scale,
+        winding_spread_threshold,
+        max_subdivision_depth,
+    );
+    // Enabled by either the per-scene TOML flag or the CLI override.
+    scene.curved_star_membership = opts.curved_star_membership || curved_star_membership_config;
+    scene.star_magnification_cap = magnification_cap_config.unwrap_or(f64::INFINITY);
     Ok(scene)
 }
 

@@ -6,27 +6,59 @@ use crate::rendering::camera::Camera;
 use crate::rendering::color::CIETristimulus;
 use crate::rendering::integrator::StopReason::{CelestialSphereReached, HorizonReached};
 use crate::rendering::integrator::{IntegrationConfiguration, Integrator, Step, StopReason};
+use crate::rendering::radiance::Radiance;
 use crate::rendering::ray::{IntegratedRay, Ray};
 use crate::rendering::raytracer::RaytracerError;
 use crate::rendering::redshift::RedshiftComputer;
-use crate::rendering::texture::{TemperatureData, TextureData, UVCoordinates};
+use crate::rendering::star_catalog::StarCatalog;
+use crate::rendering::texture::{BlackBodyMapper, TemperatureData, TextureData, UVCoordinates};
 use crate::scene_objects::objects::Objects;
 use log::{error, trace};
-use nalgebra::{Const, OVector};
+use nalgebra::{Const, OVector, Vector3};
 use std::f64::consts::PI;
 use std::fs::File;
 
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub struct RaySample {
-    pub color: CIETristimulus,
+    pub color: Radiance,
     pub ray_class: RayClass,
+    pub accumulated_angular_distance: f64,
+    pub ray: Ray,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub struct EscapeInfo {
+    /// Coordinates on the celestial sphere.
+    pub x: f64,
+    pub y: f64,
+    pub z: f64,
+    /// Frequency ratio g = nu_obs / nu_emit for a stationary emitter at
+    /// infinity (the star) as seen by this camera, along this ray. 1.0 means
+    /// no shift. Used by the star gather to tint (T_obs = g * T) and boost
+    /// (flux * g^4) each star. Same value the celestial texture is given.
+    pub redshift: f64,
+}
+
+impl EscapeInfo {
+    pub fn to_vec(&self) -> Vector3<f64> {
+        Vector3::new(self.x, self.y, self.z)
+    }
 }
 
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub enum RayClass {
-    Escaped,
+    Escaped(EscapeInfo),
     Captured,
     Hit,
+}
+
+impl RayClass {
+    pub fn escaped(self) -> Option<EscapeInfo> {
+        match self {
+            RayClass::Escaped(info) => Some(info),
+            _ => None,
+        }
+    }
 }
 
 pub struct Scene<'a, G: Geometry> {
@@ -40,6 +72,25 @@ pub struct Scene<'a, G: Geometry> {
     celestial_temperature: f64,
     pub adaptive_sampling: AdaptiveSamplingConfig,
     pub sampling_mask_color: Option<CIETristimulus>,
+    /// Optional point-source star catalogue gathered on escaped rays.
+    /// `None` falls back to the celestial texture alone.
+    pub star_catalog: Option<StarCatalog>,
+    /// Linear flux multiplier applied to catalogue stars.
+    pub star_flux_scale: f64,
+    /// Winding spread (radians) above which a traced star tube is subdivided.
+    pub winding_spread_threshold: f64,
+    /// Maximum recursive subdivision depth for a star tube.
+    pub max_subdivision_depth: usize,
+    /// Gather stars against a curved (arc-following) tube boundary instead of
+    /// the flat-quad corners. Experimental; fills lensed-ring gaps.
+    pub curved_star_membership: bool,
+    /// Upper bound on a tube's lensing magnification `A/B`. Near a caustic the
+    /// footprint `B` collapses and the ratio blows up (resolution-dependent
+    /// fireflies at the ring); clamping bounds it. `f64::INFINITY` = unbounded.
+    pub star_magnification_cap: f64,
+    /// Blackbody colour LUT for re-tinting stars at their redshifted
+    /// temperature `g * T` in the gather. Present iff a star catalogue is.
+    pub star_blackbody: Option<BlackBodyMapper>,
 }
 
 pub type EquationOfMotionState = OVector<f64, Const<8>>;
@@ -68,6 +119,24 @@ pub fn get_position(y: &EquationOfMotionState, coordinate_system: CoordinateSyst
     }
 }
 
+fn compute_accumulated_angular_distance(steps: &[Step]) -> f64 {
+    let mut angular_distance = 0.0;
+    let mut prev: Option<Vector3<f64>> = None;
+    for step in steps {
+        let r = step.x.get_spatial_vector_cartesian();
+        let n = r.norm();
+        if n < 1e-9 {
+            continue; // skip degenerate points
+        }
+        let r_hat = r / n;
+        if let Some(p) = prev {
+            angular_distance += p.dot(&r_hat).clamp(-1.0, 1.0).acos();
+        }
+        prev = Some(r_hat);
+    }
+    angular_distance
+}
+
 impl<'a, G: Geometry> Scene<'a, G> {
     pub fn new(
         integration_configuration: IntegrationConfiguration,
@@ -91,7 +160,33 @@ impl<'a, G: Geometry> Scene<'a, G> {
             celestial_temperature,
             adaptive_sampling: Default::default(),
             sampling_mask_color: None,
+            star_catalog: None,
+            star_flux_scale: 1.0,
+            winding_spread_threshold: std::f64::consts::PI,
+            max_subdivision_depth: 6,
+            curved_star_membership: false,
+            star_magnification_cap: f64::INFINITY,
+            star_blackbody: None,
         }
+    }
+
+    /// Attach an optional point-source star catalogue and its tube-tracing
+    /// parameters (flux scale, winding subdivision threshold, depth cap).
+    pub fn with_star_catalog(
+        mut self,
+        star_catalog: Option<StarCatalog>,
+        star_flux_scale: f64,
+        winding_spread_threshold: f64,
+        max_subdivision_depth: usize,
+    ) -> Self {
+        // A physically exact LUT (beaming_exponent 0): the star gather imposes
+        // its own g^4 boost, so no extra artistic beaming here.
+        self.star_blackbody = star_catalog.as_ref().map(|_| BlackBodyMapper::new(0.0));
+        self.star_catalog = star_catalog;
+        self.star_flux_scale = star_flux_scale;
+        self.winding_spread_threshold = winding_spread_threshold;
+        self.max_subdivision_depth = max_subdivision_depth;
+        self
     }
 
     pub fn with_sampling_options(
@@ -148,7 +243,7 @@ impl<'a, G: Geometry> Scene<'a, G> {
                     .intersects(last_step, step, &frequency, remaining_steps)?
             {
                 intersections.push(intersection_color);
-                let alpha = intersection_color.alpha.clamp(0.0, 1.0);
+                let alpha = intersection_color.opacity();
                 object_opacity = alpha + object_opacity * (1.0 - alpha);
             }
         }
@@ -160,7 +255,7 @@ impl<'a, G: Geometry> Scene<'a, G> {
         if let Some(reason) = stop_reason {
             match reason {
                 HorizonReached => {
-                    intersections.push(CIETristimulus::new(0.0, 0.0, 0.0, 1.0));
+                    intersections.push(Radiance::BLACK);
                     ray_class = RayClass::Captured;
                 }
                 CelestialSphereReached => {
@@ -168,14 +263,30 @@ impl<'a, G: Geometry> Scene<'a, G> {
                     let redshift = self
                         .redshift_computer
                         .compute_redshift(last_step, frequency.observer_energy);
-                    intersections.push(self.texture_data.celestial_map.color_at_uv(
-                        &uv,
-                        &TemperatureData {
-                            redshift,
-                            temperature: self.celestial_temperature,
-                        },
-                    )?);
-                    ray_class = RayClass::Escaped;
+
+                    // If no star catalog is provided, we still want to sample the celestial sphere texture.
+                    // Otherwise, the star catalog will provide the color information for the celestial sphere.
+                    if self.star_catalog.is_none() {
+                        intersections.push(Radiance::from_straight(
+                            self.texture_data.celestial_map.color_at_uv(
+                                &uv,
+                                &TemperatureData {
+                                    redshift,
+                                    temperature: self.celestial_temperature,
+                                },
+                            )?,
+                        ));
+                    }
+
+                    // Take asymptotic travel direction (momentum) that spans the end of the tube.
+                    let escape_direction =
+                        last_step.p.get_cartesian_vector(&last_step.x).normalize();
+                    ray_class = RayClass::Escaped(EscapeInfo {
+                        x: escape_direction[0],
+                        y: escape_direction[1],
+                        z: escape_direction[2],
+                        redshift,
+                    });
                 }
                 StopReason::CoordinateIsNan => {
                     error!(
@@ -191,7 +302,7 @@ impl<'a, G: Geometry> Scene<'a, G> {
                     ray_class = RayClass::Captured;
                 }
                 StopReason::ClosedOrbitDetected => {
-                    intersections.push(CIETristimulus::new(0.0, 0.0, 0.0, 1.0));
+                    intersections.push(Radiance::BLACK);
                     ray_class = RayClass::Captured;
                 }
             };
@@ -205,19 +316,25 @@ impl<'a, G: Geometry> Scene<'a, G> {
             // No terminal event: default to Captured (see the NaN case above).
             ray_class = RayClass::Captured;
         }
-        let mut result = CIETristimulus::new(0.0, 0.0, 0.0, 1.0);
+        // Preserve foreground light and transmittance independently so the
+        // catalogue background can be composed later without reweighting emission.
+        let mut result = Radiance::TRANSPARENT;
 
         for color in intersections.iter().rev() {
-            result = result.blend(color)
+            result = color.over(result)
         }
 
         if object_opacity >= self.adaptive_sampling.object_hit_opacity_threshold {
             ray_class = RayClass::Hit;
         }
 
+        let accumulated_angular_distance = compute_accumulated_angular_distance(&steps.steps);
+
         Ok(RaySample {
             color: result,
             ray_class,
+            accumulated_angular_distance,
+            ray: ray.clone(),
         })
     }
 
@@ -356,6 +473,7 @@ pub mod test_scene {
                 center_disk_inner_radius,
                 center_disk_outer_radius,
             )?,
+            1.0,
         )));
 
         let scene = Scene::new(
@@ -421,7 +539,7 @@ mod tests {
             approx::assert_abs_diff_eq!($x.x, $y.x, epsilon = $e);
             approx::assert_abs_diff_eq!($x.y, $y.y, epsilon = $e);
             approx::assert_abs_diff_eq!($x.z, $y.z, epsilon = $e);
-            approx::assert_abs_diff_eq!($x.alpha, $y.alpha, epsilon = $e);
+            approx::assert_abs_diff_eq!($x.opacity(), $y.alpha, epsilon = $e);
         };
     }
 
@@ -494,9 +612,9 @@ mod tests {
         let radius = 1.0;
         let r = position[1];
         let a = 1.0 - radius / r;
-        // Future-directed freely falling observer (t component positive);
-        // the past-directed variant used before plan 8b made the emitter
-        // energy negative, which apply_beaming now correctly rejects.
+        // Future-directed freely falling observer (t component positive).
+        // A past-directed velocity produces a nonphysical frequency ratio,
+        // which apply_beaming rejects.
         let velocity = FourVector::new_spherical(1.0 / a, -(radius / r).sqrt(), 0.0, 0.0);
 
         let geometry = Schwarzschild::new(radius, 1e-4);
@@ -574,7 +692,7 @@ mod tests {
         let ray = scene.camera.get_ray_for(0, 0);
         let sample = scene.color_of_ray(&ray).unwrap();
 
-        assert_eq!(sample.ray_class, RayClass::Escaped);
+        assert!(matches!(sample.ray_class, RayClass::Escaped(_)));
         assert_approx_eq_cie_tristimulus!(sample.color, CELESTIAL_SPHERE_COLOR_2, 1e-6);
     }
 
@@ -645,7 +763,7 @@ mod tests {
         let sample = scene.color_of_ray(&ray).unwrap();
 
         assert_eq!(sample.ray_class, RayClass::Captured);
-        assert_eq!(sample.color, CIETristimulus::new(0.0, 0.0, 0.0, 1.0));
+        assert_eq!(sample.color, crate::rendering::radiance::Radiance::BLACK);
     }
 
     #[test]

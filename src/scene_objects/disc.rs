@@ -1,7 +1,7 @@
 use crate::geometry::geometry::Geometry;
 use crate::geometry::point::{CoordinateSystem, Point};
-use crate::rendering::color::CIETristimulus;
 use crate::rendering::integrator::Step;
+use crate::rendering::radiance::Radiance;
 use crate::rendering::raytracer::RaytracerError;
 use crate::rendering::temperature::TemperatureComputer;
 use crate::rendering::texture::{TextureMapHandle, UVCoordinates};
@@ -15,6 +15,10 @@ pub struct Disc {
     center_disk_outer_radius: f64,
     texture_mapper: TextureMapHandle,
     temperature_computer: Box<dyn TemperatureComputer>,
+    /// Linear multiplier on the emitted light only (opacity is untouched), so
+    /// the disc can be dialed into the same brightness range as a starfield and
+    /// both survive a single exposure.
+    flux_scale: f64,
 }
 
 impl Disc {
@@ -23,12 +27,14 @@ impl Disc {
         center_disk_outer_radius: f64,
         texture_mapper: TextureMapHandle,
         temperature_computer: Box<dyn TemperatureComputer>,
+        flux_scale: f64,
     ) -> Self {
         Self {
             center_disk_inner_radius,
             center_disk_outer_radius,
             texture_mapper,
             temperature_computer,
+            flux_scale,
         }
     }
 
@@ -122,7 +128,7 @@ impl Hittable for Disc {
         // the equatorial plane, so its steps are too small to straddle a
         // dip-and-back; every real crossing shows up as an endpoint sign change
         // handled by the linear branch above. Instrumenting a full vantage
-        // render produced zero hits here (see docs/known-rendering-behaviors.md).
+        // render produced zero hits here.
         // The reconstruction is kept because it is correct and cheap and would
         // catch a genuine in-step double crossing if a camera ever produced one.
         // The Hermite slopes are dz/ds with s running over the step's own
@@ -208,11 +214,17 @@ impl Hittable for Disc {
         &self,
         color_computation_data: &ColorComputationData,
         _geometry: &dyn Geometry,
-    ) -> Result<CIETristimulus, RaytracerError> {
-        self.texture_mapper.color_at_uv(
+    ) -> Result<Radiance, RaytracerError> {
+        let mut color = self.texture_mapper.color_at_uv(
             &color_computation_data.uv,
             &color_computation_data.temperature_data,
-        )
+        )?;
+        // Scale the emitted light, leaving alpha (opacity) intact so the disc
+        // still fully occludes whatever is behind it.
+        color.x *= self.flux_scale;
+        color.y *= self.flux_scale;
+        color.z *= self.flux_scale;
+        Ok(Radiance::from_straight(color))
     }
 
     fn energy_of_emitter(
@@ -262,6 +274,7 @@ mod tests {
                 Color::new(0, 100, 0, 255),
             )),
             Box::new(ConstantTemperatureComputer::new(1000.0)),
+            1.0,
         )
     }
 
