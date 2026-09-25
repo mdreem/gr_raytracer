@@ -121,17 +121,24 @@ trap terminate EXIT
 # Boot-stage marker: overwrites jobs/$JOB/BOOT after each setup step, so a pod
 # that dies during boot leaves its last completed stage for diagnosis.
 stage() { echo "$1 $(date -u +%FT%TZ)" | rclone rcat "b2:${B2_BUCKET}/jobs/${JOB}/BOOT" 2>/dev/null || true; }
+# Retry a flaky boot step up to 5 times with linear backoff: fresh RunPod pods
+# often drop the first apt/B2 connection, which was the main cause of pods dying
+# during boot. `die` marks the job FAILED and exits so the trap self-terminates
+# the pod and the orchestrator relaunches the job on a fresh pod.
+retry() { local n=0; until "$@"; do n=$((n+1)); [ "$n" -ge 5 ] && return 1; echo "retry $n/5: $*" >&2; sleep $((n*5)); done; }
+die()   { echo "$1" | rclone rcat "b2:${B2_BUCKET}/jobs/${JOB}/FAILED" 2>/dev/null || true; exit 1; }
+# rclone's own transient-retry flags, layered under the coarse `retry` above.
+RC="--retries 5 --low-level-retries 10 --contimeout 30s --timeout 300s"
 export DEBIAN_FRONTEND=noninteractive
 # Conditional setup: a baked image (see `build-image`) already ships rclone, the
 # binary and the parquet, so each step is skipped when already present. On a
-# plain debian image everything is installed/pulled as before. This is what lets
-# a baked image boot in seconds and dodge the flaky download window.
-command -v rclone >/dev/null 2>&1 || { apt-get update -qq && apt-get install -y -qq curl unzip ca-certificates >/dev/null 2>&1; curl -fsSL https://rclone.org/install.sh | bash >/dev/null 2>&1; } || true
+# plain debian image everything is installed/pulled as before, now with retries.
+command -v rclone >/dev/null 2>&1 || retry sh -c 'apt-get update -qq && apt-get install -y -qq curl unzip ca-certificates >/dev/null 2>&1 && curl -fsSL https://rclone.org/install.sh | bash >/dev/null 2>&1' || die "rclone install failed after retries"
 mkdir -p /work/data && cd /work
 stage "1-tools"
-[ -x gr_raytracer ] || { rclone copyto "b2:${B2_BUCKET}/bin/gr_raytracer" gr_raytracer && chmod +x gr_raytracer; }; stage "2-binary"
-[ -f "${PARQUET}" ] || rclone copyto "b2:${B2_BUCKET}/${PARQUET}" "${PARQUET}"; stage "3-parquet"
-rclone copyto "b2:${B2_BUCKET}/jobs/${JOB}/scene.toml" scene.toml; stage "4-scene"
+[ -x gr_raytracer ] || { retry rclone copyto $RC "b2:${B2_BUCKET}/bin/gr_raytracer" gr_raytracer && chmod +x gr_raytracer; } || die "binary download failed after retries"; stage "2-binary"
+[ -f "${PARQUET}" ] || retry rclone copyto $RC "b2:${B2_BUCKET}/${PARQUET}" "${PARQUET}" || die "parquet download failed after retries"; stage "3-parquet"
+retry rclone copyto $RC "b2:${B2_BUCKET}/jobs/${JOB}/scene.toml" scene.toml || die "scene download failed after retries"; stage "4-scene"
 echo "started $(date -u +%FT%TZ), args=${RENDER_ARGS}, $(nproc) vCPU, pod ${RUNPOD_POD_ID:-unknown}" \
   | rclone rcat "b2:${B2_BUCKET}/jobs/${JOB}/STARTED"
 # Heartbeat: overwrite jobs/$JOB/progress with elapsed seconds every 30s while
