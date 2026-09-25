@@ -33,6 +33,18 @@ pub enum CoordinateSystem {
     },
 }
 
+impl CoordinateSystem {
+    /// Spin parameter `a` of the coordinate frame: the Kerr spin for
+    /// `BoyerLindquist`, and `0` for the non-rotating frames (so the oblate
+    /// embedding reduces to the ordinary spherical one).
+    pub fn spin(self) -> f64 {
+        match self {
+            CoordinateSystem::BoyerLindquist { a } => a,
+            _ => 0.0,
+        }
+    }
+}
+
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub struct Point {
     pub coordinate_system: CoordinateSystem,

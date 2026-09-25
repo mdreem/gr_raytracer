@@ -112,14 +112,18 @@ impl FourVector {
         debug_assert_eq!(self.coordinate_system, at.coordinate_system);
         match self.coordinate_system {
             CoordinateSystem::Cartesian => self.vector[1],
+            // Spatial Jacobian of the oblate embedding x = sinθ (r cosφ − a sinφ)
+            // used throughout kerr_bl.rs. Spherical is the a = 0 special case.
             CoordinateSystem::Spherical | CoordinateSystem::BoyerLindquist { .. } => {
+                let a = self.coordinate_system.spin();
                 let r = at.vector[1];
                 let theta = at.vector[2];
                 let phi = at.vector[3];
                 let (st, ct) = (theta.sin(), theta.cos());
                 let (sp, cp) = (phi.sin(), phi.cos());
-                st * cp * self.vector[1] + r * ct * cp * self.vector[2]
-                    - r * st * sp * self.vector[3]
+                st * cp * self.vector[1]
+                    + ct * (r * cp - a * sp) * self.vector[2]
+                    + st * (-r * sp - a * cp) * self.vector[3]
             }
         }
     }
@@ -128,15 +132,17 @@ impl FourVector {
         debug_assert_eq!(self.coordinate_system, at.coordinate_system);
         match self.coordinate_system {
             CoordinateSystem::Cartesian => self.vector[2],
+            // Spatial Jacobian of y = sinθ (r sinφ + a cosφ); a = 0 for Spherical.
             CoordinateSystem::Spherical | CoordinateSystem::BoyerLindquist { .. } => {
+                let a = self.coordinate_system.spin();
                 let r = at.vector[1];
                 let theta = at.vector[2];
                 let phi = at.vector[3];
                 let (st, ct) = (theta.sin(), theta.cos());
                 let (sp, cp) = (phi.sin(), phi.cos());
                 st * sp * self.vector[1]
-                    + r * ct * sp * self.vector[2]
-                    + r * st * cp * self.vector[3]
+                    + ct * (r * sp + a * cp) * self.vector[2]
+                    + st * (r * cp - a * sp) * self.vector[3]
             }
         }
     }

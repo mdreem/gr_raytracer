@@ -21,6 +21,10 @@ fn create_scene_internal<'a>(
     config: &RenderConfig,
     camera_position: Point,
 ) -> Result<Scene<'a, Schwarzschild>, RaytracerError> {
+    // Steer the spherical coordinate pole off the field of view (0 = identity).
+    // Must run before the first `cartesian_to_spherical`, which otherwise locks
+    // the frame-rotation `OnceLock` to 0 and silently discards the flag.
+    crate::geometry::spherical_coordinates_helper::set_frame_rotation_deg(opts.pole_rotation_deg);
     let camera_position_spherical = cartesian_to_spherical(&camera_position);
     let momentum = resolve_camera_velocity(
         geometry,

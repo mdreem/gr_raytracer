@@ -96,6 +96,13 @@ fn single_star_directly_behind_forms_einstein_ring() {
     let (width, height) = (100usize, 100usize);
     let geometry = Schwarzschild::new(1.0, 1e-4);
 
+    // Honour POLE_ROT_DEG before any coordinate conversion below: the first
+    // cartesian->spherical conversion locks the frame-rotation OnceLock, so
+    // setting it afterwards would be silently ignored.
+    if let Some(deg) = std::env::var("POLE_ROT_DEG").ok().and_then(|s| s.parse().ok()) {
+        crate::geometry::spherical_coordinates_helper::set_frame_rotation_deg(deg);
+    }
+
     // Camera on the -y axis, looking back at the hole (theta = pi), so the
     // shadow and ring are centred in the frame. Use the geometry's normalized
     // static-observer 4-velocity, not a raw (1,0,0,0), so the tetrad is valid.
@@ -134,11 +141,9 @@ fn single_star_directly_behind_forms_einstein_ring() {
     });
     // The production toggles are the --curved-star-membership and
     // --pole-rotation-deg flags; honour the same knobs here via env vars so
-    // this test can exercise both paths without a CLI.
+    // this test can exercise both paths without a CLI. (POLE_ROT_DEG is applied
+    // above, before the coordinate conversion.)
     renderer.scene.curved_star_membership = std::env::var_os("CURVED_MEMBERSHIP").is_some();
-    if let Some(deg) = std::env::var("POLE_ROT_DEG").ok().and_then(|s| s.parse().ok()) {
-        crate::geometry::spherical_coordinates_helper::set_frame_rotation_deg(deg);
-    }
 
     let buffer = renderer
         .render_section_to_radiance_buffer(0, 0, height as u32, width as u32)

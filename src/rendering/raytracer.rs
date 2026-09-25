@@ -815,7 +815,7 @@ impl<'a, G: Geometry> Raytracer<'a, G> {
         &self,
         buffer: &[RaySample],
         width: usize,
-        height: usize,
+        _height: usize,
         colors: &mut [Radiance],
     ) -> Result<(), RaytracerError> {
         if self
@@ -836,11 +836,10 @@ impl<'a, G: Geometry> Raytracer<'a, G> {
         let skipped = AtomicUsize::new(0);
         colors.par_iter_mut().enumerate().for_each(|(idx, color)| {
             let (row, col) = (idx / width, idx % width);
-            // The base tube spans (row, col)..(row+1, col+1); the last row and
-            // column own no tube and keep their foreground colour.
-            if row + 1 >= height || col + 1 >= width {
-                return;
-            }
+            // The base tube spans (row, col)..(row+1, col+1); on the last row or
+            // column `from_buffer` clamps the stencil inward so the boundary
+            // pixel still gets its inward neighbour's footprint instead of being
+            // skipped (which would drop border stars and leave section seams).
             if let Some(tube) = SampleTube::from_buffer(buffer, row as u32, col as u32, width as u32)
             {
                 tubes.fetch_add(1, Ordering::Relaxed);

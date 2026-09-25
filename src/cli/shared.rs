@@ -147,13 +147,19 @@ pub fn create_scene<G: Geometry>(
         .adaptive_sampling
         .validate()
         .map_err(RaytracerError::InvalidConfiguration)?;
+    if let Some(star_catalog) = &config.star_catalog {
+        star_catalog
+            .validate()
+            .map_err(RaytracerError::InvalidConfiguration)?;
+    }
     let adaptive_sampling = config.adaptive_sampling.clone();
     let sampling_mask_color = opts
         .show_sampling_mask
         .then(|| CIETristimulus::from_color(&opts.sampling_mask_color));
 
-    // Steer the spherical coordinate pole off the field of view (0 = identity).
-    crate::geometry::spherical_coordinates_helper::set_frame_rotation_deg(opts.pole_rotation_deg);
+    // The frame rotation (--pole-rotation-deg) is set in the spherical
+    // geometry wrappers before the camera position is converted, since the
+    // conversion locks the value in; see schwarzschild::create_scene_internal.
 
     let integration_configuration = IntegrationConfiguration::new(
         opts.max_steps,

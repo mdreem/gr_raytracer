@@ -37,3 +37,6 @@ __pycache__/
 
 # Local design notes and future-work scratch (not committed)
 future-work-and-notes/
+
+# Secrets for remote rendering (never commit)
+.env

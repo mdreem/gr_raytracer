@@ -146,18 +146,26 @@ impl SampleTube<'_> {
         col: u32,
         width: u32,
     ) -> Option<SampleTube<'_>> {
-        if width < 2 || col >= width - 1 {
+        if width < 2 {
+            return None;
+        }
+        let height = buffer.len() as u32 / width;
+        if height < 2 {
             return None;
         }
 
-        let idx_a = (row * width + col) as usize;
-        let idx_b = (row * width + col + 1) as usize;
-        let idx_c = ((row + 1) * width + col) as usize;
-        let idx_d = ((row + 1) * width + col + 1) as usize;
+        // Clamp the 2x2 stencil inward so the last row and column reuse their
+        // inward neighbour's footprint instead of being skipped, which would
+        // drop stars on the right/bottom borders and leave section-render edges
+        // star-free (visible as seams when sections are stitched).
+        let base_row = row.min(height - 2);
+        let base_col = col.min(width - 2);
 
-        if idx_d >= buffer.len() {
-            return None;
-        }
+        let idx_a = (base_row * width + base_col) as usize;
+        let idx_b = (base_row * width + base_col + 1) as usize;
+        let idx_c = ((base_row + 1) * width + base_col) as usize;
+        let idx_d = ((base_row + 1) * width + base_col + 1) as usize;
+
         Some(SampleTube::new(
             &buffer[idx_a],
             &buffer[idx_b],

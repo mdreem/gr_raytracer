@@ -32,11 +32,14 @@ COLUMNS = [
 ]
 
 # Photometry the renderer needs; rows missing any of these are useless as
-# point sources, so we require them to be non-null server-side.
+# point sources, so we require them to be non-null server-side. bp_rp can be
+# null even when BP/RP magnitudes are present, and the renderer derives colour
+# temperature from it, so it must be required too or it lands as NaN.
 REQUIRED_NON_NULL = [
     "phot_g_mean_mag",
     "phot_bp_mean_mag",
     "phot_rp_mean_mag",
+    "bp_rp",
 ]
 
 # Parquet dtypes. Gaia source_id is a 64-bit designation that fits in int64
