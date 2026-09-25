@@ -385,6 +385,12 @@ double-precision throughput per GPU generation; stream compaction.
 - Gibbons, Werner, *Applications of the Gauss–Bonnet theorem to gravitational lensing*, arXiv:0807.0854.
 - Müller, Weiskopf, *Distortion of the stellar sky by a Schwarzschild black hole*; Müller's GeoViS / Motion4D as the closest general-metric raytracers.
 - Grave, Buser, *Visiting the Gödel universe*, IEEE TVCG 2008.
+- Ray bundles, explained better than DNGR's appendix: Perlick, *Gravitational lensing from a spacetime perspective*, arXiv:1010.3416 (§2.3: D̈ = D·R, D(0)=0, Ḋ(0)=1, tidal matrix from Φ₀₀ and ψ₀, polar decomposition into D₊, D₋, rotation; §4.3 eqs. 96–100: closed-form D± in spherically symmetric static spacetimes, the analytic test for a Schwarzschild bundle).
+- Seitz, Schneider, Ehlers, *Light propagation in arbitrary spacetimes and the gravitational lens approximation*, arXiv:astro-ph/9403056 (§2 same equation, |det D| = δA/δΩ; §3 behaviour at conjugate points: det D ∝ ε at a fold, ∝ ε² at a focus).
+- Fleury, Larena, Uzan, *Weak gravitational lensing of finite beams*, arXiv:1706.09383 (validity conditions of the infinitesimal-beam description).
+- Grasso, Korzyński, Serbenta, *Geometric optics in general relativity using bilocal operators*, arXiv:1811.10284; Serbenta thesis arXiv:2305.18843 (Jacobi map as an 8×8 resolvent of position and momentum deviations = the variational-equation form).
+- Pineault, Roeder, *Applications of geometrical optics to the Kerr metric* I and II, ApJ 212, 541 and 213, 548 (1977). Original ξ, η formulation.
+- Igehy, *Tracing ray differentials*, SIGGRAPH 1999; Heckbert, *Fundamentals of texture mapping and image warping*, 1989 (ray differentials and EWA filtering, the flat-space graphics counterparts).
 - Hart, *Sphere tracing*, The Visual Computer 1996.
 - James, von Tunzelmann, Franklin, Thorne, *Gravitational lensing by spinning black holes in astrophysics, and in the movie Interstellar*, arXiv:1502.03808 (§3.3 star filter, App. A.2 ray bundles).
 - Riazuelo, *Seeing relativity I*, arXiv:1511.06025.
