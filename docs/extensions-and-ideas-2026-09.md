@@ -328,6 +328,30 @@ Sky Jacobian singular values = δ±/2, rotation = μ, magnification
 δ_cs²/(δ₊δ₋). Checks: principal-null-direction bundle stays circular
 (Ψ₀ = 0); far-field magnification (u²+2)/(u√(u²+4)).
 
+**Dictionary DNGR (u,v,g,h,χ) ↔ Jacobi matrix D.** Perlick: parallel
+screen basis (E₁,E₂), Y = D θ. DNGR: twisting coordinate basis (a,b), χ =
+angle to the parallel basis (χ̇ = M). In the parallel basis Y = ξθ + ηθ̄,
+so D is Z ↦ ξZ + ηZ̄:
+
+```
+ξ = u+iv, η = g+ih;  D = [[u+g, h−v],[v+h, u−g]]
+ξ = ½[(D₁₁+D₂₂) + i(D₂₁−D₁₂)],  η = ½[(D₁₁−D₂₂) + i(D₁₂+D₂₁)]
+det D = |ξ|²−|η|²;  singular values |ξ|±|η|;  parity sign(|ξ|−|η|)
+major axis: ½ arg(ξη) in (E₁,E₂), + χ in (a,b)
+Ÿ = Φ₀₀Y − ψ̄₀Ȳ  ⇔  ξ̈ = Φ₀₀ξ − ψ̄₀η̄, η̈ = Φ₀₀η − ψ̄₀ξ̄
+DNGR vacuum: ξ̈ = −Ψe^{iψ}η̄, η̈ = −Ψe^{iψ}ξ̄, ψ = arg Ψ₀* − 2χ  (spin-weight-2 rotation)
+D(0)=0, Ḋ(0)=1 ⇔ ξ=η=0, ξ̇=1, η̇=0;  elliptical start Ḋ(0)=diag(1,e) ⇔ ξ̇=(1+e)/2, η̇=(1−e)/2
+sky: semi-axes ∝ |ξ̇|±|η̇| = singular values of Ḋ; magnification = 1/|det Ḋ|
+```
+
+Traps: Perlick's χ (eq. 19) is the ellipse angle, DNGR's χ the basis twist;
+Perlick's D̈ = D·R is the transpose of the vector form. DNGR vs
+Pineault–Roeder: PR write (x,y,p,q) for (u,v,g,h); DNGR flipped the null
+tetrad vector l from 2^−½(1,−1,0,0) to 2^−½(1,+1,0,0) (ingoing instead of
+outgoing rays), turning 1/(p_t̂+p_r̂) into 1/(p_t̂−p_r̂) in Ψ₀* and M; the
+evolution equations are identical. For the KS chart, use Perlick's
+basis-free form with ψ₀ from the Riemann tensor, or the variational form.
+
 Concepts: point spread function; pullback of a pixel footprint through the
 lens map; point-source vs extended-source magnification; partition of unity
 for flux-conserving resampling; critical curves, caustics and the fold
