@@ -28,17 +28,16 @@ same grade and exposure).
 
 ### Einstein ring of a source behind the hole
 
-A 5000 K blackbody-radiator sphere placed directly behind the hole, on the
-camera axis. Its light bends around the shadow into a bright Einstein ring; the
-grey disc at the centre is the shadow silhouetted against the sphere's near
-face, and the thin outer arcs are the lensed secondary image (the arc breaks are
-the discrete star-gather folding at the caustic, the same effect discussed in
-`kerr.md`). Rendered with the Kerr engine at a = 0 (i.e. Schwarzschild, so no
-coordinate pole) over the Gaia star field.
+A 5000 K blackbody sphere (radius 3) on the camera axis, behind the hole. Its
+light is lensed around the shadow into an Einstein ring. The grey disc at the
+centre is the shadow against the sphere's near face; the thin outer arcs are the
+lensed secondary image, and the breaks in them are the discrete star-gather
+folding at the caustic (see `kerr.md`). Rendered with the Kerr engine at a = 0
+(Schwarzschild, no coordinate pole) over the Gaia star field.
 
 <div align="center">
-  <img src="einstein-ring-sphere-2026-09-25.png" alt="A blackbody-radiator sphere behind a Schwarzschild black hole, lensed into an Einstein ring">
-  <p>A 5000 K sphere behind the hole, lensed into an Einstein ring, against the real Gaia star field.</p>
+  <img src="einstein-ring-sphere-2026-09-25.png" alt="A blackbody sphere behind a Schwarzschild black hole, lensed into an Einstein ring">
+  <p>A 5000 K sphere behind the hole, lensed into an Einstein ring, over the Gaia star field.</p>
 </div>
 
 ### Accretion disc over the Gaia star field

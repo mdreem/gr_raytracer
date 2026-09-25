@@ -48,12 +48,12 @@ and spin: the red pair sits at a = 0.4995, essentially extremal.
 
 <div align="center">
   <img src="kerr_blackbody_disk_a_0_5__2.png" alt="Essentially extremal Kerr black hole with a cool red blackbody disk, close-up on the shadow">
-  <p>The extremal-limit disc up close, high-contrast grade: the bright inner annulus dominates and the cool outer disc falls to near-black.</p>
+  <p>The extremal-limit disc up close, high-contrast grade: the inner annulus dominates and the cool outer disc falls to near-black.</p>
 </div>
 
 <div align="center">
-  <img src="kerr_blackbody_disk_a_0_5__2_lifted.png" alt="The same close-up, lifted grade showing the full cool disc">
-  <p>The same frame, lifted grade (Reinhard toe): the fainter cool body of the disc stays visible end to end, at the cost of some inner-annulus contrast.</p>
+  <img src="kerr_blackbody_disk_a_0_5__2_lifted.png" alt="The same close-up, Reinhard grade showing the full cool disc">
+  <p>The same frame with a Reinhard grade, which keeps the cool outer disc visible at the cost of some inner-annulus contrast.</p>
 </div>
 
 ### Volumetric Rendering
@@ -99,7 +99,7 @@ frames stay comparable.
 
 <div align="center">
   <img src="kerr_photon_ring_windings_soft.png" alt="The same photon-ring windings under a softer Reinhard grade">
-  <p>The same frame under a gentler Reinhard grade: the disc band is pulled down off the clip, so more of the individual nested windings read through the bright core.</p>
+  <p>The same frame with a Reinhard grade: the disc band is pulled below clipping, so more of the nested windings are visible.</p>
 </div>
 
 <div align="center">
