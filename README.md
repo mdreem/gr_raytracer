@@ -217,6 +217,10 @@ Animation of a Kerr black hole with `r_s = 1.0` and spin parameter `a` increasin
 
 - [Seeing relativity -- I. Ray tracing in a Schwarzschild metric to explore the maximal analytic extension of the metric and making a proper rendering of the stars](https://arxiv.org/abs/1511.06025)
 - [BlackHoleViz_v2](https://github.com/HollowaySean/BlackHoleViz_v2)
+- Bacchini, F., Ripperda, B., Chen, A. Y., & Sironi, L. (2018). *Generalized, energy-conserving numerical simulations of
+  particles in general relativity. I. Time-like and null
+  geodesics*. *ApJS*, 237, 6. [arXiv:1801.02378](https://arxiv.org/abs/1801.02378) - the Hamiltonian form of the
+  geodesic equations used by the `Kerr` (Kerr-Schild) solver.
 - Novikov, I. D., & Thorne, K. S. (1973). *Astrophysics of black holes*. In C. DeWitt & B. S. DeWitt (Eds.), *Black
   Holes (Les Astres Occlus)*, p.
     343. [Chapter bibliographic entry](https://cir.nii.ac.jp/crid/1370025430666224928), [Book record](https://lccn.loc.gov/73169355)

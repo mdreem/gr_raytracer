@@ -207,6 +207,8 @@ impl GeodesicSolver for KerrSolver {
     /// H(x, p) = 0.5 * g^{\mu\nu} p_\mu p_\nu
     /// d x^\mu / d\lambda = \partial H / \partial p_\mu = g^{\mu\nu} p_\nu
     /// d p_\mu / d\lambda = - \partial H / \partial x^\mu = -0.5 * \partial g^{\alpha\beta} / \partial x^\mu * p_\alpha p_\beta
+    ///
+    /// See https://arxiv.org/abs/1801.02378 for this formulation.
     fn geodesic(&self, _: f64, y_state: &EquationOfMotionState) -> EquationOfMotionState {
         let _t = y_state[0];
         let x = y_state[1];
