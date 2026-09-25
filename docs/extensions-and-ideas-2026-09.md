@@ -352,6 +352,27 @@ outgoing rays), turning 1/(p_t̂+p_r̂) into 1/(p_t̂−p_r̂) in Ψ₀* and M; 
 evolution equations are identical. For the KS chart, use Perlick's
 basis-free form with ψ₀ from the Riemann tensor, or the variational form.
 
+**Route 2: Jacobi equation = linearised Hamiltonian flow.** With
+ẋ^μ = g^{μν}p_ν, ṗ_μ = −½∂_μg^{αβ}p_αp_β and a family x(λ,s), p(λ,s),
+Y = ∂x/∂s, Π = ∂p/∂s:
+
+```
+Ẏ^μ = ∂_ν g^{μα} p_α Y^ν + g^{μν} Π_ν
+Π̇_μ = −½ ∂_μ∂_ν g^{αβ} p_α p_β Y^ν − ∂_μ g^{αβ} p_α Π_β      (δy' = (∂F/∂y) δy)
+```
+
+Y is Perlick's deviation vector; Π = g·∇_kY + Christoffel term. One more
+derivative gives ∇_k∇_kY = R(k,Y)k (textbook derivation: Carroll 3.10, Wald
+3.3, MTW 11.3). Numerically: evaluate the RHS on y + ε·δy with a dual ε
+(∂g must be exact ⇒ first-order dual for ∂g, hyper-dual for the variational
+step). Checks: symplectic form δx₁·δp₂ − δx₂·δp₁ constant along the ray;
+δH = 0. References: Grasso–Korzyński–Serbenta arXiv:1811.10284 §II.A (8×8
+resolvent W, eqs. 10–21; Jacobi map = 2×2 block, eq. 54; reduced eqs.
+56–58); Uzun arXiv:1811.10917 §3 (ż = L_H z, L_H = [[0,1],[R,0]], eqs.
+53–62, symplectic ABCD transfer matrix); Hairer–Nørsett–Wanner, Solving
+ODEs I, §I.14 (variational equation); Fike & Alonso 2011 (hyper-dual
+numbers).
+
 Concepts: point spread function; pullback of a pixel footprint through the
 lens map; point-source vs extended-source magnification; partition of unity
 for flux-conserving resampling; critical curves, caustics and the fold
