@@ -31,7 +31,10 @@ POD_IMAGE="${POD_IMAGE:-debian:bookworm-slim}"     # same base as rust:latest (b
 POD_DISK_GB="${POD_DISK_GB:-20}"
 # RunPod CPU pod sizing. cpuFlavorIds picks the CPU family (see `types`); vCPU
 # count is separate. cpu3c = 3rd-gen compute-optimized; 8 vCPU is a good render box.
-POD_CPU_FLAVOR="${POD_CPU_FLAVOR:-cpu3c}"          # one of cpu3c/3g/3m, cpu5c/5g/5m
+# Space-separated list of acceptable CPU flavors. With cpuFlavorPriority
+# "availability" RunPod picks whichever is free, so listing several avoids the
+# HTTP 500 "no instances available" when one flavor is sold out.
+POD_CPU_FLAVORS="${POD_CPU_FLAVOR:-${POD_CPU_FLAVORS:-cpu3c cpu5c cpu3g cpu5g cpu3m cpu5m}}"
 POD_VCPU="${POD_VCPU:-8}"                           # vCPUs allocated to the pod
 POD_CLOUD="${POD_CLOUD:-SECURE}"                    # SECURE or COMMUNITY (cheaper)
 RUNPOD_REST="https://rest.runpod.io/v1"
@@ -89,17 +92,22 @@ cmd_types() {  # list the CPU flavors the API accepts (from its own OpenAPI spec
 pod_command() {
   cat <<'POD'
 set -uo pipefail
-terminate() { curl -fsS -X DELETE "https://rest.runpod.io/v1/pods/${RUNPOD_POD_ID}" \
+# ${RUNPOD_POD_ID:-} so a machine that fails to inject it doesn't trip `set -u`.
+terminate() { curl -fsS -X DELETE "https://rest.runpod.io/v1/pods/${RUNPOD_POD_ID:-}" \
                 -H "Authorization: Bearer ${RUNPOD_API_KEY}" >/dev/null 2>&1 || true; }
 trap terminate EXIT
+# Boot-stage marker: overwrites jobs/$JOB/BOOT after each setup step, so a pod
+# that dies during boot leaves its last completed stage for diagnosis.
+stage() { echo "$1 $(date -u +%FT%TZ)" | rclone rcat "b2:${B2_BUCKET}/jobs/${JOB}/BOOT" 2>/dev/null || true; }
 export DEBIAN_FRONTEND=noninteractive
-apt-get update -qq && apt-get install -y -qq curl unzip ca-certificates >/dev/null 2>&1
-curl -fsSL https://rclone.org/install.sh | bash >/dev/null 2>&1
+apt-get update -qq && apt-get install -y -qq curl unzip ca-certificates >/dev/null 2>&1 || true
+curl -fsSL https://rclone.org/install.sh | bash >/dev/null 2>&1 || true
 mkdir -p /work/data && cd /work
-rclone copyto "b2:${B2_BUCKET}/bin/gr_raytracer" gr_raytracer && chmod +x gr_raytracer
-rclone copyto "b2:${B2_BUCKET}/${PARQUET}" "${PARQUET}"
-rclone copyto "b2:${B2_BUCKET}/jobs/${JOB}/scene.toml" scene.toml
-echo "started $(date -u +%FT%TZ), args=${RENDER_ARGS}, $(nproc) vCPU, pod ${RUNPOD_POD_ID}" \
+stage "1-apt+rclone"
+rclone copyto "b2:${B2_BUCKET}/bin/gr_raytracer" gr_raytracer && chmod +x gr_raytracer; stage "2-binary"
+rclone copyto "b2:${B2_BUCKET}/${PARQUET}" "${PARQUET}"; stage "3-parquet"
+rclone copyto "b2:${B2_BUCKET}/jobs/${JOB}/scene.toml" scene.toml; stage "4-scene"
+echo "started $(date -u +%FT%TZ), args=${RENDER_ARGS}, $(nproc) vCPU, pod ${RUNPOD_POD_ID:-unknown}" \
   | rclone rcat "b2:${B2_BUCKET}/jobs/${JOB}/STARTED"
 # Heartbeat: overwrite jobs/$JOB/progress with elapsed seconds every 30s while
 # rendering. The renderer's indicatif progress bar only draws on a TTY, so on a
@@ -130,7 +138,7 @@ cmd_render() {  # render <job> <scene.toml> <gr_raytracer args...>
   [ -n "$render_args" ] || { echo "need gr_raytracer args, e.g. --width=1280 --height=720 --exposure=2 --camera-position=-17,0,1.5 --theta=-3.14159 --psi=0 --phi=0"; exit 1; }
   echo "Uploading scene to b2:$B2_BUCKET/jobs/$job/ ..."
   rclone copyto "$scene" "b2:$B2_BUCKET/jobs/$job/scene.toml"
-  for m in DONE FAILED STARTED progress; do
+  for m in DONE FAILED STARTED progress BOOT; do
     rclone deletefile "b2:$B2_BUCKET/jobs/$job/$m" 2>/dev/null || true
   done
 
@@ -149,12 +157,13 @@ cmd_render() {  # render <job> <scene.toml> <gr_raytracer args...>
   # computeType=CPU, cpuFlavorIds (enum) + vcpuCount, cloudType SECURE/COMMUNITY.
   local body
   body=$(jq -n \
-    --arg name "gr-render-$job" --arg image "$POD_IMAGE" --arg flavor "$POD_CPU_FLAVOR" \
+    --argjson flavors "$(printf '%s\n' $POD_CPU_FLAVORS | jq -R . | jq -sc .)" \
+    --arg name "gr-render-$job" --arg image "$POD_IMAGE" \
     --arg cloud "$POD_CLOUD" --argjson vcpu "$POD_VCPU" \
     --argjson disk "$POD_DISK_GB" --argjson env "$env_json" \
     --arg cmd "$(pod_command)" \
     '{name:$name, imageName:$image, computeType:"CPU", cloudType:$cloud,
-      cpuFlavorIds:[$flavor], cpuFlavorPriority:"availability", vcpuCount:$vcpu,
+      cpuFlavorIds:$flavors, cpuFlavorPriority:"availability", vcpuCount:$vcpu,
       containerDiskInGb:$disk, env:$env,
       dockerStartCmd:["bash","-lc",$cmd]}')
 

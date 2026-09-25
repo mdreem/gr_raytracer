@@ -122,7 +122,7 @@ def aces(x):
 BLOOM_SOURCE_CAP = 8.0
 
 
-def grade(img, exposure, bloom_strength, threshold, white=None):
+def grade(img, exposure, bloom_strength, threshold, white=None, tonemap="aces"):
     # Normalize to a white point BEFORE anything else, so the bloom threshold and
     # the ACES knee are relative to the scene's own brightness, not its absolute
     # radiance scale. A raw disc render peaks in the millions; the gallery HDRs
@@ -144,9 +144,12 @@ def grade(img, exposure, bloom_strength, threshold, white=None):
         img = img + bloom_strength * bloom
 
     lum = (img * LUMA).sum(2)
-    # Luminance-preserving ACES: map luminance through the curve, scale RGB by
-    # the same factor so chromaticity is untouched. Divide only where lum > 0.
-    scale = np.divide(aces(lum), lum, out=np.zeros_like(lum), where=lum > 1e-9)
+    # Tone-map luminance through the chosen curve, scale RGB by the same factor
+    # so chromaticity is untouched (hue-preserving). Reinhard L/(1+L) has a
+    # gentler toe and keeps saturation; ACES is the filmic look with a harder
+    # toe (crushes shadows) and highlight desaturation from the post-scale clip.
+    curve = lum / (1.0 + lum) if tonemap == "reinhard" else aces(lum)
+    scale = np.divide(curve, lum, out=np.zeros_like(lum), where=lum > 1e-9)
     rgb = np.clip(img * scale[..., None], 0.0, 1.0) ** (1 / 2.2)
     return (rgb * 255.0).astype(np.uint8)
 
@@ -162,11 +165,13 @@ def main():
     ap.add_argument("--bloom", type=float, default=0.7, help="bloom strength (0 disables)")
     ap.add_argument("--threshold", type=float, default=0.12, help="bloom luminance threshold (relative to white)")
     ap.add_argument("--no-bloom", action="store_true", help="skip bloom entirely")
+    ap.add_argument("--tonemap", choices=["aces", "reinhard"], default="aces",
+                    help="tone curve: aces (filmic) or reinhard (gentler toe, more saturated)")
     args = ap.parse_args()
 
     img = read_image(args.input)
     strength = 0.0 if args.no_bloom else args.bloom
-    out = grade(img, args.exposure, strength, args.threshold, args.white)
+    out = grade(img, args.exposure, strength, args.threshold, args.white, args.tonemap)
     Image.fromarray(out).save(args.output)
     print(f"wrote {args.output} ({out.shape[1]}x{out.shape[0]})")
 
