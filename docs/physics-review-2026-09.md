@@ -601,6 +601,181 @@ Ordered by value for a physics-first renderer.
 11. Performance: analytic KS Christoffels (4.10), and an `atol/rtol` pair per
     state component once the state is typed (5.1).
 
+## 9. The disc in depth: energy, temperature, blackbody, redshift
+
+This section follows one photon from the disc to the pixel and checks each
+link against the literature: Shakura & Sunyaev (1973), Novikov & Thorne
+(1973), Page & Thorne (1974), Cunningham (1975, 1976), Luminet (1979),
+Li, Zimmerman, Narayan & McClintock 2005 (the `kerrbb` paper,
+astro-ph/0411583), Gralla, Holz & Wald 2019 (arXiv:1906.00873) and
+Johnson et al. 2020 (arXiv:1907.04329).
+
+### 9.1 The chain as implemented, and what is right about it
+
+1. **Energy release** (`temperature.rs`): the local flux is Page & Thorne's
+   eq. (15), `F(r) = −(Ṁ/(4π√−g)) · Ω_{,r}/(E − ΩL)² · ∫_{r_ISCO}^{r} (E − ΩL) L_{,r} dr`,
+   with `√−g = r` for the (t, r, φ) equatorial metric and the zero-torque
+   inner boundary at the ISCO (η = 0 in `kerrbb`'s notation). The code has the
+   same integrand, prefactor structure and lower limit; only the constant
+   differs, and the constant is calibrated away by `Ṁ`. `E(r)`, `L(r)`, `Ω(r)`
+   are the same circular-orbit functions the redshift uses, which is the
+   consistency Page & Thorne require. Independent check (Simpson rule,
+   analytic `Ω_{,r}`, 2·10⁴ intervals): the code's `T(r)/T(1.5 r_ISCO)`
+   agrees with Page–Thorne to 4·10⁻⁴ at `a = 0`, 4·10⁻³ at `a/M = 0.5`,
+   and 10⁻³ at `a/M = 0.998` for `r ≥ 1.1 r_ISCO` (see 9.2 for the rim).
+   The far-field `T ∝ r^{−3/4}(1 − √(r_ISCO/r))^{1/4}` Shakura–Sunyaev law
+   is also pinned by an existing test.
+2. **Temperature**: `T_eff = (F/σ)^{1/4}`, local blackbody, both faces emit
+   equally, opaque (`alpha = 1`). This is the NT/Page–Thorne assumption and
+   Luminet's; `kerrbb` adds a colour correction (9.3).
+3. **Emitter frame**: the Keplerian circular geodesic at the BL radius of the
+   hit, via Killing coefficients `(u^t, u^φ)`. Correct above the ISCO; the
+   Luminet closed form `1 + z = (1 − 3M/r)^{−1/2}(1 + Ω b)` is reproduced by
+   an existing test, and `kerrbb`'s appendix F gives the same formula (their
+   eq. F1) as the one they had to correct in XSPEC's `GRAD`.
+4. **Frequency shift**: `g = (u_cam·p)/(u_disc·p)`, chart-invariant and
+   sign-invariant.
+5. **Intensity**: `I_λ^obs(λ) = g⁵ B_λ(gλ, T) ≡ B_λ(λ, gT)`. This is the
+   Liouville invariance of `I_ν/ν³` written for `I_λ`; integrated over all
+   frequencies it gives the bolometric `g⁴` (Luminet's `(1+z)^{−4}`, Gralla
+   et al. eqs. 10–11), and it is exactly DNGR's "temperature shift of the
+   blackbody" (their A.6). The XYZ integral is taken over 380–830 nm of the
+   *shifted* spectrum, which is the right band-limited quantity: a strongly
+   redshifted patch goes dark because its light leaves the visible band, not
+   only because of `g⁴` (Riazuelo makes the same point in his Appendix B).
+6. **Beaming**: none extra; `beaming_exponent = 0.0` in the blackbody scenes.
+   Correct, since `g⁵` already contains the Doppler boost.
+
+Verdict: the physics chain is the standard thin-disc one and it is
+implemented consistently. Everything below is either a numerical detail or
+physics the standard model leaves out.
+
+### 9.2 Disc-specific findings
+
+**(a) Peak-temperature calibration** (finding 4.4): +18 % at `a/M = 0.998`.
+
+**(b) Inner-rim resolution of the temperature LUT.** Near the ISCO
+`L_{,r} → 0`, so `F ∝ (r − r_ISCO)²` and `T ∝ (r − r_ISCO)^{1/2}`: a square-root
+cusp. The LUT is 1000 points uniform in `r` from `r_ISCO` to `outer_radius`,
+interpolated linearly in `T`. Measured ratio code/Page–Thorne:
+
+| a/M | outer radius | 1.01 r_ISCO | 1.02 | 1.03 | 1.05 | 1.10 | ≥ 1.2 |
+|---|---|---|---|---|---|---|---|
+| 0.998 | 12 (gallery) | 0.71 | 0.99 | 0.98 | 0.995 | 0.999 | 1.000 |
+| 0.998 | 40 | 0.33 | 0.48 | 0.61 | 0.85 | 0.98 | 0.999 |
+
+With the gallery's outer radius the error is confined to the innermost 2 %
+of the rim, where the disc is nearly dark, so it is invisible; with a wide
+disc (outer 40) the whole inner rim is 15–50 % too cool. Fix: tabulate `F`
+(or `T⁴`, which is smooth and quadratic at the rim) and take the fourth root
+after interpolation, or grid in `s = √(r − r_ISCO)`. One line either way.
+
+**(c) No physical units.** `temperature` is a display target; the disc has no
+`M` or `Ṁ`. For a physically parametrised disc use `kerrbb`'s normalisation
+(their eqs. 16–17: the spectrum depends on `f_col`, `Ṁ^{1/4} M^{1/2}` and
+`M²/D²`), or the Shakura–Sunyaev scaling `T_max ∝ M^{−1/2} Ṁ^{1/4}` (Frank,
+King & Raine, eq. 5.43). A scene could then say "10 M☉, 10 % Eddington" and
+get kelvin out; the visible-band colour of a stellar-mass disc (10⁷ K) and of
+an AGN disc (10⁴–10⁵ K) differ enormously, and the gallery's 4000–20000 K
+correspond to the AGN/quasar regime.
+
+**(d) Physics the NT chain omits, in order of visual impact:**
+
+1. *Colour correction / spectral hardening*: the disc atmosphere is
+   scattering-dominated, so the emergent spectrum is a diluted blackbody
+   `I_ν = f_col^{−4} B_ν(f_col T_eff)` with `f_col ≈ 1.5–1.9` (Shimura &
+   Takahara 1995; Davis et al. 2005 favour 1.5–1.6; `kerrbb` uses 1.7). The
+   code's colours are `f_col = 1`. For an 8000 K disc, `f_col = 1.7` moves the
+   hue from amber to white-blue at the same bolometric flux. One-line change
+   in `BlackBodyMapper` plus a scene parameter.
+2. *Limb darkening*: `kerrbb` eq. (D20), the Chandrasekhar electron-scattering
+   law `I(μ) ∝ 1 + 2.06 μ` with `μ = cos` of the emission angle measured in
+   the emitter frame. The code emits isotropically. The emission angle is
+   available for free: `μ = (p·n)/(p·u_disc)` with `n` the unit normal in the
+   disc frame. Matters most for the grazing views in the vantage series.
+3. *Returning radiation* (Cunningham 1976; `kerrbb` §3.1): light from the
+   inner disc lensed back onto the disc. `F_in` stays finite at the ISCO
+   where `F_0 → 0`, so the dark ISCO rim in the gallery renders is partly an
+   artefact of ignoring it; `kerrbb` finds the effect is equivalent to raising
+   `Ṁ` by ≈ 1.7 at `a/M = 0.999`. This renderer can compute it exactly by
+   tracing rays *from* the disc, which is the same machinery as rendering.
+4. *Inner-edge torque* (Agol & Krolik 2000; `kerrbb` eq. 2, parameter η):
+   MHD discs have `η ~ 0.2`; it adds an `F ∝ r^{−7/2}` component and brightens
+   the inner disc. A scene parameter and one extra term in the flux.
+5. *Plunging-region emission*: NT assumes none inside the ISCO and the
+   code refuses (`BelowRISCO`). Gralla, Holz & Wald show the size of the
+   central dark area is set by the lensed inner edge of the *emission*, not
+   by the critical curve: for Schwarzschild it is `b ≈ 2.9M` if emission
+   reaches the horizon versus `5.2M` for the "shadow". Chael et al. 2021
+   (arXiv:2106.00683) call the former the *inner shadow*. Allowing an
+   emissivity profile inside the ISCO (with the infalling, not Keplerian,
+   four-velocity) would let the renderer show it.
+
+**(e) Photon-ring windings caption.** The gallery says successive windings
+are "≈ 23× thinner". Using Johnson et al. eq. (29), `γ = √(R''(r_γ)/2) · G_θ`,
+at the two equatorial limb points of an edge-on observer the exponent per
+polar half-oscillation (which is what counts successive images of an
+equatorial disc, since each is a new equatorial crossing) comes out `γ = π`
+for every spin, so `e^π ≈ 23` holds there. Two caveats for the caption:
+`γ` varies around the ring at other angles (their Fig. 6), and the number of
+*azimuthal* turns per image is very spin dependent: per azimuthal half-turn
+the demagnification at `a/M = 0.998` is only `e^{0.18} ≈ 1.2` on the prograde
+limb versus `e^{4.1} ≈ 59` on the retrograde limb. That is DNGR's remark that
+frame dragging "moves the critical curves outward from the shadow's flattened
+edge", and it is why the prograde side of that image shows the nested disc
+images spread out while the retrograde side stacks them. It is also, again,
+the region finding 4.1 affects.
+
+**(f) Lensing ring versus photon ring.** Gralla, Holz & Wald's decomposition
+(direct image `n = 1`, lensing ring `n = 2` at `5.02M < b < 6.17M` in
+Schwarzschild, photon ring `n ≥ 3` within `5.19–5.23M`) explains what the
+zoomed gallery frames show: the broad second image of the disc's far side is
+the lensing ring and carries a few percent of the flux; everything inside it
+is the photon ring and carries `e^{−π}` of that per order. The caption's
+"surface brightness is conserved, so each stays at full luminance" is right
+for an opaque disc; Luminet's 1979 remark that an opaque disc occults most of
+its own secondary image applies here too, and is why the secondary image
+appears only as a thin band hugging the shadow.
+
+**(g) Small consistencies.** The volumetric disc evaluates `T` at the
+cylindrical radius (4.6) and applies an extra artistic `(T/T_ref)⁴` on top of
+the Planck amplitude, which double-counts the temperature dependence of
+brightness; document it as artistic or remove it. The sphere object uses a
+static emitter (4.9). The celestial `celestial_temperature` blackbody sky is
+fine.
+
+### 9.3 Sanity numbers you can check against the renders
+
+- Peak of `T(r)`: `1.59 r_ISCO` at `a = 0` (the classical `(49/36) r_in`
+  is for the Newtonian `(1 − √(r_in/r))/r³` law, the relativistic value is
+  slightly different), `1.56` at `a/M = 0.5`, `1.28` at `a/M = 0.998`.
+- Frequency factors at the disc, `a/M = 0.6`, viewed near the plane: ≈ 1.5
+  approaching, ≈ 0.4 receding, including ≈ 20 % gravitational redshift
+  (DNGR §4.1.2). An `--epsilon`-independent check of the redshift field.
+- `a/M = 0.998` is Thorne's (1974) spin-up limit for a disc-fed hole, so the
+  gallery's "essentially extremal" is also the astrophysically maximal case;
+  `a/M = 0.9995` (`a = 0.49975`) is beyond it.
+- Shadow edges (Section 3.1) are the disc-independent part of the same
+  geometry.
+
+### 9.4 Papers for the disc, beyond the two in the README
+
+- Page & Thorne 1974, ApJ 191, 499: the flux formula implemented.
+- Thorne 1974, ApJ 191, 507: the 0.998 spin limit.
+- Cunningham 1975, ApJ 202, 788: transfer functions and the `g`-distribution
+  of a Kerr disc; Cunningham 1976, ApJ 208, 534: returning radiation.
+- Luminet 1979, A&A 75, 228 and Luminet's history (arXiv:1902.11196):
+  the bolometric image, isoradial curves, the opaque-disc occultation.
+- Shimura & Takahara 1995, ApJ 445, 780; Davis et al. 2005: `f_col`.
+- Agol & Krolik 2000, ApJ 528, 161: inner torque.
+- Li et al. 2005 (`kerrbb`, astro-ph/0411583): the complete modern thin-disc
+  ray-tracing spec, with every formula in its appendices.
+- Gralla, Holz & Wald 2019 (arXiv:1906.00873): direct / lensing / photon
+  ring, inner dark area set by emission not by the critical curve.
+- Johnson et al. 2020 (arXiv:1907.04329): Lyapunov exponents and subring
+  demagnification around the Kerr ring.
+- Chael, Johnson & Lupsasca 2021 (arXiv:2106.00683): the inner shadow.
+
 ## Appendix: reproducing the numbers
 
 ```sh
