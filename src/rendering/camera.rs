@@ -521,8 +521,18 @@ mod tests {
         v: f64,
     ) {
         let gamma = (1.0 - v * v).sqrt().recip();
-        let camera = Camera::new(position, velocity, PI / 2.0, 101, 101, 0.0, 0.0, 0.0, geometry)
-            .unwrap();
+        let camera = Camera::new(
+            position,
+            velocity,
+            PI / 2.0,
+            101,
+            101,
+            0.0,
+            0.0,
+            0.0,
+            geometry,
+        )
+        .unwrap();
         // The boosted tetrad's time axis is the camera velocity.
         assert_abs_diff_eq!(
             camera.tetrad.t.get_as_vector(),
@@ -540,11 +550,19 @@ mod tests {
                 let cos_cam = sign_s * geometry.inner_product(&position, &n, &x_axis_boosted);
                 let g_code = (sign_t * geometry.inner_product(&position, &velocity, &p))
                     / (sign_t * geometry.inner_product(&position, &rest, &p));
-                assert_abs_diff_eq!(g_code, (gamma * (1.0 - v * cos_cam)).recip(), epsilon = 1e-12);
+                assert_abs_diff_eq!(
+                    g_code,
+                    (gamma * (1.0 - v * cos_cam)).recip(),
+                    epsilon = 1e-12
+                );
                 // Lab-frame source direction (Cartesian components of the spatial part).
                 let sp = p.get_cartesian_vector(&position);
                 let cos_lab = sp[0] / sp.norm();
-                assert_abs_diff_eq!(cos_lab, (cos_cam - v) / (1.0 - v * cos_cam), epsilon = 1e-12);
+                assert_abs_diff_eq!(
+                    cos_lab,
+                    (cos_cam - v) / (1.0 - v * cos_cam),
+                    epsilon = 1e-12
+                );
             }
         }
     }
