@@ -27,6 +27,10 @@ cd "$REPO_ROOT"
 BINARY="target/amd64/release/gr_raytracer"         # glibc build, matches POD_IMAGE
                                                    # (own target dir so it never mixes
                                                    # with the host's arm64 artifacts)
+# If IMAGE_REPO is set (e.g. docker.io/USER/gr-raytracer or ghcr.io/USER/gr-raytracer),
+# the baked image built by `build-image` is used by default: pods then boot in
+# seconds with no B2 download. Otherwise a plain debian base pulls at boot.
+POD_IMAGE="${POD_IMAGE:-${IMAGE_REPO:+${IMAGE_REPO}:latest}}"
 POD_IMAGE="${POD_IMAGE:-debian:bookworm-slim}"     # same base as rust:latest (bookworm)
 POD_DISK_GB="${POD_DISK_GB:-20}"
 # RunPod CPU pod sizing. cpuFlavorIds picks the CPU family (see `types`); vCPU
@@ -71,6 +75,24 @@ cmd_build() {
   ls -la "$BINARY"; file "$BINARY"
 }
 
+cmd_build_image() {
+  # Bake rclone + binary + parquet into an image so pods boot in seconds with no
+  # B2 download (the flaky window). Needs IMAGE_REPO set and a `docker login` to
+  # that registry. Uses buildx for a linux/amd64 image even on an arm64 host.
+  : "${IMAGE_REPO:?set IMAGE_REPO to your registry, e.g. docker.io/USER/gr-raytracer or ghcr.io/USER/gr-raytracer}"
+  [ -f "$BINARY" ] || { echo "run '$0 build' first ($BINARY missing)"; exit 1; }
+  [ -f "$PARQUET" ] || { echo "missing $PARQUET"; exit 1; }
+  local ctx; ctx=$(mktemp -d)
+  mkdir -p "$ctx/bin" "$ctx/data"
+  cp scripts/render-pod.Dockerfile "$ctx/Dockerfile"
+  cp "$BINARY" "$ctx/bin/gr_raytracer"
+  cp "$PARQUET" "$ctx/data/$(basename "$PARQUET")"
+  echo "Building + pushing ${IMAGE_REPO}:latest (linux/amd64, binary + $(basename "$PARQUET"))..."
+  docker buildx build --platform linux/amd64 -t "${IMAGE_REPO}:latest" --push "$ctx"
+  rm -rf "$ctx"
+  echo "Done. Pods will now use ${IMAGE_REPO}:latest and skip the B2 download."
+}
+
 cmd_push_data() {
   load_env
   echo "Uploading binary + parquet to b2:$B2_BUCKET ..."
@@ -100,12 +122,15 @@ trap terminate EXIT
 # that dies during boot leaves its last completed stage for diagnosis.
 stage() { echo "$1 $(date -u +%FT%TZ)" | rclone rcat "b2:${B2_BUCKET}/jobs/${JOB}/BOOT" 2>/dev/null || true; }
 export DEBIAN_FRONTEND=noninteractive
-apt-get update -qq && apt-get install -y -qq curl unzip ca-certificates >/dev/null 2>&1 || true
-curl -fsSL https://rclone.org/install.sh | bash >/dev/null 2>&1 || true
+# Conditional setup: a baked image (see `build-image`) already ships rclone, the
+# binary and the parquet, so each step is skipped when already present. On a
+# plain debian image everything is installed/pulled as before. This is what lets
+# a baked image boot in seconds and dodge the flaky download window.
+command -v rclone >/dev/null 2>&1 || { apt-get update -qq && apt-get install -y -qq curl unzip ca-certificates >/dev/null 2>&1; curl -fsSL https://rclone.org/install.sh | bash >/dev/null 2>&1; } || true
 mkdir -p /work/data && cd /work
-stage "1-apt+rclone"
-rclone copyto "b2:${B2_BUCKET}/bin/gr_raytracer" gr_raytracer && chmod +x gr_raytracer; stage "2-binary"
-rclone copyto "b2:${B2_BUCKET}/${PARQUET}" "${PARQUET}"; stage "3-parquet"
+stage "1-tools"
+[ -x gr_raytracer ] || { rclone copyto "b2:${B2_BUCKET}/bin/gr_raytracer" gr_raytracer && chmod +x gr_raytracer; }; stage "2-binary"
+[ -f "${PARQUET}" ] || rclone copyto "b2:${B2_BUCKET}/${PARQUET}" "${PARQUET}"; stage "3-parquet"
 rclone copyto "b2:${B2_BUCKET}/jobs/${JOB}/scene.toml" scene.toml; stage "4-scene"
 echo "started $(date -u +%FT%TZ), args=${RENDER_ARGS}, $(nproc) vCPU, pod ${RUNPOD_POD_ID:-unknown}" \
   | rclone rcat "b2:${B2_BUCKET}/jobs/${JOB}/STARTED"
@@ -225,9 +250,10 @@ cmd_kill() {  # kill <podId> : delete a pod by hand (backstop if self-terminate 
 }
 
 case "${1:-}" in
-  build)      cmd_build ;;
-  push-data)  cmd_push_data ;;
-  types)      cmd_types ;;
+  build)       cmd_build ;;
+  build-image) cmd_build_image ;;
+  push-data)   cmd_push_data ;;
+  types)       cmd_types ;;
   render)     shift; cmd_render "$@" ;;
   fetch)      shift; cmd_fetch "$@" ;;
   status|ps)  shift; cmd_status "$@" ;;
@@ -235,6 +261,8 @@ case "${1:-}" in
   *) cat <<EOF
 usage: $0 <command>
   build                          build the x86_64 Linux binary in Docker
+  build-image                    bake rclone+binary+parquet into IMAGE_REPO:latest
+                                 (fast, download-free pod boot; needs docker login)
   push-data                      upload binary + parquet to B2 (re-run on change)
   types                          list valid RunPod cpuFlavorIds (set POD_CPU_FLAVOR)
   render <job> <scene.toml> <gr_raytracer args...>
