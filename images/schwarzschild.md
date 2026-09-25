@@ -26,6 +26,20 @@ same grade and exposure).
   <p>Same catalogue from the disc images' vantage: the sky patch here is the one the disc renders below sit in front of.</p>
 </div>
 
+### Einstein ring of a source behind the hole
+
+A 5000 K blackbody sphere (radius 3) on the camera axis, behind the hole. Its
+light is lensed around the shadow into an Einstein ring. The grey disc at the
+centre is the shadow against the sphere's near face; the thin outer arcs are the
+lensed secondary image, and the breaks in them are the discrete star-gather
+folding at the caustic (see `kerr.md`). Rendered with the Kerr engine at a = 0
+(Schwarzschild, no coordinate pole) over the Gaia star field.
+
+<div align="center">
+  <img src="einstein-ring-sphere-2026-09-25.png" alt="A blackbody sphere behind a Schwarzschild black hole, lensed into an Einstein ring">
+  <p>A 5000 K sphere behind the hole, lensed into an Einstein ring, over the Gaia star field.</p>
+</div>
+
 ### Accretion disc over the Gaia star field
 
 A flat Novikov-Thorne blackbody accretion disc rendered together with the real
