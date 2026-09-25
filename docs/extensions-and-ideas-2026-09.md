@@ -238,7 +238,7 @@ injectivity radius, Flamm's paraboloid.
 **Recommended order.** Ellis wormhole → Eaton or fish-eye lens → Gödel. The
 3-torus fits in at any point as a one-evening exercise for the hook.
 
-## 9. Stars, filters and folds
+## 8. Stars, filters and folds
 
 **Sizes are a camera question.** The camera is stereographic with a
 hard-coded 45° half angle (90° frame height). Shadow radius is verified
@@ -312,7 +312,7 @@ catastrophe; integrable singularities; geodesic deviation / Jacobi fields;
 image parity; Einstein radius vs lens distance; lensing ring vs photon ring
 (Gralla–Holz–Wald); stereographic vs gnomonic projection.
 
-## 10. Interior camera and the Kerr–Schild chart
+## 9. Interior camera and the Kerr–Schild chart
 
 See `physics-review-2026-09.md` §11 for the measurements. Summary: rays
 crossing the future horizon integrate cleanly (≤ 105 steps to r = 60,
@@ -332,7 +332,7 @@ change; ingoing vs outgoing Eddington–Finkelstein / Kerr–Schild and which
 horizon each covers; Penrose diagram of Kerr; coordinate vs curvature
 singularity; maximal analytic extension; Cauchy horizon.
 
-## 11. GPU notes
+## 10. GPU notes
 
 Only the per-step inner loop moves (metric, inverse, derivatives, RHS,
 RKF45 step and controller, stop conditions, hit tests, redshift and
@@ -354,7 +354,7 @@ polymorphism, monomorphisation; uniform vs divergent control flow; enum
 dispatch; SPIR-V and PTX; rustc codegen backends; Float64 capability;
 double-precision throughput per GPU generation; stream compaction.
 
-## 12. Reading
+## 11. Reading
 
 - Coulon, Matsumoto, Segerman, Trettel, *Ray-marching Thurston geometries*, arXiv:2010.15801.
 - Hart, Hawksley, Matsumoto, Segerman, *Non-euclidean virtual reality I/II*, arXiv:1702.04004, arXiv:1702.04862.
