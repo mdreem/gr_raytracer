@@ -506,4 +506,68 @@ mod tests {
             * geometry.inner_product(&ray.position, &camera.velocity, &ray.momentum);
         assert!(orientation < 0.0);
     }
+
+    /// A camera boosted to velocity v in flat space must see exactly the
+    /// special-relativistic sky: for a static emitter at camera-frame
+    /// direction cosine c (measured from the velocity axis), the frequency
+    /// ratio is 1/(gamma (1 - v c)), and the lab-frame source direction obeys
+    /// the aberration formula. Regression test for the boost matrix's last
+    /// term, which once boosted to -v.
+    fn assert_boosted_camera_matches_special_relativity<G: crate::geometry::geometry::Geometry>(
+        geometry: &G,
+        position: Point,
+        velocity: FourVector,
+        x_axis_boosted: FourVector,
+        v: f64,
+    ) {
+        let gamma = (1.0 - v * v).sqrt().recip();
+        let camera = Camera::new(position, velocity, PI / 2.0, 101, 101, 0.0, 0.0, 0.0, geometry)
+            .unwrap();
+        // The boosted tetrad's time axis is the camera velocity.
+        assert_abs_diff_eq!(
+            camera.tetrad.t.get_as_vector(),
+            velocity.get_as_vector(),
+            epsilon = 1e-12
+        );
+        let sign_t = geometry.signature()[0];
+        let sign_s = geometry.signature()[1];
+        let rest = FourVector::new(1.0, 0.0, 0.0, 0.0, velocity.coordinate_system);
+        for row in (0..101).step_by(25) {
+            for col in (0..101).step_by(10) {
+                let p = camera.get_ray_for(row, col).momentum;
+                // n = p + u is the unit source direction in the camera frame.
+                let n = p + velocity;
+                let cos_cam = sign_s * geometry.inner_product(&position, &n, &x_axis_boosted);
+                let g_code = (sign_t * geometry.inner_product(&position, &velocity, &p))
+                    / (sign_t * geometry.inner_product(&position, &rest, &p));
+                assert_abs_diff_eq!(g_code, (gamma * (1.0 - v * cos_cam)).recip(), epsilon = 1e-12);
+                // Lab-frame source direction (Cartesian components of the spatial part).
+                let sp = p.get_cartesian_vector(&position);
+                let cos_lab = sp[0] / sp.norm();
+                assert_abs_diff_eq!(cos_lab, (cos_cam - v) / (1.0 - v * cos_cam), epsilon = 1e-12);
+            }
+        }
+    }
+
+    #[test]
+    fn boosted_camera_matches_special_relativity_in_flat_space() {
+        let v = 0.6;
+        let gamma = (1.0_f64 - v * v).sqrt().recip();
+        assert_boosted_camera_matches_special_relativity(
+            &EuclideanSpace::new(),
+            Point::new_cartesian(0.0, 0.0, 0.0, -10.0),
+            FourVector::new_cartesian(gamma, gamma * v, 0.0, 0.0),
+            FourVector::new_cartesian(gamma * v, gamma, 0.0, 0.0),
+            v,
+        );
+        // Spherical flat space: camera on the +x axis, where x_hat is the
+        // radial direction, so an x-velocity has only a radial component.
+        assert_boosted_camera_matches_special_relativity(
+            &EuclideanSpaceSpherical::new(),
+            Point::new_spherical(0.0, 10.0, PI / 2.0, 0.0),
+            FourVector::new_spherical(gamma, gamma * v, 0.0, 0.0),
+            FourVector::new_spherical(gamma * v, gamma, 0.0, 0.0),
+            v,
+        );
+    }
 }

@@ -110,13 +110,32 @@ impl Geometry for EuclideanSpaceSpherical {
         )
     }
 
-    fn lorentz_transformation(&self, _position: &Point, _velocity: &FourVector) -> Matrix4<f64> {
-        let mut matrix = Matrix4::zeros();
-        matrix[(0, 0)] = 1.0;
-        matrix[(1, 1)] = 1.0;
-        matrix[(2, 2)] = 1.0;
-        matrix[(3, 3)] = 1.0;
+    /// Boost taking the reference tetrad's time axis T onto `velocity` u:
+    /// Lambda^mu_nu = delta - (T+u)^mu (T+u)_nu / (1+gamma) + 2 u^mu T_nu
+    /// (Riazuelo 2018, eq. 6), with indices lowered by the flat metric in
+    /// spherical coordinates diag(1, -1, -r^2, -r^2 sin^2 theta). Previously
+    /// the identity, which silently rendered every moving camera as static.
+    fn lorentz_transformation(&self, position: &Point, velocity: &FourVector) -> Matrix4<f64> {
+        let r = position[1];
+        let theta = position[2];
+        let metric_diag = [1.0, -1.0, -r * r, -r * r * theta.sin() * theta.sin()];
+        let t = self.get_tetrad_at(position).t.get_as_vector();
+        let u = velocity.get_as_vector();
 
+        let mut gamma = 0.0;
+        for i in 0..4 {
+            gamma += metric_diag[i] * t[i] * u[i];
+        }
+
+        let mut matrix = Matrix4::zeros();
+        for mu in 0..4 {
+            for nu in 0..4 {
+                let mut res = if mu == nu { 1.0 } else { 0.0 };
+                res -= (t[mu] + u[mu]) * metric_diag[nu] * (t[nu] + u[nu]) / (1.0 + gamma);
+                res += 2.0 * u[mu] * metric_diag[nu] * t[nu];
+                matrix[(mu, nu)] = res;
+            }
+        }
         matrix
     }
 
