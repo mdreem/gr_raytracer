@@ -238,7 +238,123 @@ injectivity radius, Flamm's paraboloid.
 **Recommended order.** Ellis wormhole → Eaton or fish-eye lens → Gödel. The
 3-torus fits in at any point as a one-evening exercise for the hook.
 
-## 8. Reading
+## 9. Stars, filters and folds
+
+**Sizes are a camera question.** The camera is stereographic with a
+hard-coded 45° half angle (90° frame height). Shadow radius is verified
+against Bardeen to < 1 %. For a static camera at distance D (units r_s),
+Schwarzschild:
+
+| D | shadow diameter | Einstein ring diameter | gap: shadow edge → 2nd ring |
+|---|---|---|---|
+| 5 | 60 % of frame height | 100 % | 0.5° |
+| 10 | 30 % | 64 % | 0.34° |
+| 18 | 17 % | 46 % | 0.22° |
+| 50 | 6 % | 26 % | 0.08° |
+| 1000 | 0.3 % | 5.5 % | 0.003° |
+
+All higher-order images live in the gap column (a few pixels at 1000 px).
+Film stills use a narrower lens and a textured sky. Check without reference
+pictures: a small bright sphere exactly behind the hole must render as a ring
+of the tabulated diameter.
+
+**The Gaussian filter is camera-side.** DNGR §3.3: the beam starts at the
+camera as a 2-pixel circle in the image plane and is carried to the sky by
+the deviation equation; a star inside the resulting ellipse lights the pixel
+with the Gaussian weight of its position in the beam. Riazuelo: lens the
+star direction first, then draw a fixed-angular-size blob as seen by the
+observer. Both are blur *after* lensing. Blur before lensing = extended
+source: stars near the Einstein ring become arcs, a star behind the hole a
+ring. With the camera-side PSF a star is always ≈ 2 px; only brightness
+follows magnification; arcs arise from overlapping neighbouring footprints.
+For this code: 2-px-radius overlapping tubes, map each star back into
+image coordinates via the footprint's local linear map, Gaussian weight of
+the image-plane offset, normalise weights per star to 1 (flux
+conservation, DNGR's 2 % flicker figure). Brightness stays the solid-angle
+ratio.
+
+**Why the magnification cap exists.** Pixel brightness from a star is flux
+× magnification = image solid angle / footprint solid angle = 1/|det J| of
+the lens map. The code measures the footprint from four traced corners. On
+a critical curve (Einstein ring, photon rings) det J = 0 and the map
+folds: locally u ≈ x², v ≈ y. A pixel straddling the curve maps to a strip
+covered twice; its corners land pairwise on the same sky points, the quad
+collapses to a line, the area → 0, and the two triangles wind oppositely.
+Consequences: spurious magnification blow-up, missed stars (dark gaps in
+the ring), sign cancellation in polygon gathers. The folded-quad test,
+subdivision to single-sheet pieces, flat-gather fallback, hidden-fold
+signed-area check and `star_magnification_cap` are all patches for this
+one cause; the cap sets the photon-ring peak brightness by fiat.
+
+The physical divergence is integrable: a point source at caustic offset u
+has two images of magnification ∝ u^−1/2 each, so expected flux per pixel
+from a random star field is finite and only a star exactly on the caustic
+is formally infinite. The collapsed quad reproduces none of this.
+
+**Jacobi-field footprint.** DNGR integrates the geodesic deviation
+equation (App. A.2, Pineault–Roeder) for two deviation vectors spanning the
+pixel; at the sky they are the Jacobian's columns, the ellipse semi-axes
+its singular values, magnification 1/|det J|. Across a critical curve det J
+crosses zero linearly, one axis shrinks smoothly to zero, nothing folds or
+self-intersects, and sign(det J) is the image parity. The remaining
+divergence is the physical one, bounded by the pixel spacing and spread by
+the filter; a cap becomes a safety valve. Cost: 16 extra ODE components
+plus the Riemann tensor (second metric derivatives: expensive with finite
+differences, cheap with dual-number AD). Cheap intermediate: shrink the
+four-corner stencil to a small fraction of a pixel around the centre so it
+measures J at the centre; needs tight tolerance. Filter and footprint are
+independent; do the filter first.
+
+Concepts: point spread function; pullback of a pixel footprint through the
+lens map; point-source vs extended-source magnification; partition of unity
+for flux-conserving resampling; critical curves, caustics and the fold
+catastrophe; integrable singularities; geodesic deviation / Jacobi fields;
+image parity; Einstein radius vs lens distance; lensing ring vs photon ring
+(Gralla–Holz–Wald); stereographic vs gnomonic projection.
+
+## 10. Interior camera and the Kerr–Schild chart
+
+See `physics-review-2026-09.md` §11 for the measurements. Summary: rays
+crossing the future horizon integrate cleanly (≤ 105 steps to r = 60,
+|ΔH|/|p|² ≤ 1e-6 at ε = 1e-5); rays asymptoting to the past horizon stall at
+H_MIN and, because the integrator accepts steps at H_MIN regardless of
+error, tunnel and explode. Needed: a chart-independent stall stop (N
+consecutive H_MIN steps), "error above ε at H_MIN" as a stop reason, no
+inner-horizon stop for a camera between r₋ and r₊. Boyer–Lindquist cannot
+host an interior camera (imaginary ZAMO lapse, Δ = 0 at both horizons); a
+BL-outside/KS-inside atlas is a speed optimisation. If an atlas is added:
+transitions between accepted steps only, closed-form azimuth twist and time
+shift, covariant momentum via the Jacobian transpose, E/L/Q checked across
+the switch, hysteresis wider than H_MAX.
+
+Concepts: atlas and transition functions; cotangent lift of a coordinate
+change; ingoing vs outgoing Eddington–Finkelstein / Kerr–Schild and which
+horizon each covers; Penrose diagram of Kerr; coordinate vs curvature
+singularity; maximal analytic extension; Cauchy horizon.
+
+## 11. GPU notes
+
+Only the per-step inner loop moves (metric, inverse, derivatives, RHS,
+RKF45 step and controller, stop conditions, hit tests, redshift and
+temperature lookups): ≈ 1500–2000 of 15 000 lines. Host keeps config,
+camera/tetrad, star gather and octree, temperature table, supersampling,
+compositing, output, tests. Polymorphism survives as generics
+(`fn trace<G: Geometry>`, one monomorphised kernel per geometry); scene
+objects become a tagged enum with a uniform `match`; scalar type generic
+(f64 or dual). Shared crate `no_std`, no heap / `dyn` / recursion /
+formatted panics; nalgebra and logging host-side behind `cfg`. Routes:
+rust-gpu (SPIR-V, vendor neutral, f64 via Float64 capability, host via
+`ash` or `wgpu` passthrough); Rust-CUDA (PTX, NVIDIA); CubeCL (`#[cube]`
+DSL, f64 on CUDA/HIP); or foreign-language kernels. Ruled out by f64: WGSL,
+browsers, Apple GPUs; consumer NVIDIA f64 is 1/32–1/64 rate. Do fused loop,
+AD and the first-order BL solver first.
+
+Concepts: loop fusion, arithmetic intensity, roofline; static vs dynamic
+polymorphism, monomorphisation; uniform vs divergent control flow; enum
+dispatch; SPIR-V and PTX; rustc codegen backends; Float64 capability;
+double-precision throughput per GPU generation; stream compaction.
+
+## 12. Reading
 
 - Coulon, Matsumoto, Segerman, Trettel, *Ray-marching Thurston geometries*, arXiv:2010.15801.
 - Hart, Hawksley, Matsumoto, Segerman, *Non-euclidean virtual reality I/II*, arXiv:1702.04004, arXiv:1702.04862.
@@ -247,5 +363,8 @@ injectivity radius, Flamm's paraboloid.
 - Müller, Weiskopf, *Distortion of the stellar sky by a Schwarzschild black hole*; Müller's GeoViS / Motion4D as the closest general-metric raytracers.
 - Grave, Buser, *Visiting the Gödel universe*, IEEE TVCG 2008.
 - Hart, *Sphere tracing*, The Visual Computer 1996.
+- James, von Tunzelmann, Franklin, Thorne, *Gravitational lensing by spinning black holes in astrophysics, and in the movie Interstellar*, arXiv:1502.03808 (§3.3 star filter, App. A.2 ray bundles).
+- Riazuelo, *Seeing relativity I*, arXiv:1511.06025.
+- Gralla, Holz, Wald, *Black hole shadows, photon rings, and lensing rings*, arXiv:1906.00873.
 - Ellis, *Ether flow through a drainhole*, J. Math. Phys. 14, 104 (1973).
 - Leonhardt, Philbin, *Geometry and Light: The Science of Invisibility*.
