@@ -809,6 +809,45 @@ fine.
   demagnification around the Kerr ring.
 - Chael, Johnson & Lupsasca 2021 (arXiv:2106.00683): the inner shadow.
 
+## 10. Would a GPU help, given the early-stopping logic?
+
+Yes, by an order of magnitude or more for the geodesic pass, and the stop
+conditions (horizon, celestial sphere, NaN, trapped orbit, object hit) are not
+the obstacle. What decides it:
+
+1. **Divergence from early stopping is manageable.** Rays end at different
+   steps, so lockstep threads idle; every GPU geodesic code has this (GRay,
+   Odyssey) and still reports 10–100× over CPU. The standard cure is a
+   persistent-thread work queue with ray compaction: a finished thread takes
+   the next unstarted pixel, so warp cost is bounded by the longest *active*
+   ray. Rays near the critical curve take ~100× more steps than background
+   rays, so a naive one-pixel-per-thread kernel would idle most of the device.
+2. **The adaptive integrator diverges more than the stop tests.** RKF45 with
+   per-ray retry loops branches every step. Either make accept/reject
+   branch-free (compute both, mask), or use a fixed-step high-order scheme
+   with a per-ray step chosen from the local curvature scale, as most GPU
+   codes do.
+3. **The CPU architecture cannot be ported as is.** `color_of_ray`
+   integrates the whole trajectory into a `Vec<Step>` (up to `max_steps` × 64
+   bytes per ray) and intersects objects afterwards; the volumetric disc
+   marches over `remaining_steps`. A GPU version must fuse integration,
+   intersection and shading in one loop (test the disc crossing each step,
+   march the volume as it goes, accumulate radiance front to back, stop when
+   opaque). That restructuring is the real work, and it would also speed up
+   the CPU path and cut its memory traffic.
+4. **Precision decides the API.** Finding 4.1 shows near-critical geodesics
+   are ill-conditioned even in f64; f32 is not usable near the shadow. That
+   rules out wgpu/WGSL (no f64). From Rust: CUDA via `cudarc`/`cust`, or
+   Vulkan compute with the `Float64` capability. Consumer GPUs run f64 at
+   1/32–1/64 of f32 rate, roughly a 16–32-core CPU under rayon; data-centre
+   parts (A100/H100 class) are where the 10–50× is.
+5. **Cheaper wins first.** Analytic Kerr–Schild Christoffels (the backend
+   currently spends 36 metric evaluations per right-hand side on finite
+   differences) give several× on the CPU today, and the BL super-Hamiltonian
+   form is both the correctness fix and GPU-friendly (polynomial right-hand
+   sides). The star gather and adaptive supersampling stay on the CPU either
+   way; they are not the bottleneck.
+
 ## Appendix: reproducing the numbers
 
 ```sh
