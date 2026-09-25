@@ -9,7 +9,8 @@ the two papers the project builds on: Riazuelo, *Seeing relativity I*
 Movie Interstellar* (CQG 32, 065001; arXiv:1502.03808, the DNGR paper).
 On top of the reading, four numerical experiments were run against closed-form
 results; their scripts are in `scripts/validation/`. The full test suite passes
-(187 tests).
+(187 tests). Both papers were read in full text (via alphaXiv); equation
+numbers below refer to the arXiv versions (1511.06025v2, 1502.03808v2).
 
 Units in this document follow the code: `r_s = 2M` is the length unit, spin
 `a` is in the same unit, so `a = 0.499` with `r_s = 1` is `a/M = 0.998`.
@@ -429,6 +430,20 @@ Riazuelo (1511.06025):
   (Section 8).
 - Redshift: his eq. (22), `1 + z = E/(k·u_obs)`, is what `RedshiftComputer`
   does.
+- Star photometry (his §V.C, eqs. 52–53): `T_obs = T/(1+z)` and a bolometric
+  `(1+z)⁻⁴` flux factor times the amplification `f = Ω/Ω*`, which he notes is
+  "the convergence part of the optical scalar equations". This is the code's
+  `g⁴` and `g·T` treatment; the only difference is the screen solid angle
+  discussed in 4.2. He draws stars as truncated-Gaussian blobs whose size
+  grows with brightness (the Akira Fujii diffusion-filter look), which is what
+  `scripts/grade.py`'s bloom approximates after the fact.
+- Sky texture under redshift (his §III.C): he keeps the hue and scales the
+  intensity by an ad-hoc power law of `(1+z)⁻¹` for blueshift and an
+  exponential for redshift, because a bitmap has no spectrum. The code's
+  `beaming_exponent = 3` on bitmaps is the same kind of artistic choice; the
+  README should say so as plainly as he does.
+- He assumes photopic (colour) vision at all intensities, as the code does
+  through the CIE 1931 curves.
 
 James et al. (DNGR, 1502.03808):
 
@@ -448,11 +463,43 @@ James et al. (DNGR, 1502.03808):
   four-corner tube is the finite-difference cousin; it is correct away from
   folds but needs the subdivision/`magnification_cap` machinery exactly where
   the Jacobi-field approach is exact and cheap (Section 8).
-- Disc: DNGR's disc for the film deliberately omitted Doppler and gravitational
-  colour shifts and intensity changes, and the disc scenes used `a/M = 0.6`;
-  the paper's Fig. 15-style "physically correct" images show the approaching
-  side blue and bright. This code does the physical version by default, which
-  is the right choice for a physics renderer.
+- Disc (their §4 and A.6): the film disc is an artist's image on an infinitely
+  thin plane with an optical-thickness map, "marginally optically thick",
+  *not accreting*, at a uniform 4500 K blackbody; frequency shifts are applied
+  as a temperature shift of the blackbody (exactly this code's `g·T`), then
+  convolved with film sensitivity curves. Nolan and Franklin dropped the
+  Doppler/gravitational colour and brightness shifts and lowered the spin from
+  `a/M ≈ 1` to `0.6` because the flattened left shadow edge, the multiple disc
+  images along it and the lopsided brightness (their Fig. 15c, "the hole's
+  shadow barely discernible") were judged confusing. This code's default is
+  the physical version with a Novikov–Thorne temperature profile, which is
+  the better choice for a physics renderer. Their numbers for `a/M = 0.6`,
+  `r_c ≈ 10M`-class views, disc speeds ≈ 0.55c, net frequency factors ≈ 1.5
+  (approaching) and ≈ 0.4 (receding) including a ≈ 20 % gravitational
+  redshift, are a cheap sanity check for the disc `g` field here.
+- Their bug story (§3.4) is worth knowing: an early DNGR showed a
+  "fingerprint-like" pattern of lensed stars inside the secondary critical
+  curve on the flattened (prograde) side; Riazuelo's images did not, the
+  discrepancy exposed a bug, and the corrected code also matched the SXS
+  imaging code. That is the same region finding 4.1 affects, and the same
+  method (cross-code comparison on the prograde limb) that would have caught
+  it here; the two backends in this repository can play that role for each
+  other once 4.3 is fixed.
+- Caustics (§3.3–3.4): the primary caustic on the celestial sphere is a small
+  astroid, secondary and tertiary caustics wrap the sphere once and six-plus
+  times for a camera at `2.6M`, and the number of images of a sky patch
+  between critical curves (three, then eight) is independent of the camera's
+  velocity because caustics depend on the camera's location only. Multiple
+  nested images along the flat edge are therefore real, not artifacts.
+- Camera velocity (§3.5): for the same location at `r = 2.6M` the static,
+  ZAMO and geodesic-orbit cameras see wildly different shadows through
+  aberration alone (the static camera's shadow exceeds half the sky). The
+  `CameraVelocityConfig` choice is not cosmetic; the gallery captions should
+  state which observer each close vantage uses.
+- Integration (A.4–A.5): RKF with "empirically determined tolerances", tighter
+  on the ray's position than on the beam's shape; renders near the shadow
+  dominate run time. Same integrator family as here, and the same place where
+  the tolerance matters most.
 - Shadow: the near-extremal flattening of the prograde limb is Bardeen's
   result that the code's gallery text describes correctly, and it is the
   feature finding 4.1 gets wrong under default settings, because the flat
@@ -490,6 +537,10 @@ Ranked by how likely it is to bite and how hard it is to notice.
    stereographic image (4.5).
 9. Camera inside the ergosphere with the default `StaticObserver`: fails
    loudly (good); a sphere object inside the ergosphere fails per pixel (4.9).
+9b. "Too many" nested disc or star images along the flat edge of a high-spin
+   shadow are real (DNGR §3.4: three images between the primary and secondary
+   critical curves, eight between the secondary and tertiary); a *missing*
+   set of them on that side is the symptom of 4.1.
 10. Volumetric disc at high spin: temperature edge and ISCO test at the wrong
     radius (4.6); small but systematic.
 
@@ -511,11 +562,17 @@ Ordered by value for a physics-first renderer.
    precompute `φ_∞(δ)` once per observer, place every star image (all orders)
    by inverting it, amplify by the local Jacobian. Exact positions, no tubes,
    two orders of magnitude faster.
-4. Analytic Kerr lensing: Gralla & Lupsasca (2020, "Null geodesics of the Kerr
-   exterior") give all null geodesics in closed form with elliptic integrals;
-   Bardeen's critical curve `(ξ(r), η(r))` as a first-class test object
-   (already used in the validation script). Concepts: Mino time, radial roots,
-   the photon-shell parameter `r̃`.
+4. Analytic Kerr lensing: Gralla & Lupsasca, "Null geodesics of the Kerr
+   exterior" (arXiv:1910.12881) give all null geodesics in closed form with
+   elliptic integrals, and Gralla, Lupsasca & Marrone (arXiv:2008.03879) the
+   photon-ring shape; Bardeen's critical curve `(ξ(r), η(r))` as a first-class
+   test object (already used in the validation script). Concepts: Mino time,
+   radial roots, the photon-shell parameter `r̃`.
+4b. Cross-code validation as a habit: GYOTO's validation paper
+   (arXiv:1605.04195) lists the standard test problems (shadow size, thin-disc
+   spectra, redshift of circular orbits); GYOTO 2.0 (arXiv:2311.18802) and the
+   2026 TARTARUS code (arXiv:2609.08989) are open references to compare disc
+   images against. DNGR's own bug was found exactly this way.
 5. Emission-time / light-travel-time consistency: everything here is
    stationary, so a rotating disc texture is a "frozen" pattern. For time
    dependence (hot spots, flares, camera motion), record the coordinate time
@@ -524,7 +581,10 @@ Ordered by value for a physics-first renderer.
 6. Polarization: the Walker–Penrose constant transports polarization along
    Kerr null geodesics algebraically (no ODE); with a Novikov–Thorne disc and a
    simple scattering-atmosphere polarization model this gives EHT-style
-   polarization maps. Concepts: Walker–Penrose constant, EVPA rotation.
+   polarization maps. Concepts: Walker–Penrose constant, EVPA rotation;
+   GYOTO 2.0 (arXiv:2311.18802) for a full polarized transfer implementation,
+   and arXiv:2407.14897 for polarized hot-spot images as a small worked
+   example.
 7. A physical disc spectrum instead of a blackbody at `T(r)`: colour
    correction / spectral hardening factor (Shimura & Takahara 1995), limb
    darkening, and optionally the `kerrbb` parametrisation (Li et al. 2005) so
