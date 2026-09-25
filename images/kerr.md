@@ -2,15 +2,16 @@
 
 [← Back to the gallery index](images.md)
 
-Recipes: `images/create-gallery-images.sh` (checkerboard, blackbody, and
-volumetric renders, grid animation), `images/create-vantage-images.sh`
-(close vantages), `images/create-main-image.sh` with its
-`TEMPERATURE`/`EXPOSURE` overrides (temperature series), and
-`scripts/rendering/create_kerr_images.sh` (spin-sweep animations).
-Not scripted: the photon-ring pair (6x zoom section renders of the
-main-image scene, with the disc removed for the control) and the
-trajectory visualization (ray-export plus `scripts/plotting`; see
-`scripts/Readme.md`).
+Recipes: `images/create-gallery-images.sh` (checkerboard renders, grid
+animation), `images/create-vantage-images.sh` (close vantages), and
+`scripts/rendering/create_kerr_images.sh` (spin-sweep animations). The
+blackbody, volumetric, and temperature-series frames here were re-rendered
+over the real Gaia DR3 star catalogue and graded with `scripts/grade.py`;
+their exact per-image parameters are in
+`images/starfield-gallery-recipes.md`. Not scripted: the photon-ring pair
+(6x zoom section renders of the main-image scene, with the disc removed for
+the control) and the trajectory visualization (ray-export plus
+`scripts/plotting`; see `scripts/Readme.md`).
 
 ### Checkerboard Accretion Disk
 <div align="center">
@@ -32,7 +33,7 @@ and spin: the red pair sits at a = 0.4995, essentially extremal.
 
 <div align="center">
   <img src="kerr_blackbody_disk_1.png" alt="Kerr black hole with a hot blackbody accretion disk, distant view">
-  <p>Hot (8000 K) blackbody disc at a = 0.499, distant view (background image: <a href="https://commons.wikimedia.org/wiki/File:Messier_object_025.jpg">M25</a>)</p>
+  <p>Hot (8000 K) blackbody disc at a = 0.499, distant view, against the real Gaia DR3 star field (point sources to magnitude 12, redshifted and lensed with the rays)</p>
 </div>
 
 <div align="center">
@@ -47,7 +48,12 @@ and spin: the red pair sits at a = 0.4995, essentially extremal.
 
 <div align="center">
   <img src="kerr_blackbody_disk_a_0_5__2.png" alt="Essentially extremal Kerr black hole with a cool red blackbody disk, close-up on the shadow">
-  <p>The extremal-limit disc up close</p>
+  <p>The extremal-limit disc up close, high-contrast grade: the bright inner annulus dominates and the cool outer disc falls to near-black.</p>
+</div>
+
+<div align="center">
+  <img src="kerr_blackbody_disk_a_0_5__2_lifted.png" alt="The same close-up, lifted grade showing the full cool disc">
+  <p>The same frame, lifted grade (Reinhard toe): the fainter cool body of the disc stays visible end to end, at the cost of some inner-annulus contrast.</p>
 </div>
 
 ### Volumetric Rendering
@@ -58,29 +64,30 @@ and spin: the red pair sits at a = 0.4995, essentially extremal.
 
 <div align="center">
   <img src="render_kerr_stars_volumetric.png" alt="Kerr black hole visualization with background stars and volumetric disc">
-  <p>Kerr black hole visualization with background stars and volumetric disc (background image: <a href="https://commons.wikimedia.org/wiki/File:NGC6355_-_HST_-_Potw2301a.jpg">NGC 6355</a>)</p>
+  <p>Kerr black hole visualization with a volumetric disc against the real Gaia DR3 star field (point sources to magnitude 12, redshifted and lensed with the rays)</p>
 </div>
 
 ### Accretion-disc temperature series
 
-The main-image scene (see `images/create-main-image.sh`) rendered at three
-peak disc temperatures. Lensing and camera are identical; only the
-Novikov-Thorne calibration target changes, with `--exposure` compensating
-the (T/T_ref)^4 brightness difference so the frames stay comparable.
+The main-image scene rendered at three peak disc temperatures against the
+real Gaia DR3 star field. Lensing and camera are identical; only the
+Novikov-Thorne calibration target changes, with the per-frame flux scale and
+grade white point compensating the (T/T_ref)^4 brightness difference so the
+frames stay comparable.
 
 <div align="center">
   <img src="kerr_disc_temperature_8000k.png" alt="Kerr volumetric disc at 8000 K peak temperature: deep amber, sparse outskirts">
-  <p>8000 K (exposure 5): deep amber; the cool outskirts thin toward transparency, stars showing through.</p>
+  <p>8000 K: deep amber; the cool outskirts thin toward transparency, stars showing through.</p>
 </div>
 
 <div align="center">
   <img src="kerr_disc_temperature_12000k.png" alt="Kerr volumetric disc at 12000 K peak temperature: pale gold, fully luminous">
-  <p>12000 K (exposure 1): the previous main-image temperature; pale gold, fully luminous end to end.</p>
+  <p>12000 K: the previous main-image temperature; pale gold, fully luminous end to end.</p>
 </div>
 
 <div align="center">
   <img src="kerr_disc_temperature_20000k.png" alt="Kerr volumetric disc at 20000 K peak temperature: cream white">
-  <p>20000 K (exposure 0.13): pale ivory with a blue-white core. At matched brightness the frame is only mildly hotter-looking than 12000 K, because the visible-band blackbody chromaticity converges toward blue-white above ~10000 K; most of what higher temperature buys here is radiance, not color.</p>
+  <p>20000 K: pale ivory with a blue-white core. At matched brightness the frame is only mildly hotter-looking than 12000 K, because the visible-band blackbody chromaticity converges toward blue-white above ~10000 K; most of what higher temperature buys here is radiance, not color.</p>
 </div>
 
 ### Photon-ring windings
