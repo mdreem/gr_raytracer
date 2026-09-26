@@ -1,0 +1,45 @@
+# Over-extremal Kerr-Schild, a = 0.55 > M = 0.5: a naked singularity. No disc,
+# no background photograph; the only sources are the Gaia DR3 catalogue stars
+# (G <= 12, 3,083,990 sources). With no horizon there is no shadow, so the
+# frame centre shows light that passed arbitrarily close to the ring
+# singularity, wound into a bright core.
+#
+# The camera angles follow the Kerr-Schild tetrad (theta = pi/2, psi = -pi/2 for
+# an equatorial view); the KerrBL scenes' theta = -pi does not carry over.
+#
+# Framing: a 2x zoom crop. The camera stays at the vantage the other no-disc
+# starfield frames use, and the full 45-degree frame is rendered at 3200x1800
+# with only the central 1600x900 evaluated, so the ring and the lensed halo
+# around it sit inside the frame with margin.
+#
+# Reproduction from the repository root:
+# RUST_LOG=info RAYON_NUM_THREADS=16 target/release/gr_raytracer \
+#   --width=3200 --height=1800 --camera-position=-17,0,1.5 \
+#   --theta=1.5708 --psi=-1.5708 --phi=0 --max-radius=200 --max-steps=200000 \
+#   --config-file=images/gaia-mag12-kerr-naked-singularity-no-disc-2026-09-26.toml \
+#   render --from-row=450 --to-row=1350 --from-col=800 --to-col=2400 --filename=out.hdr
+# then grade: uv run scripts/grade.py out.hdr out.png --white W --bloom 0.05 --tonemap aces
+#
+# max-steps: 200000 and 1000000 differ in a single pixel at 320x180, so the
+# 200000 budget is not what limits the core.
+
+celestial_temperature = 0.0
+objects = []
+
+[adaptive_sampling]
+enabled = true
+samples_per_axis = 2
+minimum_luminance = 0.0
+
+[celestial_texture.BlackBody]
+beaming_exponent = 0.0
+
+[geometry_type.Kerr]
+radius = 1.0
+a = 0.55
+horizon_epsilon = 1e-4
+
+[star_catalog]
+path = "data/gaia_mag12.parquet"
+flux_scale = 200.0
+max_subdivision_depth = 6

@@ -200,16 +200,30 @@ pub fn create_scene<G: Geometry>(
         magnification_cap_config,
     ) = match config.star_catalog {
             Some(catalog_config) => {
-                let catalog = StarCatalog::load_parquet(&catalog_config.path).map_err(|error| {
-                    RaytracerError::InvalidConfiguration(format!(
-                        "Failed to load star catalog {:?}: {}",
-                        catalog_config.path, error
-                    ))
-                })?;
+                let sky_rotation = match &catalog_config.rotation {
+                    Some(rotation) => Some(
+                        rotation
+                            .rotation()
+                            .map_err(RaytracerError::InvalidConfiguration)?,
+                    ),
+                    None => None,
+                };
+                let catalog = StarCatalog::load_parquet_rotated(&catalog_config.path, sky_rotation)
+                    .map_err(|error| {
+                        RaytracerError::InvalidConfiguration(format!(
+                            "Failed to load star catalog {:?}: {}",
+                            catalog_config.path, error
+                        ))
+                    })?;
                 debug!(
-                    "Loaded {} stars from {}",
+                    "Loaded {} stars from {}{}",
                     catalog.len(),
-                    catalog_config.path
+                    catalog_config.path,
+                    if sky_rotation.is_some() {
+                        " (celestial sphere rotated)"
+                    } else {
+                        ""
+                    }
                 );
                 (
                     Some(catalog),

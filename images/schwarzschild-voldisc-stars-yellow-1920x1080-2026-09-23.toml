@@ -48,5 +48,13 @@ beaming_exponent = 0.0
 
 [star_catalog]
 path = "data/gaia_mag12.parquet"
-flux_scale = 3.0
+flux_scale = 8.0
 max_subdivision_depth = 6
+
+# Rotate the celestial sphere so the catalogue's highest-contrast patch sits
+# behind the hole rather than the sparse patch this camera happens to face.
+# At the recipe's star flux of 3 the band stayed below the visible range, so the
+# star flux is 8 here (20 starts to compete with the disc).
+[star_catalog.rotation]
+from = [-0.3782, 0.0, -0.9257]
+to = [0.0, 0.9652, -0.2614]

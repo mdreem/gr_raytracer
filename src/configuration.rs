@@ -59,6 +59,49 @@ pub struct StarCatalogConfig {
     /// no cap.
     #[serde(default)]
     pub magnification_cap: Option<f64>,
+    /// Optional rigid rotation of the celestial sphere, so which patch of the
+    /// catalogue sits behind the hole stops being dictated by where the camera
+    /// has to stand. Without it, camera position fixes both the inclination to
+    /// the spin axis and the sky behind, which are unrelated choices.
+    #[serde(default)]
+    pub rotation: Option<SkyRotationConfig>,
+}
+
+/// The rotation that carries catalogue direction `from` onto scene direction
+/// `to`, taking the shortest path. Both are read as vectors and normalised, so
+/// any scale works; `to` is typically the direction the camera looks along.
+#[derive(Deserialize, Serialize, Debug, PartialEq, Clone)]
+pub struct SkyRotationConfig {
+    pub from: [f64; 3],
+    pub to: [f64; 3],
+}
+
+impl SkyRotationConfig {
+    /// The rotation itself, or an error naming why the pair cannot define one:
+    /// a non-finite or zero-length vector, or an exactly antipodal pair, which
+    /// leaves the rotation axis undetermined.
+    pub fn rotation(&self) -> Result<nalgebra::Rotation3<f64>, String> {
+        let from = Self::unit(&self.from, "from")?;
+        let to = Self::unit(&self.to, "to")?;
+        nalgebra::Rotation3::rotation_between(&from, &to).ok_or_else(|| {
+            format!(
+                "star_catalog.rotation cannot map {:?} onto {:?}: the directions are antipodal,                  which leaves the rotation axis undetermined. Nudge either one off the axis.",
+                self.from, self.to
+            )
+        })
+    }
+
+    fn unit(v: &[f64; 3], name: &str) -> Result<nalgebra::Vector3<f64>, String> {
+        let vector = nalgebra::Vector3::new(v[0], v[1], v[2]);
+        if !vector.iter().all(|c| c.is_finite()) {
+            return Err(format!(
+                "star_catalog.rotation.{name} must be finite (got {v:?})"
+            ));
+        }
+        vector
+            .try_normalize(0.0)
+            .ok_or_else(|| format!("star_catalog.rotation.{name} must not be the zero vector"))
+    }
 }
 
 impl StarCatalogConfig {
@@ -85,6 +128,9 @@ impl StarCatalogConfig {
             return Err(format!(
                 "star_catalog.magnification_cap must be finite and positive (got {cap})"
             ));
+        }
+        if let Some(rotation) = &self.rotation {
+            rotation.rotation()?;
         }
         Ok(())
     }

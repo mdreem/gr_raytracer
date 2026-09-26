@@ -8,6 +8,12 @@ adds a `[star_catalog]` block so the catalogue stars are lensed and
 redshifted along with the rays, then the linear HDR is graded to PNG with
 [`scripts/grade.py`](../scripts/grade.py).
 
+Which patch of sky a frame lands on is a separate decision from the scene, and
+[`sky-survey/README.md`](sky-survey/README.md) records it: a flat-space survey of
+the catalogue, a scan ranking every direction by brightness and contrast, and the
+camera conventions for aiming (the vantage these recipes use scores lowest of
+everything measured).
+
 Two-step pipeline per frame:
 
 1. **Render** the scene to a linear `.hdr`. Common flags:
@@ -43,9 +49,16 @@ Scene: the main-image volumetric disc + `[star_catalog]`, camera `-17,0,1.5`,
 
 | image | T (K) | flux_scale | white | bloom | tonemap |
 |-------|-------|-----------|-------|-------|---------|
-| `kerr_disc_temperature_8000k` | 8000 | 20 | 13 | 0.1 | aces |
-| `kerr_disc_temperature_12000k` | 12000 | 1000 | 735 | 0.1 | aces |
-| `kerr_disc_temperature_20000k` | 20000 | 70000 | 47000 | 0.1 | aces |
+| `kerr_disc_temperature_8000k` | 8000 | 6000 | 50 | 0.18 | aces |
+| `kerr_disc_temperature_12000k` | 12000 | 327000 | 2733 | 0.18 | aces |
+| `kerr_disc_temperature_20000k` | 20000 | 20900000 | 174713 | 0.18 | aces |
+
+The `flux_scale` column is the **star** flux, not the disc's, and all three rows
+are now exact: each scene is committed beside its image as
+`images/kerr-disc-temperature-<T>k-bsky-2026-09-27.toml`, with the linear HDR in
+`images/raw/`. The white points come from one ratio (white / 99th-percentile
+luminance = 0.0164, fixed by the 8000 K frame) rather than being picked per
+frame, so the three stay comparable. All three have the sky rotated behind them.
 
 ## Volumetric (`scene-definitions/kerr-bl-volumetric-streaky.toml` + `[star_catalog]`)
 
