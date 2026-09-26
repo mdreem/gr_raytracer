@@ -89,11 +89,16 @@ so its edge is a soft, fluffy falloff (no sharp outer rim) and its opacity comes
 from the local gas density: the dim receding side still fully occludes the stars
 behind it (dim in emission, unchanged in opacity), while only the tenuous outer
 gas lets starlight bleed through. The disc's `flux_scale` dims its emitted light
-into the star field's range so one exposure holds both. Graded from linear HDR
+into the star field's range so one exposure holds both. The sky behind is chosen
+rather than inherited: the celestial sphere is rotated so the catalogue's
+highest-contrast patch sits behind the hole (see
+[`sky-survey/README.md`](sky-survey/README.md)), which is what makes the dark
+lensed void around the shadow readable. Graded from linear HDR
 with bloom + ACES (recipes:
 `images/schwarzschild-voldisc-stars-yellow-1920x1080-2026-09-23.toml`,
 `images/schwarzschild-voldisc-stars-blue-1920x1080-2026-09-23.toml`). An HDR
-gain-map JPEG (`*-hdr.jpg`) sits beside each PNG: an ordinary SDR JPEG carrying a
+gain-map JPEG (`*-hdr.jpg`) sits beside each PNG (built from the earlier render
+of this scene, before the sky rotation): an ordinary SDR JPEG carrying a
 hidden gain map, so it shows SDR everywhere and brightens the disc past white on
 an HDR screen.
 
