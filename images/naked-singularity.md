@@ -50,3 +50,54 @@ metadata.
   <img src="kerr-a0499-horizon-control-1600x900-2026-09-26.png" alt="Kerr just below extremality: a black shadow with a photon ring, at the same camera and grade">
   <p>a = 0.499, below extremality, at an identical camera and grade. A horizon exists, so the interior structure of the frames above is replaced by a shadow bounded by the photon ring.</p>
 </div>
+
+## The same frames against a chosen sky
+
+The frames above sit against whatever patch of the catalogue their camera faces,
+which for these vantages is among the sparsest in the sky. Rotating the
+celestial sphere puts the highest-contrast patch behind the hole instead, so the
+band is visibly dragged around the ring and the windings have something to be
+images *of* (recipe: `images/kerr-naked-singularity-bsky-2026-09-27.toml`;
+method: [`sky-survey/README.md`](sky-survey/README.md)). These are full-frame,
+so the structure is smaller than in the 2x crops above; the two zoom frames at
+the end give it at 1.8x.
+
+<div align="center">
+  <img src="kerr-naked-singularity-a075-equatorial-bsky-1920x1080-2026-09-27.png" alt="Over-extremal Kerr at spin 0.75, edge-on, against the Milky Way band">
+  <p>a = 0.75 edge-on. The band enters from the left and wraps into the ring; the bright patches either side of it are lensed images of the denser parts.</p>
+</div>
+
+<div align="center">
+  <img src="kerr-naked-singularity-a075-axis-bsky-1920x1080-2026-09-27.png" alt="Over-extremal Kerr at spin 0.75 down the spin axis, against the Milky Way band">
+  <p>a = 0.75 down the axis. Each concentric ring is the same band imaged one turn further around the singularity.</p>
+</div>
+
+<div align="center">
+  <img src="kerr-naked-singularity-a055-equatorial-bsky-1920x1080-2026-09-27.png" alt="Over-extremal Kerr at spin 0.55, edge-on, against the Milky Way band">
+  <p>a = 0.55 edge-on: a tighter knot inside the ring than at 0.75.</p>
+</div>
+
+<div align="center">
+  <img src="kerr-naked-singularity-a055-axis-bsky-1920x1080-2026-09-27.png" alt="Over-extremal Kerr at spin 0.55 down the spin axis, against the Milky Way band">
+  <p>a = 0.55 down the axis: more windings, packed closer together than at 0.75.</p>
+</div>
+
+<div align="center">
+  <img src="kerr-a0499-horizon-control-bsky-1920x1080-2026-09-27.png" alt="Kerr just below extremality against the Milky Way band: a shadow with a photon ring">
+  <p>a = 0.499, the horizon control at the same camera, sky and grade: the interior structure is replaced by a shadow.</p>
+</div>
+
+### Closer on the ring
+
+Rendered at 3456x1944 with only the central 1920x1080 evaluated, a 1.8x zoom at
+full resolution for the cost of the smaller frame.
+
+<div align="center">
+  <img src="kerr-naked-singularity-a075-axis-bsky-zoom-1920x1080-2026-09-27.png" alt="Over-extremal Kerr down the spin axis, zoomed so the rings fill the frame">
+  <p>a = 0.75 down the axis at 1.8x: the nested rings fill the frame, and each can be followed inward to the core.</p>
+</div>
+
+<div align="center">
+  <img src="kerr-naked-singularity-a075-equatorial-bsky-zoom-1920x1080-2026-09-27.png" alt="Over-extremal Kerr edge-on, zoomed so the ring fills the frame">
+  <p>a = 0.75 edge-on at 1.8x, graded lighter (white 0.05) because the rotated sky dominates the frame's luminance and would otherwise leave the ring dark.</p>
+</div>
