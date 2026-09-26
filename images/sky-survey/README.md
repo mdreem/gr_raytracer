@@ -72,6 +72,24 @@ Starting from survey frames and adjusted by hand:
 | `adjusted-10-panned-right` | `6.63,15.62,0` | | rich region moved from x = 0.77 to x = 0.63 |
 | `adjusted-12-panned-down` | `-8.87,0,-14.47` | | band moved from y = 0.63 to y = 0.49 |
 
+## Aiming without moving the camera
+
+Camera position decides two unrelated things at once: the inclination to the
+hole's spin axis, and which patch of sky ends up behind it. `[star_catalog.rotation]`
+separates them by rotating the celestial sphere instead. To put the B patch
+behind a camera that stays on the equatorial `-x` axis:
+
+```toml
+[star_catalog.rotation]
+from = [-0.3782, 0.0, -0.9257]   # what the B vantage sees behind the hole
+to = [1.0, 0.0, 0.0]             # the view axis of a camera at -17,0,0
+```
+
+The `from` vector for any row in the tables above is just the normalised
+negative of its camera position, since these cameras face the origin. The
+rotation leaves the roll about the view axis free, so pair it with `--psi` when
+a particular orientation matters.
+
 ## Camera conventions
 
 - **Aiming.** In flat space the camera faces the origin, so to look at sky
