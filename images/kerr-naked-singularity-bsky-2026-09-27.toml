@@ -1,0 +1,46 @@
+# Over-extremal Kerr-Schild (a > M = 0.5): a naked singularity, no horizon and
+# so no shadow. Same scene as the 2026-09-26 set, but with the celestial sphere
+# rotated so the catalogue's highest-contrast patch sits behind the hole instead
+# of the sparse patch these cameras face (see images/sky-survey/README.md).
+#
+# Set `a` per frame (0.55, 0.75, or 0.499 for the horizon control). The camera
+# angles follow the Kerr-Schild tetrad, whose default facing is the spin axis:
+# theta = acos(d_z), phi = atan2(d_y, d_x) for view direction d. Equatorial is
+# --theta=1.5708 --psi=-1.5708 from -17,0,0; down the axis is --theta=0 from
+# 0.15,0,-18. The `to` vector below must match the camera's view direction.
+#
+# Reproduce from the repository root:
+# target/release/gr_raytracer --width=1920 --height=1080 --camera-position=-17,0,0 \
+#   --theta=1.5708 --psi=-1.5708 --phi=0 --max-radius=200 --max-steps=200000 \
+#   --config-file=images/kerr-naked-singularity-bsky-2026-09-27.toml render --filename=out.hdr
+# The zoom frames render 3456x1944 and evaluate the central 1920x1080
+# (--from-row=432 --to-row=1512 --from-col=768 --to-col=2688): 1.8x at full resolution.
+# Grade: uv run scripts/grade.py out.hdr out.png --white W --bloom 0.35 --tonemap aces
+# (W is recorded in each PNG's metadata; the rotated sky is ~5x brighter than
+# the old one, so the equatorial frames want ~0.33 rather than ~0.065.)
+
+celestial_temperature = 0.0
+objects = []
+
+[adaptive_sampling]
+enabled = true
+samples_per_axis = 2
+minimum_luminance = 0.0
+
+[celestial_texture.BlackBody]
+beaming_exponent = 0.0
+
+[geometry_type.Kerr]
+radius = 1.0
+a = 0.55
+horizon_epsilon = 1e-4
+
+[star_catalog]
+path = "data/gaia_mag12.parquet"
+flux_scale = 200.0
+max_subdivision_depth = 4
+
+# Equatorial cameras look along +x; for the axis frames use to = [0.0, 0.0, 1.0].
+[star_catalog.rotation]
+from = [-0.3782, 0.0, -0.9257]
+to = [1.0, 0.0, 0.0]

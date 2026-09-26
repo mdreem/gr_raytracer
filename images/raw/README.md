@@ -25,10 +25,19 @@ uv run scripts/grade.py images/raw/<file>.hdr out.png --white W --bloom B --tone
 | `kerr-naked-singularity-a055-axis-1600x900-2026-09-26.hdr` | same, `a = 0.55` | `0.15,0,-18`, `--theta=0`, 2x zoom crop | `--bloom 0.2 --tonemap aces`, auto white |
 | `kerr-a0499-horizon-control-1600x900-2026-09-26.hdr` | same, `a = 0.499` | `-17,0,0`, `--theta=1.5708 --psi=-1.5708`, 2x zoom crop | the control frame: identical camera, but a horizon exists |
 
+| `kerr-naked-singularity-a075-equatorial-bsky-1920x1080-2026-09-27.hdr` | `images/kerr-naked-singularity-bsky-2026-09-27.toml`, `a = 0.75` | `-17,0,0`, `--theta=1.5708 --psi=-1.5708` | `--white 0.32631 --bloom 0.35 --tonemap aces` |
+| `kerr-naked-singularity-a075-axis-bsky-1920x1080-2026-09-27.hdr` | same, `a = 0.75` | `0.15,0,-18`, `--theta=0` | `--white 0.28863 --bloom 0.35` |
+| `kerr-naked-singularity-a055-equatorial-bsky-1920x1080-2026-09-27.hdr` | same, `a = 0.55` | `-17,0,0`, `--theta=1.5708 --psi=-1.5708` | `--white 0.32509 --bloom 0.35` |
+| `kerr-naked-singularity-a055-axis-bsky-1920x1080-2026-09-27.hdr` | same, `a = 0.55` | `0.15,0,-18`, `--theta=0` | `--white 0.28708 --bloom 0.35` |
+| `kerr-a0499-horizon-control-bsky-1920x1080-2026-09-27.hdr` | same, `a = 0.499` | `-17,0,0`, `--theta=1.5708 --psi=-1.5708` | `--white 0.32466 --bloom 0.35` |
+| `kerr-naked-singularity-a075-axis-bsky-zoom-1920x1080-2026-09-27.hdr` | same, `a = 0.75`, 1.8x zoom crop | `0.15,0,-18`, `--theta=0` | `--white 0.14850 --bloom 0.35` |
+| `kerr-naked-singularity-a075-equatorial-bsky-zoom-1920x1080-2026-09-27.hdr` | same, `a = 0.75`, 1.8x zoom crop | `-17,0,0`, `--theta=1.5708 --psi=-1.5708` | `--white 0.05 --bloom 0.35` |
+
 The naked-singularity frames render the full 45-degree frame at 3200x1800 and
 evaluate only the central 1600x900 (`--from-row=450 --to-row=1350
 --from-col=800 --to-col=2400`), which gives a 2x zoom at full resolution for the
-cost of 1600x900 pixels.
+cost of 1600x900 pixels. The 2026-09-27 zoom frames do the same at 3456x1944
+for a central 1920x1080, a 1.8x zoom.
 
 Not kept here: `render.hdr` and `black_body_spectrum.hdr` in the repository root.
 Both are throwaway output, the second written by a unit test in
