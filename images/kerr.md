@@ -73,11 +73,19 @@ The main-image scene rendered at three peak disc temperatures against the
 real Gaia DR3 star field. Lensing and camera are identical; only the
 Novikov-Thorne calibration target changes, with the per-frame flux scale and
 grade white point compensating the (T/T_ref)^4 brightness difference so the
-frames stay comparable.
+frames stay comparable. The celestial sphere is rotated so the catalogue's
+highest-contrast patch sits behind the hole (method:
+[`../images/sky-survey/README.md`](sky-survey/README.md)), which is why the band
+crosses behind the disc and the lensed void around the shadow reads through the
+thinning gas. Each frame's white point is derived from the same ratio rather
+than picked per frame: white / 99th-percentile luminance = 0.0164, giving 50,
+2733 and 174713 at bloom 0.18. Recipes are committed beside the images as
+`images/kerr-disc-temperature-<T>k-bsky-2026-09-27.toml`, with the linear HDRs
+in `images/raw/`.
 
 <div align="center">
   <img src="kerr_disc_temperature_8000k.png" alt="Kerr volumetric disc at 8000 K peak temperature: deep amber, sparse outskirts">
-  <p>8000 K: deep amber; the cool outskirts thin toward transparency, stars showing through. This frame alone has the celestial sphere rotated so the catalogue's highest-contrast patch sits behind the hole (recipe: <code>images/kerr-disc-temperature-8000k-bsky-2026-09-27.toml</code>), which is why the band crosses behind the disc and the lensed void around the shadow reads; graded at white 50, bloom 0.18, so it is not directly comparable to the two below.</p>
+  <p>8000 K: deep amber; the cool outskirts thin toward transparency, stars showing through.</p>
 </div>
 
 <div align="center">

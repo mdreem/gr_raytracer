@@ -1,0 +1,45 @@
+celestial_temperature = 0.0
+
+[adaptive_sampling]
+enabled = true
+samples_per_axis = 2
+minimum_luminance = 0.0
+
+[celestial_texture.BlackBody]
+beaming_exponent = 0.0
+
+[geometry_type.KerrBL]
+radius = 1.0
+a = 0.499
+horizon_epsilon = 1e-4
+
+[star_catalog]
+path = "data/gaia_mag12.parquet"
+flux_scale = 327000.0
+max_subdivision_depth = 6
+
+[[objects]]
+
+[objects.VolumetricDisc]
+inner_radius = 0.8
+outer_radius = 16.0
+temperature = 12000.0
+num_octaves = 8
+max_steps = 50000
+step_size = 0.0002
+thickness = 0.03
+density_multiplier = 180.0
+brightness_reference_temperature = 7000.0
+absorption = 0.3
+scattering = 0.4
+noise_scale = [60.0, 4.0, 45.0]
+noise_offset = 0.0
+
+[objects.VolumetricDisc.texture.BlackBody]
+beaming_exponent = 0.0
+
+# Rotate the catalogue so the B patch (the highest-contrast sky) sits behind the
+# hole instead of the sparse patch this camera faces.
+[star_catalog.rotation]
+from = [-0.3782, 0.0, -0.9257]
+to = [0.9961, 0.0, -0.0879]
