@@ -8,6 +8,12 @@ adds a `[star_catalog]` block so the catalogue stars are lensed and
 redshifted along with the rays, then the linear HDR is graded to PNG with
 [`scripts/grade.py`](../scripts/grade.py).
 
+Which patch of sky a frame lands on is a separate decision from the scene, and
+[`sky-survey/README.md`](sky-survey/README.md) records it: a flat-space survey of
+the catalogue, a scan ranking every direction by brightness and contrast, and the
+camera conventions for aiming (the vantage these recipes use scores lowest of
+everything measured).
+
 Two-step pipeline per frame:
 
 1. **Render** the scene to a linear `.hdr`. Common flags:

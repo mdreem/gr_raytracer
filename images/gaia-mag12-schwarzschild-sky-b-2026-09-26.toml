@@ -1,0 +1,37 @@
+# Schwarzschild over the Gaia DR3 star field, aimed at sky direction B: the
+# highest-contrast patch in the catalogue (see images/sky-survey/README.md).
+# No disc and no background photograph; the only light is catalogue stars.
+#
+# The camera faces the hole with --theta=3.14159 from any position in
+# Schwarzschild, so only --camera-position selects the sky behind the hole.
+#
+# Reproduce from the repository root:
+# target/release/gr_raytracer --width=1920 --height=1080 \
+#   --camera-position=6.43,0,15.74 --theta=3.14159 --psi=0 --phi=0 \
+#   --max-radius=200 --max-steps=200000 \
+#   --config-file=images/gaia-mag12-schwarzschild-sky-b-2026-09-26.toml \
+#   render --filename=images/raw/gaia-mag12-schwarzschild-sky-b-1920x1080-2026-09-26.hdr
+# then grade:
+# uv run scripts/grade.py images/raw/gaia-mag12-schwarzschild-sky-b-1920x1080-2026-09-26.hdr \
+#   images/gaia-mag12-schwarzschild-sky-b-1920x1080-2026-09-26.png \
+#   --white 0.26 --bloom 0.35 --tonemap aces
+
+celestial_temperature = 0.0
+objects = []
+
+[adaptive_sampling]
+enabled = true
+samples_per_axis = 2
+minimum_luminance = 0.0
+
+[celestial_texture.BlackBody]
+beaming_exponent = 0.0
+
+[geometry_type.Schwarzschild]
+radius = 1.0
+horizon_epsilon = 1e-4
+
+[star_catalog]
+path = "data/gaia_mag12.parquet"
+flux_scale = 200.0
+max_subdivision_depth = 4

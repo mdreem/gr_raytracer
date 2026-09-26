@@ -1,0 +1,20 @@
+# Flat-space star survey: no black hole, no disc. Straight rays, so each frame
+# is the raw Gaia DR3 sky in the direction the camera faces, which is the patch
+# a lensed scene would place behind the hole.
+celestial_temperature = 0.0
+objects = []
+
+[adaptive_sampling]
+enabled = true
+samples_per_axis = 2
+minimum_luminance = 0.0
+
+[celestial_texture.BlackBody]
+beaming_exponent = 0.0
+
+[geometry_type.Euclidean]
+
+[star_catalog]
+path = "data/gaia_mag12.parquet"
+flux_scale = 200.0
+max_subdivision_depth = 4
