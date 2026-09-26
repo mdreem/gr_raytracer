@@ -150,10 +150,13 @@ echo "started $(date -u +%FT%TZ), args=${RENDER_ARGS}, $(nproc) vCPU, pod ${RUNP
     echo "elapsed $(( $(date +%s) - t0 ))s${line:+ | ${line}}" \
     | rclone rcat "b2:${B2_BUCKET}/jobs/${JOB}/progress"; done ) & HB=$!
 set +e
-RAYON_NUM_THREADS="$(nproc)" RUST_LOG=off ./gr_raytracer ${RENDER_ARGS} --config-file scene.toml render --filename "${OUT}" ${RENDER_SUBARGS} 2> render.log
+RAYON_NUM_THREADS="$(nproc)" RUST_LOG=info ./gr_raytracer ${RENDER_ARGS} --config-file scene.toml render --filename "${OUT}" ${RENDER_SUBARGS} 2> render.log
 rc=$?
 set -e
 kill "$HB" 2>/dev/null || true
+# The pod's disk goes away with the pod, so push the log before deciding the
+# outcome: on a failure it is the only account of what happened.
+rclone copyto render.log "b2:${B2_BUCKET}/jobs/${JOB}/render.log" 2>/dev/null || true
 if [ $rc -eq 0 ] && [ -f "${OUT}" ]; then
   rclone copyto "${OUT}" "b2:${B2_BUCKET}/jobs/${JOB}/${OUT}"
   echo "done $(date -u +%FT%TZ)" | rclone rcat "b2:${B2_BUCKET}/jobs/${JOB}/DONE"
@@ -250,6 +253,13 @@ cmd_status() {  # status [job] : how many pods are running + per-job progress
   done <<< "$jobs"
 }
 
+cmd_logs() {  # logs <job> : the pod's render log, uploaded when the render ended
+  load_env
+  local job="${1:?usage: $0 logs <job>}"
+  b2_has "$job" render.log || { echo "no render.log in jobs/$job/ (pod still rendering, or it died before the upload)"; exit 2; }
+  rclone cat "b2:$B2_BUCKET/jobs/$job/render.log"
+}
+
 cmd_kill() {  # kill <podId> : delete a pod by hand (backstop if self-terminate didn't fire)
   load_env
   local id="${1:?usage: $0 kill <podId>  (get ids from: $0 status)}"
@@ -264,6 +274,7 @@ case "${1:-}" in
   render)     shift; cmd_render "$@" ;;
   fetch)      shift; cmd_fetch "$@" ;;
   status|ps)  shift; cmd_status "$@" ;;
+  logs)       shift; cmd_logs "$@" ;;
   kill)       shift; cmd_kill "$@" ;;
   *) cat <<EOF
 usage: $0 <command>
@@ -278,6 +289,7 @@ usage: $0 <command>
                                       --theta=-3.14159 --psi=0 --phi=0
   status | ps [job]              how many pods are live + per-job progress
   kill <podId>                   delete a pod by hand (ids from status)
+  logs <job>                     print the pod's render log (pushed when the render ended)
   fetch <job> [out.hdr]          download the result once DONE
 EOF
   ;;
