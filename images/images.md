@@ -15,6 +15,12 @@ The gallery is split into one page per topic:
   <p>Checkerboard, blackbody, and volumetric discs; animations; ray trajectories.</p>
 </div>
 
+## [Naked Singularity](naked-singularity.md)
+<div align="center">
+  <a href="naked-singularity.md"><img src="kerr-naked-singularity-a075-axis-1600x900-2026-09-26.png" width="400" alt="Over-extremal Kerr seen down the spin axis: nested rings of lensed starlight with no shadow"></a>
+  <p>Kerr past extremality (<code>a &gt; M</code>): no horizon, no shadow, and the sky wound into rings where the shadow would be.</p>
+</div>
+
 ## [Showcase](showcase.md)
 <div align="center">
   <a href="showcase.md"><img src="showcase_kerr_ringspoke_spin.png" width="400" alt="Kerr disc with rainbow radius-coded rings reaching the ISCO"></a>
