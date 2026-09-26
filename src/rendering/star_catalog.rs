@@ -11,7 +11,7 @@ use crate::rendering::black_body_radiation::get_cie_xyz_of_black_body_redshifted
 use crate::rendering::color::CIETristimulus;
 use crate::rendering::octree::Octree;
 use arrow::array::{Float32Array, Float64Array, Int64Array};
-use nalgebra::Vector3;
+use nalgebra::{Rotation3, Vector3};
 use parquet::arrow::arrow_reader::ParquetRecordBatchReaderBuilder;
 use parquet::file::reader::ChunkReader;
 use std::fs::File;
@@ -115,11 +115,31 @@ pub struct StarCatalog {
 impl StarCatalog {
     /// Load a catalogue from a Parquet file on disk (e.g. `data/gaia_dr3.parquet`).
     pub fn load_parquet(path: impl AsRef<Path>) -> Result<Self, StarCatalogError> {
-        Self::from_reader(File::open(path)?)
+        Self::load_parquet_rotated(path, None)
+    }
+
+    /// Load a catalogue, optionally rotating the whole celestial sphere first.
+    /// The rotation turns the sky behind the hole into a free choice, instead
+    /// of whatever the camera position happens to face.
+    pub fn load_parquet_rotated(
+        path: impl AsRef<Path>,
+        rotation: Option<Rotation3<f64>>,
+    ) -> Result<Self, StarCatalogError> {
+        Self::from_reader_rotated(File::open(path)?, rotation)
     }
 
     /// Load from any Parquet source (a file, or in-memory bytes for tests).
     pub fn from_reader<R: ChunkReader + 'static>(reader: R) -> Result<Self, StarCatalogError> {
+        Self::from_reader_rotated(reader, None)
+    }
+
+    /// Load from any Parquet source, rotating every star direction by
+    /// `rotation`. Applied once here, so the octree and every later gather see
+    /// the rotated sky and nothing downstream needs to know about it.
+    pub fn from_reader_rotated<R: ChunkReader + 'static>(
+        reader: R,
+        rotation: Option<Rotation3<f64>>,
+    ) -> Result<Self, StarCatalogError> {
         let batch_reader = ParquetRecordBatchReaderBuilder::try_new(reader)?
             .with_batch_size(8192)
             .build()?;
@@ -152,7 +172,10 @@ impl StarCatalog {
                     bp_mag: bp.value(i) as f64,
                     rp_mag: rp.value(i) as f64,
                     bp_rp: bp_rp_value,
-                    direction: radec_to_unit_vector(ra_deg, dec_deg),
+                    direction: match &rotation {
+                        Some(rotation) => rotation * radec_to_unit_vector(ra_deg, dec_deg),
+                        None => radec_to_unit_vector(ra_deg, dec_deg),
+                    },
                     temperature,
                     emission_xyz: star_emission_xyz(g_mag, temperature),
                 });
@@ -252,6 +275,47 @@ mod tests {
             Vector3::new(0.0, 0.0, -1.0),
             epsilon = 1e-12
         );
+    }
+
+    #[test]
+    fn sky_rotation_carries_the_named_direction_onto_its_target() {
+        // The rotation the config builds is the one applied to every star at
+        // load: the catalogue direction `from` must land exactly on `to`.
+        let config = crate::configuration::SkyRotationConfig {
+            from: [1.0, 0.0, 0.0],
+            to: [0.0, 0.0, 1.0],
+        };
+        let rotation = config.rotation().expect("perpendicular pair is rotatable");
+        assert_relative_eq!(
+            rotation * radec_to_unit_vector(0.0, 0.0),
+            Vector3::new(0.0, 0.0, 1.0),
+            epsilon = 1e-12
+        );
+        // A rigid rotation leaves every other direction on the unit sphere.
+        for (ra, dec) in [(12.3, -45.6), (270.0, 12.0), (180.0, 0.0)] {
+            assert_relative_eq!(
+                (rotation * radec_to_unit_vector(ra, dec)).norm(),
+                1.0,
+                epsilon = 1e-12
+            );
+        }
+    }
+
+    #[test]
+    fn sky_rotation_rejects_pairs_that_do_not_define_one() {
+        use crate::configuration::SkyRotationConfig;
+        // Antipodal: every axis through the pair is a valid rotation axis.
+        let antipodal = SkyRotationConfig {
+            from: [0.0, 0.0, 1.0],
+            to: [0.0, 0.0, -1.0],
+        };
+        assert!(antipodal.rotation().is_err());
+        // A zero-length direction names no direction at all.
+        let degenerate = SkyRotationConfig {
+            from: [0.0, 0.0, 0.0],
+            to: [1.0, 0.0, 0.0],
+        };
+        assert!(degenerate.rotation().is_err());
     }
 
     #[test]
