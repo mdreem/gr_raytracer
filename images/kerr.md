@@ -77,7 +77,7 @@ frames stay comparable.
 
 <div align="center">
   <img src="kerr_disc_temperature_8000k.png" alt="Kerr volumetric disc at 8000 K peak temperature: deep amber, sparse outskirts">
-  <p>8000 K: deep amber; the cool outskirts thin toward transparency, stars showing through.</p>
+  <p>8000 K: deep amber; the cool outskirts thin toward transparency, stars showing through. This frame alone has the celestial sphere rotated so the catalogue's highest-contrast patch sits behind the hole (recipe: <code>images/kerr-disc-temperature-8000k-bsky-2026-09-27.toml</code>), which is why the band crosses behind the disc and the lensed void around the shadow reads; graded at white 50, bloom 0.18, so it is not directly comparable to the two below.</p>
 </div>
 
 <div align="center">
