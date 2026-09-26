@@ -181,7 +181,10 @@ cmd_render() {  # render <job> <scene.toml> <gr_raytracer args...>
   [ -n "$render_args" ] || { echo "need gr_raytracer args, e.g. --width=1280 --height=720 --exposure=2 --camera-position=-17,0,1.5 --theta=-3.14159 --psi=0 --phi=0"; exit 1; }
   echo "Uploading scene to b2:$B2_BUCKET/jobs/$job/ ..."
   rclone copyto "$scene" "b2:$B2_BUCKET/jobs/$job/scene.toml"
-  for m in DONE FAILED STARTED progress BOOT; do
+  # The logs go too, not just the markers: `logs` prefers the final render.log,
+  # so a leftover one from an earlier attempt under this job name would be
+  # reported throughout the new run in place of its live partial.
+  for m in DONE FAILED STARTED progress BOOT render.log render.log.partial; do
     rclone deletefile "b2:$B2_BUCKET/jobs/$job/$m" 2>/dev/null || true
   done
 
