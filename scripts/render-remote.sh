@@ -148,7 +148,15 @@ echo "started $(date -u +%FT%TZ), args=${RENDER_ARGS}, $(nproc) vCPU, pod ${RUNP
 ( t0=$(date +%s); while :; do sleep 30; \
     line="$(grep 'progress:' render.log | tail -1)"; \
     echo "elapsed $(( $(date +%s) - t0 ))s${line:+ | ${line}}" \
-    | rclone rcat "b2:${B2_BUCKET}/jobs/${JOB}/progress"; done ) & HB=$!
+    | rclone rcat "b2:${B2_BUCKET}/jobs/${JOB}/progress"; \
+    # Also push the log tail every beat. The end-of-render upload below cannot
+    # explain a pod that dies during the catalogue load, which is exactly the
+    # window every observed failure fell into.
+    tail -c 20000 render.log | rclone rcat "b2:${B2_BUCKET}/jobs/${JOB}/render.log.partial" 2>/dev/null; \
+    done ) & HB=$!
+# A first beat before the render starts, so a death during the catalogue load
+# leaves evidence that the process did begin.
+echo "elapsed 0s | starting render" | rclone rcat "b2:${B2_BUCKET}/jobs/${JOB}/progress" 2>/dev/null || true
 set +e
 RAYON_NUM_THREADS="$(nproc)" RUST_LOG=info ./gr_raytracer ${RENDER_ARGS} --config-file scene.toml render --filename "${OUT}" ${RENDER_SUBARGS} 2> render.log
 rc=$?
@@ -253,11 +261,17 @@ cmd_status() {  # status [job] : how many pods are running + per-job progress
   done <<< "$jobs"
 }
 
-cmd_logs() {  # logs <job> : the pod's render log, uploaded when the render ended
+cmd_logs() {  # logs <job> : the pod's render log, live or final
   load_env
   local job="${1:?usage: $0 logs <job>}"
-  b2_has "$job" render.log || { echo "no render.log in jobs/$job/ (pod still rendering, or it died before the upload)"; exit 2; }
-  rclone cat "b2:$B2_BUCKET/jobs/$job/render.log"
+  if b2_has "$job" render.log; then
+    rclone cat "b2:$B2_BUCKET/jobs/$job/render.log"
+  elif b2_has "$job" render.log.partial; then
+    echo "# render still running (or the pod died mid-render): last 20 kB of the log" >&2
+    rclone cat "b2:$B2_BUCKET/jobs/$job/render.log.partial"
+  else
+    echo "no log in jobs/$job/ yet (the pod has not reached its first heartbeat)"; exit 2
+  fi
 }
 
 cmd_kill() {  # kill <podId> : delete a pod by hand (backstop if self-terminate didn't fire)
