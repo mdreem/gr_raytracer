@@ -49,9 +49,16 @@ Scene: the main-image volumetric disc + `[star_catalog]`, camera `-17,0,1.5`,
 
 | image | T (K) | flux_scale | white | bloom | tonemap |
 |-------|-------|-----------|-------|-------|---------|
-| `kerr_disc_temperature_8000k` | 8000 | 20 | 13 | 0.1 | aces |
+| `kerr_disc_temperature_8000k` | 8000 | 6000 | 50 | 0.18 | aces |
 | `kerr_disc_temperature_12000k` | 12000 | 1000 | 735 | 0.1 | aces |
 | `kerr_disc_temperature_20000k` | 20000 | 70000 | 47000 | 0.1 | aces |
+
+The `flux_scale` column is the **star** flux, not the disc's. The 12000 K and
+20000 K rows carry the values their scenes were first rendered with; the
+committed frames came from later re-scaled variants, so treat those two as
+approximate until they are re-derived. The 8000 K row is exact: its scene is
+committed as `images/kerr-disc-temperature-8000k-bsky-2026-09-27.toml`, and that
+frame is also the only one of the three with the sky rotated behind it.
 
 ## Volumetric (`scene-definitions/kerr-bl-volumetric-streaky.toml` + `[star_catalog]`)
 
