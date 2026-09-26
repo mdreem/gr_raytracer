@@ -148,12 +148,23 @@ echo "started $(date -u +%FT%TZ), args=${RENDER_ARGS}, $(nproc) vCPU, pod ${RUNP
 ( t0=$(date +%s); while :; do sleep 30; \
     line="$(grep 'progress:' render.log | tail -1)"; \
     echo "elapsed $(( $(date +%s) - t0 ))s${line:+ | ${line}}" \
-    | rclone rcat "b2:${B2_BUCKET}/jobs/${JOB}/progress"; done ) & HB=$!
+    | rclone rcat "b2:${B2_BUCKET}/jobs/${JOB}/progress"; \
+    # Also push the log tail every beat. The end-of-render upload below cannot
+    # explain a pod that dies during the catalogue load, which is exactly the
+    # window every observed failure fell into.
+    tail -c 20000 render.log | rclone rcat "b2:${B2_BUCKET}/jobs/${JOB}/render.log.partial" 2>/dev/null; \
+    done ) & HB=$!
+# A first beat before the render starts, so a death during the catalogue load
+# leaves evidence that the process did begin.
+echo "elapsed 0s | starting render" | rclone rcat "b2:${B2_BUCKET}/jobs/${JOB}/progress" 2>/dev/null || true
 set +e
-RAYON_NUM_THREADS="$(nproc)" RUST_LOG=off ./gr_raytracer ${RENDER_ARGS} --config-file scene.toml render --filename "${OUT}" ${RENDER_SUBARGS} 2> render.log
+RAYON_NUM_THREADS="$(nproc)" RUST_LOG=info ./gr_raytracer ${RENDER_ARGS} --config-file scene.toml render --filename "${OUT}" ${RENDER_SUBARGS} 2> render.log
 rc=$?
 set -e
 kill "$HB" 2>/dev/null || true
+# The pod's disk goes away with the pod, so push the log before deciding the
+# outcome: on a failure it is the only account of what happened.
+rclone copyto render.log "b2:${B2_BUCKET}/jobs/${JOB}/render.log" 2>/dev/null || true
 if [ $rc -eq 0 ] && [ -f "${OUT}" ]; then
   rclone copyto "${OUT}" "b2:${B2_BUCKET}/jobs/${JOB}/${OUT}"
   echo "done $(date -u +%FT%TZ)" | rclone rcat "b2:${B2_BUCKET}/jobs/${JOB}/DONE"
@@ -170,7 +181,10 @@ cmd_render() {  # render <job> <scene.toml> <gr_raytracer args...>
   [ -n "$render_args" ] || { echo "need gr_raytracer args, e.g. --width=1280 --height=720 --exposure=2 --camera-position=-17,0,1.5 --theta=-3.14159 --psi=0 --phi=0"; exit 1; }
   echo "Uploading scene to b2:$B2_BUCKET/jobs/$job/ ..."
   rclone copyto "$scene" "b2:$B2_BUCKET/jobs/$job/scene.toml"
-  for m in DONE FAILED STARTED progress BOOT; do
+  # The logs go too, not just the markers: `logs` prefers the final render.log,
+  # so a leftover one from an earlier attempt under this job name would be
+  # reported throughout the new run in place of its live partial.
+  for m in DONE FAILED STARTED progress BOOT render.log render.log.partial; do
     rclone deletefile "b2:$B2_BUCKET/jobs/$job/$m" 2>/dev/null || true
   done
 
@@ -250,6 +264,19 @@ cmd_status() {  # status [job] : how many pods are running + per-job progress
   done <<< "$jobs"
 }
 
+cmd_logs() {  # logs <job> : the pod's render log, live or final
+  load_env
+  local job="${1:?usage: $0 logs <job>}"
+  if b2_has "$job" render.log; then
+    rclone cat "b2:$B2_BUCKET/jobs/$job/render.log"
+  elif b2_has "$job" render.log.partial; then
+    echo "# render still running (or the pod died mid-render): last 20 kB of the log" >&2
+    rclone cat "b2:$B2_BUCKET/jobs/$job/render.log.partial"
+  else
+    echo "no log in jobs/$job/ yet (the pod has not reached its first heartbeat)"; exit 2
+  fi
+}
+
 cmd_kill() {  # kill <podId> : delete a pod by hand (backstop if self-terminate didn't fire)
   load_env
   local id="${1:?usage: $0 kill <podId>  (get ids from: $0 status)}"
@@ -264,6 +291,7 @@ case "${1:-}" in
   render)     shift; cmd_render "$@" ;;
   fetch)      shift; cmd_fetch "$@" ;;
   status|ps)  shift; cmd_status "$@" ;;
+  logs)       shift; cmd_logs "$@" ;;
   kill)       shift; cmd_kill "$@" ;;
   *) cat <<EOF
 usage: $0 <command>
@@ -278,6 +306,7 @@ usage: $0 <command>
                                       --theta=-3.14159 --psi=0 --phi=0
   status | ps [job]              how many pods are live + per-job progress
   kill <podId>                   delete a pod by hand (ids from status)
+  logs <job>                     print the pod's render log (pushed when the render ended)
   fetch <job> [out.hdr]          download the result once DONE
 EOF
   ;;

@@ -26,6 +26,20 @@ same grade and exposure).
   <p>Same catalogue from the disc images' vantage: the sky patch here is the one the disc renders below sit in front of.</p>
 </div>
 
+The same hole aimed at the densest, most structured patch of the catalogue
+rather than an arbitrary axis. The direction was picked by binning the
+catalogue into a sky map and scoring each view by brightness and internal
+contrast; this one scores highest in contrast of anything measured, while the
+&minus;x axis used above scores lowest (method and the other candidates:
+[`sky-survey/README.md`](sky-survey/README.md); recipe:
+`images/gaia-mag12-schwarzschild-sky-b-2026-09-26.toml`, source HDR in
+`images/raw/`).
+
+<div align="center">
+  <img src="gaia-mag12-schwarzschild-sky-b-1920x1080-2026-09-26.png" alt="A Schwarzschild black hole lensing the Milky Way band of the Gaia DR3 catalogue">
+  <p>The band runs behind the hole here, so the photon ring is built from band light around its whole circumference, and the bright patches to either side are lensed images of dense parts of the band; 1920&times;1080 HDR, white 0.26, bloom 0.35, ACES.</p>
+</div>
+
 ### Einstein ring of a source behind the hole
 
 A 5000 K blackbody sphere (radius 3) on the camera axis, behind the hole. Its
@@ -75,11 +89,16 @@ so its edge is a soft, fluffy falloff (no sharp outer rim) and its opacity comes
 from the local gas density: the dim receding side still fully occludes the stars
 behind it (dim in emission, unchanged in opacity), while only the tenuous outer
 gas lets starlight bleed through. The disc's `flux_scale` dims its emitted light
-into the star field's range so one exposure holds both. Graded from linear HDR
+into the star field's range so one exposure holds both. The sky behind is chosen
+rather than inherited: the celestial sphere is rotated so the catalogue's
+highest-contrast patch sits behind the hole (see
+[`sky-survey/README.md`](sky-survey/README.md)), which is what makes the dark
+lensed void around the shadow readable. Graded from linear HDR
 with bloom + ACES (recipes:
 `images/schwarzschild-voldisc-stars-yellow-1920x1080-2026-09-23.toml`,
 `images/schwarzschild-voldisc-stars-blue-1920x1080-2026-09-23.toml`). An HDR
-gain-map JPEG (`*-hdr.jpg`) sits beside each PNG: an ordinary SDR JPEG carrying a
+gain-map JPEG (`*-hdr.jpg`) sits beside each PNG (built from the earlier render
+of this scene, before the sky rotation): an ordinary SDR JPEG carrying a
 hidden gain map, so it shows SDR everywhere and brightens the disc past white on
 an HDR screen.
 

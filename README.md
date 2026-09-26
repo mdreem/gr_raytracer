@@ -116,6 +116,23 @@ magnification_cap = 50.0        # clamp the lensing magnification A/B to bound
                                 # caustic fireflies on the ring (omit for no cap)
 ```
 
+The celestial sphere can be rotated, so which patch of the catalogue sits
+behind the hole is independent of where the camera has to stand. Without it the
+camera position fixes both the inclination to the spin axis and the sky behind,
+which are unrelated choices. Give the catalogue direction to move and where to
+put it (both are normalised, so any scale works):
+
+```toml
+[star_catalog.rotation]
+from = [-0.3782, 0.0, -0.9257]  # a direction in the catalogue (ICRS = scene axes)
+to = [1.0, 0.0, 0.0]            # where it should end up, e.g. the view axis
+```
+
+The shortest rotation carrying `from` onto `to` is applied to every star once at
+load, so nothing downstream needs to know about it. It leaves the roll about
+that axis free; set `--psi` if a particular orientation is wanted. An exactly
+antipodal pair is rejected, since it leaves the rotation axis undetermined.
+
 Two CLI flags override or complement the scene:
 
 - `--curved-star-membership` forces curved membership on regardless of the config.
