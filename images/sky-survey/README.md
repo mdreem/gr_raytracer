@@ -43,12 +43,10 @@ scored over the real frame footprint:
 | 11 | `-12,0,12` | 1.29 | 0.30 | sparse |
 | 12 | `-12,0,-12` | 1.76 | 0.63 | band low in frame, upper half dark |
 
-Contact sheet: `survey-12-directions.png`.
 
 ## Scan picks
 
-The five highest-scoring directions the scan found, rendered in
-`scan-candidates.png` and stored individually:
+The five highest-scoring directions the scan found, stored individually:
 
 | pick | camera | brightness | contrast | character |
 |------|--------|-----------|----------|-----------|
