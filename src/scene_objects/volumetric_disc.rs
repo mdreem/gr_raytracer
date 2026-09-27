@@ -47,6 +47,8 @@ fn resolvable_octaves(noise_scale: f64, nyquist: f64, max_octaves: usize) -> usi
 /// frame like the emission beside it: `nu * chi` is invariant, so `chi =
 /// chi_0 / z`. Approaching gas is thinner than it looks, receding gas thicker.
 /// An unphysical redshift leaves the opacity untouched rather than exploding.
+///
+/// See https://arxiv.org/abs/astro-ph/0406401 equation (10).
 fn opacity_frame_factor_for(redshift: f64) -> f64 {
     if redshift > 0.0 && redshift.is_finite() {
         1.0 / redshift

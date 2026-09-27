@@ -234,6 +234,10 @@ Animation of a Kerr black hole with `r_s = 1.0` and spin parameter `a` increasin
 
 - [Seeing relativity -- I. Ray tracing in a Schwarzschild metric to explore the maximal analytic extension of the metric and making a proper rendering of the stars](https://arxiv.org/abs/1511.06025)
 - [BlackHoleViz_v2](https://github.com/HollowaySean/BlackHoleViz_v2)
+- Fuerst, S. V., & Wu, K. (2004). *Radiation transfer of emission lines in curved
+  space-time*. *A&A*, 424, 733. [arXiv:astro-ph/0406401](https://arxiv.org/abs/astro-ph/0406401) - the
+  frame transformations for the emission and absorption coefficients used by the
+  volumetric disc.
 - Bacchini, F., Ripperda, B., Chen, A. Y., & Sironi, L. (2018). *Generalized, energy-conserving numerical simulations of
   particles in general relativity. I. Time-like and null
   geodesics*. *ApJS*, 237, 6. [arXiv:1801.02378](https://arxiv.org/abs/1801.02378) - the Hamiltonian form of the
