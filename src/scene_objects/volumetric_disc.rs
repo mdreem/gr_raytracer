@@ -43,6 +43,18 @@ fn resolvable_octaves(noise_scale: f64, nyquist: f64, max_octaves: usize) -> usi
     }
 }
 
+/// Extinction is measured in the gas frame, so it needs carrying into the ray's
+/// frame like the emission beside it: `nu * chi` is invariant, so `chi =
+/// chi_0 / z`. Approaching gas is thinner than it looks, receding gas thicker.
+/// An unphysical redshift leaves the opacity untouched rather than exploding.
+fn opacity_frame_factor_for(redshift: f64) -> f64 {
+    if redshift > 0.0 && redshift.is_finite() {
+        1.0 / redshift
+    } else {
+        1.0
+    }
+}
+
 pub struct VolumetricDisc {
     center_disk_inner_radius: f64,
     center_disk_outer_radius: f64,
@@ -305,6 +317,7 @@ impl VolumetricDisc {
             let sigma_t = sigma_a + sigma_s;
             let mut texture_density = 1.0;
             let mut source = Vector3::zeros();
+            let mut opacity_frame_factor = 1.0;
 
             // Per-sample redshift from the ray's conserved (p_t, p_phi)
             // and the local circular-orbit Killing coefficients:
@@ -319,6 +332,7 @@ impl VolumetricDisc {
                 let emitter_energy =
                     coefficients.u_t * frequency.p_t + coefficients.u_phi * frequency.p_phi;
                 let redshift = frequency.observer_energy / emitter_energy;
+                opacity_frame_factor = opacity_frame_factor_for(redshift);
 
                 let r_dist = p.cross(&self.axis).norm();
                 let temperature = self.temperature_computer.compute_temperature(r_dist)?;
@@ -350,7 +364,7 @@ impl VolumetricDisc {
                 trace!("  no timelike circular orbit at {:?}; emission skipped", p);
             }
 
-            let tau_cell = step_size * density * texture_density * sigma_t;
+            let tau_cell = step_size * density * texture_density * sigma_t * opacity_frame_factor;
             let cell_transmittance = (-tau_cell).exp();
             // Kirchhoff source integrated across the cell. exp_m1 avoids
             // cancellation in optically thin gas. over() supplies only the
@@ -724,6 +738,21 @@ mod tests {
     use crate::rendering::texture::{CheckerMapper, TemperatureData, TextureMap};
     use approx::assert_abs_diff_eq;
     use std::sync::Arc;
+
+    #[test]
+    fn opacity_scales_inversely_with_the_frequency_shift() {
+        // Blueshifted gas is thinner, redshifted gas thicker, both by 1/z.
+        assert_abs_diff_eq!(opacity_frame_factor_for(2.0), 0.5, epsilon = 1e-12);
+        assert_abs_diff_eq!(opacity_frame_factor_for(0.5), 2.0, epsilon = 1e-12);
+        assert_abs_diff_eq!(opacity_frame_factor_for(1.0), 1.0, epsilon = 1e-12);
+    }
+
+    #[test]
+    fn unphysical_shifts_leave_the_opacity_alone() {
+        for z in [0.0, -1.0, f64::NAN, f64::INFINITY] {
+            assert_abs_diff_eq!(opacity_frame_factor_for(z), 1.0, epsilon = 1e-12);
+        }
+    }
 
     fn unit_frequency() -> RayFrequencyData {
         RayFrequencyData {
