@@ -1,0 +1,25 @@
+# The same scene with the mass removed: radius = 0 makes the Kerr-Schild metric
+# function f vanish identically, so the metric is Minkowski and rays travel
+# straight. Everything else -- geometry, camera tetrad, spin, sky patch, framing
+# and grade -- is unchanged, so this is the a = 0.55 frame with nothing but the
+# mass taken away.
+celestial_temperature = 0.0
+objects = []
+
+[adaptive_sampling]
+enabled = true
+samples_per_axis = 2
+minimum_luminance = 0.0
+
+[celestial_texture.BlackBody]
+beaming_exponent = 0.0
+
+[geometry_type.Kerr]
+radius = 0.0
+a = 0.55
+horizon_epsilon = 1e-4
+
+[star_catalog]
+path = "data/gaia_mag12.parquet"
+flux_scale = 200.0
+max_subdivision_depth = 4
