@@ -27,6 +27,7 @@ uv run scripts/grade.py images/raw/<file>.hdr out.png --white W --bloom B --tone
 
 | `kerr-disc-temperature-12000k-bsky-1280x720-2026-09-27.hdr` | `images/kerr-disc-temperature-12000k-bsky-2026-09-27.toml` | `-17,0,1.5`, `--theta=-3.14159` | `--white 2733.1 --bloom 0.18 --tonemap aces` |
 | `kerr-disc-temperature-20000k-bsky-1280x720-2026-09-27.hdr` | `images/kerr-disc-temperature-20000k-bsky-2026-09-27.toml` | `-17,0,1.5`, `--theta=-3.14159` | `--white 174713.1 --bloom 0.18 --tonemap aces` |
+| `kerr-hero-bsky-1280x720-2026-09-27.hdr` | `images/create-main-image.sh` (inline scene, star flux 400) | `-17,0,1.5`, `--theta=-3.14159` | `--white 1.8 --exposure 1.0 --bloom 0.12` |
 | `kerr-disc-temperature-8000k-bsky-1280x720-2026-09-27.hdr` | `images/kerr-disc-temperature-8000k-bsky-2026-09-27.toml` | `-17,0,1.5`, `--theta=-3.14159` | `--white 50 --bloom 0.18 --tonemap aces` |
 | `kerr-naked-singularity-a075-equatorial-bsky-1920x1080-2026-09-27.hdr` | `images/kerr-naked-singularity-bsky-2026-09-27.toml`, `a = 0.75` | `-17,0,0`, `--theta=1.5708 --psi=-1.5708` | `--white 0.32631 --bloom 0.35 --tonemap aces` |
 | `kerr-naked-singularity-a075-axis-bsky-1920x1080-2026-09-27.hdr` | same, `a = 0.75` | `0.15,0,-18`, `--theta=0` | `--white 0.28863 --bloom 0.35` |
