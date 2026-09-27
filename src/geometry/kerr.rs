@@ -392,10 +392,13 @@ impl Geometry for Kerr {
     }
 
     fn inside_horizon(&self, position: &Point) -> bool {
-        if self.a.abs() > self.radius / 2.0 {
-            return false;
-        }
         let (x, y, z) = (position[1], position[2], position[3]);
+        if self.a.abs() > self.radius / 2.0 {
+            // No horizon, but the metric is still singular at r = 0, so rays
+            // need stopping before they reach it.
+            let r = compute_r_sqr(self.a, x, y, z).sqrt();
+            return r <= self.horizon_epsilon;
+        }
         let r = compute_r_sqr(self.a, x, y, z).sqrt();
         // Guard against FP rounding at extremal Kerr (a == M) producing a
         // negative argument; mathematically the discriminant is >= 0 here.
@@ -557,16 +560,39 @@ mod tests {
 
     #[test]
     fn test_inside_horizon_over_extremal_negative_spin_has_no_horizon() {
-        // a = -2*M is over-extremal (|a| > M) with a negative spin; there is
-        // no event horizon regardless of spin sign, so nothing should ever
-        // register as "inside" it.
+        // a = -2*M is over-extremal (|a| > M) with a negative spin: no event
+        // horizon exists for either spin sign, so ordinary points outside the
+        // singularity must not register as "inside".
         let radius = 1.0;
         let m = radius / 2.0;
         let a = -2.0 * m;
         let geometry = Kerr::new(radius, a, 1e-4);
 
-        let near_origin = Point::new_cartesian(0.0, m * 0.5, 0.0, 0.0);
-        assert!(!geometry.inside_horizon(&near_origin));
+        for rho in [m * 0.5, 1.0, 5.0, 50.0] {
+            let point = Point::new_cartesian(0.0, 0.0, 0.0, rho);
+            assert!(
+                !geometry.inside_horizon(&point),
+                "z = {rho} should be outside"
+            );
+        }
+    }
+
+    #[test]
+    fn test_over_extremal_stops_rays_at_the_singularity() {
+        // Without a horizon the only thing to stop a ray is r = 0 itself,
+        // where the metric is singular. In these spheroidal coordinates that
+        // is the whole equatorial disc rho <= |a|, not just the ring.
+        let radius = 1.0;
+        let a = -2.0 * (radius / 2.0);
+        let geometry = Kerr::new(radius, a, 1e-4);
+
+        let on_the_disc = Point::new_cartesian(0.0, 0.5 * a.abs(), 0.0, 0.0);
+        assert!(geometry.inside_horizon(&on_the_disc));
+
+        // Off the disc, at the same distance from the axis, r > 0 and the ray
+        // carries on.
+        let off_the_disc = Point::new_cartesian(0.0, 0.5 * a.abs(), 0.0, 1.0);
+        assert!(!geometry.inside_horizon(&off_the_disc));
     }
 
     #[test]
