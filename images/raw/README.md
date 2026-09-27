@@ -19,6 +19,7 @@ uv run scripts/grade.py images/raw/<file>.hdr out.png --white W --bloom B --tone
 | `gaia-mag12-schwarzschild-no-disc-1200x675-2026-09-15.hdr` | `images/gaia-mag12-schwarzschild-no-disc-2026-09-15.toml` | `-17,0,1.5`, `--theta=-3.14159` | star flux scale 3 is baked in; see that scene's header |
 | `schwarzschild-voldisc-stars-yellow-1920x1080-2026-09-23.hdr` | `images/schwarzschild-voldisc-stars-yellow-1920x1080-2026-09-23.toml` | `0,-24,6.5`, `--theta=3.14159265` | `--white 0.02 --bloom 0.35 --tonemap aces` |
 | `schwarzschild-voldisc-stars-blue-1920x1080-2026-09-23.hdr` | same scene, hot disc | `0,-24,6.5`, `--theta=3.14159265` | `--white 0.02 --bloom 0.35 --tonemap aces` |
+| `kerr-massless-control-1600x900-2026-09-27.hdr` | `images/kerr-massless-control-2026-09-27.toml` (`radius = 0`, flat space) | `-17,0,0`, `--theta=1.5708 --psi=-1.5708`, 2x zoom crop | `--white 0.06548 --bloom 0.35 --tonemap aces` |
 | `kerr-naked-singularity-a075-equatorial-1600x900-2026-09-26.hdr` | `images/gaia-mag12-kerr-naked-singularity-no-disc-2026-09-26.toml` with `a = 0.75` | `-17,0,0`, `--theta=1.5708 --psi=-1.5708`, 2x zoom crop | `--bloom 0.2 --tonemap aces`, auto white |
 | `kerr-naked-singularity-a055-equatorial-1600x900-2026-09-26.hdr` | same, `a = 0.55` | `-17,0,0`, `--theta=1.5708 --psi=-1.5708`, 2x zoom crop | `--bloom 0.2 --tonemap aces`, auto white |
 | `kerr-naked-singularity-a075-axis-1600x900-2026-09-26.hdr` | same, `a = 0.75` | `0.15,0,-18`, `--theta=0`, 2x zoom crop | `--bloom 0.2 --tonemap aces`, auto white |
