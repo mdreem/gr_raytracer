@@ -20,6 +20,22 @@ Recipe: `images/gaia-mag12-kerr-naked-singularity-no-disc-2026-09-26.toml`
 `--bloom 0.35 --tonemap aces` with the per-frame white recorded in each PNG's
 metadata.
 
+### The same view with no hole at all
+
+Before the lensed frames, the sky they are made of. This is the identical
+camera, sky patch, framing and grade, with the mass set to zero: `radius = 0`
+makes the Kerr-Schild metric function vanish, so the metric is Minkowski and
+rays travel straight. Same geometry, same tetrad, same code path, nothing
+removed but the mass (recipe:
+`images/kerr-massless-control-2026-09-27.toml`). The grade is identical down to
+the white point, which is taken from the a = 0.55 frame rather than derived from
+this one, so no brightness difference creeps in alongside the mass.
+
+<div align="center">
+  <img src="kerr-massless-control-1600x900-2026-09-27.png" alt="The undistorted Gaia star field: the same view with the black hole's mass set to zero">
+  <p>An even field of catalogue stars with no structure in it. Everything in the frames below -- the ring, the windings, the dark void around them -- is the geometry acting on this.</p>
+</div>
+
 ### Seen from the equatorial plane
 
 <div align="center">
