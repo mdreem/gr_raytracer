@@ -43,15 +43,18 @@ fn resolvable_octaves(noise_scale: f64, nyquist: f64, max_octaves: usize) -> usi
     }
 }
 
-/// Extinction is measured in the gas frame, so it needs carrying into the ray's
-/// frame like the emission beside it: `nu * chi` is invariant, so `chi =
-/// chi_0 / z`. Approaching gas is thinner than it looks, receding gas thicker.
-/// An unphysical redshift leaves the opacity untouched rather than exploding.
+/// Converts the gas-frame extinction into optical depth per unit marched
+/// coordinate distance: `dtau = chi_0 * nu_0 * dlambda`, with `nu_0` the
+/// gas-frame frequency and `lambda` the affine parameter. Both scale together
+/// with the photon momentum's normalisation, so the result does not depend on
+/// the camera. Approaching gas ends up thinner than its rest-frame opacity,
+/// receding gas thicker; a static emitter seen by a static camera gives 1.
 ///
-/// See https://arxiv.org/abs/astro-ph/0406401 equation (10).
-fn opacity_frame_factor_for(redshift: f64) -> f64 {
-    if redshift > 0.0 && redshift.is_finite() {
-        1.0 / redshift
+/// See https://arxiv.org/abs/astro-ph/0406401 equations (10) and (13).
+fn opacity_frame_factor_for(emitter_energy: f64, affine_per_length: f64) -> f64 {
+    let factor = emitter_energy.abs() * affine_per_length;
+    if factor > 0.0 && factor.is_finite() {
+        factor
     } else {
         1.0
     }
@@ -282,8 +285,25 @@ impl VolumetricDisc {
                 break;
             }
 
-            let result =
-                self.raymarch_segment(from, to, geometry, frequency, &mut segment_state)?;
+            // dlambda/ds for this segment: the integrator's affine parameter
+            // over the coordinate length the march walks. Pairing it with the
+            // gas-frame frequency keeps the optical depth invariant, so a
+            // moving camera cannot change how opaque static gas looks.
+            let segment_length = (to - from).norm();
+            let affine_per_length = if segment_length > 0.0 {
+                (steps[1].t - steps[0].t).abs() / segment_length
+            } else {
+                0.0
+            };
+
+            let result = self.raymarch_segment(
+                from,
+                to,
+                geometry,
+                frequency,
+                affine_per_length,
+                &mut segment_state,
+            )?;
 
             if result == RaymarchResult::AlreadyOpaque {
                 break;
@@ -308,6 +328,7 @@ impl VolumetricDisc {
         p: &Vector3<f64>,
         geometry: &dyn Geometry,
         frequency: &RayFrequencyData,
+        affine_per_length: f64,
         segment_state: &mut SegmentState,
     ) -> Result<(), RaytracerError> {
         let sigma_a = self.absorption;
@@ -334,7 +355,8 @@ impl VolumetricDisc {
                 let emitter_energy =
                     coefficients.u_t * frequency.p_t + coefficients.u_phi * frequency.p_phi;
                 let redshift = frequency.observer_energy / emitter_energy;
-                opacity_frame_factor = opacity_frame_factor_for(redshift);
+                opacity_frame_factor =
+                    opacity_frame_factor_for(emitter_energy, affine_per_length);
 
                 let r_dist = p.cross(&self.axis).norm();
                 let temperature = self.temperature_computer.compute_temperature(r_dist)?;
@@ -396,6 +418,7 @@ impl VolumetricDisc {
         to: &Vector3<f64>,
         geometry: &dyn Geometry,
         frequency: &RayFrequencyData,
+        affine_per_length: f64,
         segment_state: &mut SegmentState,
     ) -> Result<RaymarchResult, RaytracerError> {
         let segment = to - from;
@@ -408,7 +431,7 @@ impl VolumetricDisc {
         while dist < segment_length {
             let p = from + direction * dist;
 
-            self.march_constant_step(&p, geometry, frequency, segment_state)?;
+            self.march_constant_step(&p, geometry, frequency, affine_per_length, segment_state)?;
 
             if segment_state.radiance.transmittance <= TRANSPARENCY_EARLY_EXIT {
                 return Ok(RaymarchResult::AlreadyOpaque);
@@ -742,17 +765,33 @@ mod tests {
     use std::sync::Arc;
 
     #[test]
-    fn opacity_scales_inversely_with_the_frequency_shift() {
-        // Blueshifted gas is thinner, redshifted gas thicker, both by 1/z.
-        assert_abs_diff_eq!(opacity_frame_factor_for(2.0), 0.5, epsilon = 1e-12);
-        assert_abs_diff_eq!(opacity_frame_factor_for(0.5), 2.0, epsilon = 1e-12);
-        assert_abs_diff_eq!(opacity_frame_factor_for(1.0), 1.0, epsilon = 1e-12);
+    fn optical_depth_tracks_the_gas_frame_frequency() {
+        // dtau = chi_0 * nu_0 * dlambda: twice the gas-frame frequency over the
+        // same marched distance is twice the optical depth.
+        assert_abs_diff_eq!(opacity_frame_factor_for(2.0, 1.0), 2.0, epsilon = 1e-12);
+        assert_abs_diff_eq!(opacity_frame_factor_for(1.0, 0.5), 0.5, epsilon = 1e-12);
+        // The sign convention of the inner product must not leak through.
+        assert_abs_diff_eq!(opacity_frame_factor_for(-2.0, 1.0), 2.0, epsilon = 1e-12);
     }
 
     #[test]
-    fn unphysical_shifts_leave_the_opacity_alone() {
-        for z in [0.0, -1.0, f64::NAN, f64::INFINITY] {
-            assert_abs_diff_eq!(opacity_frame_factor_for(z), 1.0, epsilon = 1e-12);
+    fn rescaling_the_photon_momentum_leaves_the_optical_depth_alone() {
+        // A boosted camera scales nu_0 by d and the affine parameter by 1/d,
+        // so the product, and with it how opaque the gas looks, is unchanged.
+        let reference = opacity_frame_factor_for(3.0, 0.25);
+        for d in [0.5, 2.0, 10.0] {
+            assert_abs_diff_eq!(
+                opacity_frame_factor_for(3.0 * d, 0.25 / d),
+                reference,
+                epsilon = 1e-12
+            );
+        }
+    }
+
+    #[test]
+    fn degenerate_inputs_leave_the_opacity_alone() {
+        for (nu, dl) in [(0.0, 1.0), (1.0, 0.0), (f64::NAN, 1.0), (f64::INFINITY, 1.0)] {
+            assert_abs_diff_eq!(opacity_frame_factor_for(nu, dl), 1.0, epsilon = 1e-12);
         }
     }
 
@@ -846,7 +885,7 @@ mod tests {
                     radiance: Radiance::TRANSPARENT,
                 };
                 for _ in 0..cells {
-                    disc.march_constant_step(&p, &geometry, &unit_frequency(), &mut state)
+                    disc.march_constant_step(&p, &geometry, &unit_frequency(), 1.0, &mut state)
                         .unwrap();
                 }
                 let tau = disc.compute_density(&p) * disc.absorption * mask;
