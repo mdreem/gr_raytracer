@@ -355,8 +355,7 @@ impl VolumetricDisc {
                 let emitter_energy =
                     coefficients.u_t * frequency.p_t + coefficients.u_phi * frequency.p_phi;
                 let redshift = frequency.observer_energy / emitter_energy;
-                opacity_frame_factor =
-                    opacity_frame_factor_for(emitter_energy, affine_per_length);
+                opacity_frame_factor = opacity_frame_factor_for(emitter_energy, affine_per_length);
 
                 let r_dist = p.cross(&self.axis).norm();
                 let temperature = self.temperature_computer.compute_temperature(r_dist)?;
@@ -790,7 +789,12 @@ mod tests {
 
     #[test]
     fn degenerate_inputs_leave_the_opacity_alone() {
-        for (nu, dl) in [(0.0, 1.0), (1.0, 0.0), (f64::NAN, 1.0), (f64::INFINITY, 1.0)] {
+        for (nu, dl) in [
+            (0.0, 1.0),
+            (1.0, 0.0),
+            (f64::NAN, 1.0),
+            (f64::INFINITY, 1.0),
+        ] {
             assert_abs_diff_eq!(opacity_frame_factor_for(nu, dl), 1.0, epsilon = 1e-12);
         }
     }
