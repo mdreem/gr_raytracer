@@ -394,6 +394,11 @@ impl Geometry for Kerr {
     fn inside_horizon(&self, position: &Point) -> bool {
         let (x, y, z) = (position[1], position[2], position[3]);
         if self.a.abs() > self.radius / 2.0 {
+            // Without mass the metric function vanishes: the geometry is
+            // Minkowski and r = 0 is a coordinate artefact, not a singularity.
+            if self.radius <= 0.0 {
+                return false;
+            }
             // No horizon, but the metric is still singular at r = 0, so rays
             // need stopping before they reach it.
             let r = compute_r_sqr(self.a, x, y, z).sqrt();
@@ -575,6 +580,18 @@ mod tests {
                 "z = {rho} should be outside"
             );
         }
+    }
+
+    #[test]
+    fn test_massless_kerr_stops_nothing() {
+        // radius = 0 with spin is the flat-space control scene: no mass, so no
+        // singularity, and the r = 0 disc must not swallow rays.
+        let geometry = Kerr::new(0.0, 0.55, 1e-4);
+
+        let on_the_disc = Point::new_cartesian(0.0, 0.3, 0.0, 0.0);
+        assert!(!geometry.inside_horizon(&on_the_disc));
+        let at_the_origin = Point::new_cartesian(0.0, 0.0, 0.0, 0.0);
+        assert!(!geometry.inside_horizon(&at_the_origin));
     }
 
     #[test]
