@@ -6,12 +6,16 @@
 #
 # The star field is the real Gaia DR3 catalogue (G <= 12). It is NOT checked into
 # the repository; this script downloads it to data/gaia_mag12.parquet on first
-# use via scripts/gaia/download.py.
+# use via scripts/gaia/download.py. The celestial sphere is rotated so the
+# catalogue's highest-contrast patch sits behind the hole rather than the sparse
+# one this camera faces (see images/sky-survey/README.md); at star flux 400 the
+# band and its dust lanes read either side of the disc, and WHITE 1.8 holds the
+# field back to where the disc stays the subject.
 #
 # Usage:  images/create-main-image.sh [output.png]
 #   WIDTH/HEIGHT env vars override the resolution (default 1280x720).
 #   TEMPERATURE overrides the peak disc temperature (default 10000.0).
-#   WHITE/EXPOSURE/BLOOM override the grade (defaults 1.2 / 1.0 / 0.12): lower
+#   WHITE/EXPOSURE/BLOOM override the grade (defaults 1.8 / 1.0 / 0.12): lower
 #   WHITE lifts the star field but brightens the disc; BLOOM is the glow strength.
 #   Rendering takes roughly half an hour at the default resolution.
 set -euo pipefail
@@ -24,7 +28,7 @@ OUTPUT="${1:-kerr_black_hole_with_stars.png}"
 WIDTH="${WIDTH:-1280}"
 HEIGHT="${HEIGHT:-720}"
 TEMPERATURE="${TEMPERATURE:-10000.0}"
-WHITE="${WHITE:-1.2}"
+WHITE="${WHITE:-1.8}"
 EXPOSURE="${EXPOSURE:-1.0}"
 BLOOM="${BLOOM:-0.12}"
 
@@ -66,8 +70,12 @@ horizon_epsilon = 1e-4
 
 [star_catalog]
 path = "$CATALOGUE"
-flux_scale = 120.0
+flux_scale = 400.0
 max_subdivision_depth = 6
+
+[star_catalog.rotation]
+from = [-0.3782, 0.0, -0.9257]
+to = [0.9961, 0.0, -0.0879]
 
 [[objects]]
 
