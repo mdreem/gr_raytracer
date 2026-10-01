@@ -1,0 +1,65 @@
+# A close-up in the style of the Interstellar black hole: a thin accretion disc
+# with a painted, partly transparent texture, seen from just above the disc
+# plane with the hole swung off to one side.
+#
+# The texture is generated rather than committed:
+#   uv run scripts/textures/make_interstellar_disc.py
+#
+# Camera and grade used for the reference framing:
+#   ./target/release/gr_raytracer --width=1600 --height=900 \
+#     --camera-position=-2.5,0,0.55 --theta=-2.56159 --psi=0 --phi=0 \
+#     --config-file scene-definitions/kerr-bl-interstellar.toml \
+#     render --filename=out.hdr
+#   uv run scripts/grade.py out.hdr out.png --white 0.65 --bloom 0.25
+#
+# The disc's approaching side always falls on the same side of frame here, so
+# matching the film's composition means flipping the result horizontally.
+#
+# See kerr-bl-interstellar-a06.toml for the spin the film actually used.
+
+celestial_temperature = 0.0
+
+[adaptive_sampling]
+enabled = true
+samples_per_axis = 2
+minimum_luminance = 0.0
+
+[celestial_texture.BlackBody]
+beaming_exponent = 0.0
+
+[geometry_type.KerrBL]
+radius = 1.0
+a = 0.499
+horizon_epsilon = 1e-4
+
+[[objects]]
+
+[objects.Disc]
+inner_radius = 0.8  # outside prograde ISCO (r_ISCO ≈ 0.619 r_s for a=0.499, M=r_s/2)
+outer_radius = 18.0
+# A bitmap-textured disc ignores the Novikov-Thorne profile and uses this as a
+# constant temperature, so it only drives the redshift re-tint. The radial
+# brightness falloff is painted into the texture instead.
+temperature = 4500.0
+flux_scale = 1.0
+
+[objects.Disc.texture.Bitmap]
+beaming_exponent = 0.0
+path = "resources/interstellar-disc.png"
+
+[[objects]]
+
+# A small dark object crossing in front of the disc. A blackbody is never dark
+# blue at any temperature, so the colour comes from a Checker texture with both
+# squares set to the same value.
+[objects.Sphere]
+radius = 0.012
+position = [-1.9, 0.55, 0.45]
+temperature = 0.0
+
+[objects.Sphere.texture.Checker]
+beaming_exponent = 0.0
+width = 1.0
+height = 1.0
+color1 = [6, 11, 42]
+color2 = [6, 11, 42]
