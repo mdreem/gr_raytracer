@@ -1,0 +1,66 @@
+# The same close-up as kerr-bl-interstellar.toml at the spin the film used for
+# Gargantua, a/M = 0.6, with the 4500 K disc from the DNGR paper.
+#
+# The lower spin makes the whole scene larger: the horizon grows from 0.53 to
+# 0.9 r_s and the prograde ISCO roughly triples, so the disc's inner edge and
+# the camera both move out to keep the same framing.
+#
+# The texture is generated rather than committed:
+#   uv run scripts/textures/make_interstellar_disc.py
+#
+# Camera and grade used for the reference framing:
+#   ./target/release/gr_raytracer --width=1600 --height=900 \
+#     --camera-position=-5.0,0,1.1 --theta=-2.56159 --psi=0 --phi=0 \
+#     --config-file scene-definitions/kerr-bl-interstellar-a06.toml \
+#     render --filename=out.hdr
+#   uv run scripts/grade.py out.hdr out.png --white 0.56 --bloom 0.25
+#
+# The disc's approaching side always falls on the same side of frame here, so
+# matching the film's composition means flipping the result horizontally.
+
+celestial_temperature = 0.0
+
+[adaptive_sampling]
+enabled = true
+samples_per_axis = 2
+minimum_luminance = 0.0
+
+[celestial_texture.BlackBody]
+beaming_exponent = 0.0
+
+[geometry_type.KerrBL]
+radius = 1.0
+a = 0.3  # a/M = 0.6, the value the film's visuals used
+horizon_epsilon = 1e-4
+
+[[objects]]
+
+[objects.Disc]
+inner_radius = 2.0  # outside prograde ISCO (r_ISCO ≈ 1.91 r_s for a=0.3, M=r_s/2)
+outer_radius = 18.0
+# A bitmap-textured disc ignores the Novikov-Thorne profile and uses this as a
+# constant temperature, so it only drives the redshift re-tint. The radial
+# brightness falloff is painted into the texture instead.
+temperature = 4500.0
+flux_scale = 1.0
+
+[objects.Disc.texture.Bitmap]
+beaming_exponent = 0.0
+path = "resources/interstellar-disc.png"
+
+[[objects]]
+
+# A small dark object crossing in front of the disc. A blackbody is never dark
+# blue at any temperature, so the colour comes from a Checker texture with both
+# squares set to the same value.
+[objects.Sphere]
+radius = 0.023
+position = [-3.8, 1.1, 0.9]
+temperature = 0.0
+
+[objects.Sphere.texture.Checker]
+beaming_exponent = 0.0
+width = 1.0
+height = 1.0
+color1 = [6, 11, 42]
+color2 = [6, 11, 42]
