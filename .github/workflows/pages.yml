@@ -1,16 +1,16 @@
-name: Publish gallery to GitHub Pages
+name: Redirect the old gallery URLs
 
-# Publishes ONLY the image gallery (images/*.md + the referenced bitmaps)
-# to https://dreevich.dev/gr_raytracer/ - the rest of the repository is not
-# part of the site. The staged markdown is built with GitHub's stock Jekyll
-# action, so relative .md links are rewritten to .html exactly like classic
-# Pages builds.
+# The gallery moved to its own repository so that cloning this one does not
+# pull a quarter of a gigabyte of renders:
+#
+#   https://dreevich.dev/gr_raytracer-gallery/   (mdreem/gr_raytracer-gallery)
+#
+# This workflow keeps the old paths alive. It publishes nothing but redirects.
 
 on:
   push:
     branches: [master]
     paths:
-      - "images/**"
       - ".github/workflows/pages.yml"
   workflow_dispatch:
 
@@ -26,34 +26,39 @@ concurrency:
 jobs:
   build:
     runs-on: ubuntu-latest
+    env:
+      GALLERY: https://dreevich.dev/gr_raytracer-gallery
     steps:
-      - uses: actions/checkout@v4
-      - name: Stage gallery subset
+      - name: Generate redirects
         run: |
-          mkdir -p _staging
-          cp images/*.png images/*.gif _staging/
-          for f in images/*.md; do
-            cp "$f" "_staging/$(basename "$f")"
-          done
-          # The gallery index becomes the site root.
-          mv _staging/images.md _staging/index.md
-          # Rewrite back-links accordingly.
-          sed -i 's/(images\.md)/(index.md)/g' _staging/*.md
-          # jekyll-relative-links only rewrites Markdown links; raw HTML
-          # anchors (the index thumbnails) must point at the built .html.
-          sed -i -E 's/href="([A-Za-z0-9_-]+)\.md"/href="\1.html"/g' _staging/*.md
-          # Minimal Jekyll config: a bundled theme plus a site title.
-          # jekyll-default-layout (part of the github-pages gem) applies the
-          # theme layout to pages without front matter.
-          cat > _staging/_config.yml <<'EOF'
-          title: gr_raytracer image gallery
-          theme: jekyll-theme-primer
-          EOF
-      - uses: actions/jekyll-build-pages@v1
-        with:
-          source: ./_staging
-          destination: ./_site
+          mkdir -p _site
+          emit() {  # emit <old path> <new path under the gallery>
+            cat > "_site/$1" <<HTML
+          <!DOCTYPE html>
+          <html lang="en">
+          <head>
+            <meta charset="utf-8">
+            <title>Moved</title>
+            <link rel="canonical" href="${GALLERY}$2">
+            <meta http-equiv="refresh" content="0; url=${GALLERY}$2">
+          </head>
+          <body>
+            <p>The gr_raytracer gallery moved to
+            <a href="${GALLERY}$2">${GALLERY}$2</a>.</p>
+          </body>
+          </html>
+          HTML
+          }
+          emit index.html                        /
+          emit schwarzschild.html                /schwarzschild/
+          emit kerr.html                         /kerr/
+          emit naked-singularity.html            /naked-singularity/
+          emit showcase.html                     /showcase/
+          emit starfield-gallery-recipes.html    /recipes/starfield/
+
       - uses: actions/upload-pages-artifact@v3
+        with:
+          path: _site
 
   deploy:
     needs: build

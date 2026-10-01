@@ -1,0 +1,35 @@
+# Schwarzschild, Gaia DR3 G <= 12, no disc or background photograph.
+# Dim naked-eye-style approximation, not a calibrated human-vision model.
+# Reproduce from the repository root:
+# RUST_LOG=info RAYON_NUM_THREADS=16 target/release/gr_raytracer \
+#   --width=1200 --height=675 --camera-position=-17,0,1.5 \
+#   --theta=-3.14159 --psi=0 --phi=0 --max-radius=200 \
+#   --tone-mapping=reinhard --exposure=1 \
+#   --config-file=images/gaia-mag12-schwarzschild-no-disc-2026-09-15.toml \
+#   render --filename=images/gaia-mag12-schwarzschild-no-disc-1200x675-2026-09-15.png
+# For linear HDR, use the same command with the .hdr filename instead.
+# HDR export bypasses exposure and tone mapping; star flux scale 3 is baked in.
+# For this star-only HDR, multiply linear RGB by desired_flux_scale / 3
+# before applying the chosen display exposure and tone mapping.
+
+celestial_temperature = 0.0
+objects = []
+# The tiny offset from exact pi avoids exact meridional/polar ray alignment.
+
+[adaptive_sampling]
+enabled = true
+samples_per_axis = 2
+# Keep section rendering independent of section-local luminance statistics.
+minimum_luminance = 0.0
+
+[celestial_texture.BlackBody]
+beaming_exponent = 0.0
+
+[geometry_type.Schwarzschild]
+radius = 1.0
+horizon_epsilon = 1e-4
+
+[star_catalog]
+path = "data/gaia_mag12.parquet"
+flux_scale = 3.0
+max_subdivision_depth = 6
