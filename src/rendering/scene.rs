@@ -1,7 +1,7 @@
 use crate::configuration::AdaptiveSamplingConfig;
+use crate::geometry::coordinates::atlas::{CartesianConvertible, Chart};
 use crate::geometry::geometry::Geometry;
-use crate::geometry::point::{CoordinateSystem, Point};
-use crate::geometry::spherical_coordinates_helper::spherical_to_cartesian;
+use crate::geometry::point::Point;
 use crate::rendering::camera::Camera;
 use crate::rendering::color::CIETristimulus;
 use crate::rendering::integrator::StopReason::{CelestialSphereReached, HorizonReached};
@@ -19,11 +19,11 @@ use std::f64::consts::PI;
 use std::fs::File;
 
 #[derive(Debug, Clone, Copy, PartialEq)]
-pub struct RaySample {
+pub struct RaySample<C: Chart> {
     pub color: Radiance,
     pub ray_class: RayClass,
     pub accumulated_angular_distance: f64,
-    pub ray: Ray,
+    pub ray: Ray<C>,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq)]
@@ -66,7 +66,7 @@ pub struct Scene<'a, G: Geometry> {
     objects: Objects<'a, G>,
     texture_data: TextureData,
     pub geometry: &'a G,
-    pub camera: Camera,
+    pub camera: Camera<G::Chart>,
     save_ray_data: bool,
     redshift_computer: RedshiftComputer<'a, G>,
     celestial_temperature: f64,
@@ -96,30 +96,11 @@ pub struct Scene<'a, G: Geometry> {
 pub type EquationOfMotionState = OVector<f64, Const<8>>;
 
 // TODO: replace this with a more natural function, that does not need to use cartesian coordinates.
-pub fn get_position(y: &EquationOfMotionState, coordinate_system: CoordinateSystem) -> Point {
-    match coordinate_system {
-        CoordinateSystem::Cartesian => Point::new_cartesian(y[0], y[1], y[2], y[3]),
-        CoordinateSystem::Spherical => spherical_to_cartesian(&Point::new(
-            y[0],
-            y[1],
-            y[2],
-            y[3],
-            CoordinateSystem::Spherical,
-        )),
-        CoordinateSystem::BoyerLindquist { a } => {
-            let bl = Point::new(
-                y[0],
-                y[1],
-                y[2],
-                y[3],
-                CoordinateSystem::BoyerLindquist { a },
-            );
-            bl.to_cartesian()
-        }
-    }
+pub fn get_position<C: Chart>(y: &EquationOfMotionState, chart: C) -> Point<C> {
+    Point::new(y[0], y[1], y[2], y[3], chart)
 }
 
-fn compute_accumulated_angular_distance(steps: &[Step]) -> f64 {
+fn compute_accumulated_angular_distance<C: CartesianConvertible>(steps: &[Step<C>]) -> f64 {
     let mut angular_distance = 0.0;
     let mut prev: Option<Vector3<f64>> = None;
     for step in steps {
@@ -143,7 +124,7 @@ impl<'a, G: Geometry> Scene<'a, G> {
         objects: Objects<'a, G>,
         texture_data: TextureData,
         geometry: &'a G,
-        camera: Camera,
+        camera: Camera<G::Chart>,
         save_ray_data: bool,
         celestial_temperature: f64,
     ) -> Scene<'a, G> {
@@ -201,12 +182,12 @@ impl<'a, G: Geometry> Scene<'a, G> {
 
     pub fn integrate_ray(
         &self,
-        ray: &Ray,
-    ) -> Result<(IntegratedRay, Option<StopReason>), RaytracerError> {
+        ray: &Ray<G::Chart>,
+    ) -> Result<(IntegratedRay<G::Chart>, Option<StopReason>), RaytracerError> {
         self.integrator.integrate(ray)
     }
 
-    pub fn color_of_ray(&self, ray: &Ray) -> Result<RaySample, RaytracerError> {
+    pub fn color_of_ray(&self, ray: &Ray<G::Chart>) -> Result<RaySample<G::Chart>, RaytracerError> {
         trace!("Tracing ray at ({}|{})", ray.row, ray.col);
         let m_s = self
             .geometry
@@ -280,7 +261,7 @@ impl<'a, G: Geometry> Scene<'a, G> {
 
                     // Take asymptotic travel direction (momentum) that spans the end of the tube.
                     let escape_direction =
-                        last_step.p.get_cartesian_vector(&last_step.x).normalize();
+                        last_step.p.to_cartesian().get_spatial_vector().normalize();
                     ray_class = RayClass::Escaped(EscapeInfo {
                         x: escape_direction[0],
                         y: escape_direction[1],
@@ -338,7 +319,7 @@ impl<'a, G: Geometry> Scene<'a, G> {
         })
     }
 
-    fn get_uv_coordinates(&self, step_far: &Step) -> UVCoordinates {
+    fn get_uv_coordinates(&self, step_far: &Step<G::Chart>) -> UVCoordinates {
         let point_on_celestial_sphere = step_far.x.get_as_spherical();
 
         let theta = point_on_celestial_sphere[1];
@@ -371,8 +352,8 @@ pub mod test_scene {
         center_disk_inner_radius: f64,
         center_disk_outer_radius: f64,
         geometry: &G,
-        camera_position: Point,
-        camera_velocity: FourVector,
+        camera_position: Point<G::Chart>,
+        camera_velocity: FourVector<G::Chart>,
     ) -> Result<Scene<'_, G>, RaytracerError> {
         let camera = Camera::new(
             camera_position,
@@ -402,7 +383,7 @@ pub mod test_scene {
         center_disk_inner_radius: f64,
         center_disk_outer_radius: f64,
         geometry: &G,
-        camera: Camera,
+        camera: Camera<G::Chart>,
         epsilon: f64,
     ) -> Result<Scene<'_, G>, RaytracerError> {
         let texture_mapper_celestial = Arc::new(CheckerMapper::new(
@@ -494,7 +475,7 @@ mod tests {
     use crate::geometry::euclidean::EuclideanSpace;
     use crate::geometry::euclidean_spherical::EuclideanSpaceSpherical;
     use crate::geometry::four_vector::FourVector;
-    use crate::geometry::point::{CoordinateSystem, Point};
+    use crate::geometry::point::Point;
     use crate::geometry::schwarzschild::Schwarzschild;
     use crate::geometry::spherical_coordinates_helper::cartesian_to_spherical;
     use crate::rendering::camera::Camera;
@@ -546,8 +527,14 @@ mod tests {
     #[test]
     fn test_color_of_ray_hits_sphere() {
         let camera = Camera::new(
-            Point::new(0.0, 10.0, 0.0, 0.0, CoordinateSystem::Cartesian),
-            FourVector::new_cartesian(1.0, 0.0, 0.0, 0.0),
+            Point::new_cartesian(0.0, 10.0, 0.0, 0.0),
+            FourVector::new(
+                1.0,
+                0.0,
+                0.0,
+                0.0,
+                Point::new_cartesian(0.0, 10.0, 0.0, 0.0),
+            ),
             PI / 2.0,
             11,
             11,
@@ -569,16 +556,10 @@ mod tests {
 
     #[test]
     fn test_color_of_ray_hits_sphere_spherical() {
-        let position = cartesian_to_spherical(&Point::new(
-            0.0,
-            0.0,
-            0.0,
-            -10.0,
-            CoordinateSystem::Spherical,
-        ));
+        let position = cartesian_to_spherical(&Point::new_cartesian(0.0, 0.0, 0.0, -10.0));
         let camera = Camera::new(
             position,
-            FourVector::new_spherical(1.0, 0.0, 0.0, 0.0),
+            FourVector::new(1.0, 0.0, 0.0, 0.0, position),
             PI / 2.0,
             11,
             11,
@@ -608,14 +589,14 @@ mod tests {
 
     #[test]
     fn test_color_of_ray_hits_sphere_schwarzschild() {
-        let position = Point::new(0.0, 10.0, PI / 2.0, 0.0, CoordinateSystem::Spherical);
+        let position = Point::new_spherical(0.0, 10.0, PI / 2.0, 0.0);
         let radius = 1.0;
         let r = position[1];
         let a = 1.0 - radius / r;
         // Future-directed freely falling observer (t component positive).
         // A past-directed velocity produces a nonphysical frequency ratio,
         // which apply_beaming rejects.
-        let velocity = FourVector::new_spherical(1.0 / a, -(radius / r).sqrt(), 0.0, 0.0);
+        let velocity = FourVector::new(1.0 / a, -(radius / r).sqrt(), 0.0, 0.0, position);
 
         let geometry = Schwarzschild::new(radius, 1e-4);
 
@@ -641,13 +622,13 @@ mod tests {
 
     #[test]
     fn test_color_of_ray_hits_sphere_schwarzschild_stationary_observer() {
-        let position = Point::new(0.0, 10.0, PI / 2.0, 0.0, CoordinateSystem::Spherical);
+        let position = Point::new_spherical(0.0, 10.0, PI / 2.0, 0.0);
         let radius = 1.0;
         let sphere_radius = 2.0;
         let r = position[1];
         let a = 1.0 - radius / r;
         // Future-directed stationary observer (see note in the test above).
-        let velocity = FourVector::new_spherical(a.sqrt().recip(), 0.0, 0.0, 0.0);
+        let velocity = FourVector::new(a.sqrt().recip(), 0.0, 0.0, 0.0, position);
 
         let geometry = Schwarzschild::new(radius, 1e-4);
 
@@ -674,8 +655,14 @@ mod tests {
     #[test]
     fn test_color_of_ray_misses_sphere() {
         let camera = Camera::new(
-            Point::new(0.0, 10.0, 0.0, 0.0, CoordinateSystem::Cartesian),
-            FourVector::new_spherical(1.0, 0.0, 0.0, 0.0),
+            Point::new_cartesian(0.0, 10.0, 0.0, 0.0),
+            FourVector::new(
+                1.0,
+                0.0,
+                0.0,
+                0.0,
+                Point::new_cartesian(0.0, 10.0, 0.0, 0.0),
+            ),
             PI / 2.0,
             11,
             11,
@@ -698,17 +685,11 @@ mod tests {
 
     #[test]
     fn test_color_of_ray_misses_sphere_schwarzschild() {
-        let position = cartesian_to_spherical(&Point::new(
-            0.0,
-            10.0,
-            0.0,
-            0.0,
-            CoordinateSystem::Cartesian,
-        ));
+        let position = cartesian_to_spherical(&Point::new_cartesian(0.0, 10.0, 0.0, 0.0));
         let radius = 2.0;
         let r = position[1];
         let a = 1.0 - radius / r;
-        let velocity = FourVector::new_spherical(1.0 / a, -(radius / r).sqrt(), 0.0, 0.0); // we have a freely falling observer here.
+        let velocity = FourVector::new(1.0 / a, -(radius / r).sqrt(), 0.0, 0.0, position); // we have a freely falling observer here.
 
         let camera = Camera::new(
             position,
@@ -742,7 +723,7 @@ mod tests {
         let radius = 1.0;
         let r = camera_position[1];
         let a = 1.0 - radius / r;
-        let momentum = FourVector::new_spherical(-1.0 / a.sqrt(), 0.0, 0.0, 0.0);
+        let momentum = FourVector::new(-1.0 / a.sqrt(), 0.0, 0.0, 0.0, camera_position);
 
         let camera = Camera::new(
             camera_position,
@@ -769,8 +750,8 @@ mod tests {
     #[test]
     fn test_intersects_with_disk() {
         let camera = Camera::new(
-            Point::new(0.0, 7.0, 0.0, 0.8, CoordinateSystem::Cartesian),
-            FourVector::new_cartesian(1.0, 0.0, 0.0, 0.0),
+            Point::new_cartesian(0.0, 7.0, 0.0, 0.8),
+            FourVector::new(1.0, 0.0, 0.0, 0.0, Point::new_cartesian(0.0, 7.0, 0.0, 0.8)),
             PI / 4.0,
             101,
             101,

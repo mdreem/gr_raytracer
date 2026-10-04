@@ -1,8 +1,10 @@
 use crate::cli::cli::GlobalOpts;
 use crate::configuration::RenderConfig;
 use crate::geometry::circular_orbit::OrbitKillingDecomposition;
+use crate::geometry::coordinates::atlas::{CartesianConvertible, Chart, SphericalConvertible};
+use crate::geometry::coordinates::euclidean::CartesianChart;
 use crate::geometry::four_vector::FourVector;
-use crate::geometry::point::{CoordinateSystem, Point};
+use crate::geometry::point::Point;
 use crate::geometry::tetrad::Tetrad;
 use crate::rendering::ray::Ray;
 use crate::rendering::raytracer::RaytracerError;
@@ -12,9 +14,11 @@ use crate::rendering::temperature::TemperatureComputer;
 use nalgebra::{Const, Matrix4};
 use std::io::Write;
 
-pub trait GeodesicSolver: OdeFunction<Const<8>> + HasCoordinateSystem {
+pub trait GeodesicSolver: OdeFunction<Const<8>> {
+    type Chart: Chart;
+    fn chart(&self) -> Self::Chart;
     fn geodesic(&self, t: f64, y: &EquationOfMotionState) -> EquationOfMotionState;
-    fn create_initial_state(&self, ray: &Ray) -> EquationOfMotionState {
+    fn create_initial_state(&self, ray: &Ray<Self::Chart>) -> EquationOfMotionState {
         EquationOfMotionState::from_column_slice(&[
             ray.position[0],
             ray.position[1],
@@ -26,17 +30,24 @@ pub trait GeodesicSolver: OdeFunction<Const<8>> + HasCoordinateSystem {
             ray.momentum[3],
         ])
     }
-    fn momentum_from_state(&self, y: &EquationOfMotionState) -> FourVector {
-        FourVector::new(y[4], y[5], y[6], y[7], self.coordinate_system())
+    fn momentum_from_state(&self, y: &EquationOfMotionState) -> FourVector<Self::Chart> {
+        FourVector::new(
+            y[4],
+            y[5],
+            y[6],
+            y[7],
+            Point::new(y[0], y[1], y[2], y[3], self.chart()),
+        )
     }
 }
 
-pub trait HasCoordinateSystem {
-    fn coordinate_system(&self) -> CoordinateSystem;
-}
-
-pub trait InnerProduct {
-    fn inner_product(&self, position: &Point, v: &FourVector, w: &FourVector) -> f64;
+pub trait InnerProduct: HasChart {
+    fn inner_product(
+        &self,
+        position: &Point<Self::Chart>,
+        v: &FourVector<Self::Chart>,
+        w: &FourVector<Self::Chart>,
+    ) -> f64;
 }
 
 pub trait Signature {
@@ -46,31 +57,31 @@ pub trait Signature {
 /// Support quantities that can be derived from the geometry.
 /// This includes things like computing various velocities at a given position or ways to
 /// compute temperatures.
-pub trait SupportQuantities {
+pub trait SupportQuantities: HasChart {
     /// The static (Killing) observer: at rest relative to infinity, purely
     /// along d_t. Does not exist inside the ergosphere of a spinning hole
     /// (components become non-finite there).
-    fn get_stationary_velocity_at(&self, position: &Point) -> FourVector;
+    fn get_stationary_velocity_at(&self, position: &Point<Self::Chart>) -> FourVector<Self::Chart>;
     /// The ZAMO (zero angular momentum observer / locally non-rotating
     /// frame): co-rotates with frame dragging, u . d_phi = 0. Coincides with
     /// the static observer wherever there is no rotation; exists everywhere
     /// outside the horizon, including inside the ergosphere.
-    fn get_zamo_velocity_at(&self, position: &Point) -> FourVector;
+    fn get_zamo_velocity_at(&self, position: &Point<Self::Chart>) -> FourVector<Self::Chart>;
     fn get_circular_orbit_velocity_at(
         &self,
-        position: &Point,
-    ) -> Result<FourVector, RaytracerError>;
+        position: &Point<Self::Chart>,
+    ) -> Result<FourVector<Self::Chart>, RaytracerError>;
     /// The axial Killing vector d_phi (generator of rotations about the spin
     /// axis) expressed in this geometry's chart: (0,0,0,1) in spherical/BL
     /// charts, (0, -y, x, 0) in Cartesian charts. Contracting the ray momentum
     /// with it yields the conserved p_phi.
-    fn axial_killing_vector(&self, position: &Point) -> FourVector;
+    fn axial_killing_vector(&self, position: &Point<Self::Chart>) -> FourVector<Self::Chart>;
     /// Killing coefficients (u^t, u^phi) of the equatorial circular orbit at
     /// the position's radius. Chart-independent scalars; see
     /// `OrbitKillingDecomposition` for how they pair with conserved (p_t, p_phi).
     fn circular_orbit_killing_coefficients(
         &self,
-        position: &Point,
+        position: &Point<Self::Chart>,
     ) -> Result<OrbitKillingDecomposition, RaytracerError>;
     fn get_temperature_computer(
         &self,
@@ -105,27 +116,49 @@ impl ConstantsOfMotion {
 /// `closed_orbit` implementations of the black-hole geometries.
 pub const TRAPPED_ORBIT_RADIUS_FACTOR: f64 = 5.0;
 
-pub trait Geometry:
-    InnerProduct + HasCoordinateSystem + Signature + SupportQuantities + Sync
-{
-    fn get_tetrad_at(&self, position: &Point) -> Tetrad;
-    fn lorentz_transformation(&self, position: &Point, velocity: &FourVector) -> Matrix4<f64>;
-    fn inside_horizon(&self, position: &Point) -> bool;
-    fn closed_orbit(&self, position: &Point, step_index: usize, max_steps: usize) -> bool;
-    fn get_geodesic_solver(&self, ray: &Ray) -> Box<dyn GeodesicSolver>;
-    fn get_radial_coordinate(&self, position: &Point) -> f64;
-    /// Return the invariants along a geodesic, e.g. E and L_z.
-    #[allow(dead_code)]
-    fn get_constants_of_motion(&self, position: &Point, momentum: &FourVector)
-    -> ConstantsOfMotion;
+pub trait HasChart {
+    type Chart: Chart + CartesianConvertible + SphericalConvertible;
 }
 
-pub trait RenderableGeometry: Geometry {
+pub trait Geometry: HasChart + InnerProduct + SupportQuantities + Signature + Sync {
+    fn get_tetrad_at(&self, position: &Point<Self::Chart>) -> Tetrad<Self::Chart>;
+    fn lorentz_transformation(
+        &self,
+        position: &Point<Self::Chart>,
+        velocity: &FourVector<Self::Chart>,
+    ) -> Matrix4<f64>;
+    fn inside_horizon(&self, position: &Point<Self::Chart>) -> bool;
+    fn closed_orbit(
+        &self,
+        position: &Point<Self::Chart>,
+        step_index: usize,
+        max_steps: usize,
+    ) -> bool;
+    fn get_geodesic_solver(
+        &self,
+        ray: &Ray<Self::Chart>,
+    ) -> Box<dyn GeodesicSolver<Chart = Self::Chart>>;
+    fn get_radial_coordinate(&self, position: &Point<Self::Chart>) -> f64;
+    /// d(affine parameter)/d(`Step::t`) at `position`: 1 for solvers that integrate in the
+    /// affine parameter, Σ for ones that integrate in Mino time (KerrBL).
+    fn step_parameter_scale(&self, _position: &Point<Self::Chart>) -> f64 {
+        1.0
+    }
+    /// Return the invariants along a geodesic, e.g. E and L_z.
+    #[allow(dead_code)]
+    fn get_constants_of_motion(
+        &self,
+        position: &Point<Self::Chart>,
+        momentum: &FourVector<Self::Chart>,
+    ) -> ConstantsOfMotion;
+}
+
+pub trait RenderableGeometry {
     fn render(
         &self,
         opts: GlobalOpts,
         config: RenderConfig,
-        camera_position: Point,
+        camera_position: Point<CartesianChart>,
         filename: String,
         from_row: Option<u32>,
         from_col: Option<u32>,
@@ -139,14 +172,14 @@ pub trait RenderableGeometry: Geometry {
         col: i64,
         opts: GlobalOpts,
         config: RenderConfig,
-        camera_position: Point,
+        camera_position: Point<CartesianChart>,
         write: &mut dyn Write,
     ) -> Result<(), RaytracerError>;
 
     fn render_ray_at(
         &self,
-        position: Point,
-        direction: FourVector,
+        position: Point<CartesianChart>,
+        direction: FourVector<CartesianChart>,
         opts: GlobalOpts,
         write: &mut dyn Write,
     ) -> Result<(), RaytracerError>;

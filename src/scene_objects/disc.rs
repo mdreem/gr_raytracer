@@ -1,12 +1,13 @@
+use crate::geometry::coordinates::atlas::{CartesianConvertible, SphericalConvertible};
+use crate::geometry::coordinates::euclidean::CartesianChart;
 use crate::geometry::geometry::Geometry;
-use crate::geometry::point::{CoordinateSystem, Point};
+use crate::geometry::point::Point;
 use crate::rendering::integrator::Step;
 use crate::rendering::radiance::Radiance;
 use crate::rendering::raytracer::RaytracerError;
 use crate::rendering::temperature::TemperatureComputer;
 use crate::rendering::texture::{TextureMapHandle, UVCoordinates};
 use crate::scene_objects::hittable::{ColorComputationData, Hittable, Intersection};
-use crate::scene_objects::objects::SceneObject;
 use nalgebra::Vector3;
 use roots::{SimpleConvergency, find_root_brent};
 
@@ -38,14 +39,15 @@ impl Disc {
         }
     }
 
-    fn create_intersection(
+    fn create_intersection<C: CartesianConvertible + SphericalConvertible>(
         &self,
-        geometry: &dyn Geometry,
+        geometry: &dyn Geometry<Chart = C>,
         center: Vector3<f64>,
         y_start_spatial: Vector3<f64>,
         direction: Vector3<f64>,
         t: f64,
-    ) -> Option<Intersection> {
+        chart: C,
+    ) -> Option<Intersection<CartesianChart>> {
         // In-plane coordinates are interpolated at t; z is pinned to the disc
         // plane (z = 0). For the linear branch the chord already crosses at
         // z = 0, but the cubic branch solves z(s) = 0 on the reconstructed
@@ -60,7 +62,8 @@ impl Disc {
         // In Kerr charts the equatorial Cartesian radius obeys
         // x^2 + y^2 = r^2 + a^2, so the Cartesian norm must not be compared
         // against them directly.
-        let r = geometry.get_radial_coordinate(&intersection_point_p);
+        let r =
+            geometry.get_radial_coordinate(&C::point_from_cartesian(chart, &intersection_point_p));
 
         if r >= self.center_disk_inner_radius && r <= self.center_disk_outer_radius {
             let vector_in_plane = intersection_point - center;
@@ -83,13 +86,13 @@ impl Disc {
     }
 }
 
-impl Hittable for Disc {
+impl<C: CartesianConvertible + SphericalConvertible> Hittable<C> for Disc {
     fn intersects(
         &self,
-        y_start: &Step,
-        y_end: &Step,
-        geometry: &dyn Geometry,
-    ) -> Option<Intersection> {
+        y_start: &Step<C>,
+        y_end: &Step<C>,
+        geometry: &dyn Geometry<Chart = C>,
+    ) -> Option<Intersection<CartesianChart>> {
         // z x y
         let normal = Vector3::new(0.0, 0.0, 1.0);
         let center = Vector3::new(0.0, 0.0, 0.0);
@@ -115,7 +118,15 @@ impl Hittable for Disc {
                 return None;
             }
 
-            return self.create_intersection(geometry, center, y_start_spatial, direction, t);
+            let chart = y_start.x.chart;
+            return self.create_intersection(
+                geometry,
+                center,
+                y_start_spatial,
+                direction,
+                t,
+                chart,
+            );
         }
 
         // Same-sign endpoints: the straight chord never crosses the plane, but
@@ -132,24 +143,20 @@ impl Hittable for Disc {
         // The reconstruction is kept because it is correct and cheap and would
         // catch a genuine in-step double crossing if a camera ever produced one.
         // The Hermite slopes are dz/ds with s running over the step's own
-        // integration parameter (Step::t). get_z_cartesian returns dz/d(affine
+        // integration parameter (Step::t). The Cartesian z of p is dz/d(affine
         // lambda); on charts whose Step::t is not the affine parameter this
         // needs rescaling by d(affine)/d(Step::t). KerrBL integrates in Mino
         // time, where d(affine) = Sigma d(Mino), so its slopes carry a factor
         // of Sigma = r^2 + a^2 cos^2(theta); the affine-parametrised charts
         // (Kerr/KS, Schwarzschild) use 1.
-        let param_scale = |p: &Point| match p.coordinate_system {
-            CoordinateSystem::BoyerLindquist { a } => {
-                let (r, theta) = (p[1], p[2]);
-                r * r + a * a * theta.cos().powi(2)
-            }
-            _ => 1.0,
-        };
         let d_lambda = y_end.t - y_start.t;
         let p0 = y_start_spatial[2];
         let p1 = y_end_spatial[2];
-        let m0 = y_start.p.get_z_cartesian(&y_start.x) * param_scale(&y_start.x) * d_lambda;
-        let m1 = y_end.p.get_z_cartesian(&y_end.x) * param_scale(&y_end.x) * d_lambda;
+        let m0 = y_start.p.to_cartesian().vector[3]
+            * geometry.step_parameter_scale(&y_start.x)
+            * d_lambda;
+        let m1 =
+            y_end.p.to_cartesian().vector[3] * geometry.step_parameter_scale(&y_end.x) * d_lambda;
 
         // p(t) = (2 t^3 - 3 t^2 + 1) p0 + (t^3 - 2 t^2 + t) m0 + (-2 t^3 + 3 t^2) p1 + (t^3 - t^2) m1
         //      = p0 + m0 t + (-2 m0 - m1 - 3 p0 + 3 p1) t^2 + (m0 + m1 + 2 p0 - 2 p1) t^3
@@ -200,8 +207,9 @@ impl Hittable for Disc {
                 Err(_) => continue,
             };
 
+            let chart = y_start.x.chart;
             let intersection =
-                self.create_intersection(geometry, center, y_start_spatial, direction, t);
+                self.create_intersection(geometry, center, y_start_spatial, direction, t, chart);
 
             if intersection.is_some() {
                 return intersection;
@@ -212,8 +220,8 @@ impl Hittable for Disc {
 
     fn color_at_uv(
         &self,
-        color_computation_data: &ColorComputationData,
-        _geometry: &dyn Geometry,
+        color_computation_data: &ColorComputationData<C>,
+        _geometry: &dyn Geometry<Chart = C>,
     ) -> Result<Radiance, RaytracerError> {
         let mut color = self.texture_mapper.color_at_uv(
             &color_computation_data.uv,
@@ -229,8 +237,8 @@ impl Hittable for Disc {
 
     fn energy_of_emitter(
         &self,
-        geometry: &dyn Geometry,
-        step: &Step,
+        geometry: &dyn Geometry<Chart = C>,
+        step: &Step<C>,
     ) -> Result<f64, RaytracerError> {
         let position = step.x;
         let velocity = geometry.get_circular_orbit_velocity_at(&position)?;
@@ -240,16 +248,14 @@ impl Hittable for Disc {
 
     fn temperature_of_emitter(
         &self,
-        point: &Point,
-        geometry: &dyn Geometry,
+        point: &Point<C>,
+        geometry: &dyn Geometry<Chart = C>,
     ) -> Result<f64, RaytracerError> {
         let r = geometry.get_radial_coordinate(point);
         let temperature = self.temperature_computer.compute_temperature(r)?;
         Ok(temperature)
     }
 }
-
-impl SceneObject for Disc {}
 
 #[cfg(test)]
 mod tests {
@@ -278,12 +284,12 @@ mod tests {
         )
     }
 
-    fn crossing_at(x: f64) -> (Step, Step) {
-        let start = Point::new_cartesian(0.0, x, 0.0, 0.1);
-        let end = Point::new_cartesian(0.0, x, 0.0, -0.1);
+    fn crossing_at<C: CartesianConvertible>(chart: C, x: f64) -> (Step<C>, Step<C>) {
+        let start = C::point_from_cartesian(chart, &Point::new_cartesian(0.0, x, 0.0, 0.1));
+        let end = C::point_from_cartesian(chart, &Point::new_cartesian(0.0, x, 0.0, -0.1));
         // Straight-line tangent, so the Cubic Hermite reduces to the linear crossing this fixture describes.
         let dir = end.get_spatial_vector_cartesian() - start.get_spatial_vector_cartesian();
-        let p = FourVector::new_cartesian(1.0, dir[0], dir[1], dir[2]);
+        let p = FourVector::new(1.0, dir[0], dir[1], dir[2], start);
         (
             Step {
                 x: start,
@@ -311,15 +317,15 @@ mod tests {
 
         // Cartesian R = 0.8 -> BL r = sqrt(0.64 - 0.499^2) ~ 0.625 < 0.795:
         // no gas there.
-        let (start, end) = crossing_at(0.8);
+        let (start, end) = crossing_at(geometry.kerr_schild_chart(), 0.8);
         assert!(disc.intersects(&start, &end, &geometry).is_none());
 
         // Cartesian R = 0.95 -> BL r ~ 0.808 > 0.795: inside the disc.
-        let (start, end) = crossing_at(0.95);
+        let (start, end) = crossing_at(geometry.kerr_schild_chart(), 0.95);
         assert!(disc.intersects(&start, &end, &geometry).is_some());
 
         // Outer edge: Cartesian R = 8.01 -> BL r ~ 7.994 < 8.0: still gas.
-        let (start, end) = crossing_at(8.01);
+        let (start, end) = crossing_at(geometry.kerr_schild_chart(), 8.01);
         assert!(disc.intersects(&start, &end, &geometry).is_some());
     }
 
@@ -328,11 +334,11 @@ mod tests {
         let geometry = EuclideanSpace::new();
         let disc = create_disc(3.05, 8.0);
 
-        let (start, end) = crossing_at(3.0);
+        let (start, end) = crossing_at(CartesianChart::Cartesian, 3.0);
         assert!(disc.intersects(&start, &end, &geometry).is_none());
-        let (start, end) = crossing_at(3.1);
+        let (start, end) = crossing_at(CartesianChart::Cartesian, 3.1);
         assert!(disc.intersects(&start, &end, &geometry).is_some());
-        let (start, end) = crossing_at(8.1);
+        let (start, end) = crossing_at(CartesianChart::Cartesian, 8.1);
         assert!(disc.intersects(&start, &end, &geometry).is_none());
     }
 
@@ -346,7 +352,7 @@ mod tests {
 
         // Cartesian R such that BL r == inner edge: R = sqrt(r^2 + a^2).
         let r_inner_cartesian = (0.795f64 * 0.795 + 0.499 * 0.499).sqrt();
-        let (start, end) = crossing_at(r_inner_cartesian + 1e-6);
+        let (start, end) = crossing_at(geometry.kerr_schild_chart(), r_inner_cartesian + 1e-6);
         let intersection = disc
             .intersects(&start, &end, &geometry)
             .expect("should hit the inner edge");
@@ -358,21 +364,27 @@ mod tests {
 
     /// A step with fixed in-plane position (radius `x`, phi = 0), endpoint
     /// heights `z0`/`z1` above the disc plane, and Cartesian z-velocities
-    /// `m0`/`m1`. The affine step length is 1, so `get_z_cartesian * d_lambda`
+    /// `m0`/`m1`. The affine step length is 1, so the Cartesian z of p times `d_lambda`
     /// returns `m0`/`m1` directly as the cubic's endpoint slopes. Used to
     /// exercise the same-side cubic branch, where both endpoints share a sign
     /// and the straight chord finds no crossing.
-    fn dip_steps(x: f64, z0: f64, z1: f64, m0: f64, m1: f64) -> (Step, Step) {
+    fn dip_steps(
+        x: f64,
+        z0: f64,
+        z1: f64,
+        m0: f64,
+        m1: f64,
+    ) -> (Step<CartesianChart>, Step<CartesianChart>) {
         (
             Step {
                 x: Point::new_cartesian(0.0, x, 0.0, z0),
-                p: FourVector::new_cartesian(1.0, 0.0, 0.0, m0),
+                p: FourVector::new(1.0, 0.0, 0.0, m0, Point::new_cartesian(0.0, x, 0.0, z0)),
                 t: 0.0,
                 step: 0,
             },
             Step {
                 x: Point::new_cartesian(0.0, x, 0.0, z1),
-                p: FourVector::new_cartesian(1.0, 0.0, 0.0, m1),
+                p: FourVector::new(1.0, 0.0, 0.0, m1, Point::new_cartesian(0.0, x, 0.0, z1)),
                 t: 1.0,
                 step: 1,
             },

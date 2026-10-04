@@ -25,8 +25,8 @@ use std::sync::Arc;
 fn assert_directed<G: Geometry>(
     context: &str,
     geometry: &G,
-    position: &Point,
-    four_vector: &FourVector,
+    position: &Point<G::Chart>,
+    four_vector: &FourVector<G::Chart>,
     expected_sign: f64,
 ) -> Result<(), RaytracerError> {
     let t = four_vector[0];
@@ -49,9 +49,9 @@ fn assert_directed<G: Geometry>(
 /// `StaticObserver`/`Zamo` are normalized by construction.
 pub fn resolve_camera_velocity<G: Geometry>(
     geometry: &G,
-    position: &Point,
+    position: &Point<G::Chart>,
     config: &configuration::CameraVelocityConfig,
-) -> Result<FourVector, RaytracerError> {
+) -> Result<FourVector<G::Chart>, RaytracerError> {
     match config {
         configuration::CameraVelocityConfig::StaticObserver => {
             Ok(geometry.get_stationary_velocity_at(position))
@@ -63,7 +63,7 @@ pub fn resolve_camera_velocity<G: Geometry>(
                 components[1],
                 components[2],
                 components[3],
-                geometry.coordinate_system(),
+                *position,
             );
             let norm = geometry.inner_product(position, &velocity, &velocity);
             let expected = geometry.signature()[0];
@@ -81,8 +81,8 @@ pub fn resolve_camera_velocity<G: Geometry>(
 pub fn assert_future_directed<G: Geometry>(
     context: &str,
     geometry: &G,
-    position: &Point,
-    four_vector: &FourVector,
+    position: &Point<G::Chart>,
+    four_vector: &FourVector<G::Chart>,
 ) -> Result<(), RaytracerError> {
     assert_directed(context, geometry, position, four_vector, 1.0)
 }
@@ -114,8 +114,8 @@ pub fn render<G: Geometry>(
 
 pub fn integrate_and_save_ray<G: Geometry>(
     geometry: &G,
-    position: Point,
-    momentum: FourVector,
+    position: Point<G::Chart>,
+    momentum: FourVector<G::Chart>,
     opts: GlobalOpts,
     write: &mut dyn Write,
 ) -> Result<(), RaytracerError> {
@@ -138,8 +138,8 @@ pub fn integrate_and_save_ray<G: Geometry>(
 
 pub fn create_scene<G: Geometry>(
     geometry: &G,
-    camera_position: Point,
-    camera_momentum: FourVector,
+    camera_position: Point<G::Chart>,
+    camera_momentum: FourVector<G::Chart>,
     opts: GlobalOpts,
     config: RenderConfig,
 ) -> Result<Scene<'_, G>, RaytracerError> {
@@ -199,43 +199,43 @@ pub fn create_scene<G: Geometry>(
         curved_star_membership_config,
         magnification_cap_config,
     ) = match config.star_catalog {
-            Some(catalog_config) => {
-                let sky_rotation = match &catalog_config.rotation {
-                    Some(rotation) => Some(
-                        rotation
-                            .rotation()
-                            .map_err(RaytracerError::InvalidConfiguration)?,
-                    ),
-                    None => None,
-                };
-                let catalog = StarCatalog::load_parquet_rotated(&catalog_config.path, sky_rotation)
-                    .map_err(|error| {
-                        RaytracerError::InvalidConfiguration(format!(
-                            "Failed to load star catalog {:?}: {}",
-                            catalog_config.path, error
-                        ))
-                    })?;
-                debug!(
-                    "Loaded {} stars from {}{}",
-                    catalog.len(),
-                    catalog_config.path,
-                    if sky_rotation.is_some() {
-                        " (celestial sphere rotated)"
-                    } else {
-                        ""
-                    }
-                );
-                (
-                    Some(catalog),
-                    catalog_config.flux_scale,
-                    catalog_config.winding_spread_threshold,
-                    catalog_config.max_subdivision_depth,
-                    catalog_config.curved_star_membership,
-                    catalog_config.magnification_cap,
-                )
-            }
-            None => (None, 1.0, std::f64::consts::PI, 6, false, None),
-        };
+        Some(catalog_config) => {
+            let sky_rotation = match &catalog_config.rotation {
+                Some(rotation) => Some(
+                    rotation
+                        .rotation()
+                        .map_err(RaytracerError::InvalidConfiguration)?,
+                ),
+                None => None,
+            };
+            let catalog = StarCatalog::load_parquet_rotated(&catalog_config.path, sky_rotation)
+                .map_err(|error| {
+                    RaytracerError::InvalidConfiguration(format!(
+                        "Failed to load star catalog {:?}: {}",
+                        catalog_config.path, error
+                    ))
+                })?;
+            debug!(
+                "Loaded {} stars from {}{}",
+                catalog.len(),
+                catalog_config.path,
+                if sky_rotation.is_some() {
+                    " (celestial sphere rotated)"
+                } else {
+                    ""
+                }
+            );
+            (
+                Some(catalog),
+                catalog_config.flux_scale,
+                catalog_config.winding_spread_threshold,
+                catalog_config.max_subdivision_depth,
+                catalog_config.curved_star_membership,
+                catalog_config.magnification_cap,
+            )
+        }
+        None => (None, 1.0, std::f64::consts::PI, 6, false, None),
+    };
 
     let mut objects = Objects::new(geometry);
     for object in config.objects {

@@ -3,6 +3,7 @@ use crate::cli::shared::{
     assert_future_directed, create_scene, integrate_and_save_ray, render, resolve_camera_velocity,
 };
 use crate::configuration::RenderConfig;
+use crate::geometry::coordinates::euclidean::CartesianChart;
 use crate::geometry::euclidean::EuclideanSpace;
 use crate::geometry::four_vector::FourVector;
 use crate::geometry::geometry::RenderableGeometry;
@@ -18,7 +19,7 @@ impl RenderableGeometry for EuclideanSpace {
         &self,
         opts: GlobalOpts,
         config: RenderConfig,
-        camera_position: Point,
+        camera_position: Point<CartesianChart>,
         filename: String,
         from_row: Option<u32>,
         from_col: Option<u32>,
@@ -54,7 +55,7 @@ impl RenderableGeometry for EuclideanSpace {
         col: i64,
         opts: GlobalOpts,
         config: RenderConfig,
-        camera_position: Point,
+        camera_position: Point<CartesianChart>,
         write: &mut dyn Write,
     ) -> Result<(), RaytracerError> {
         let momentum = resolve_camera_velocity(self, &camera_position, &config.camera_velocity)?;
@@ -75,8 +76,8 @@ impl RenderableGeometry for EuclideanSpace {
 
     fn render_ray_at(
         &self,
-        position: Point,
-        direction: FourVector,
+        position: Point<CartesianChart>,
+        direction: FourVector<CartesianChart>,
         opts: GlobalOpts,
         write: &mut dyn Write,
     ) -> Result<(), RaytracerError> {
@@ -89,8 +90,13 @@ impl RenderableGeometry for EuclideanSpace {
                 "render_ray_at direction must have a non-zero finite spatial part.".to_string(),
             ));
         }
-        let momentum =
-            FourVector::new_cartesian(spatial_norm, direction[1], direction[2], direction[3]);
+        let momentum = FourVector::new(
+            spatial_norm,
+            direction[1],
+            direction[2],
+            direction[3],
+            position,
+        );
         assert_future_directed(
             "Euclidean render_ray_at momentum",
             self,

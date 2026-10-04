@@ -28,7 +28,7 @@ impl<'a, G: Geometry> RedshiftComputer<'a, G> {
         Self { geometry }
     }
 
-    pub fn compute_redshift(&self, step: &Step, observer_energy: f64) -> f64 {
+    pub fn compute_redshift(&self, step: &Step<G::Chart>, observer_energy: f64) -> f64 {
         let emitter_energy = self.energy_of_stationary_emitter(step);
         self.compute_redshift_from_energies(emitter_energy, observer_energy)
     }
@@ -37,14 +37,18 @@ impl<'a, G: Geometry> RedshiftComputer<'a, G> {
         self.to_physical_energy(observer_energy) / self.to_physical_energy(emitter_energy)
     }
 
-    pub fn get_observer_energy(&self, ray: &Ray, velocity: &FourVector) -> f64 {
+    pub fn get_observer_energy(&self, ray: &Ray<G::Chart>, velocity: &FourVector<G::Chart>) -> f64 {
         self.geometry
             .inner_product(&ray.position, velocity, &ray.momentum)
     }
 
-    pub fn get_ray_frequency_data(&self, ray: &Ray, velocity: &FourVector) -> RayFrequencyData {
+    pub fn get_ray_frequency_data(
+        &self,
+        ray: &Ray<G::Chart>,
+        velocity: &FourVector<G::Chart>,
+    ) -> RayFrequencyData {
         let observer_energy = self.get_observer_energy(ray, velocity);
-        let e_t = FourVector::new(1.0, 0.0, 0.0, 0.0, ray.momentum.coordinate_system);
+        let e_t = FourVector::new(1.0, 0.0, 0.0, 0.0, ray.momentum.at);
         let p_t = self
             .geometry
             .inner_product(&ray.position, &e_t, &ray.momentum);
@@ -59,7 +63,7 @@ impl<'a, G: Geometry> RedshiftComputer<'a, G> {
         }
     }
 
-    fn energy_of_stationary_emitter(&self, step: &Step) -> f64 {
+    fn energy_of_stationary_emitter(&self, step: &Step<G::Chart>) -> f64 {
         let position = step.x;
         let velocity = self.geometry.get_stationary_velocity_at(&position);
         let momentum = step.p;
@@ -76,6 +80,7 @@ impl<'a, G: Geometry> RedshiftComputer<'a, G> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::geometry::coordinates::euclidean::CartesianChart;
     use crate::geometry::euclidean::EuclideanSpace;
     use crate::geometry::four_vector::FourVector;
     use crate::geometry::geometry::{InnerProduct, SupportQuantities};
@@ -100,13 +105,13 @@ mod tests {
     /// Flat space, hand-built traced momentum. The observer sits at +x, the
     /// emitter towards -x, so the traced (past-directed) photon momentum is
     /// N - e_t with N = -x_hat: p = (-1, -1, 0, 0).
-    fn doppler_redshift_for(emitter_velocity: &FourVector) -> f64 {
+    fn doppler_redshift_for(emitter_velocity: &FourVector<CartesianChart>) -> f64 {
         let geometry = EuclideanSpace::new();
         let computer = RedshiftComputer::new(&geometry);
         let position = Point::new_cartesian(0.0, 0.0, 0.0, 0.0);
-        let momentum = FourVector::new_cartesian(-1.0, -1.0, 0.0, 0.0);
+        let momentum = FourVector::new(-1.0, -1.0, 0.0, 0.0, position);
 
-        let observer = FourVector::new_cartesian(1.0, 0.0, 0.0, 0.0);
+        let observer = FourVector::new(1.0, 0.0, 0.0, 0.0, position);
         let observer_energy = geometry.inner_product(&position, &observer, &momentum);
         let emitter_energy = geometry.inner_product(&position, emitter_velocity, &momentum);
         computer.compute_redshift_from_energies(emitter_energy, observer_energy)
@@ -116,28 +121,46 @@ mod tests {
     fn test_doppler_formulas_with_hand_built_momentum() {
         let v = EMITTER_SPEED;
         // Approaching the observer at +x: nu_obs/nu_em = 1 / (gamma (1 - v)).
-        let approaching = FourVector::new_cartesian(gamma(v), gamma(v) * v, 0.0, 0.0);
+        let approaching = FourVector::new(
+            gamma(v),
+            gamma(v) * v,
+            0.0,
+            0.0,
+            Point::new_cartesian(0.0, 0.0, 0.0, 0.0),
+        );
         assert_abs_diff_eq!(
             doppler_redshift_for(&approaching),
             (gamma(v) * (1.0 - v)).recip(),
             epsilon = 1e-12
         );
         // Receding: nu_obs/nu_em = 1 / (gamma (1 + v)).
-        let receding = FourVector::new_cartesian(gamma(v), -gamma(v) * v, 0.0, 0.0);
+        let receding = FourVector::new(
+            gamma(v),
+            -gamma(v) * v,
+            0.0,
+            0.0,
+            Point::new_cartesian(0.0, 0.0, 0.0, 0.0),
+        );
         assert_abs_diff_eq!(
             doppler_redshift_for(&receding),
             (gamma(v) * (1.0 + v)).recip(),
             epsilon = 1e-12
         );
         // Transverse: only time dilation, nu_obs/nu_em = 1 / gamma.
-        let transverse = FourVector::new_cartesian(gamma(v), 0.0, gamma(v) * v, 0.0);
+        let transverse = FourVector::new(
+            gamma(v),
+            0.0,
+            gamma(v) * v,
+            0.0,
+            Point::new_cartesian(0.0, 0.0, 0.0, 0.0),
+        );
         assert_abs_diff_eq!(
             doppler_redshift_for(&transverse),
             gamma(v).recip(),
             epsilon = 1e-12
         );
         // At rest: no shift.
-        let at_rest = FourVector::new_cartesian(1.0, 0.0, 0.0, 0.0);
+        let at_rest = FourVector::new(1.0, 0.0, 0.0, 0.0, Point::new_cartesian(0.0, 0.0, 0.0, 0.0));
         assert_abs_diff_eq!(doppler_redshift_for(&at_rest), 1.0, epsilon = 1e-12);
     }
 
@@ -149,11 +172,11 @@ mod tests {
         let geometry = EuclideanSpace::new();
         let computer = RedshiftComputer::new(&geometry);
         let position = Point::new_cartesian(0.0, 0.0, 0.0, 0.0);
-        let observer = FourVector::new_cartesian(1.0, 0.0, 0.0, 0.0);
+        let observer = FourVector::new(1.0, 0.0, 0.0, 0.0, position);
         let v = EMITTER_SPEED;
-        let emitter = FourVector::new_cartesian(gamma(v), gamma(v) * v, 0.0, 0.0);
+        let emitter = FourVector::new(gamma(v), gamma(v) * v, 0.0, 0.0, position);
 
-        let momentum = FourVector::new_cartesian(-1.0, -1.0, 0.0, 0.0);
+        let momentum = FourVector::new(-1.0, -1.0, 0.0, 0.0, position);
         let negated = -momentum;
 
         let g = computer.compute_redshift_from_energies(
@@ -196,7 +219,7 @@ mod tests {
                     let p_phi = p_phi_hat / r; // scale to comparable magnitude
                     let spatial = p_r * p_r / a + r * r * p_phi * p_phi;
                     let p_t = -(spatial / a).sqrt();
-                    let momentum = FourVector::new_spherical(p_t, p_r, 0.0, p_phi);
+                    let momentum = FourVector::new(p_t, p_r, 0.0, p_phi, position);
                     assert_abs_diff_eq!(
                         geometry.inner_product(&position, &momentum, &momentum),
                         0.0,
@@ -248,8 +271,8 @@ mod tests {
         let p_t = -1.0;
         let camera_position = Point::new_spherical(0.0, r_camera, PI / 2.0, 0.0);
         let emitter_position = Point::new_spherical(0.0, r_emitter, PI / 2.0, 0.0);
-        let p_camera = FourVector::new_spherical(p_t / a_camera, p_t, 0.0, 0.0);
-        let p_emitter = FourVector::new_spherical(p_t / a_emitter, p_t, 0.0, 0.0);
+        let p_camera = FourVector::new(p_t / a_camera, p_t, 0.0, 0.0, camera_position);
+        let p_emitter = FourVector::new(p_t / a_emitter, p_t, 0.0, 0.0, emitter_position);
 
         // Both ends must be null.
         assert_abs_diff_eq!(
@@ -282,11 +305,17 @@ mod tests {
     /// transported ray momentum at the emitter is the camera-frame momentum
     /// itself. The returned value is the code's `redshift` variable,
     /// i.e. nu_obs / nu_em = 1 / (1 + z).
-    fn flat_space_redshift_for(emitter_velocity: FourVector) -> f64 {
+    fn flat_space_redshift_for(emitter_velocity: FourVector<CartesianChart>) -> f64 {
         let geometry = EuclideanSpace::new();
         let camera = Camera::new(
             Point::new_cartesian(0.0, 10.0, 0.0, 0.0),
-            FourVector::new_cartesian(1.0, 0.0, 0.0, 0.0),
+            FourVector::new(
+                1.0,
+                0.0,
+                0.0,
+                0.0,
+                Point::new_cartesian(0.0, 10.0, 0.0, 0.0),
+            ),
             PI / 2.0,
             11,
             11,
@@ -313,7 +342,13 @@ mod tests {
 
     #[test]
     fn test_emitter_at_rest_in_flat_space_has_no_shift() {
-        let redshift = flat_space_redshift_for(FourVector::new_cartesian(1.0, 0.0, 0.0, 0.0));
+        let redshift = flat_space_redshift_for(FourVector::new(
+            1.0,
+            0.0,
+            0.0,
+            0.0,
+            Point::new_cartesian(0.0, 5.0, 0.0, 0.0),
+        ));
         assert_abs_diff_eq!(redshift, 1.0, epsilon = 1e-12);
     }
 
@@ -322,7 +357,13 @@ mod tests {
         let v = EMITTER_SPEED;
         // The camera sits at x = +10, the emitter at x = +5, so moving toward
         // the camera means a positive x velocity.
-        let u = FourVector::new_cartesian(gamma(v), gamma(v) * v, 0.0, 0.0);
+        let u = FourVector::new(
+            gamma(v),
+            gamma(v) * v,
+            0.0,
+            0.0,
+            Point::new_cartesian(0.0, 5.0, 0.0, 0.0),
+        );
         let redshift = flat_space_redshift_for(u);
         // Longitudinal Doppler: nu_obs / nu_em = 1 / (gamma (1 - v)) > 1.
         assert_abs_diff_eq!(redshift, (gamma(v) * (1.0 - v)).recip(), epsilon = 1e-12);
@@ -331,7 +372,13 @@ mod tests {
     #[test]
     fn test_emitter_moving_away_from_camera_is_redshifted() {
         let v = EMITTER_SPEED;
-        let u = FourVector::new_cartesian(gamma(v), -gamma(v) * v, 0.0, 0.0);
+        let u = FourVector::new(
+            gamma(v),
+            -gamma(v) * v,
+            0.0,
+            0.0,
+            Point::new_cartesian(0.0, 5.0, 0.0, 0.0),
+        );
         let redshift = flat_space_redshift_for(u);
         // Longitudinal Doppler: nu_obs / nu_em = 1 / (gamma (1 + v)) < 1.
         assert_abs_diff_eq!(redshift, (gamma(v) * (1.0 + v)).recip(), epsilon = 1e-12);
@@ -341,7 +388,13 @@ mod tests {
     fn test_emitter_moving_transverse_shows_transverse_doppler_redshift() {
         let v = EMITTER_SPEED;
         // Motion perpendicular to the line of sight: only time dilation remains.
-        let u = FourVector::new_cartesian(gamma(v), 0.0, gamma(v) * v, 0.0);
+        let u = FourVector::new(
+            gamma(v),
+            0.0,
+            gamma(v) * v,
+            0.0,
+            Point::new_cartesian(0.0, 5.0, 0.0, 0.0),
+        );
         let redshift = flat_space_redshift_for(u);
         assert_abs_diff_eq!(redshift, gamma(v).recip(), epsilon = 1e-12);
     }
@@ -356,7 +409,7 @@ mod tests {
         let a_camera = 1.0 - 1.0 / r_camera;
 
         let position = Point::new_spherical(0.0, r_camera, PI / 2.0, 0.0);
-        let velocity = FourVector::new_spherical(a_camera.sqrt().recip(), 0.0, 0.0, 0.0);
+        let velocity = FourVector::new(a_camera.sqrt().recip(), 0.0, 0.0, 0.0, position);
         let camera = Camera::new(
             position,
             velocity,

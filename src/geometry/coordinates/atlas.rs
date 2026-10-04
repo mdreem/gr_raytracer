@@ -1,0 +1,48 @@
+use crate::geometry::coordinates;
+use crate::geometry::four_vector::FourVector;
+use crate::geometry::point::Point;
+use nalgebra::Vector3;
+use std::fmt::Debug;
+
+pub trait Chart: Copy + PartialEq + Debug + Send + Sync + 'static {
+    // TODO: Align all tetrads on one handedness convention (the (phi, theta, r) tetrads are
+    // left-handed, the Kerr-Schild Gram-Schmidt one right-handed), then delete this and
+    // `spatial_handedness` in camera.rs.
+    /// Handedness of the spatial tetrad that geometries build in this chart; the camera
+    /// falls back to it where the Cartesian triple product degenerates.
+    fn tetrad_handedness_fallback(&self) -> f64;
+}
+
+pub trait Atlas {
+    type Chart: Chart;
+    fn best_chart(&self, position: &Point<Self::Chart>, current: &Self::Chart) -> Self::Chart;
+    fn transition_point(
+        &self,
+        position: &Point<Self::Chart>,
+        from: &Self::Chart,
+        to: &Self::Chart,
+    ) -> Point<Self::Chart>;
+    fn transition_four_vector(
+        &self,
+        position: &Point<Self::Chart>,
+        from: &Self::Chart,
+        to: &Self::Chart,
+    ) -> Point<Self::Chart>;
+}
+
+pub trait SphericalConvertible: Chart {
+    // The order of the components is: (r, theta, phi)
+    fn point_as_spherical(point: &Point<Self>) -> Vector3<f64>; // TODO: Consider using Point here too.
+    fn radial_distance_spatial_part_squared(point: &Point<Self>) -> f64;
+}
+
+pub trait CartesianConvertible: Chart {
+    fn point_to_cartesian(point: &Point<Self>) -> Point<coordinates::euclidean::CartesianChart>;
+    fn point_from_cartesian(
+        chart: Self,
+        point: &Point<coordinates::euclidean::CartesianChart>,
+    ) -> Point<Self>;
+    fn vector_to_cartesian(
+        vector: &FourVector<Self>,
+    ) -> FourVector<coordinates::euclidean::CartesianChart>;
+}

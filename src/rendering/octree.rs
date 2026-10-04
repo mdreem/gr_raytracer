@@ -375,7 +375,11 @@ mod tests {
 
         assert_eq!(found.len(), inside.len());
         let planes = triangle_planes(&plus_z_triangle());
-        assert!(found.iter().all(|s| point_in_triangle(&s.direction, &planes)));
+        assert!(
+            found
+                .iter()
+                .all(|s| point_in_triangle(&s.direction, &planes))
+        );
     }
 
     #[test]
@@ -393,13 +397,23 @@ mod tests {
         assert!(tree.root.children.is_some(), "test should subdivide");
 
         let planes = triangle_planes(&plus_z_triangle());
-        let expected = dirs.iter().filter(|d| point_in_triangle(d, &planes)).count();
+        let expected = dirs
+            .iter()
+            .filter(|d| point_in_triangle(d, &planes))
+            .count();
         let mut found = Vec::new();
         tree.gather_triangle(&plus_z_triangle(), &mut found);
 
-        assert!(expected > 0 && expected < dirs.len(), "triangle should split the set");
+        assert!(
+            expected > 0 && expected < dirs.len(),
+            "triangle should split the set"
+        );
         assert_eq!(found.len(), expected);
-        assert!(found.iter().all(|s| point_in_triangle(&s.direction, &planes)));
+        assert!(
+            found
+                .iter()
+                .all(|s| point_in_triangle(&s.direction, &planes))
+        );
     }
 
     // ---- Adaptive insertion ----------------------------------------------

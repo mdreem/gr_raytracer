@@ -6,8 +6,9 @@ mod scene_objects;
 
 use crate::cli::cli::{Action, App};
 use crate::configuration::RenderConfig;
+use crate::geometry::coordinates::euclidean::CartesianChart;
 use crate::geometry::four_vector::FourVector;
-use crate::geometry::point::{CoordinateSystem, Point};
+use crate::geometry::point::Point;
 use crate::rendering::raytracer::RaytracerError;
 use clap::Parser;
 use log::info;
@@ -97,11 +98,8 @@ fn run() -> Result<(), RaytracerError> {
             );
 
             let geometry = config.geometry_type.get_renderable_geometry();
-            info!(
-                "Using coordinate system: {:?}",
-                geometry.coordinate_system()
-            );
-            let position = Point::new_from_vector(position, CoordinateSystem::Cartesian);
+            info!("Using geometry: {:?}", config.geometry_type);
+            let position = Point::new_cartesian(position[0], position[1], position[2], position[3]);
 
             geometry.render(
                 args.global_opts,
@@ -134,7 +132,7 @@ fn run() -> Result<(), RaytracerError> {
                 col,
                 args.global_opts.clone(),
                 config.clone(),
-                Point::new_from_vector(position, CoordinateSystem::Cartesian),
+                Point::new_from_vector(position, CartesianChart::Cartesian),
                 &mut file,
             )?;
             info!("Saved integrated ray to {}", filename);
@@ -163,7 +161,13 @@ fn run() -> Result<(), RaytracerError> {
                 .get_renderable_geometry()
                 .render_ray_at(
                     Point::new_cartesian(0.0, position[0], position[1], position[2]),
-                    FourVector::new_cartesian(0.0, direction[0], direction[1], direction[2]),
+                    FourVector::new(
+                        0.0,
+                        direction[0],
+                        direction[1],
+                        direction[2],
+                        Point::new_cartesian(0.0, position[0], position[1], position[2]),
+                    ),
                     args.global_opts,
                     &mut file,
                 )?;

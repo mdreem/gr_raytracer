@@ -1,3 +1,4 @@
+use crate::geometry::coordinates::atlas::CartesianConvertible;
 use crate::geometry::four_vector::FourVector;
 use crate::geometry::geometry::Geometry;
 use crate::geometry::point::Point;
@@ -11,9 +12,9 @@ use crate::rendering::scene::{EquationOfMotionState, get_position};
 use log::debug;
 
 #[derive(Debug)]
-pub struct Step {
-    pub x: Point,
-    pub p: FourVector,
+pub struct Step<C: CartesianConvertible> {
+    pub x: Point<C>,
+    pub p: FourVector<C>,
     pub t: f64,
     pub step: usize,
 }
@@ -77,14 +78,16 @@ pub enum IntegrationError {
 impl<G: Geometry> Integrator<'_, G> {
     pub fn integrate(
         &self,
-        ray: &Ray,
-    ) -> Result<(IntegratedRay, Option<StopReason>), RaytracerError> {
+        ray: &Ray<G::Chart>,
+    ) -> Result<(IntegratedRay<G::Chart>, Option<StopReason>), RaytracerError> {
         let mut t = 0.0;
         let geodesic_solver = self.geometry.get_geodesic_solver(ray);
         let mut y = geodesic_solver.create_initial_state(ray);
 
-        let mut result: Vec<Step> = Vec::with_capacity(self.integration_configuration.max_steps);
-        let x = Point::new(y[0], y[1], y[2], y[3], self.geometry.coordinate_system());
+        let initial_chart = ray.position.chart;
+        let mut result: Vec<Step<G::Chart>> =
+            Vec::with_capacity(self.integration_configuration.max_steps);
+        let x = Point::new(y[0], y[1], y[2], y[3], initial_chart);
         let p = geodesic_solver.momentum_from_state(&y);
         result.push(Step { x, p, t, step: 0 });
 
@@ -112,7 +115,8 @@ impl<G: Geometry> Integrator<'_, G> {
             t += h_taken;
             h = h_next;
 
-            let x = Point::new(y[0], y[1], y[2], y[3], self.geometry.coordinate_system());
+            // TODO: Set up chart conversion.
+            let x = Point::new(y[0], y[1], y[2], y[3], initial_chart);
             let p = geodesic_solver.momentum_from_state(&y);
             result.push(Step { x, p, t, step: i });
 
@@ -145,7 +149,8 @@ impl<G: Geometry> Integrator<'_, G> {
                 }
             }
 
-            match self.should_stop(&last_y, &y, i) {
+            // TODO: Careful here once chart transitions are implemented/
+            match self.should_stop(&last_y, &y, i, initial_chart) {
                 None => {}
                 Some(r) => {
                     self.report_drifts(
@@ -205,6 +210,7 @@ impl<G: Geometry> Integrator<'_, G> {
         _last_y: &EquationOfMotionState,
         cur_y: &EquationOfMotionState,
         step_index: usize,
+        chart: G::Chart,
     ) -> Option<StopReason> {
         // Position must be finite to evaluate anything below; if it isn't,
         // there's no reliable state to check horizon/escape against.
@@ -212,29 +218,20 @@ impl<G: Geometry> Integrator<'_, G> {
             debug!("last_y: {:?}", _last_y);
             debug!(
                 "spherical last_y: {:?}",
-                get_position(_last_y, self.geometry.coordinate_system()).get_as_spherical()
+                get_position(_last_y, chart).get_as_spherical()
             );
             return Some(CoordinateIsNan);
         }
 
-        if self.geometry.inside_horizon(&Point::new(
-            cur_y[0],
-            cur_y[1],
-            cur_y[2],
-            cur_y[3],
-            self.geometry.coordinate_system(),
-        )) {
+        if self
+            .geometry
+            .inside_horizon(&Point::new(cur_y[0], cur_y[1], cur_y[2], cur_y[3], chart))
+        {
             return Some(HorizonReached);
         }
 
         if self.geometry.closed_orbit(
-            &Point::new(
-                cur_y[0],
-                cur_y[1],
-                cur_y[2],
-                cur_y[3],
-                self.geometry.coordinate_system(),
-            ),
+            &Point::new(cur_y[0], cur_y[1], cur_y[2], cur_y[3], chart),
             step_index,
             self.integration_configuration.max_steps,
         ) {
@@ -242,8 +239,7 @@ impl<G: Geometry> Integrator<'_, G> {
         }
 
         // iterate until the celestial plane distance has been reached.
-        if get_position(cur_y, self.geometry.coordinate_system())
-            .radial_distance_spatial_part_squared()
+        if get_position(cur_y, chart).radial_distance_spatial_part_squared()
             > self.integration_configuration.max_radius_sq
         {
             return Some(CelestialSphereReached);
@@ -259,7 +255,7 @@ impl<G: Geometry> Integrator<'_, G> {
             debug!("last_y: {:?}", _last_y);
             debug!(
                 "spherical last_y: {:?}",
-                get_position(_last_y, self.geometry.coordinate_system()).get_as_spherical()
+                get_position(_last_y, chart).get_as_spherical()
             );
             return Some(CoordinateIsNan);
         }
@@ -297,7 +293,12 @@ mod tests {
         ]);
 
         assert_eq!(
-            integrator.should_stop(&last_y, &cur_y, 1),
+            integrator.should_stop(
+                &last_y,
+                &cur_y,
+                1,
+                Point::new_spherical(0.0, 0.0, 0.0, 0.0).chart
+            ),
             Some(StopReason::CelestialSphereReached)
         );
     }
@@ -324,7 +325,12 @@ mod tests {
         ]);
 
         assert_eq!(
-            integrator.should_stop(&last_y, &cur_y, 1),
+            integrator.should_stop(
+                &last_y,
+                &cur_y,
+                1,
+                Point::new_spherical(0.0, 0.0, 0.0, 0.0).chart
+            ),
             Some(StopReason::CoordinateIsNan)
         );
     }

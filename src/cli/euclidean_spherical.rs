@@ -3,10 +3,11 @@ use crate::cli::shared::{
     assert_future_directed, create_scene, integrate_and_save_ray, render, resolve_camera_velocity,
 };
 use crate::configuration::RenderConfig;
+use crate::geometry::coordinates::euclidean::CartesianChart;
 use crate::geometry::euclidean_spherical::EuclideanSpaceSpherical;
 use crate::geometry::four_vector::FourVector;
 use crate::geometry::geometry::RenderableGeometry;
-use crate::geometry::point::{CoordinateSystem, Point};
+use crate::geometry::point::Point;
 use crate::geometry::spherical_coordinates_helper::cartesian_to_spherical;
 use crate::rendering::color::ToneMappingMethod;
 use crate::rendering::raytracer;
@@ -19,7 +20,7 @@ impl RenderableGeometry for EuclideanSpaceSpherical {
         &self,
         opts: GlobalOpts,
         config: RenderConfig,
-        camera_position: Point,
+        camera_position: Point<CartesianChart>,
         filename: String,
         from_row: Option<u32>,
         from_col: Option<u32>,
@@ -56,7 +57,7 @@ impl RenderableGeometry for EuclideanSpaceSpherical {
         col: i64,
         opts: GlobalOpts,
         config: RenderConfig,
-        camera_position: Point,
+        camera_position: Point<CartesianChart>,
         write: &mut dyn Write,
     ) -> Result<(), RaytracerError> {
         let camera_position = cartesian_to_spherical(&camera_position);
@@ -78,21 +79,12 @@ impl RenderableGeometry for EuclideanSpaceSpherical {
 
     fn render_ray_at(
         &self,
-        position: Point,
-        direction: FourVector,
+        position: Point<CartesianChart>,
+        direction: FourVector<CartesianChart>,
         opts: GlobalOpts,
         write: &mut dyn Write,
     ) -> Result<(), RaytracerError> {
-        if direction.coordinate_system != CoordinateSystem::Cartesian {
-            return Err(RaytracerError::InvalidConfiguration(
-                "Euclidean-spherical render_ray_at expects a Cartesian direction vector."
-                    .to_string(),
-            ));
-        }
-        let position_spherical = match position.coordinate_system {
-            CoordinateSystem::Cartesian => cartesian_to_spherical(&position),
-            CoordinateSystem::Spherical | CoordinateSystem::BoyerLindquist { .. } => position,
-        };
+        let position_spherical = cartesian_to_spherical(&position);
 
         let r = position_spherical[1];
         let theta = position_spherical[2];
@@ -132,7 +124,7 @@ impl RenderableGeometry for EuclideanSpaceSpherical {
         let theta_dot = theta_unit_dot / r;
         let phi_dot = phi_unit_dot / (r * sin_theta);
 
-        let momentum = FourVector::new_spherical(spatial_norm, r_dot, theta_dot, phi_dot);
+        let momentum = FourVector::new(spatial_norm, r_dot, theta_dot, phi_dot, position_spherical);
         assert_future_directed(
             "Euclidean-spherical render_ray_at momentum",
             self,

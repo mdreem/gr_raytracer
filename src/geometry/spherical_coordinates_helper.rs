@@ -1,4 +1,5 @@
-use crate::geometry::point::{CoordinateSystem, Point};
+use crate::geometry::coordinates;
+use crate::geometry::point::Point;
 use log::trace;
 use std::sync::OnceLock;
 
@@ -30,7 +31,9 @@ pub fn rotate_about_x(x: f64, y: f64, z: f64, deg: f64) -> (f64, f64, f64) {
 }
 
 // The order of the components is: (r, theta, phi)
-pub fn cartesian_to_spherical(cartesian: &Point) -> Point {
+pub fn cartesian_to_spherical(
+    cartesian: &Point<coordinates::euclidean::CartesianChart>,
+) -> Point<coordinates::spherical::SphericalChart> {
     let t = cartesian[0];
     // Physical -> coordinate frame: rotate so the pole moves off the field.
     let (x, y, z) = rotate_about_x(
@@ -42,9 +45,10 @@ pub fn cartesian_to_spherical(cartesian: &Point) -> Point {
 
     let r = (x * x + y * y + z * z).sqrt();
     if r == 0.0 {
-        return Point::new(t, 0.0, 0.0, 0.0, CoordinateSystem::Spherical);
+        return Point::new_spherical(t, 0.0, 0.0, 0.0);
     }
 
+    // TODO: Take into account rotation
     let theta = (z / r).acos();
     let phi = y.atan2(x);
 
@@ -54,10 +58,13 @@ pub fn cartesian_to_spherical(cartesian: &Point) -> Point {
         "  Spherical: t={}, r={}, theta={}, phi={}",
         t, r, theta, phi
     );
-    Point::new(t, r, theta, phi, CoordinateSystem::Spherical)
+    Point::new_spherical(t, r, theta, phi)
 }
 
-pub fn spherical_to_cartesian(spherical: &Point) -> Point {
+// TODO: Take into account rotation
+pub fn spherical_to_cartesian(
+    spherical: &Point<coordinates::spherical::SphericalChart>,
+) -> Point<coordinates::euclidean::CartesianChart> {
     let t = spherical[0];
     let r = spherical[1];
     let theta = spherical[2];
@@ -69,18 +76,23 @@ pub fn spherical_to_cartesian(spherical: &Point) -> Point {
 
     // Coordinate -> physical frame: undo the pole rotation.
     let (x, y, z) = rotate_about_x(x, y, z, -frame_rotation_deg());
-    Point::new(t, x, y, z, CoordinateSystem::Cartesian)
+    Point::new_cartesian(t, x, y, z)
 }
 
 /// Convert a Cartesian point to Boyer-Lindquist (t, r, θ, φ) coordinates for
 /// spin parameter `a`, using the Kerr-Schild embedding documented on
-/// `CoordinateSystem::BoyerLindquist`.
-pub fn cartesian_to_boyer_lindquist(a: f64, cartesian: &Point) -> Point {
+/// `BoyerLindquistData`.
+pub fn cartesian_to_boyer_lindquist(
+    a: f64,
+    r_s: f64,
+    cartesian: &Point<coordinates::euclidean::CartesianChart>,
+) -> Point<coordinates::boyer_lindquist::KerrChart> {
     let t = cartesian[0];
     let x = cartesian[1];
     let y = cartesian[2];
     let z = cartesian[3];
 
+    // TODO: Rethink once the atlas exists: untwisted BL embedding vs. Kerr-Schild; to_cartesian must agree across KerrChart variants.
     let rho_sqr = x * x + y * y + z * z;
     let r_sqr = 0.5 * (rho_sqr - a * a + ((rho_sqr - a * a).powi(2) + 4.0 * a * a * z * z).sqrt());
     let r = r_sqr.sqrt();
@@ -91,12 +103,12 @@ pub fn cartesian_to_boyer_lindquist(a: f64, cartesian: &Point) -> Point {
     };
     let phi = (r * y - a * x).atan2(r * x + a * y);
 
-    Point::new(t, r, theta, phi, CoordinateSystem::BoyerLindquist { a })
+    Point::new_boyer_lindquist(a, r_s, t, r, theta, phi)
 }
 
 #[cfg(test)]
 mod tests {
-    use crate::geometry::point::{CoordinateSystem, Point};
+    use crate::geometry::point::Point;
     use crate::geometry::spherical_coordinates_helper::{
         cartesian_to_spherical, spherical_to_cartesian,
     };
@@ -104,7 +116,7 @@ mod tests {
 
     #[test]
     fn test_cartesian_to_spherical() {
-        let cartesian = Point::new(0.0, 1.0, 2.0, 3.0, CoordinateSystem::Cartesian);
+        let cartesian = Point::new_cartesian(0.0, 1.0, 2.0, 3.0);
         let spherical = cartesian_to_spherical(&cartesian);
         let back_to_cartesian = spherical_to_cartesian(&spherical);
 

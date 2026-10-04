@@ -3,6 +3,7 @@ use crate::cli::shared::{
     assert_future_directed, create_scene, integrate_and_save_ray, render, resolve_camera_velocity,
 };
 use crate::configuration::RenderConfig;
+use crate::geometry::coordinates::euclidean::CartesianChart;
 use crate::geometry::four_vector::FourVector;
 use crate::geometry::geometry::{Geometry, RenderableGeometry};
 use crate::geometry::point::Point;
@@ -19,7 +20,7 @@ fn create_scene_internal<'a>(
     geometry: &'a Schwarzschild,
     opts: GlobalOpts,
     config: &RenderConfig,
-    camera_position: Point,
+    camera_position: Point<CartesianChart>,
 ) -> Result<Scene<'a, Schwarzschild>, RaytracerError> {
     // Steer the spherical coordinate pole off the field of view (0 = identity).
     // Must run before the first `cartesian_to_spherical`, which otherwise locks
@@ -51,7 +52,7 @@ impl RenderableGeometry for Schwarzschild {
         &self,
         opts: GlobalOpts,
         config: RenderConfig,
-        camera_position: Point,
+        camera_position: Point<CartesianChart>,
         filename: String,
         from_row: Option<u32>,
         from_col: Option<u32>,
@@ -80,7 +81,7 @@ impl RenderableGeometry for Schwarzschild {
         col: i64,
         opts: GlobalOpts,
         config: RenderConfig,
-        camera_position: Point,
+        camera_position: Point<CartesianChart>,
         write: &mut dyn Write,
     ) -> Result<(), RaytracerError> {
         let scene = create_scene_internal(self, opts, &config, camera_position)?;
@@ -94,8 +95,8 @@ impl RenderableGeometry for Schwarzschild {
 
     fn render_ray_at(
         &self,
-        position: Point,
-        direction: FourVector,
+        position: Point<CartesianChart>,
+        direction: FourVector<CartesianChart>,
         opts: GlobalOpts,
         write: &mut dyn Write,
     ) -> Result<(), RaytracerError> {
@@ -139,7 +140,7 @@ mod tests {
     #[test]
     fn test_render_schwarzschild_ray_at() {
         let position = Point::new_cartesian(0.0, 0.0, 4.0, -18.0);
-        let direction = FourVector::new_cartesian(0.0, 0.0, 1.0, 0.0);
+        let direction = FourVector::new(0.0, 0.0, 1.0, 0.0, position);
         let radius = 1.0;
         let horizon_epsilon = 1e-5;
         let opts = GlobalOpts {

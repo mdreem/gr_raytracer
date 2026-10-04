@@ -12,9 +12,10 @@
 //! POLE_ROT_DEG=<deg> to steer the coordinate pole off the ring.
 
 use super::*;
-use crate::geometry::geometry::{HasCoordinateSystem, SupportQuantities};
+use crate::geometry::geometry::SupportQuantities;
 use crate::geometry::point::Point;
 use crate::geometry::schwarzschild::Schwarzschild;
+use crate::geometry::spherical_coordinates_helper::cartesian_to_spherical;
 use crate::rendering::camera::Camera;
 use crate::rendering::color::CIETristimulus;
 use crate::rendering::integrator::IntegrationConfiguration;
@@ -75,7 +76,13 @@ fn radial_profile(buffer: &[Radiance], width: usize, height: usize) -> Vec<f64> 
         }
     }
     (0..rmax)
-        .map(|k| if count[k] > 0 { sum[k] / count[k] as f64 } else { 0.0 })
+        .map(|k| {
+            if count[k] > 0 {
+                sum[k] / count[k] as f64
+            } else {
+                0.0
+            }
+        })
         .collect()
 }
 
@@ -99,15 +106,17 @@ fn single_star_directly_behind_forms_einstein_ring() {
     // Honour POLE_ROT_DEG before any coordinate conversion below: the first
     // cartesian->spherical conversion locks the frame-rotation OnceLock, so
     // setting it afterwards would be silently ignored.
-    if let Some(deg) = std::env::var("POLE_ROT_DEG").ok().and_then(|s| s.parse().ok()) {
+    if let Some(deg) = std::env::var("POLE_ROT_DEG")
+        .ok()
+        .and_then(|s| s.parse().ok())
+    {
         crate::geometry::spherical_coordinates_helper::set_frame_rotation_deg(deg);
     }
 
     // Camera on the -y axis, looking back at the hole (theta = pi), so the
     // shadow and ring are centred in the frame. Use the geometry's normalized
     // static-observer 4-velocity, not a raw (1,0,0,0), so the tetrad is valid.
-    let position = Point::new_cartesian(0.0, 0.0, -20.0, 0.0)
-        .to_coordinate_system(geometry.coordinate_system());
+    let position = cartesian_to_spherical(&Point::new_cartesian(0.0, 0.0, -20.0, 0.0));
     let velocity = geometry.get_stationary_velocity_at(&position);
     let camera = Camera::new(
         position,

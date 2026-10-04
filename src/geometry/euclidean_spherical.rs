@@ -1,10 +1,10 @@
 use crate::geometry::circular_orbit::OrbitKillingDecomposition;
+use crate::geometry::coordinates::spherical::{RotatedSpherical, SphericalChart};
 use crate::geometry::four_vector::FourVector;
 use crate::geometry::geometry::{
-    GeodesicSolver, Geometry, HasCoordinateSystem, InnerProduct, Signature, SupportQuantities,
+    GeodesicSolver, Geometry, HasChart, InnerProduct, Signature, SupportQuantities,
 };
-use crate::geometry::point::CoordinateSystem::Spherical;
-use crate::geometry::point::{CoordinateSystem, Point};
+use crate::geometry::point::Point;
 use crate::geometry::tetrad::Tetrad;
 use crate::rendering::ray::Ray;
 use crate::rendering::raytracer::RaytracerError;
@@ -13,7 +13,9 @@ use crate::rendering::scene::EquationOfMotionState;
 use crate::rendering::temperature::{ConstantTemperatureComputer, TemperatureComputer};
 use nalgebra::{Const, Matrix4, OVector};
 
-pub struct EuclideanSpaceSphericalSolver {}
+pub struct EuclideanSpaceSphericalSolver {
+    chart: SphericalChart,
+}
 
 #[derive(Clone)]
 pub struct EuclideanSpaceSpherical {}
@@ -37,13 +39,13 @@ impl OdeFunction<Const<8>> for EuclideanSpaceSphericalSolver {
     }
 }
 
-impl HasCoordinateSystem for EuclideanSpaceSphericalSolver {
-    fn coordinate_system(&self) -> CoordinateSystem {
-        Spherical
-    }
-}
-
 impl GeodesicSolver for EuclideanSpaceSphericalSolver {
+    type Chart = SphericalChart;
+
+    fn chart(&self) -> Self::Chart {
+        self.chart
+    }
+
     fn geodesic(&self, _: f64, y: &EquationOfMotionState) -> EquationOfMotionState {
         let _t = y[0];
         let r = y[1];
@@ -69,14 +71,13 @@ impl GeodesicSolver for EuclideanSpaceSphericalSolver {
     }
 }
 
-impl HasCoordinateSystem for EuclideanSpaceSpherical {
-    fn coordinate_system(&self) -> CoordinateSystem {
-        Spherical
-    }
-}
-
 impl InnerProduct for EuclideanSpaceSpherical {
-    fn inner_product(&self, position: &Point, v: &FourVector, w: &FourVector) -> f64 {
+    fn inner_product(
+        &self,
+        position: &Point<SphericalChart>,
+        v: &FourVector<SphericalChart>,
+        w: &FourVector<SphericalChart>,
+    ) -> f64 {
         let r = position[1];
         let theta = position[2];
         let _phi = position[3];
@@ -94,23 +95,31 @@ impl Signature for EuclideanSpaceSpherical {
     }
 }
 
+impl HasChart for EuclideanSpaceSpherical {
+    type Chart = SphericalChart;
+}
+
 impl Geometry for EuclideanSpaceSpherical {
     // TODO: take into account rotations.
-    fn get_tetrad_at(&self, position: &Point) -> Tetrad {
+    fn get_tetrad_at(&self, position: &Point<SphericalChart>) -> Tetrad<Self::Chart> {
         let r = position[1];
         let theta = position[2];
         let _phi = position[3];
 
         Tetrad::new(
             *position,
-            FourVector::new_spherical(1.0, 0.0, 0.0, 0.0),
-            FourVector::new_spherical(0.0, 0.0, 0.0, 1.0 / (r * theta.sin())), // Phi
-            -FourVector::new_spherical(0.0, 0.0, 1.0 / r, 0.0),                // Theta
-            -FourVector::new_spherical(0.0, 1.0, 0.0, 0.0),                    // R
+            FourVector::new(1.0, 0.0, 0.0, 0.0, *position),
+            FourVector::new(0.0, 0.0, 0.0, 1.0 / (r * theta.sin()), *position), // Phi
+            -FourVector::new(0.0, 0.0, 1.0 / r, 0.0, *position),                // Theta
+            -FourVector::new(0.0, 1.0, 0.0, 0.0, *position),                    // R
         )
     }
 
-    fn lorentz_transformation(&self, _position: &Point, _velocity: &FourVector) -> Matrix4<f64> {
+    fn lorentz_transformation(
+        &self,
+        _position: &Point<SphericalChart>,
+        _velocity: &FourVector<SphericalChart>,
+    ) -> Matrix4<f64> {
         let mut matrix = Matrix4::zeros();
         matrix[(0, 0)] = 1.0;
         matrix[(1, 1)] = 1.0;
@@ -120,34 +129,36 @@ impl Geometry for EuclideanSpaceSpherical {
         matrix
     }
 
-    fn inside_horizon(&self, _position: &Point) -> bool {
+    fn inside_horizon(&self, _position: &Point<SphericalChart>) -> bool {
         false
     }
 
-    fn closed_orbit(&self, _position: &Point, _step_index: usize, _max_steps: usize) -> bool {
+    fn closed_orbit(
+        &self,
+        _position: &Point<SphericalChart>,
+        _step_index: usize,
+        _max_steps: usize,
+    ) -> bool {
         false
     }
 
-    fn get_geodesic_solver(&self, _ray: &Ray) -> Box<dyn GeodesicSolver> {
-        Box::new(EuclideanSpaceSphericalSolver {})
+    fn get_geodesic_solver(
+        &self,
+        _ray: &Ray<SphericalChart>,
+    ) -> Box<dyn GeodesicSolver<Chart = SphericalChart>> {
+        Box::new(EuclideanSpaceSphericalSolver {
+            chart: SphericalChart::Rotated(RotatedSpherical { rotation: 0.0 }),
+        })
     }
 
-    fn get_radial_coordinate(&self, position: &Point) -> f64 {
-        match position.coordinate_system {
-            CoordinateSystem::Cartesian => position.get_as_spherical()[0],
-            CoordinateSystem::Spherical => position[1],
-            CoordinateSystem::BoyerLindquist { .. } => {
-                unreachable!(
-                    "BoyerLindquist coordinates should not be used with EuclideanSpherical"
-                )
-            }
-        }
+    fn get_radial_coordinate(&self, position: &Point<SphericalChart>) -> f64 {
+        position[1]
     }
 
     fn get_constants_of_motion(
         &self,
-        position: &Point,
-        momentum: &FourVector,
+        position: &Point<SphericalChart>,
+        momentum: &FourVector<SphericalChart>,
     ) -> crate::geometry::geometry::ConstantsOfMotion {
         let mut constants = crate::geometry::geometry::ConstantsOfMotion::default();
 
@@ -167,30 +178,36 @@ impl Geometry for EuclideanSpaceSpherical {
 }
 
 impl SupportQuantities for EuclideanSpaceSpherical {
-    fn get_stationary_velocity_at(&self, _position: &Point) -> FourVector {
-        FourVector::new_spherical(1.0, 0.0, 0.0, 0.0)
+    fn get_stationary_velocity_at(
+        &self,
+        _position: &Point<SphericalChart>,
+    ) -> FourVector<SphericalChart> {
+        FourVector::new(1.0, 0.0, 0.0, 0.0, *_position)
     }
 
-    fn get_zamo_velocity_at(&self, position: &Point) -> FourVector {
+    fn get_zamo_velocity_at(&self, position: &Point<SphericalChart>) -> FourVector<SphericalChart> {
         // No frame dragging: the ZAMO is the static observer.
         self.get_stationary_velocity_at(position)
     }
 
     fn get_circular_orbit_velocity_at(
         &self,
-        _position: &Point,
-    ) -> Result<FourVector, RaytracerError> {
-        Ok(FourVector::new_spherical(1.0, 0.0, 0.0, 0.0))
+        _position: &Point<SphericalChart>,
+    ) -> Result<FourVector<SphericalChart>, RaytracerError> {
+        Ok(FourVector::new(1.0, 0.0, 0.0, 0.0, *_position))
         // TODO: implement proper circular orbit velocity in Euclidean space.
     }
 
-    fn axial_killing_vector(&self, _position: &Point) -> FourVector {
-        FourVector::new_spherical(0.0, 0.0, 0.0, 1.0)
+    fn axial_killing_vector(
+        &self,
+        _position: &Point<SphericalChart>,
+    ) -> FourVector<SphericalChart> {
+        FourVector::new(0.0, 0.0, 0.0, 1.0, *_position)
     }
 
     fn circular_orbit_killing_coefficients(
         &self,
-        _position: &Point,
+        _position: &Point<SphericalChart>,
     ) -> Result<OrbitKillingDecomposition, RaytracerError> {
         // Emitters are at rest in flat space (matches
         // get_circular_orbit_velocity_at above).
@@ -227,7 +244,7 @@ mod tests {
         let cols = 30;
 
         let position = cartesian_to_spherical(&Point::new_cartesian(0.0, 0.0, 0.0, -10.0));
-        let velocity = FourVector::new_spherical(1.0, 0.0, 0.0, 0.0);
+        let velocity = FourVector::new(1.0, 0.0, 0.0, 0.0, position);
         let camera = Camera::new(
             position,
             velocity,

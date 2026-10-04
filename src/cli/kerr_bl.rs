@@ -3,6 +3,7 @@ use crate::cli::shared::{
     assert_future_directed, create_scene, integrate_and_save_ray, render, resolve_camera_velocity,
 };
 use crate::configuration::RenderConfig;
+use crate::geometry::coordinates::euclidean::CartesianChart;
 use crate::geometry::four_vector::FourVector;
 use crate::geometry::geometry::{Geometry, InnerProduct, RenderableGeometry};
 use crate::geometry::kerr_bl::KerrBL;
@@ -18,7 +19,7 @@ fn create_scene_internal<'a>(
     geometry: &'a KerrBL,
     opts: GlobalOpts,
     config: &RenderConfig,
-    camera_position: Point,
+    camera_position: Point<CartesianChart>,
 ) -> Result<Scene<'a, KerrBL>, RaytracerError> {
     let bl_position = geometry.cartesian_to_bl(&camera_position);
     let momentum = resolve_camera_velocity(geometry, &bl_position, &config.camera_velocity)?;
@@ -36,7 +37,7 @@ impl RenderableGeometry for KerrBL {
         &self,
         opts: GlobalOpts,
         config: RenderConfig,
-        camera_position: Point,
+        camera_position: Point<CartesianChart>,
         filename: String,
         from_row: Option<u32>,
         from_col: Option<u32>,
@@ -65,7 +66,7 @@ impl RenderableGeometry for KerrBL {
         col: i64,
         opts: GlobalOpts,
         config: RenderConfig,
-        camera_position: Point,
+        camera_position: Point<CartesianChart>,
         write: &mut dyn Write,
     ) -> Result<(), RaytracerError> {
         let scene = create_scene_internal(self, opts, &config, camera_position)?;
@@ -79,8 +80,8 @@ impl RenderableGeometry for KerrBL {
 
     fn render_ray_at(
         &self,
-        position: Point,
-        direction: FourVector,
+        position: Point<CartesianChart>,
+        direction: FourVector<CartesianChart>,
         opts: GlobalOpts,
         write: &mut dyn Write,
     ) -> Result<(), RaytracerError> {
@@ -114,7 +115,7 @@ mod tests {
     use super::*;
     use crate::cli::cli::GlobalOpts;
     use crate::geometry::four_vector::FourVector;
-    use crate::geometry::point::{CoordinateSystem, Point};
+    use crate::geometry::point::Point;
     use crate::rendering::color::ToneMappingMethod;
     use std::f64::consts::PI;
     use std::io::BufWriter;
@@ -128,9 +129,9 @@ mod tests {
 
         // Provide a Cartesian position for render_ray_at (equatorial plane, r=18, phi=0)
         // cartesian_to_bl will convert this to BL (r=18, theta=PI/2, phi=0)
-        let position = Point::new(0.0, 18.0, 0.0, 0.0, CoordinateSystem::Cartesian);
+        let position = Point::new_cartesian(0.0, 18.0, 0.0, 0.0);
         // Direction: purely radial inward in BL frame
-        let direction = FourVector::new(0.0, 1.0, 0.0, 0.0, CoordinateSystem::BoyerLindquist { a });
+        let direction = FourVector::new(0.0, 1.0, 0.0, 0.0, position);
 
         let opts = GlobalOpts {
             exposure: 1.0,
