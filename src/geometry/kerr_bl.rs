@@ -29,33 +29,6 @@ use log::warn;
 /// which cannot arise for physical rays but may occur due to floating-point rounding.
 const SIN2_FLOOR: f64 = 1e-28;
 
-/// Jacobian ∂(x^Cartesian)/∂(x^BL) as a 4×4 matrix.
-/// Row μ, column ν = ∂x^μ_Cart / ∂x^ν_BL
-#[allow(dead_code)]
-fn jacobian_bl_to_cartesian(r_s: f64, a: f64, r: f64, theta: f64, phi: f64) -> Matrix4<f64> {
-    let (st, ct) = (theta.sin(), theta.cos());
-    let (sp, cp) = (phi.sin(), phi.cos());
-    let del = delta(r, r_s, a);
-
-    // The (ingoing) Kerr-Schild chart's time and azimuth are twisted against
-    // Boyer-Lindquist by dt_KS = dt_BL + (r_s r / Δ) dr and
-    // dφ_KS = dφ_BL + (a / Δ) dr, so the r column carries the corresponding
-    // twist terms; with them J^T g_KS J = g_BL holds to machine precision
-    // (see test_bl_jacobian_transforms_metric_exactly).
-    let dx_dphi = (-r * sp - a * cp) * st;
-    let dy_dphi = (r * cp - a * sp) * st;
-
-    #[rustfmt::skip]
-    let data = [
-        1.0, r_s * r / del,                    0.0,                    0.0,
-        0.0, st * cp + (a / del) * dx_dphi,    (r * cp - a * sp) * ct, dx_dphi,
-        0.0, st * sp + (a / del) * dy_dphi,    (r * sp + a * cp) * ct, dy_dphi,
-        0.0, ct,                               -r * st,                0.0,
-    ];
-
-    Matrix4::from_row_slice(&data)
-}
-
 fn sigma(r: f64, a: f64, theta: f64) -> f64 {
     r * r + a * a * theta.cos().powi(2)
 }
@@ -562,6 +535,7 @@ mod tests {
     /// Cartesian input: untwisted position embedding and the inverse BL Jacobian.
     #[test]
     fn test_bl_jacobian_transforms_metric_exactly() {
+        use crate::geometry::coordinates::boyer_lindquist::jacobian_bl_to_cartesian;
         // The BL->KS-Cartesian Jacobian must be the exact chart
         // transformation: J^T g_KS J = g_BL. This pins the time and azimuth
         // twist terms (dt_KS/dr = r_s r / Δ, dφ_KS/dr = a / Δ); without them

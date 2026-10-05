@@ -13,21 +13,14 @@ pub trait Chart: Copy + PartialEq + Debug + Send + Sync + 'static {
     fn tetrad_handedness_fallback(&self) -> f64;
 }
 
-pub trait Atlas {
-    type Chart: Chart;
-    fn best_chart(&self, position: &Point<Self::Chart>, current: &Self::Chart) -> Self::Chart;
-    fn transition_point(
-        &self,
-        position: &Point<Self::Chart>,
-        from: &Self::Chart,
-        to: &Self::Chart,
-    ) -> Point<Self::Chart>;
-    fn transition_four_vector(
-        &self,
-        position: &Point<Self::Chart>,
-        from: &Self::Chart,
-        to: &Self::Chart,
-    ) -> Point<Self::Chart>;
+/// The chart enum of a geometry is its atlas: it lists every chart, picks the best one for a
+/// point and transforms points and vectors between them. Transitions are exact coordinate
+/// changes of the same spacetime; the source chart is the one the point or vector carries.
+#[allow(dead_code)] // Used once the integrator switches charts.
+pub trait Atlas: Chart {
+    fn best_chart(&self, position: &Point<Self>) -> Self;
+    fn transition_point(&self, position: &Point<Self>, to: Self) -> Point<Self>;
+    fn transition_four_vector(&self, vector: &FourVector<Self>, to: Self) -> FourVector<Self>;
 }
 
 pub trait SphericalConvertible: Chart {
