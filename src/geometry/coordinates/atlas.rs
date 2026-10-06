@@ -39,3 +39,10 @@ pub trait CartesianConvertible: Chart {
         vector: &FourVector<Self>,
     ) -> FourVector<coordinates::euclidean::CartesianChart>;
 }
+
+/// Everything the renderer requires of a geometry's chart. Implemented automatically for every
+/// chart that meets the bounds; generic code going through `dyn Geometry<Chart = C>` needs
+/// `C: GeometryChart`, since the compiler does not infer the bounds of `HasChart::Chart` there.
+pub trait GeometryChart: Chart + Atlas + CartesianConvertible + SphericalConvertible {}
+
+impl<T: Chart + Atlas + CartesianConvertible + SphericalConvertible> GeometryChart for T {}

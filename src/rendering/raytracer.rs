@@ -872,7 +872,10 @@ impl<'a, G: Geometry> Raytracer<'a, G> {
         // the critical curve would otherwise pin one core.
         let tubes = AtomicUsize::new(0);
         let skipped = AtomicUsize::new(0);
+        let gathered = AtomicUsize::new(0);
+        let progress = Progress::new(colors.len() as u64, "stars")?;
         colors.par_iter_mut().enumerate().for_each(|(idx, color)| {
+            progress.set(gathered.fetch_add(1, Ordering::Relaxed) as u64 + 1);
             let (row, col) = (idx / width, idx % width);
             // The base tube spans (row, col)..(row+1, col+1); on the last row or
             // column `from_buffer` clamps the stencil inward so the boundary
@@ -897,6 +900,7 @@ impl<'a, G: Geometry> Raytracer<'a, G> {
                 }
             }
         });
+        progress.finish();
         let tubes = tubes.into_inner();
         let skipped = skipped.into_inner();
         if skipped > 0 {

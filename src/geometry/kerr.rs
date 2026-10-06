@@ -260,18 +260,18 @@ impl GeodesicSolver for KerrSolver {
         EquationOfMotionState::from_column_slice(&[dt, dx, dy, dz, a_t, a_x, a_y, a_z])
     }
 
-    fn create_initial_state(&self, ray: &Ray<KerrChart>) -> EquationOfMotionState {
-        let (x, y, z) = (ray.position[1], ray.position[2], ray.position[3]);
+    fn create_initial_state(&self, momentum: &FourVector<Self::Chart>) -> EquationOfMotionState {
+        let (x, y, z) = (momentum.at[1], momentum.at[2], momentum.at[3]);
         let covariant_metric = metric(self.radius, self.a, x, y, z);
         trace!("covariant_metric = {:?}", covariant_metric);
 
-        let momentum_covariant = covariant_metric * ray.momentum.vector;
+        let momentum_covariant = covariant_metric * momentum.vector;
 
         EquationOfMotionState::from_column_slice(&[
-            ray.position[0],
-            ray.position[1],
-            ray.position[2],
-            ray.position[3],
+            momentum.at[0],
+            momentum.at[1],
+            momentum.at[2],
+            momentum.at[3],
             momentum_covariant[0],
             momentum_covariant[1],
             momentum_covariant[2],
@@ -450,8 +450,8 @@ impl Geometry for Kerr {
 
     fn get_geodesic_solver(
         &self,
-        _ray: &Ray<KerrChart>,
-    ) -> Box<dyn GeodesicSolver<Chart = KerrChart>> {
+        _momentum: &FourVector<Self::Chart>,
+    ) -> Box<dyn GeodesicSolver<Chart=Self::Chart>> {
         Box::new(KerrSolver {
             chart: self.kerr_schild_chart(),
             radius: self.radius,

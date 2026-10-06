@@ -1,5 +1,5 @@
 use crate::geometry::circular_orbit::{self, OrbitKillingDecomposition};
-use crate::geometry::coordinates::spherical::{RotatedSpherical, SphericalChart};
+use crate::geometry::coordinates::spherical::SphericalChart;
 use crate::geometry::four_vector::FourVector;
 use crate::geometry::geometry::{
     GeodesicSolver, Geometry, HasChart, InnerProduct, Signature, SupportQuantities,
@@ -204,10 +204,10 @@ impl Geometry for Schwarzschild {
 
     fn get_geodesic_solver(
         &self,
-        _ray: &Ray<SphericalChart>,
-    ) -> Box<dyn GeodesicSolver<Chart = SphericalChart>> {
+        momentum: &FourVector<Self::Chart>,
+    ) -> Box<dyn GeodesicSolver<Chart=Self::Chart>> {
         Box::new(SchwarzschildSolver {
-            chart: SphericalChart::Rotated(RotatedSpherical { rotation: 0.0 }),
+            chart: momentum.at.chart,
             radius: self.radius,
         })
     }

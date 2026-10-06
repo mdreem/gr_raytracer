@@ -1,4 +1,4 @@
-use crate::geometry::coordinates::atlas::{CartesianConvertible, Chart};
+use crate::geometry::coordinates::atlas::{CartesianConvertible, Chart, GeometryChart};
 use crate::geometry::coordinates::euclidean::CartesianChart;
 use crate::geometry::geometry::Geometry;
 use crate::geometry::point::Point;
@@ -24,7 +24,7 @@ pub struct ColorComputationData<'a, C: Chart + CartesianConvertible> {
     pub remaining_steps: &'a [Step<C>],
 }
 
-pub trait Hittable<C: CartesianConvertible>: Sync {
+pub trait Hittable<C: GeometryChart>: Sync {
     fn intersects(
         &self,
         y_start: &Step<C>,

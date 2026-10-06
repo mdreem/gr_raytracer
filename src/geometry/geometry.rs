@@ -1,7 +1,7 @@
 use crate::cli::cli::GlobalOpts;
 use crate::configuration::RenderConfig;
 use crate::geometry::circular_orbit::OrbitKillingDecomposition;
-use crate::geometry::coordinates::atlas::{CartesianConvertible, Chart, SphericalConvertible};
+use crate::geometry::coordinates::atlas::{Chart, GeometryChart};
 use crate::geometry::coordinates::euclidean::CartesianChart;
 use crate::geometry::four_vector::FourVector;
 use crate::geometry::point::Point;
@@ -18,16 +18,16 @@ pub trait GeodesicSolver: OdeFunction<Const<8>> {
     type Chart: Chart;
     fn chart(&self) -> Self::Chart;
     fn geodesic(&self, t: f64, y: &EquationOfMotionState) -> EquationOfMotionState;
-    fn create_initial_state(&self, ray: &Ray<Self::Chart>) -> EquationOfMotionState {
+    fn create_initial_state(&self, momentum: &FourVector<Self::Chart>) -> EquationOfMotionState {
         EquationOfMotionState::from_column_slice(&[
-            ray.position[0],
-            ray.position[1],
-            ray.position[2],
-            ray.position[3],
-            ray.momentum[0],
-            ray.momentum[1],
-            ray.momentum[2],
-            ray.momentum[3],
+            momentum.at[0],
+            momentum.at[1],
+            momentum.at[2],
+            momentum.at[3],
+            momentum[0],
+            momentum[1],
+            momentum[2],
+            momentum[3],
         ])
     }
     fn momentum_from_state(&self, y: &EquationOfMotionState) -> FourVector<Self::Chart> {
@@ -117,7 +117,7 @@ impl ConstantsOfMotion {
 pub const TRAPPED_ORBIT_RADIUS_FACTOR: f64 = 5.0;
 
 pub trait HasChart {
-    type Chart: Chart + CartesianConvertible + SphericalConvertible;
+    type Chart: GeometryChart;
 }
 
 pub trait Geometry: HasChart + InnerProduct + SupportQuantities + Signature + Sync {
@@ -136,7 +136,7 @@ pub trait Geometry: HasChart + InnerProduct + SupportQuantities + Signature + Sy
     ) -> bool;
     fn get_geodesic_solver(
         &self,
-        ray: &Ray<Self::Chart>,
+        momentum: &FourVector<Self::Chart>,
     ) -> Box<dyn GeodesicSolver<Chart = Self::Chart>>;
     fn get_radial_coordinate(&self, position: &Point<Self::Chart>) -> f64;
     /// d(affine parameter)/d(`Step::t`) at `position`: 1 for solvers that integrate in the

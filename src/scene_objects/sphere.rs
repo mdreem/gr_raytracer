@@ -1,4 +1,4 @@
-use crate::geometry::coordinates::atlas::{CartesianConvertible, SphericalConvertible};
+use crate::geometry::coordinates::atlas::GeometryChart;
 use crate::geometry::coordinates::euclidean::CartesianChart;
 use crate::geometry::geometry::Geometry;
 use crate::geometry::point::Point;
@@ -60,7 +60,7 @@ fn solve_for_t(y_start_spatial: Vector3<f64>, direction: Vector3<f64>, r: f64) -
     }
 }
 
-impl<C: CartesianConvertible + SphericalConvertible> Hittable<C> for Sphere {
+impl<C: GeometryChart> Hittable<C> for Sphere {
     // y_start and y_end have to be Cartesian.
     fn intersects(
         &self,

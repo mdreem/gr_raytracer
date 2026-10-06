@@ -1,4 +1,4 @@
-use crate::geometry::coordinates::atlas::{CartesianConvertible, SphericalConvertible};
+use crate::geometry::coordinates::atlas::{CartesianConvertible, GeometryChart};
 use crate::geometry::coordinates::euclidean::CartesianChart;
 use crate::geometry::geometry::Geometry;
 use crate::geometry::point::Point;
@@ -241,7 +241,7 @@ impl VolumetricDisc {
         UVCoordinates { u, v }
     }
 
-    fn raymarch<C: CartesianConvertible + SphericalConvertible>(
+    fn raymarch<C: GeometryChart>(
         &self,
         geometry: &dyn Geometry<Chart = C>,
         frequency: &RayFrequencyData,
@@ -326,7 +326,7 @@ impl VolumetricDisc {
         Ok(segment_state.radiance)
     }
 
-    fn march_constant_step<C: CartesianConvertible + SphericalConvertible>(
+    fn march_constant_step<C: GeometryChart>(
         &self,
         p: &Vector3<f64>,
         geometry: &dyn Geometry<Chart = C>,
@@ -416,7 +416,7 @@ impl VolumetricDisc {
     // step sizes do not align with the segment boundaries, so the sampling
     // phase (distance_accumulated) carries across segments to keep one
     // uniform comb along the whole episode.
-    fn raymarch_segment<C: SphericalConvertible + CartesianConvertible>(
+    fn raymarch_segment<C: GeometryChart>(
         &self,
         from: &Vector3<f64>,
         to: &Vector3<f64>,
@@ -722,7 +722,7 @@ impl VolumetricDisc {
     }
 }
 
-impl<C: CartesianConvertible + SphericalConvertible> Hittable<C> for VolumetricDisc {
+impl<C: GeometryChart> Hittable<C> for VolumetricDisc {
     fn intersects(
         &self,
         y_start: &Step<C>,

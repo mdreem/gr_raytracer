@@ -1,4 +1,4 @@
-use crate::geometry::coordinates::atlas::CartesianConvertible;
+use crate::geometry::coordinates::atlas::{Atlas, CartesianConvertible};
 use crate::geometry::four_vector::FourVector;
 use crate::geometry::geometry::Geometry;
 use crate::geometry::point::Point;
@@ -81,8 +81,9 @@ impl<G: Geometry> Integrator<'_, G> {
         ray: &Ray<G::Chart>,
     ) -> Result<(IntegratedRay<G::Chart>, Option<StopReason>), RaytracerError> {
         let mut t = 0.0;
-        let geodesic_solver = self.geometry.get_geodesic_solver(ray);
-        let mut y = geodesic_solver.create_initial_state(ray);
+        let mut geodesic_solver = self.geometry.get_geodesic_solver(&ray.momentum);
+        // Assume ray has been created in the "best" chart.
+        let mut y = geodesic_solver.create_initial_state(&ray.momentum);
 
         let initial_chart = ray.position.chart;
         let mut result: Vec<Step<G::Chart>> =
@@ -100,6 +101,7 @@ impl<G: Geometry> Integrator<'_, G> {
         let mut max_constant_drifts = vec![0.0f64; initial_constants.as_slice().len()];
 
         let mut h = self.integration_configuration.step_size;
+        let mut previous_chart = initial_chart;
         for i in 1..self.integration_configuration.max_steps {
             let last_y = y;
             let (y_new, h_taken, h_next) = rkf45(
@@ -115,9 +117,25 @@ impl<G: Geometry> Integrator<'_, G> {
             t += h_taken;
             h = h_next;
 
-            // TODO: Set up chart conversion.
-            let x = Point::new(y[0], y[1], y[2], y[3], initial_chart);
-            let p = geodesic_solver.momentum_from_state(&y);
+            // TODO: Chart conversion.
+            let x_previous_chart = Point::new(y[0], y[1], y[2], y[3], previous_chart);
+            let p_previous_chart = geodesic_solver.momentum_from_state(&y);
+            let new_chart = previous_chart.best_chart(&x_previous_chart);
+
+            let (x, p) = if previous_chart != new_chart {
+                let x_new_chart = previous_chart.transition_point(&x_previous_chart, new_chart);
+                let p_new_chart =
+                    previous_chart.transition_four_vector(&p_previous_chart, new_chart);
+
+                geodesic_solver = self.geometry.get_geodesic_solver(&p_new_chart);
+                y = geodesic_solver.create_initial_state(&p_new_chart);
+
+                (x_new_chart, p_new_chart)
+            } else {
+                (x_previous_chart, p_previous_chart)
+            };
+            previous_chart = new_chart;
+
             result.push(Step { x, p, t, step: i });
 
             #[cfg(debug_assertions)]
@@ -150,7 +168,7 @@ impl<G: Geometry> Integrator<'_, G> {
             }
 
             // TODO: Careful here once chart transitions are implemented/
-            match self.should_stop(&last_y, &y, i, initial_chart) {
+            match self.should_stop(&last_y, &y, i, new_chart) {
                 None => {}
                 Some(r) => {
                     self.report_drifts(

@@ -1,4 +1,4 @@
-use crate::geometry::coordinates::atlas::{CartesianConvertible, SphericalConvertible};
+use crate::geometry::coordinates::atlas::GeometryChart;
 use crate::geometry::coordinates::euclidean::CartesianChart;
 use crate::geometry::geometry::Geometry;
 use crate::geometry::point::Point;
@@ -39,7 +39,7 @@ impl Disc {
         }
     }
 
-    fn create_intersection<C: CartesianConvertible + SphericalConvertible>(
+    fn create_intersection<C: GeometryChart>(
         &self,
         geometry: &dyn Geometry<Chart = C>,
         center: Vector3<f64>,
@@ -86,7 +86,7 @@ impl Disc {
     }
 }
 
-impl<C: CartesianConvertible + SphericalConvertible> Hittable<C> for Disc {
+impl<C: GeometryChart> Hittable<C> for Disc {
     fn intersects(
         &self,
         y_start: &Step<C>,
@@ -260,6 +260,7 @@ impl<C: CartesianConvertible + SphericalConvertible> Hittable<C> for Disc {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::geometry::coordinates::atlas::CartesianConvertible;
     use crate::geometry::euclidean::EuclideanSpace;
     use crate::geometry::four_vector::FourVector;
     use crate::geometry::kerr::Kerr;

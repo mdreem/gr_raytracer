@@ -144,15 +144,15 @@ impl GeodesicSolver for KerrBLSolver {
         ])
     }
 
-    fn create_initial_state(&self, ray: &Ray<KerrChart>) -> EquationOfMotionState {
+    fn create_initial_state(&self, momentum: &FourVector<Self::Chart>) -> EquationOfMotionState {
         let (r, theta, phi, t, sign_r, sign_theta) = {
             // BL ray: use position components directly; signs from BL contravariant momentum.
-            let r = ray.position[1];
-            let theta = ray.position[2];
-            let phi = ray.position[3];
-            let t = ray.position[0];
-            let sign_r = if ray.momentum[1] >= 0.0 { 1.0 } else { -1.0 };
-            let sign_theta = if ray.momentum[2] >= 0.0 { 1.0 } else { -1.0 };
+            let r = momentum.at[1];
+            let theta = momentum.at[2];
+            let phi =momentum.at[3];
+            let t = momentum.at[0];
+            let sign_r = if momentum[1] >= 0.0 { 1.0 } else { -1.0 };
+            let sign_theta = if momentum[2] >= 0.0 { 1.0 } else { -1.0 };
             (r, theta, phi, t, sign_r, sign_theta)
         };
         // Compute initial Mino-time velocities from potentials
@@ -243,6 +243,13 @@ pub struct KerrBL {
 }
 
 impl KerrBL {
+    pub fn boyer_lindquist_chart(&self) -> KerrChart {
+        KerrChart::BoyerLindquist(BoyerLindquistData {
+            a: self.a,
+            r_s: self.radius,
+        })
+    }
+
     pub fn new(radius: f64, a: f64, horizon_epsilon: f64) -> Self {
         if a.abs() > radius / 2.0 {
             warn!(
@@ -449,16 +456,16 @@ impl Geometry for KerrBL {
 
     fn get_geodesic_solver(
         &self,
-        ray: &Ray<KerrChart>,
-    ) -> Box<dyn GeodesicSolver<Chart = KerrChart>> {
-        let (r, theta, _phi_bl) = (ray.position[1], ray.position[2], ray.position[3]);
+        momentum: &FourVector<Self::Chart>,
+    ) -> Box<dyn GeodesicSolver<Chart=Self::Chart>> {
+        let (r, theta, _phi_bl) = (momentum.at[1], momentum.at[2], momentum.at[3]);
 
         // Compute conserved quantities (E, L_z, Q) via the BL metric.
         // For BL rays, the contravariant momentum is already in BL components.
         let (e, l_z, p_theta) = {
             // BL ray: lower with BL metric directly.
             let g = metric_bl(self.radius, self.a, r, theta);
-            let p_bl_cov = g * ray.momentum.vector;
+            let p_bl_cov = g * momentum.vector;
             let e = -p_bl_cov[0];
             let l_z = p_bl_cov[3];
             let p_theta = p_bl_cov[2];
@@ -473,10 +480,7 @@ impl Geometry for KerrBL {
             + cos_t * cos_t * (l_z * l_z / sin2.max(SIN2_FLOOR) - self.a * self.a * e * e);
 
         Box::new(KerrBLSolver {
-            chart: KerrChart::BoyerLindquist(BoyerLindquistData {
-                a: self.a,
-                r_s: self.radius,
-            }),
+            chart: self.boyer_lindquist_chart(),
             radius: self.radius,
             a: self.a,
             e,
@@ -793,8 +797,8 @@ mod tests {
         .unwrap();
         let ray = camera.get_ray_for(5, 5);
 
-        let solver = kerr_bl.get_geodesic_solver(&ray);
-        let state = solver.create_initial_state(&ray);
+        let solver = kerr_bl.get_geodesic_solver(&ray.momentum);
+        let state = solver.create_initial_state(&ray.momentum);
         let p = solver.momentum_from_state(&state);
         let pos = Point::new_boyer_lindquist(a, radius, state[0], state[1], state[2], state[3]);
 
@@ -842,8 +846,8 @@ mod tests {
         let ray_cart = camera_ks.get_ray_for(5, 8);
         let ray_cart_bl = ray_cart;
 
-        let solver_cart = kerr_bl.get_geodesic_solver(&ray_cart_bl);
-        let state_cart = solver_cart.create_initial_state(&ray_cart_bl);
+        let solver_cart = kerr_bl.get_geodesic_solver(&ray_cart_bl.momentum);
+        let state_cart = solver_cart.create_initial_state(&ray_cart_bl.momentum);
         let p_cart = solver_cart.momentum_from_state(&state_cart);
         let pos_cart_bl = Point::new_boyer_lindquist(
             a,
@@ -865,8 +869,8 @@ mod tests {
         // --- Test with a BL ray input ---
         // Build a BL ray by going through the production code path:
         // get_geodesic_solver handles Cartesian input, create_initial_state converts to BL internally.
-        let solver_via_cart = kerr_bl.get_geodesic_solver(&ray_cart_bl);
-        let state_from_cart = solver_via_cart.create_initial_state(&ray_cart_bl);
+        let solver_via_cart = kerr_bl.get_geodesic_solver(&ray_cart_bl.momentum);
+        let state_from_cart = solver_via_cart.create_initial_state(&ray_cart_bl.momentum);
         let position_bl = Point::new_boyer_lindquist(
             a,
             radius,
@@ -879,8 +883,8 @@ mod tests {
         let ray_bl =
             crate::rendering::ray::Ray::new(ray_cart.row, ray_cart.col, position_bl, p_bl_fv);
 
-        let solver_bl = kerr_bl.get_geodesic_solver(&ray_bl);
-        let state_bl = solver_bl.create_initial_state(&ray_bl);
+        let solver_bl = kerr_bl.get_geodesic_solver(&ray_bl.momentum);
+        let state_bl = solver_bl.create_initial_state(&ray_bl.momentum);
         let p_bl = solver_bl.momentum_from_state(&state_bl);
         let pos_bl_start = Point::new_boyer_lindquist(
             a,

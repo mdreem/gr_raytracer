@@ -167,8 +167,8 @@ impl Geometry for EuclideanSpace {
 
     fn get_geodesic_solver(
         &self,
-        _ray: &Ray<CartesianChart>,
-    ) -> Box<dyn GeodesicSolver<Chart = CartesianChart>> {
+        _momentum: &FourVector<Self::Chart>,
+    ) -> Box<dyn GeodesicSolver<Chart=Self::Chart>> {
         Box::new(EuclideanSpacedSolver {
             chart: CartesianChart::Cartesian,
         })
