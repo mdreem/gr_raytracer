@@ -4,6 +4,8 @@ use crate::geometry::point::Point;
 use crate::geometry::spherical_coordinates_helper::rotate_about_x;
 use nalgebra::Vector3;
 
+const POLE_SWITCH_SIN_THETA: f64 = 0.1;
+
 /// Spherical coordinates whose frame is rotated by `rotation` degrees about the x-axis
 /// (same convention as `rotate_about_x`: coordinate frame = R(rotation) · physical frame).
 #[derive(Copy, Clone, PartialEq, Debug)]
@@ -41,9 +43,16 @@ fn rotate(v: Vector3<f64>, deg: f64) -> Vector3<f64> {
 }
 
 impl Atlas for SphericalChart {
-    // TODO: Two-chart atlas (e.g. rotations 0° and 90°) that leaves a chart near its pole.
+    /// Near the current chart's pole, switch to the chart rotated by 90°, where the point lies
+    /// close to the equator. Two perpendicular poles cannot both be near a point
+    /// (sin²θ_A + sin²θ_B ≥ 1), so the switch has built-in hysteresis.
     fn best_chart(&self, position: &Point<Self>) -> Self {
-        position.chart
+        if position[2].sin().abs() >= POLE_SWITCH_SIN_THETA {
+            return position.chart;
+        }
+        SphericalChart::Rotated(RotatedSpherical {
+            rotation: (position.chart.rotation() + 90.0).rem_euclid(360.0),
+        })
     }
 
     fn transition_point(&self, position: &Point<Self>, to: Self) -> Point<Self> {
@@ -130,6 +139,30 @@ mod tests {
         let w = p.chart.transition_four_vector(&v, rotated(30.0));
         assert_abs_diff_eq!(spatial_norm(&v), spatial_norm(&w), epsilon = 1e-12);
         assert_abs_diff_eq!(v[0], w[0]);
+    }
+
+    #[test]
+    fn best_chart_leaves_a_chart_near_its_pole_only() {
+        let away_from_pole = Point::new(0.0, 5.0, 1.0, 0.4, rotated(0.0));
+        assert_eq!(
+            away_from_pole.chart.best_chart(&away_from_pole),
+            rotated(0.0)
+        );
+
+        for theta in [0.05, std::f64::consts::PI - 0.05] {
+            let near_pole = Point::new(0.0, 5.0, theta, 0.4, rotated(0.0));
+            let best = near_pole.chart.best_chart(&near_pole);
+            assert_eq!(best, rotated(90.0));
+            let switched = near_pole.chart.transition_point(&near_pole, best);
+            assert!(switched[2].sin() > 0.99);
+            assert_eq!(switched.chart.best_chart(&switched), rotated(90.0));
+        }
+
+        let near_pole_of_last = Point::new(0.0, 5.0, 0.05, 0.4, rotated(270.0));
+        assert_eq!(
+            near_pole_of_last.chart.best_chart(&near_pole_of_last),
+            rotated(0.0)
+        );
     }
 
     #[test]
