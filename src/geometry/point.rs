@@ -4,7 +4,7 @@ use crate::geometry::coordinates::boyer_lindquist::BoyerLindquistData;
 use crate::geometry::coordinates::spherical::RotatedSpherical;
 use crate::geometry::four_vector::FourVector;
 use crate::geometry::spherical_coordinates_helper::{
-    cartesian_to_boyer_lindquist, cartesian_to_spherical, frame_rotation_deg, rotate_about_x,
+    cartesian_to_boyer_lindquist, cartesian_to_spherical, rotate_about_x,
     spherical_to_cartesian,
 };
 use nalgebra::{Matrix4, Vector3, Vector4};
@@ -247,12 +247,14 @@ impl CartesianConvertible for coordinates::spherical::SphericalChart {
         spherical_to_cartesian(point)
     }
 
-    // TODO: Take into account the chart's rotation (cartesian_to_spherical applies the global frame rotation).
     fn point_from_cartesian(
         chart: Self,
         point: &Point<coordinates::euclidean::CartesianChart>,
     ) -> Point<Self> {
-        Point::new_from_vector(cartesian_to_spherical(point).vector, chart)
+        // Physical -> coordinate frame: apply the chart's rotation.
+        let (x, y, z) = rotate_about_x(point[1], point[2], point[3], chart.rotation());
+        let rotated = Point::new_cartesian(point[0], x, y, z);
+        Point::new_from_vector(cartesian_to_spherical(&rotated).vector, chart)
     }
 
     fn vector_to_cartesian(
@@ -268,8 +270,8 @@ impl CartesianConvertible for coordinates::spherical::SphericalChart {
         let y = st * sp * dr + r * ct * sp * dtheta + r * st * cp * dphi;
         let z = ct * dr - r * st * dtheta;
 
-        // Coordinate -> physical frame: undo the pole rotation, as `spherical_to_cartesian` does for points.
-        let (x, y, z) = rotate_about_x(x, y, z, -frame_rotation_deg());
+        // Coordinate -> physical frame: undo the chart's rotation, as `spherical_to_cartesian` does for points.
+        let (x, y, z) = rotate_about_x(x, y, z, -vector.at.chart.rotation());
         FourVector::new(vector[0], x, y, z, at)
     }
 }
@@ -362,6 +364,28 @@ impl<C: Chart> Index<usize> for Point<C> {
 mod tests {
     use super::*;
     use approx::assert_abs_diff_eq;
+
+    #[test]
+    fn test_rotated_spherical_chart_round_trips_through_cartesian() {
+        use crate::geometry::coordinates::atlas::Atlas;
+        use crate::geometry::coordinates::spherical::{RotatedSpherical, SphericalChart};
+        use crate::geometry::four_vector::FourVector;
+
+        let physical = Point::new_cartesian(1.0, 3.0, -2.0, 4.0);
+        let unrotated = SphericalChart::Rotated(RotatedSpherical { rotation: 0.0 });
+        let rotated = SphericalChart::Rotated(RotatedSpherical { rotation: 37.0 });
+
+        let p = SphericalChart::point_from_cartesian(rotated, &physical);
+        assert_eq!(p.chart, rotated);
+        assert_abs_diff_eq!(p.to_cartesian().vector, physical.vector, epsilon = 1e-12);
+
+        // The same physical vector, expressed in both charts, maps to the same Cartesian vector.
+        let q = SphericalChart::point_from_cartesian(unrotated, &physical);
+        let v_q = FourVector::new(1.0, 0.3, -0.05, 0.02, q);
+        let v_p = q.chart.transition_four_vector(&v_q, rotated);
+        assert_abs_diff_eq!(v_p.at.vector, p.vector, epsilon = 1e-12);
+        assert_abs_diff_eq!(v_p.to_cartesian().vector, v_q.to_cartesian().vector, epsilon = 1e-12);
+    }
 
     #[test]
     fn test_boyer_lindquist_to_cartesian_a_zero() {

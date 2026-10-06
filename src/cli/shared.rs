@@ -157,10 +157,6 @@ pub fn create_scene<G: Geometry>(
         .show_sampling_mask
         .then(|| CIETristimulus::from_color(&opts.sampling_mask_color));
 
-    // The frame rotation (--pole-rotation-deg) is set in the spherical
-    // geometry wrappers before the camera position is converted, since the
-    // conversion locks the value in; see schwarzschild::create_scene_internal.
-
     let integration_configuration = IntegrationConfiguration::new(
         opts.max_steps,
         opts.max_radius,

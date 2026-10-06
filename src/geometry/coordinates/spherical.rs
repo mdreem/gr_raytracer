@@ -25,7 +25,7 @@ pub enum SphericalChart {
 }
 
 impl SphericalChart {
-    fn rotation(&self) -> f64 {
+    pub fn rotation(&self) -> f64 {
         let SphericalChart::Rotated(RotatedSpherical { rotation }) = self;
         *rotation
     }
