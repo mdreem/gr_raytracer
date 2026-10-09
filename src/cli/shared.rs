@@ -1,5 +1,6 @@
 use crate::cli::cli::GlobalOpts;
 use crate::configuration::{RenderConfig, TextureConfig};
+use crate::geometry::coordinates::atlas::Atlas;
 use crate::geometry::four_vector::FourVector;
 use crate::geometry::geometry::Geometry;
 use crate::geometry::point::Point;
@@ -110,6 +111,14 @@ pub fn render<G: Geometry>(
         to_col.unwrap_or(raytracer.scene.camera.columns as u32),
         filename,
     )
+}
+
+/// The same point in the chart of its atlas best suited there, so that e.g. a camera on a
+/// spherical chart's polar axis gets a regular tetrad.
+pub fn in_best_chart<C: Atlas>(position: &Point<C>) -> Point<C> {
+    position
+        .chart
+        .transition_point(position, position.chart.best_chart(position))
 }
 
 pub fn integrate_and_save_ray<G: Geometry>(

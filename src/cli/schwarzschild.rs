@@ -1,6 +1,7 @@
 use crate::cli::cli::GlobalOpts;
 use crate::cli::shared::{
-    assert_future_directed, create_scene, integrate_and_save_ray, render, resolve_camera_velocity,
+    assert_future_directed, create_scene, in_best_chart, integrate_and_save_ray, render,
+    resolve_camera_velocity,
 };
 use crate::configuration::RenderConfig;
 use crate::geometry::coordinates::euclidean::CartesianChart;
@@ -22,7 +23,7 @@ fn create_scene_internal<'a>(
     config: &RenderConfig,
     camera_position: Point<CartesianChart>,
 ) -> Result<Scene<'a, Schwarzschild>, RaytracerError> {
-    let camera_position_spherical = cartesian_to_spherical(&camera_position);
+    let camera_position_spherical = in_best_chart(&cartesian_to_spherical(&camera_position));
     let momentum = resolve_camera_velocity(
         geometry,
         &camera_position_spherical,
