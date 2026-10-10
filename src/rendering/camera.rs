@@ -445,4 +445,83 @@ mod tests {
             * geometry.inner_product(&ray.position, &camera.velocity, &ray.momentum);
         assert!(orientation < 0.0);
     }
+
+    /// Handedness of the geometry's spatial tetrad, measured in the Cartesian view. The point
+    /// must be away from places where the view degenerates, so the measurement is meaningful.
+    fn measured_handedness<G: crate::geometry::geometry::Geometry>(
+        geometry: &G,
+        position: &Point<G::Chart>,
+    ) -> f64 {
+        let tetrad = crate::geometry::geometry::Geometry::get_tetrad_at(geometry, position);
+        let x = super::spatial_basis_vector_cartesian(position, &tetrad.x);
+        let y = super::spatial_basis_vector_cartesian(position, &tetrad.y);
+        let z = super::spatial_basis_vector_cartesian(position, &tetrad.z);
+        let triple = x.dot(&y.cross(&z));
+        assert!(
+            triple.is_finite() && triple.abs() > 1e-6,
+            "degenerate tetrad at {position:?}: triple product {triple}"
+        );
+        triple.signum()
+    }
+
+    /// The camera falls back to `tetrad_handedness_fallback` where it cannot measure the
+    /// handedness. That is only correct if the fallback equals the handedness measured
+    /// everywhere else; otherwise the image would be mirrored at those points.
+    #[test]
+    fn handedness_fallback_matches_the_measured_tetrad_handedness() {
+        use crate::geometry::coordinates::atlas::Chart;
+        use crate::geometry::coordinates::spherical::{RotatedSpherical, SphericalChart};
+        use crate::geometry::kerr_bl::KerrBL;
+
+        let spherical_points = [(12.0, 1.1, 0.4), (7.0, 2.5, -2.0), (30.0, 0.3, 3.0)];
+
+        let flat = EuclideanSpace::new();
+        for (x, y, z) in [(1.0, 2.0, 3.0), (-4.0, 0.5, -1.0)] {
+            let p = Point::new_cartesian(0.0, x, y, z);
+            assert_eq!(
+                measured_handedness(&flat, &p),
+                p.chart.tetrad_handedness_fallback()
+            );
+        }
+
+        let flat_spherical = EuclideanSpaceSpherical::new();
+        let schwarzschild = Schwarzschild::new(1.0, 1e-4);
+        for rotation in [0.0, 90.0, 180.0, 270.0] {
+            let chart = SphericalChart::Rotated(RotatedSpherical { rotation });
+            for (r, theta, phi) in spherical_points {
+                let p = Point::new(0.0, r, theta, phi, chart);
+                let expected = chart.tetrad_handedness_fallback();
+                assert_eq!(
+                    measured_handedness(&flat_spherical, &p),
+                    expected,
+                    "flat, {p:?}"
+                );
+                assert_eq!(
+                    measured_handedness(&schwarzschild, &p),
+                    expected,
+                    "Schwarzschild, {p:?}"
+                );
+            }
+        }
+
+        let kerr = Kerr::new(1.0, 0.6, 1e-4);
+        for (x, y, z) in [(8.0, 3.0, 2.0), (-5.0, 6.0, -4.0)] {
+            let p = Point::new(0.0, x, y, z, kerr.kerr_schild_chart());
+            assert_eq!(
+                measured_handedness(&kerr, &p),
+                p.chart.tetrad_handedness_fallback(),
+                "Kerr, {p:?}"
+            );
+        }
+
+        let kerr_bl = KerrBL::new(1.0, 0.6, 1e-4);
+        for (r, theta, phi) in spherical_points {
+            let p = Point::new(0.0, r, theta, phi, kerr_bl.boyer_lindquist_chart());
+            assert_eq!(
+                measured_handedness(&kerr_bl, &p),
+                p.chart.tetrad_handedness_fallback(),
+                "KerrBL, {p:?}"
+            );
+        }
+    }
 }
