@@ -11,3 +11,4 @@ pub mod point;
 pub mod schwarzschild;
 pub mod spherical_coordinates_helper;
 pub mod tetrad;
+pub mod hypersphere;

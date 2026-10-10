@@ -1,9 +1,13 @@
-use crate::geometry::coordinates::atlas::{Atlas, Chart};
+use crate::geometry::coordinates::atlas::{
+    Atlas, CartesianConvertible, Chart, SphericalConvertible,
+};
+use crate::geometry::coordinates::euclidean::CartesianChart;
 use crate::geometry::coordinates::stereographic::StereographicChart::{
     WithNorthPole, WithSouthPole,
 };
 use crate::geometry::four_vector::FourVector;
 use crate::geometry::point::Point;
+use crate::geometry::spherical_coordinates_helper::cartesian_to_spherical;
 use nalgebra::{Matrix3, Vector3};
 
 const CHART_SWITCH_DISTANCE: f64 = 2.0;
@@ -74,6 +78,46 @@ impl Atlas for StereographicChart {
             new_vector_spatial[2],
             new_point,
         )
+    }
+}
+
+/// The Cartesian view is the north chart, in units of the radius. The south pole of the sphere
+/// (the origin of the south chart) lies at infinity there.
+impl CartesianConvertible for StereographicChart {
+    fn point_to_cartesian(point: &Point<Self>) -> Point<CartesianChart> {
+        let north = point.chart.transition_point(point, WithNorthPole);
+        Point::new_cartesian(north[0], north[1], north[2], north[3])
+    }
+
+    fn point_from_cartesian(chart: Self, point: &Point<CartesianChart>) -> Point<Self> {
+        let north = Point::new(point[0], point[1], point[2], point[3], WithNorthPole);
+        WithNorthPole.transition_point(&north, chart)
+    }
+
+    fn vector_to_cartesian(vector: &FourVector<Self>) -> FourVector<CartesianChart> {
+        let north = vector
+            .at
+            .chart
+            .transition_four_vector(vector, WithNorthPole);
+        FourVector::new(
+            north[0],
+            north[1],
+            north[2],
+            north[3],
+            Self::point_to_cartesian(&vector.at),
+        )
+    }
+}
+
+impl SphericalConvertible for StereographicChart {
+    fn point_as_spherical(point: &Point<Self>) -> Vector3<f64> {
+        let v = cartesian_to_spherical(&point.to_cartesian());
+        Vector3::new(v[1], v[2], v[3])
+    }
+
+    /// A closed space has no celestial sphere, so nothing ever counts as escaped.
+    fn radial_distance_spatial_part_squared(_point: &Point<Self>) -> f64 {
+        0.0
     }
 }
 
