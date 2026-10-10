@@ -408,6 +408,13 @@ impl Geometry for Kerr {
         matrix
     }
 
+    // TODO: Let the solver dispatch on the chart (Boyer-Lindquist away from the axis), then
+    // drop this override.
+    /// The solver integrates in Kerr-Schild coordinates only.
+    fn integration_chart(&self, _position: &Point<KerrChart>) -> KerrChart {
+        self.kerr_schild_chart()
+    }
+
     fn inside_horizon(&self, position: &Point<KerrChart>) -> bool {
         let (x, y, z) = (position[1], position[2], position[3]);
         if self.a.abs() > self.radius / 2.0 {

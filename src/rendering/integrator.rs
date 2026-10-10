@@ -120,7 +120,7 @@ impl<G: Geometry> Integrator<'_, G> {
             // TODO: Chart conversion.
             let x_previous_chart = Point::new(y[0], y[1], y[2], y[3], previous_chart);
             let p_previous_chart = geodesic_solver.momentum_from_state(&y);
-            let new_chart = previous_chart.best_chart(&x_previous_chart);
+            let new_chart = self.geometry.integration_chart(&x_previous_chart);
 
             let (x, p) = if previous_chart != new_chart {
                 let x_new_chart = previous_chart.transition_point(&x_previous_chart, new_chart);

@@ -1,7 +1,7 @@
 use crate::cli::cli::GlobalOpts;
 use crate::configuration::RenderConfig;
 use crate::geometry::circular_orbit::OrbitKillingDecomposition;
-use crate::geometry::coordinates::atlas::{Chart, GeometryChart};
+use crate::geometry::coordinates::atlas::{Atlas, Chart, GeometryChart};
 use crate::geometry::coordinates::euclidean::CartesianChart;
 use crate::geometry::four_vector::FourVector;
 use crate::geometry::point::Point;
@@ -139,6 +139,11 @@ pub trait Geometry: HasChart + InnerProduct + SupportQuantities + Signature + Sy
         momentum: &FourVector<Self::Chart>,
     ) -> Box<dyn GeodesicSolver<Chart = Self::Chart>>;
     fn get_radial_coordinate(&self, position: &Point<Self::Chart>) -> f64;
+    /// The chart to continue integrating in at `position`: the atlas' choice by default.
+    /// Geometries whose solver handles only some of their charts restrict it.
+    fn integration_chart(&self, position: &Point<Self::Chart>) -> Self::Chart {
+        position.chart.best_chart(position)
+    }
     /// d(affine parameter)/d(`Step::t`) at `position`: 1 for solvers that integrate in the
     /// affine parameter, Σ for ones that integrate in Mino time (KerrBL).
     fn step_parameter_scale(&self, _position: &Point<Self::Chart>) -> f64 {

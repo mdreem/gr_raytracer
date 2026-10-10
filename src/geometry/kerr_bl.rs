@@ -426,6 +426,13 @@ impl Geometry for KerrBL {
         matrix
     }
 
+    // TODO: Let the solver dispatch on the chart (Kerr-Schild near the axis), then drop this
+    // override.
+    /// The solver integrates in Boyer-Lindquist coordinates only.
+    fn integration_chart(&self, _position: &Point<KerrChart>) -> KerrChart {
+        self.boyer_lindquist_chart()
+    }
+
     fn inside_horizon(&self, position: &Point<KerrChart>) -> bool {
         // r_plus = M + sqrt(M^2 - a^2) where M = radius/2 (since radius = r_s = 2M)
         let m = self.radius / 2.0;
