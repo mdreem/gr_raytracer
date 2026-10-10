@@ -149,7 +149,7 @@ impl GeodesicSolver for KerrBLSolver {
             // BL ray: use position components directly; signs from BL contravariant momentum.
             let r = momentum.at[1];
             let theta = momentum.at[2];
-            let phi =momentum.at[3];
+            let phi = momentum.at[3];
             let t = momentum.at[0];
             let sign_r = if momentum[1] >= 0.0 { 1.0 } else { -1.0 };
             let sign_theta = if momentum[2] >= 0.0 { 1.0 } else { -1.0 };
@@ -457,7 +457,7 @@ impl Geometry for KerrBL {
     fn get_geodesic_solver(
         &self,
         momentum: &FourVector<Self::Chart>,
-    ) -> Box<dyn GeodesicSolver<Chart=Self::Chart>> {
+    ) -> Box<dyn GeodesicSolver<Chart = Self::Chart>> {
         let (r, theta, _phi_bl) = (momentum.at[1], momentum.at[2], momentum.at[3]);
 
         // Compute conserved quantities (E, L_z, Q) via the BL metric.

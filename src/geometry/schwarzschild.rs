@@ -205,7 +205,7 @@ impl Geometry for Schwarzschild {
     fn get_geodesic_solver(
         &self,
         momentum: &FourVector<Self::Chart>,
-    ) -> Box<dyn GeodesicSolver<Chart=Self::Chart>> {
+    ) -> Box<dyn GeodesicSolver<Chart = Self::Chart>> {
         Box::new(SchwarzschildSolver {
             chart: momentum.at.chart,
             radius: self.radius,

@@ -451,7 +451,7 @@ impl Geometry for Kerr {
     fn get_geodesic_solver(
         &self,
         _momentum: &FourVector<Self::Chart>,
-    ) -> Box<dyn GeodesicSolver<Chart=Self::Chart>> {
+    ) -> Box<dyn GeodesicSolver<Chart = Self::Chart>> {
         Box::new(KerrSolver {
             chart: self.kerr_schild_chart(),
             radius: self.radius,

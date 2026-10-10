@@ -4,8 +4,7 @@ use crate::geometry::coordinates::boyer_lindquist::BoyerLindquistData;
 use crate::geometry::coordinates::spherical::RotatedSpherical;
 use crate::geometry::four_vector::FourVector;
 use crate::geometry::spherical_coordinates_helper::{
-    cartesian_to_boyer_lindquist, cartesian_to_spherical, rotate_about_x,
-    spherical_to_cartesian,
+    cartesian_to_boyer_lindquist, cartesian_to_spherical, rotate_about_x, spherical_to_cartesian,
 };
 use nalgebra::{Matrix4, Vector3, Vector4};
 use std::cmp::PartialEq;
@@ -384,7 +383,11 @@ mod tests {
         let v_q = FourVector::new(1.0, 0.3, -0.05, 0.02, q);
         let v_p = q.chart.transition_four_vector(&v_q, rotated);
         assert_abs_diff_eq!(v_p.at.vector, p.vector, epsilon = 1e-12);
-        assert_abs_diff_eq!(v_p.to_cartesian().vector, v_q.to_cartesian().vector, epsilon = 1e-12);
+        assert_abs_diff_eq!(
+            v_p.to_cartesian().vector,
+            v_q.to_cartesian().vector,
+            epsilon = 1e-12
+        );
     }
 
     #[test]

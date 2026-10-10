@@ -9,7 +9,7 @@ pub enum CartesianChart {
 
 impl Chart for CartesianChart {
     fn tetrad_handedness_fallback(&self) -> f64 {
-        1.0
+        -1.0
     }
 }
 

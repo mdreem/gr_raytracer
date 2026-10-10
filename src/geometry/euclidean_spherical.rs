@@ -144,7 +144,7 @@ impl Geometry for EuclideanSpaceSpherical {
     fn get_geodesic_solver(
         &self,
         momentum: &FourVector<Self::Chart>,
-    ) -> Box<dyn GeodesicSolver<Chart=Self::Chart>> {
+    ) -> Box<dyn GeodesicSolver<Chart = Self::Chart>> {
         Box::new(EuclideanSpaceSphericalSolver {
             chart: momentum.at.chart,
         })
