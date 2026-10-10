@@ -2,7 +2,7 @@ use crate::geometry::coordinates::atlas::{Atlas, Chart};
 use crate::geometry::four_vector::FourVector;
 use crate::geometry::point::Point;
 use nalgebra::{Matrix4, Vector4};
-use std::f64::consts::PI;
+use std::f64::consts::{FRAC_PI_2, PI};
 
 const BL_TO_KS_SIN_THETA: f64 = 0.1;
 const KS_TO_BL_SIN_THETA: f64 = 0.5;
@@ -114,7 +114,11 @@ fn twist_integrals(r: f64, a: f64, r_s: f64) -> (f64, f64) {
     } else if disc < 0.0 {
         let b = (-disc).sqrt();
         let at = ((r - m) / b).atan();
-        (at / b, 0.5 * delta(r, r_s, a).ln() + m / b * at)
+        // The constant makes the azimuthal twist vanish at infinity, as in the other cases.
+        (
+            (at - FRAC_PI_2) / b,
+            0.5 * delta(r, r_s, a).ln() + m / b * at,
+        )
     } else {
         let u = r - m;
         (-1.0 / u, u.abs().ln() - m / u)
@@ -154,7 +158,7 @@ pub(crate) fn jacobian_bl_to_cartesian(
 }
 
 /// BL (t, r, θ, φ_BL) → Kerr-Schild (t_KS, x, y, z), including the t and φ twist.
-fn bl_to_ks(a: f64, r_s: f64, v: &Vector4<f64>) -> Vector4<f64> {
+pub(crate) fn bl_to_ks(a: f64, r_s: f64, v: &Vector4<f64>) -> Vector4<f64> {
     let (t, r, theta, phi) = (v[0], v[1], v[2], v[3]);
     let (i_phi, i_t) = twist_integrals(r, a, r_s);
     let phi_ks = phi + a * i_phi;
@@ -175,7 +179,7 @@ fn wrap_phi(phi: f64) -> f64 {
 }
 
 /// Kerr-Schild (t_KS, x, y, z) → BL (t, r, θ, φ_BL); also returns φ_KS for the Jacobian.
-fn ks_to_bl(a: f64, r_s: f64, v: &Vector4<f64>) -> (Vector4<f64>, f64) {
+pub(crate) fn ks_to_bl(a: f64, r_s: f64, v: &Vector4<f64>) -> (Vector4<f64>, f64) {
     let (x, y, z) = (v[1], v[2], v[3]);
     let r = KerrSchildData { a, r_s }.bl_radius(v);
     let theta = if r == 0.0 {

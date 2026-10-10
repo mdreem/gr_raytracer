@@ -7,6 +7,7 @@
 use nalgebra::{Const, Matrix4};
 
 use crate::geometry::circular_orbit::{self, OrbitKillingDecomposition};
+use crate::geometry::coordinates::atlas::CartesianConvertible;
 use crate::geometry::coordinates::boyer_lindquist::{BoyerLindquistData, KerrChart};
 use crate::geometry::coordinates::euclidean::CartesianChart;
 use crate::geometry::four_vector::FourVector;
@@ -15,7 +16,6 @@ use crate::geometry::geometry::{
     SupportQuantities, TRAPPED_ORBIT_RADIUS_FACTOR,
 };
 use crate::geometry::point::Point;
-use crate::geometry::spherical_coordinates_helper::cartesian_to_boyer_lindquist;
 use crate::geometry::tetrad::Tetrad;
 use crate::rendering::ray::Ray;
 use crate::rendering::raytracer::RaytracerError;
@@ -269,7 +269,7 @@ impl KerrBL {
     }
 
     pub fn cartesian_to_bl(&self, position: &Point<CartesianChart>) -> Point<KerrChart> {
-        cartesian_to_boyer_lindquist(self.a, self.radius, position)
+        KerrChart::point_from_cartesian(self.boyer_lindquist_chart(), position)
     }
 }
 

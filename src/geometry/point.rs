@@ -1,12 +1,15 @@
 use crate::geometry::coordinates;
+use crate::geometry::coordinates::atlas::Atlas;
 use crate::geometry::coordinates::atlas::{CartesianConvertible, Chart, SphericalConvertible};
-use crate::geometry::coordinates::boyer_lindquist::BoyerLindquistData;
+use crate::geometry::coordinates::boyer_lindquist::{
+    BoyerLindquistData, KerrSchildData, bl_to_ks, ks_to_bl,
+};
 use crate::geometry::coordinates::spherical::RotatedSpherical;
 use crate::geometry::four_vector::FourVector;
 use crate::geometry::spherical_coordinates_helper::{
-    cartesian_to_boyer_lindquist, cartesian_to_spherical, rotate_about_x, spherical_to_cartesian,
+    cartesian_to_spherical, rotate_about_x, spherical_to_cartesian,
 };
-use nalgebra::{Matrix4, Vector3, Vector4};
+use nalgebra::{Vector3, Vector4};
 use std::cmp::PartialEq;
 use std::f64::consts::PI;
 use std::ops::{Add, Index, Neg};
@@ -280,32 +283,23 @@ impl CartesianConvertible for coordinates::spherical::SphericalChart {
     }
 }
 
-// TODO: Rethink once the atlas exists: untwisted BL embedding vs. Kerr-Schild; to_cartesian must agree across KerrChart variants.
+/// The Cartesian view of both Kerr charts is the Kerr-Schild one: Boyer-Lindquist points and
+/// vectors go through the same (twisted) map as the atlas transition, so the view does not
+/// depend on the chart a step happens to be in.
 impl CartesianConvertible for coordinates::boyer_lindquist::KerrChart {
     fn point_to_cartesian(point: &Point<Self>) -> Point<coordinates::euclidean::CartesianChart> {
-        let a = match point.chart {
+        match point.chart {
             coordinates::boyer_lindquist::KerrChart::BoyerLindquist(BoyerLindquistData {
                 a,
-                ..
-            }) => a,
+                r_s,
+            }) => Point::new_from_vector(
+                bl_to_ks(a, r_s, &point.vector),
+                coordinates::euclidean::CartesianChart::Cartesian,
+            ),
             coordinates::boyer_lindquist::KerrChart::KerrSchild(_) => {
-                return Point::new_cartesian(
-                    point.vector[0],
-                    point.vector[1],
-                    point.vector[2],
-                    point.vector[3],
-                );
+                kerr_schild_as_cartesian(point)
             }
-        };
-
-        let t = point.vector[0];
-        let r = point.vector[1];
-        let theta = point.vector[2];
-        let phi = point.vector[3];
-        let x = (r * phi.cos() - a * phi.sin()) * theta.sin();
-        let y = (r * phi.sin() + a * phi.cos()) * theta.sin();
-        let z = r * theta.cos();
-        Point::new_cartesian(t, x, y, z)
+        }
     }
 
     fn point_from_cartesian(
@@ -316,7 +310,7 @@ impl CartesianConvertible for coordinates::boyer_lindquist::KerrChart {
             coordinates::boyer_lindquist::KerrChart::BoyerLindquist(BoyerLindquistData {
                 a,
                 r_s,
-            }) => cartesian_to_boyer_lindquist(a, r_s, point),
+            }) => Point::new_from_vector(ks_to_bl(a, r_s, &point.vector).0, chart),
             coordinates::boyer_lindquist::KerrChart::KerrSchild(_) => {
                 Point::new_from_vector(point.vector, chart)
             }
@@ -326,33 +320,23 @@ impl CartesianConvertible for coordinates::boyer_lindquist::KerrChart {
     fn vector_to_cartesian(
         vector: &FourVector<Self>,
     ) -> FourVector<coordinates::euclidean::CartesianChart> {
-        let at = vector.at.to_cartesian();
-        let a = match vector.at.chart {
+        let in_kerr_schild = match vector.at.chart {
             coordinates::boyer_lindquist::KerrChart::BoyerLindquist(BoyerLindquistData {
                 a,
-                ..
-            }) => a,
-            coordinates::boyer_lindquist::KerrChart::KerrSchild(_) => {
-                return FourVector::new(vector[0], vector[1], vector[2], vector[3], at);
-            }
+                r_s,
+            }) => vector.at.chart.transition_four_vector(
+                vector,
+                coordinates::boyer_lindquist::KerrChart::KerrSchild(KerrSchildData { a, r_s }),
+            ),
+            coordinates::boyer_lindquist::KerrChart::KerrSchild(_) => *vector,
         };
-
-        // Derivative of the embedding in `point_to_cartesian` (no t/φ twist), so the
-        // components match `at`.
-        let (r, theta, phi) = (vector.at[1], vector.at[2], vector.at[3]);
-        let (st, ct) = theta.sin_cos();
-        let (sp, cp) = phi.sin_cos();
-
-        #[rustfmt::skip]
-        let j = Matrix4::from_row_slice(&[
-            1.0, 0.0,     0.0,                    0.0,
-            0.0, st * cp, (r * cp - a * sp) * ct, (-r * sp - a * cp) * st,
-            0.0, st * sp, (r * sp + a * cp) * ct, (r * cp - a * sp) * st,
-            0.0, ct,      -r * st,                0.0,
-        ]);
-
-        let v = j * vector.vector;
-        FourVector::new(v[0], v[1], v[2], v[3], at)
+        FourVector::new(
+            in_kerr_schild[0],
+            in_kerr_schild[1],
+            in_kerr_schild[2],
+            in_kerr_schild[3],
+            kerr_schild_as_cartesian(&in_kerr_schild.at),
+        )
     }
 }
 
@@ -413,28 +397,44 @@ mod tests {
 
     #[test]
     fn test_boyer_lindquist_to_cartesian_a_zero() {
-        // When a=0, BL should match standard spherical
+        // When a=0, BL space matches standard spherical (the time keeps the Kerr-Schild twist).
         let bl = Point::new_boyer_lindquist(0.0, 1.0, 0.0, 5.0, 1.2, 0.8);
         let sph = Point::new_spherical(0.0, 5.0, 1.2, 0.8);
-        let bl_cart = bl.to_cartesian();
-        let sph_cart = sph.to_cartesian();
-        assert_abs_diff_eq!(bl_cart.vector, sph_cart.vector, epsilon = 1e-12);
+        assert_abs_diff_eq!(
+            bl.get_spatial_vector_cartesian(),
+            sph.get_spatial_vector_cartesian(),
+            epsilon = 1e-12
+        );
     }
 
+    /// The Cartesian view of a BL point or vector is that of the same event in the Kerr-Schild
+    /// chart, so it does not jump when a ray switches charts, and it round-trips.
     #[test]
-    fn test_boyer_lindquist_to_cartesian_nonzero_a() {
-        let a = 0.5_f64;
-        let r = 5.0_f64;
-        let theta = 1.2_f64;
-        let phi = 0.8_f64;
-        let bl = Point::new_boyer_lindquist(a, 1.0, 0.0, r, theta, phi);
-        let cart = bl.to_cartesian();
-        // Expected values computed independently: x = (r cosφ - a sinφ) sinθ, etc.
-        // cos(0.8) ≈ 0.6967067093471654, sin(0.8) ≈ 0.7173560908995228
-        // sin(1.2) ≈ 0.9320390309173473, cos(1.2) ≈ 0.3623577544766736
-        assert_abs_diff_eq!(cart[1], 2.91248746519832302226_f64, epsilon = 1e-10);
-        assert_abs_diff_eq!(cart[2], 3.66769851865865170737_f64, epsilon = 1e-10);
-        assert_abs_diff_eq!(cart[3], 1.81178877238336810684_f64, epsilon = 1e-10);
+    fn test_boyer_lindquist_cartesian_view_agrees_with_kerr_schild() {
+        use crate::geometry::coordinates::boyer_lindquist::KerrChart;
+
+        for a in [0.5, -0.3, 0.7] {
+            let bl_chart = KerrChart::BoyerLindquist(BoyerLindquistData { a, r_s: 1.0 });
+            let ks_chart = KerrChart::KerrSchild(KerrSchildData { a, r_s: 1.0 });
+            let bl = Point::new(0.4, 5.0, 1.2, 0.8, bl_chart);
+            let ks = bl_chart.transition_point(&bl, ks_chart);
+            assert_abs_diff_eq!(
+                bl.to_cartesian().vector,
+                ks.to_cartesian().vector,
+                epsilon = 1e-12
+            );
+
+            let back = KerrChart::point_from_cartesian(bl_chart, &bl.to_cartesian());
+            assert_abs_diff_eq!(back.vector, bl.vector, epsilon = 1e-10);
+
+            let v = FourVector::new(1.0, -0.3, 0.02, 0.05, bl);
+            let v_ks = bl_chart.transition_four_vector(&v, ks_chart);
+            assert_abs_diff_eq!(
+                v.to_cartesian().vector,
+                v_ks.to_cartesian().vector,
+                epsilon = 1e-12
+            );
+        }
     }
 
     #[test]

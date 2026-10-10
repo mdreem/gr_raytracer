@@ -53,33 +53,6 @@ pub fn spherical_to_cartesian(
     Point::new_cartesian(t, x, y, z)
 }
 
-/// Convert a Cartesian point to Boyer-Lindquist (t, r, θ, φ) coordinates for
-/// spin parameter `a`, using the Kerr-Schild embedding documented on
-/// `BoyerLindquistData`.
-pub fn cartesian_to_boyer_lindquist(
-    a: f64,
-    r_s: f64,
-    cartesian: &Point<coordinates::euclidean::CartesianChart>,
-) -> Point<coordinates::boyer_lindquist::KerrChart> {
-    let t = cartesian[0];
-    let x = cartesian[1];
-    let y = cartesian[2];
-    let z = cartesian[3];
-
-    // TODO: Rethink once the atlas exists: untwisted BL embedding vs. Kerr-Schild; to_cartesian must agree across KerrChart variants.
-    let rho_sqr = x * x + y * y + z * z;
-    let r_sqr = 0.5 * (rho_sqr - a * a + ((rho_sqr - a * a).powi(2) + 4.0 * a * a * z * z).sqrt());
-    let r = r_sqr.sqrt();
-    let theta = if r == 0.0 {
-        0.0
-    } else {
-        (z / r).clamp(-1.0, 1.0).acos()
-    };
-    let phi = (r * y - a * x).atan2(r * x + a * y);
-
-    Point::new_boyer_lindquist(a, r_s, t, r, theta, phi)
-}
-
 #[cfg(test)]
 mod tests {
     use crate::geometry::point::Point;
