@@ -1,5 +1,7 @@
 use super::*;
+use crate::geometry::coordinates::euclidean::CartesianChart;
 use crate::geometry::euclidean::EuclideanSpace;
+use crate::geometry::point::Point;
 use crate::rendering::camera::Camera;
 use crate::rendering::integrator::IntegrationConfiguration;
 use crate::rendering::octree::Octree;
@@ -35,12 +37,12 @@ impl TemperatureComputer for ConstantTemperature {
 fn renderer<'a>(
     geometry: &'a EuclideanSpace,
     objects: Objects<'a, EuclideanSpace>,
-    position: Point,
+    position: Point<CartesianChart>,
     sky: CIETristimulus,
 ) -> Raytracer<'a, EuclideanSpace> {
     let camera = Camera::new(
         position,
-        FourVector::new_cartesian(1.0, 0.0, 0.0, 0.0),
+        FourVector::new(1.0, 0.0, 0.0, 0.0, position),
         0.7,
         3,
         3,
@@ -72,7 +74,7 @@ fn scene_surface_and_sky_apply_straight_alpha_once() {
         1,
         1,
         position,
-        FourVector::new_cartesian(-1.0, 0.0, 0.0, -1.0),
+        FourVector::new(-1.0, 0.0, 0.0, -1.0, position),
     );
     let source = Vector3::new(2.0, 1.0, 0.5);
     for opacity in [0.0, 0.1, 0.6, 1.0] {
@@ -109,7 +111,7 @@ fn scene_volume_preserves_marched_light_with_or_without_a_background() {
         1,
         1,
         position,
-        FourVector::new_cartesian(-1.0, 0.0, 0.0, -1.0),
+        FourVector::new(-1.0, 0.0, 0.0, -1.0, position),
     );
     let mut objects = Objects::new(&geometry);
     objects.add_object(Box::new(VolumetricDisc::new(

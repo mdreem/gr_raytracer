@@ -1,3 +1,4 @@
+use crate::geometry::coordinates::atlas::Chart;
 use crate::rendering::scene::RaySample;
 
 /// A single ray tube's rectangular footprint on the camera screen.
@@ -21,23 +22,23 @@ pub struct TubeScreenBounds {
 
 /// Four traced corner samples and their originating camera-screen rectangle.
 /// Corners a/b/c/d are top-left/top-right/bottom-left/bottom-right.
-pub struct SampleTube<'a> {
-    pub a: &'a RaySample,
-    pub b: &'a RaySample,
-    pub c: &'a RaySample,
-    pub d: &'a RaySample,
+pub struct SampleTube<'a, C: Chart> {
+    pub a: &'a RaySample<C>,
+    pub b: &'a RaySample<C>,
+    pub c: &'a RaySample<C>,
+    pub d: &'a RaySample<C>,
     /// Actual sampling positions; Ray.row/col retain integer pixel identities.
     pub screen_bounds: TubeScreenBounds,
 }
 
-impl SampleTube<'_> {
+impl<C: Chart> SampleTube<'_, C> {
     pub fn new<'a>(
-        a: &'a RaySample,
-        b: &'a RaySample,
-        c: &'a RaySample,
-        d: &'a RaySample,
+        a: &'a RaySample<C>,
+        b: &'a RaySample<C>,
+        c: &'a RaySample<C>,
+        d: &'a RaySample<C>,
         screen_bounds: TubeScreenBounds,
-    ) -> SampleTube<'a> {
+    ) -> SampleTube<'a, C> {
         SampleTube {
             a,
             b,
@@ -76,7 +77,7 @@ impl SampleTube<'_> {
     /// The samples must follow subdivision_points' ordering. Borrowing the
     /// samples keeps shared child boundaries identical without retracing.
     /// Each child's screen bounds cover one quarter of the parent's rectangle.
-    pub fn children<'b>(&'b self, samples: &'b [RaySample; 5]) -> [SampleTube<'b>; 4] {
+    pub fn children<'b>(&'b self, samples: &'b [RaySample<C>; 5]) -> [SampleTube<'b, C>; 4] {
         let [center, top_mid, left_mid, right_mid, bottom_mid] = samples;
         let TubeScreenBounds {
             top,
@@ -141,11 +142,11 @@ impl SampleTube<'_> {
     /// Builds a base tube spanning four neighboring pixel centers, not the
     /// edges of a single output pixel.
     pub fn from_buffer(
-        buffer: &[RaySample],
+        buffer: &[RaySample<C>],
         row: u32,
         col: u32,
         width: u32,
-    ) -> Option<SampleTube<'_>> {
+    ) -> Option<SampleTube<'_, C>> {
         if width < 2 {
             return None;
         }

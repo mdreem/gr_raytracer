@@ -1,6 +1,7 @@
+use crate::geometry::coordinates::atlas::{CartesianConvertible, Chart};
 use crate::geometry::four_vector::FourVector;
 use crate::geometry::geometry::Geometry;
-use crate::geometry::point::{CoordinateSystem, Point};
+use crate::geometry::point::Point;
 use crate::geometry::tetrad::{Tetrad, TetradValidator};
 use crate::rendering::ray::Ray;
 use log::{debug, trace};
@@ -13,144 +14,78 @@ pub enum CameraError {
 }
 
 #[derive(Debug, Clone)]
-pub struct Camera {
+pub struct Camera<C: Chart> {
     alpha: f64,
     pub rows: i64,
     pub columns: i64,
-    pub position: Point,
-    pub velocity: FourVector,
-    tetrad: Tetrad,
+    pub position: Point<C>,
+    pub velocity: FourVector<C>,
+    tetrad: Tetrad<C>,
     spatial_signature: f64,
     spatial_handedness: f64,
 }
 
-pub fn lorentz_transform_tetrad<G: Geometry>(
+pub fn lorentz_transform_tetrad<G: Geometry<Chart = C>, C: Chart>(
     geometry: &G,
-    tetrad: &Tetrad,
-    position: &Point,
-    velocity: &FourVector,
-) -> Tetrad {
+    tetrad: &Tetrad<C>,
+    position: &Point<C>,
+    velocity: &FourVector<C>,
+) -> Tetrad<C> {
     let lorentz = geometry.lorentz_transformation(position, velocity);
 
     debug!("lorentz transformation: {:?}", lorentz);
 
     // TODO: Move matrix multiplication to FourVector.
-    let t_vec = lorentz * tetrad.t.get_as_vector();
-    let x_vec = lorentz * tetrad.x.get_as_vector();
-    let y_vec = lorentz * tetrad.y.get_as_vector();
-    let z_vec = lorentz * tetrad.z.get_as_vector();
+    let t_vec = lorentz * tetrad.t.vector;
+    let x_vec = lorentz * tetrad.x.vector;
+    let y_vec = lorentz * tetrad.y.vector;
+    let z_vec = lorentz * tetrad.z.vector;
 
     Tetrad::new(
         *position,
-        FourVector::new(
-            t_vec[0],
-            t_vec[1],
-            t_vec[2],
-            t_vec[3],
-            tetrad.t.coordinate_system,
-        ),
-        FourVector::new(
-            x_vec[0],
-            x_vec[1],
-            x_vec[2],
-            x_vec[3],
-            tetrad.x.coordinate_system,
-        ),
-        FourVector::new(
-            y_vec[0],
-            y_vec[1],
-            y_vec[2],
-            y_vec[3],
-            tetrad.y.coordinate_system,
-        ),
-        FourVector::new(
-            z_vec[0],
-            z_vec[1],
-            z_vec[2],
-            z_vec[3],
-            tetrad.z.coordinate_system,
-        ),
+        FourVector::new(t_vec[0], t_vec[1], t_vec[2], t_vec[3], tetrad.t.at),
+        FourVector::new(x_vec[0], x_vec[1], x_vec[2], x_vec[3], tetrad.x.at),
+        FourVector::new(y_vec[0], y_vec[1], y_vec[2], y_vec[3], tetrad.y.at),
+        FourVector::new(z_vec[0], z_vec[1], z_vec[2], z_vec[3], tetrad.z.at),
     )
 }
 
-fn rotate(v1: FourVector, v2: FourVector, angle: f64) -> (FourVector, FourVector) {
+// TODO: This likely assumes cartesian vectors. Confirm.
+fn rotate<C: Chart>(
+    v1: FourVector<C>,
+    v2: FourVector<C>,
+    angle: f64,
+) -> (FourVector<C>, FourVector<C>) {
     let v1_rotated = angle.cos() * v1 + angle.sin() * v2;
     let v2_rotated = -angle.sin() * v1 + angle.cos() * v2;
 
     (v1_rotated, v2_rotated)
 }
 
-fn spatial_basis_vector_cartesian(position: &Point, vector: &FourVector) -> Vector3<f64> {
-    match vector.coordinate_system {
-        CoordinateSystem::Cartesian => Vector3::new(vector[1], vector[2], vector[3]),
-        CoordinateSystem::Spherical => {
-            let spherical_position = position.get_as_spherical();
-            let r = spherical_position[0];
-            let theta = spherical_position[1];
-            let phi = spherical_position[2];
-
-            let dr = vector[1];
-            let dtheta = vector[2];
-            let dphi = vector[3];
-
-            let sin_theta = theta.sin();
-            let cos_theta = theta.cos();
-            let sin_phi = phi.sin();
-            let cos_phi = phi.cos();
-
-            // Contravariant spherical spatial components transformed to Cartesian.
-            Vector3::new(
-                sin_theta * cos_phi * dr + r * cos_theta * cos_phi * dtheta
-                    - r * sin_theta * sin_phi * dphi,
-                sin_theta * sin_phi * dr
-                    + r * cos_theta * sin_phi * dtheta
-                    + r * sin_theta * cos_phi * dphi,
-                cos_theta * dr - r * sin_theta * dtheta,
-            )
-        }
-        CoordinateSystem::BoyerLindquist { a } => {
-            let spherical_position = position.get_as_spherical();
-            let r = spherical_position[0];
-            let theta = spherical_position[1];
-            let phi = spherical_position[2];
-
-            let dr = vector[1];
-            let dtheta = vector[2];
-            let dphi = vector[3];
-
-            let (st, ct) = (theta.sin(), theta.cos());
-            let (sp, cp) = (phi.sin(), phi.cos());
-
-            // BL Jacobian: ∂x^Cart/∂x^BL applied to the spatial components.
-            Vector3::new(
-                st * cp * dr + (r * cp - a * sp) * ct * dtheta + (-r * sp - a * cp) * st * dphi,
-                st * sp * dr + (r * sp + a * cp) * ct * dtheta + (r * cp - a * sp) * st * dphi,
-                ct * dr - r * st * dtheta,
-            )
-        }
-    }
+fn spatial_basis_vector_cartesian<C: CartesianConvertible>(
+    _position: &Point<C>,
+    vector: &FourVector<C>,
+) -> Vector3<f64> {
+    let v = vector.to_cartesian().vector;
+    Vector3::new(v[1], v[2], v[3])
 }
 
-fn spatial_handedness(position: &Point, tetrad: &Tetrad) -> f64 {
+fn spatial_handedness<C: CartesianConvertible>(position: &Point<C>, tetrad: &Tetrad<C>) -> f64 {
     let x = spatial_basis_vector_cartesian(position, &tetrad.x);
     let y = spatial_basis_vector_cartesian(position, &tetrad.y);
     let z = spatial_basis_vector_cartesian(position, &tetrad.z);
 
     let triple_product = x.dot(&y.cross(&z));
     if !triple_product.is_finite() || triple_product.abs() <= 1e-12 {
-        return match tetrad.x.coordinate_system {
-            // Spherical and BoyerLindquist tetrads in this codebase use a left-handed spatial convention.
-            CoordinateSystem::Spherical | CoordinateSystem::BoyerLindquist { .. } => -1.0,
-            CoordinateSystem::Cartesian => 1.0,
-        };
+        return tetrad.x.at.chart.tetrad_handedness_fallback();
     }
     if triple_product >= 0.0 { 1.0 } else { -1.0 }
 }
 
-impl Camera {
-    pub fn new<G: Geometry>(
-        position: Point,
-        velocity: FourVector,
+impl<C: CartesianConvertible> Camera<C> {
+    pub fn new<G: Geometry<Chart = C>>(
+        position: Point<C>,
+        velocity: FourVector<C>,
         alpha: f64,
         rows: i64,
         columns: i64,
@@ -158,7 +93,7 @@ impl Camera {
         theta: f64,
         psi: f64,
         geometry: &G,
-    ) -> Result<Camera, CameraError> {
+    ) -> Result<Camera<C>, CameraError> {
         let original_tetrad = geometry.get_tetrad_at(&position);
 
         let tetrad_validator = TetradValidator::new(geometry);
@@ -211,7 +146,7 @@ impl Camera {
     ///
     /// row, column range from 1..R, 1..C in https://arxiv.org/abs/1511.06025, but here we work
     /// with 0-based indices. This needs to be accounted for below.
-    fn get_direction_for(&self, row: f64, column: f64) -> FourVector {
+    fn get_direction_for(&self, row: f64, column: f64) -> FourVector<C> {
         let shifted_column = column + 1.0; // Convert to 1-based index.
         let shifted_row = row + 1.0; // Convert to 1-based index.
         let tan_half_alpha = f64::tan(self.alpha / 2.0);
@@ -231,7 +166,7 @@ impl Camera {
         -self.tetrad.z + 2.0 * w / (self.spatial_signature * w_squared)
     }
 
-    pub fn get_ray_for(&self, row: i64, column: i64) -> Ray {
+    pub fn get_ray_for(&self, row: i64, column: i64) -> Ray<C> {
         let direction = self.get_direction_for(row as f64, column as f64);
         trace!("direction ({}|{}): {:?}", row, column, direction);
         // Trace the physical photon that arrives at the camera from
@@ -244,7 +179,7 @@ impl Camera {
         Ray::new(row, column, self.position, momentum)
     }
 
-    pub fn get_ray_for_offset(&self, row: i64, column: i64, dx: f64, dy: f64) -> Ray {
+    pub fn get_ray_for_offset(&self, row: i64, column: i64, dx: f64, dy: f64) -> Ray<C> {
         // The original pixel is in the middle of the sweeping interval from 0.0...1.0, so we need to subtract 0.5 to get the correct offset.
         let direction =
             self.get_direction_for((row as f64) + (dy - 0.5), (column as f64) + (dx - 0.5));
@@ -256,12 +191,14 @@ impl Camera {
 
 #[cfg(test)]
 mod tests {
+    use crate::geometry::coordinates::atlas::CartesianConvertible;
+    use crate::geometry::coordinates::boyer_lindquist::KerrChart;
     use crate::geometry::euclidean::EuclideanSpace;
     use crate::geometry::euclidean_spherical::EuclideanSpaceSpherical;
     use crate::geometry::four_vector::FourVector;
     use crate::geometry::geometry::{InnerProduct, Signature};
     use crate::geometry::kerr::Kerr;
-    use crate::geometry::point::{CoordinateSystem, Point};
+    use crate::geometry::point::Point;
     use crate::geometry::schwarzschild::Schwarzschild;
     use crate::geometry::spherical_coordinates_helper::{
         cartesian_to_spherical, spherical_to_cartesian,
@@ -272,10 +209,10 @@ mod tests {
 
     #[test]
     fn test_get_direction_for() {
-        let position = Point::new(0.0, 1.0, 0.0, 0.0, CoordinateSystem::Cartesian);
+        let position = Point::new_cartesian(0.0, 1.0, 0.0, 0.0);
         let camera = Camera::new(
             position.clone(),
-            FourVector::new_cartesian(1.0, 0.0, 0.0, 0.0),
+            FourVector::new(1.0, 0.0, 0.0, 0.0, position),
             PI / 2.0,
             11,
             11,
@@ -296,39 +233,39 @@ mod tests {
         let corner = -0.6853582554517135;
         let corner_z = 0.24610591900311507;
         assert_abs_diff_eq!(
-            top_left_corner.get_as_vector(),
-            FourVector::new_cartesian(0.0, corner_z, -corner, corner).get_as_vector()
+            top_left_corner.vector,
+            FourVector::new(0.0, corner_z, -corner, corner, position).vector
         );
         let top_left_corner_scalar =
             geometry.inner_product(&position, &top_left_corner, &top_left_corner);
         assert_abs_diff_eq!(top_left_corner_scalar, -1.0);
 
         assert_abs_diff_eq!(
-            top_right_corner.get_as_vector(),
-            FourVector::new_cartesian(0.0, corner_z, corner, corner).get_as_vector()
+            top_right_corner.vector,
+            FourVector::new(0.0, corner_z, corner, corner, position).vector
         );
         let top_right_corner_scalar =
             geometry.inner_product(&position, &top_right_corner, &top_right_corner);
         assert_abs_diff_eq!(top_right_corner_scalar, -1.0);
 
         assert_abs_diff_eq!(
-            middle.get_as_vector(),
-            FourVector::new_cartesian(0.0, -1.0, 0.0, 0.0).get_as_vector()
+            middle.vector,
+            FourVector::new(0.0, -1.0, 0.0, 0.0, position).vector
         );
         let middle_scalar = geometry.inner_product(&position, &middle, &middle);
         assert_abs_diff_eq!(middle_scalar, -1.0);
 
         assert_abs_diff_eq!(
-            bottom_left_corner.get_as_vector(),
-            FourVector::new_cartesian(0.0, corner_z, -corner, -corner).get_as_vector()
+            bottom_left_corner.vector,
+            FourVector::new(0.0, corner_z, -corner, -corner, position).vector
         );
         let bottom_left_corner_scalar =
             geometry.inner_product(&position, &bottom_left_corner, &bottom_left_corner);
         assert_abs_diff_eq!(bottom_left_corner_scalar, -1.0);
 
         assert_abs_diff_eq!(
-            bottom_right_corner.get_as_vector(),
-            FourVector::new_cartesian(0.0, corner_z, corner, -corner).get_as_vector()
+            bottom_right_corner.vector,
+            FourVector::new(0.0, corner_z, corner, -corner, position).vector
         );
         let bottom_right_corner_scalar =
             geometry.inner_product(&position, &bottom_right_corner, &bottom_right_corner);
@@ -340,7 +277,7 @@ mod tests {
         let geometry = EuclideanSpace::new();
         let camera = Camera::new(
             Point::new_cartesian(0.0, 1.0, 0.0, 0.0),
-            FourVector::new_cartesian(1.0, 0.0, 0.0, 0.0),
+            FourVector::new(1.0, 0.0, 0.0, 0.0, Point::new_cartesian(0.0, 1.0, 0.0, 0.0)),
             PI / 2.0,
             11,
             11,
@@ -357,16 +294,13 @@ mod tests {
         assert_eq!(centered.row, base.row);
         assert_eq!(centered.col, base.col);
         assert_abs_diff_eq!(centered.position.vector, base.position.vector);
-        assert_abs_diff_eq!(
-            centered.momentum.get_as_vector(),
-            base.momentum.get_as_vector()
-        );
+        assert_abs_diff_eq!(centered.momentum.vector, base.momentum.vector);
     }
 
     #[test]
     fn test_get_ray_for_different_geometries_euclidean() {
         let position = Point::new_cartesian(0.0, 0.0, 1.0, 0.0);
-        let velocity = FourVector::new_cartesian(1.0, 0.0, 0.0, 0.0);
+        let velocity = FourVector::new(1.0, 0.0, 0.0, 0.0, position);
 
         let geometry_euclidean = EuclideanSpace::new();
         let camera_euclidean = Camera::new(
@@ -383,9 +317,10 @@ mod tests {
         .unwrap();
 
         let geometry_euclidean_spherical = EuclideanSpaceSpherical::new();
+        let position_spherical = cartesian_to_spherical(&position);
         let camera_euclidean_spherical = Camera::new(
-            cartesian_to_spherical(&position.clone()),
-            velocity.clone(),
+            position_spherical,
+            FourVector::new(1.0, 0.0, 0.0, 0.0, position_spherical),
             PI / 2.0,
             100,
             100,
@@ -412,7 +347,7 @@ mod tests {
     #[test]
     fn test_get_ray_for_different_geometries_schwarzschild() {
         let position = Point::new_cartesian(0.0, 0.0, 1.0, 0.0);
-        let velocity = FourVector::new_cartesian(1.0, 0.0, 0.0, 0.0);
+        let velocity = FourVector::new(1.0, 0.0, 0.0, 0.0, position);
 
         let geometry_euclidean = EuclideanSpace::new();
         let camera_euclidean = Camera::new(
@@ -429,9 +364,10 @@ mod tests {
         .unwrap();
 
         let geometry_euclidean_schwarzschild = Schwarzschild::new(0.0, 0.0);
+        let position_spherical = cartesian_to_spherical(&position);
         let camera_euclidean_schwarzschild = Camera::new(
-            cartesian_to_spherical(&position.clone()),
-            velocity.clone(),
+            position_spherical,
+            FourVector::new(1.0, 0.0, 0.0, 0.0, position_spherical),
             PI / 2.0,
             100,
             100,
@@ -463,7 +399,7 @@ mod tests {
     fn test_camera_ray_is_past_directed_for_plus_minus_minus_minus_signature() {
         let position = cartesian_to_spherical(&Point::new_cartesian(0.0, 10.0, 0.0, 0.0));
         let geometry = Schwarzschild::new(0.0, 0.0);
-        let velocity = FourVector::new_spherical(1.0, 0.0, 0.0, 0.0);
+        let velocity = FourVector::new(1.0, 0.0, 0.0, 0.0, position);
         let camera = Camera::new(
             position,
             velocity,
@@ -485,9 +421,12 @@ mod tests {
 
     #[test]
     fn test_camera_ray_is_past_directed_for_minus_plus_plus_plus_signature() {
-        let position = Point::new_cartesian(0.0, 10.0, 0.0, 0.0);
         let geometry = Kerr::new(0.0, 0.0, 0.0);
-        let velocity = FourVector::new_cartesian(1.0, 0.0, 0.0, 0.0);
+        let position = KerrChart::point_from_cartesian(
+            geometry.kerr_schild_chart(),
+            &Point::new_cartesian(0.0, 10.0, 0.0, 0.0),
+        );
+        let velocity = FourVector::new(1.0, 0.0, 0.0, 0.0, position);
         let camera = Camera::new(
             position,
             velocity,
@@ -505,5 +444,84 @@ mod tests {
         let orientation = geometry.signature()[0]
             * geometry.inner_product(&ray.position, &camera.velocity, &ray.momentum);
         assert!(orientation < 0.0);
+    }
+
+    /// Handedness of the geometry's spatial tetrad, measured in the Cartesian view. The point
+    /// must be away from places where the view degenerates, so the measurement is meaningful.
+    fn measured_handedness<G: crate::geometry::geometry::Geometry>(
+        geometry: &G,
+        position: &Point<G::Chart>,
+    ) -> f64 {
+        let tetrad = crate::geometry::geometry::Geometry::get_tetrad_at(geometry, position);
+        let x = super::spatial_basis_vector_cartesian(position, &tetrad.x);
+        let y = super::spatial_basis_vector_cartesian(position, &tetrad.y);
+        let z = super::spatial_basis_vector_cartesian(position, &tetrad.z);
+        let triple = x.dot(&y.cross(&z));
+        assert!(
+            triple.is_finite() && triple.abs() > 1e-6,
+            "degenerate tetrad at {position:?}: triple product {triple}"
+        );
+        triple.signum()
+    }
+
+    /// The camera falls back to `tetrad_handedness_fallback` where it cannot measure the
+    /// handedness. That is only correct if the fallback equals the handedness measured
+    /// everywhere else; otherwise the image would be mirrored at those points.
+    #[test]
+    fn handedness_fallback_matches_the_measured_tetrad_handedness() {
+        use crate::geometry::coordinates::atlas::Chart;
+        use crate::geometry::coordinates::spherical::{RotatedSpherical, SphericalChart};
+        use crate::geometry::kerr_bl::KerrBL;
+
+        let spherical_points = [(12.0, 1.1, 0.4), (7.0, 2.5, -2.0), (30.0, 0.3, 3.0)];
+
+        let flat = EuclideanSpace::new();
+        for (x, y, z) in [(1.0, 2.0, 3.0), (-4.0, 0.5, -1.0)] {
+            let p = Point::new_cartesian(0.0, x, y, z);
+            assert_eq!(
+                measured_handedness(&flat, &p),
+                p.chart.tetrad_handedness_fallback()
+            );
+        }
+
+        let flat_spherical = EuclideanSpaceSpherical::new();
+        let schwarzschild = Schwarzschild::new(1.0, 1e-4);
+        for rotation in [0.0, 90.0, 180.0, 270.0] {
+            let chart = SphericalChart::Rotated(RotatedSpherical { rotation });
+            for (r, theta, phi) in spherical_points {
+                let p = Point::new(0.0, r, theta, phi, chart);
+                let expected = chart.tetrad_handedness_fallback();
+                assert_eq!(
+                    measured_handedness(&flat_spherical, &p),
+                    expected,
+                    "flat, {p:?}"
+                );
+                assert_eq!(
+                    measured_handedness(&schwarzschild, &p),
+                    expected,
+                    "Schwarzschild, {p:?}"
+                );
+            }
+        }
+
+        let kerr = Kerr::new(1.0, 0.6, 1e-4);
+        for (x, y, z) in [(8.0, 3.0, 2.0), (-5.0, 6.0, -4.0)] {
+            let p = Point::new(0.0, x, y, z, kerr.kerr_schild_chart());
+            assert_eq!(
+                measured_handedness(&kerr, &p),
+                p.chart.tetrad_handedness_fallback(),
+                "Kerr, {p:?}"
+            );
+        }
+
+        let kerr_bl = KerrBL::new(1.0, 0.6, 1e-4);
+        for (r, theta, phi) in spherical_points {
+            let p = Point::new(0.0, r, theta, phi, kerr_bl.boyer_lindquist_chart());
+            assert_eq!(
+                measured_handedness(&kerr_bl, &p),
+                p.chart.tetrad_handedness_fallback(),
+                "KerrBL, {p:?}"
+            );
+        }
     }
 }

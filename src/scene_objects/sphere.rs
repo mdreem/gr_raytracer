@@ -1,19 +1,20 @@
+use crate::geometry::coordinates::atlas::GeometryChart;
+use crate::geometry::coordinates::euclidean::CartesianChart;
 use crate::geometry::geometry::Geometry;
-use crate::geometry::point::{CoordinateSystem, Point};
+use crate::geometry::point::Point;
 use crate::geometry::spherical_coordinates_helper::cartesian_to_spherical;
 use crate::rendering::integrator::Step;
 use crate::rendering::radiance::Radiance;
 use crate::rendering::raytracer::RaytracerError;
 use crate::rendering::texture::{TextureMapHandle, UVCoordinates};
 use crate::scene_objects::hittable::{ColorComputationData, Hittable, Intersection};
-use crate::scene_objects::objects::SceneObject;
 use nalgebra::Vector3;
 use std::f64::consts::PI;
 
 pub struct Sphere {
     radius: f64,
     texture_mapper: TextureMapHandle,
-    position: Point,
+    position: Point<CartesianChart>,
     temperature: f64,
 }
 
@@ -21,7 +22,7 @@ impl Sphere {
     pub fn new(
         radius: f64,
         texture_mapper: TextureMapHandle,
-        position: Point,
+        position: Point<CartesianChart>,
         temperature: f64,
     ) -> Self {
         Self {
@@ -59,16 +60,14 @@ fn solve_for_t(y_start_spatial: Vector3<f64>, direction: Vector3<f64>, r: f64) -
     }
 }
 
-impl Hittable for Sphere {
+impl<C: GeometryChart> Hittable<C> for Sphere {
     // y_start and y_end have to be Cartesian.
     fn intersects(
         &self,
-        y_start: &Step,
-        y_end: &Step,
-        _geometry: &dyn Geometry,
-    ) -> Option<Intersection> {
-        debug_assert_eq!(self.position.coordinate_system, CoordinateSystem::Cartesian);
-
+        y_start: &Step<C>,
+        y_end: &Step<C>,
+        _geometry: &dyn Geometry<Chart = C>,
+    ) -> Option<Intersection<CartesianChart>> {
         let y_start_cartesian = y_start.x.to_cartesian();
         let y_end_cartesian = y_end.x.to_cartesian();
 
@@ -91,12 +90,11 @@ impl Hittable for Sphere {
         // (so e.g. the texture's north pole is always the sphere's own
         // north pole, regardless of where the sphere sits in the scene).
         let point_on_sphere_spatial = y_start_spatial + t * direction;
-        let point_on_sphere_local = cartesian_to_spherical(&Point::new(
+        let point_on_sphere_local = cartesian_to_spherical(&Point::new_cartesian(
             0.0,
             point_on_sphere_spatial[0],
             point_on_sphere_spatial[1],
             point_on_sphere_spatial[2],
-            CoordinateSystem::Cartesian,
         ));
 
         let theta = point_on_sphere_local[2];
@@ -126,8 +124,8 @@ impl Hittable for Sphere {
 
     fn color_at_uv(
         &self,
-        color_computation_data: &ColorComputationData,
-        _geometry: &dyn Geometry,
+        color_computation_data: &ColorComputationData<C>,
+        _geometry: &dyn Geometry<Chart = C>,
     ) -> Result<Radiance, RaytracerError> {
         self.texture_mapper
             .color_at_uv(
@@ -139,8 +137,8 @@ impl Hittable for Sphere {
 
     fn energy_of_emitter(
         &self,
-        geometry: &dyn Geometry,
-        step: &Step,
+        geometry: &dyn Geometry<Chart = C>,
+        step: &Step<C>,
     ) -> Result<f64, RaytracerError> {
         let position = step.x;
         let velocity = geometry.get_stationary_velocity_at(&position);
@@ -150,14 +148,12 @@ impl Hittable for Sphere {
 
     fn temperature_of_emitter(
         &self,
-        _point: &Point,
-        _geometry: &dyn Geometry,
+        _point: &Point<C>,
+        _geometry: &dyn Geometry<Chart = C>,
     ) -> Result<f64, RaytracerError> {
         Ok(self.temperature)
     }
 }
-
-impl SceneObject for Sphere {}
 
 #[cfg(test)]
 mod tests {
@@ -173,10 +169,10 @@ mod tests {
 
     // Sphere intersection only reads the endpoint positions; the momentum is
     // a placeholder so the tests can build `Step`s.
-    fn as_step(p: Point) -> Step {
+    fn as_step(p: Point<CartesianChart>) -> Step<CartesianChart> {
         Step {
             x: p,
-            p: FourVector::new_cartesian(1.0, 0.0, 0.0, 0.0),
+            p: FourVector::new(1.0, 0.0, 0.0, 0.0, p),
             t: 0.0,
             step: 0,
         }

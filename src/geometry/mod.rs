@@ -1,4 +1,5 @@
 pub mod circular_orbit;
+pub mod coordinates;
 pub mod euclidean;
 pub mod euclidean_spherical;
 pub mod four_vector;
@@ -10,3 +11,4 @@ pub mod point;
 pub mod schwarzschild;
 pub mod spherical_coordinates_helper;
 pub mod tetrad;
+pub mod hypersphere;

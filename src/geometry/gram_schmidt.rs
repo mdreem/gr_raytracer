@@ -3,7 +3,12 @@ use crate::geometry::geometry::Geometry;
 use crate::geometry::point::Point;
 use log::trace;
 
-fn proj<G: Geometry>(geometry: &G, position: &Point, u: &FourVector, v: &FourVector) -> FourVector {
+fn proj<G: Geometry>(
+    geometry: &G,
+    position: &Point<G::Chart>,
+    u: &FourVector<G::Chart>,
+    v: &FourVector<G::Chart>,
+) -> FourVector<G::Chart> {
     let p1 = geometry.inner_product(position, v, u);
     let p2 = geometry.inner_product(position, u, u);
 
@@ -12,10 +17,10 @@ fn proj<G: Geometry>(geometry: &G, position: &Point, u: &FourVector, v: &FourVec
 
 pub fn gram_schmidt<G: Geometry>(
     geometry: &G,
-    position: &Point,
-    vectors: &[FourVector],
-) -> Vec<FourVector> {
-    let mut orthonormal_vectors: Vec<FourVector> = Vec::new();
+    position: &Point<G::Chart>,
+    vectors: &[FourVector<G::Chart>],
+) -> Vec<FourVector<G::Chart>> {
+    let mut orthonormal_vectors: Vec<FourVector<G::Chart>> = Vec::new();
 
     for v in vectors {
         let mut w = *v;
@@ -52,15 +57,16 @@ mod tests {
         let theta = point_in_spherical.y;
         let phi = point_in_spherical.z;
 
-        let e_t = FourVector::new_cartesian(1.0, 0.0, 0.0, 0.0);
-        let e_r = FourVector::new_cartesian(
+        let e_t = FourVector::new(1.0, 0.0, 0.0, 0.0, position);
+        let e_r = FourVector::new(
             0.0,
             theta.sin() * phi.cos(),
             theta.sin() * phi.sin(),
             theta.cos(),
+            position,
         );
-        let e_theta = FourVector::new_cartesian(0.0, 0.0, -1.0, 0.0);
-        let e_phi = FourVector::new_cartesian(0.0, 0.0, 0.0, -1.0);
+        let e_theta = FourVector::new(0.0, 0.0, -1.0, 0.0, position);
+        let e_phi = FourVector::new(0.0, 0.0, 0.0, -1.0, position);
 
         let geometry = EuclideanSpace::new();
         let vectors = vec![e_t, e_r, e_theta, e_phi];
@@ -107,10 +113,10 @@ mod tests {
 
         let a = 1.0 - r_s / r;
 
-        let e_t = FourVector::new_spherical(1.0 / a, -(r_s / r).sqrt(), 0.0, 0.0);
-        let e_r = FourVector::new_spherical(0.0, -1.0, 0.0, 0.0);
-        let e_theta = FourVector::new_spherical(0.0, 0.0, -1.0, 0.0);
-        let e_phi = FourVector::new_spherical(0.0, 0.0, 0.0, -1.0);
+        let e_t = FourVector::new(1.0 / a, -(r_s / r).sqrt(), 0.0, 0.0, point_in_spherical);
+        let e_r = FourVector::new(0.0, -1.0, 0.0, 0.0, point_in_spherical);
+        let e_theta = FourVector::new(0.0, 0.0, -1.0, 0.0, point_in_spherical);
+        let e_phi = FourVector::new(0.0, 0.0, 0.0, -1.0, point_in_spherical);
 
         let geometry = Schwarzschild::new(r_s, 1e-5);
         let vectors = vec![e_t, e_r, e_theta, e_phi];
@@ -163,10 +169,10 @@ mod tests {
 
         let a = 1.0 - r_s / r;
 
-        let e_t = FourVector::new_spherical(1.0 / a, -(r_s / r).sqrt(), 0.0, 0.0);
-        let e_1 = FourVector::new_spherical(0.0, -1.0, 0.0, 0.0);
-        let e_2 = FourVector::new_spherical(0.0, 0.0, -1.0, 0.0);
-        let e_3 = FourVector::new_spherical(0.0, 0.0, 0.0, -1.0);
+        let e_t = FourVector::new(1.0 / a, -(r_s / r).sqrt(), 0.0, 0.0, point_in_spherical);
+        let e_1 = FourVector::new(0.0, -1.0, 0.0, 0.0, point_in_spherical);
+        let e_2 = FourVector::new(0.0, 0.0, -1.0, 0.0, point_in_spherical);
+        let e_3 = FourVector::new(0.0, 0.0, 0.0, -1.0, point_in_spherical);
 
         let geometry = Schwarzschild::new(r_s, 1e-5);
         let vectors = vec![e_t, e_1, e_2, e_3];
@@ -174,10 +180,13 @@ mod tests {
 
         assert_eq!(orthonormal_vectors.len(), 4);
 
-        let e_t_expected = FourVector::new_spherical(1.0 / a, -(r_s / r).sqrt(), 0.0, 0.0);
-        let e_1_expected = FourVector::new_spherical((r_s / r).sqrt() / a, -1.0, 0.0, 0.0);
-        let e_2_expected = FourVector::new_spherical(0.0, 0.0, -1.0 / r, 0.0);
-        let e_3_expected = FourVector::new_spherical(0.0, 0.0, 0.0, -1.0 / (r * theta.sin()));
+        let e_t_expected =
+            FourVector::new(1.0 / a, -(r_s / r).sqrt(), 0.0, 0.0, point_in_spherical);
+        let e_1_expected =
+            FourVector::new((r_s / r).sqrt() / a, -1.0, 0.0, 0.0, point_in_spherical);
+        let e_2_expected = FourVector::new(0.0, 0.0, -1.0 / r, 0.0, point_in_spherical);
+        let e_3_expected =
+            FourVector::new(0.0, 0.0, 0.0, -1.0 / (r * theta.sin()), point_in_spherical);
 
         println!(
             "{:?}",

@@ -1,5 +1,7 @@
 use super::*;
+use crate::geometry::coordinates::euclidean::CartesianChart;
 use crate::geometry::euclidean::EuclideanSpace;
+use crate::geometry::point::Point;
 use crate::rendering::camera::Camera;
 use crate::rendering::integrator::IntegrationConfiguration;
 use crate::rendering::octree::Octree;
@@ -37,7 +39,13 @@ fn renderer<'a>(
 ) -> Raytracer<'a, EuclideanSpace> {
     let camera = Camera::new(
         Point::new_cartesian(0.0, 0.0, 0.0, 10.0),
-        FourVector::new_cartesian(1.0, 0.0, 0.0, 0.0),
+        FourVector::new(
+            1.0,
+            0.0,
+            0.0,
+            0.0,
+            Point::new_cartesian(0.0, 0.0, 0.0, 10.0),
+        ),
         0.7,
         32,
         32,
@@ -64,7 +72,11 @@ fn renderer<'a>(
     Raytracer::new(scene, ToneMappingMethod::Reinhard, 1.0)
 }
 
-fn corners(renderer: &Raytracer<EuclideanSpace>, row: i64, col: i64) -> [RaySample; 4] {
+fn corners(
+    renderer: &Raytracer<EuclideanSpace>,
+    row: i64,
+    col: i64,
+) -> [RaySample<CartesianChart>; 4] {
     [
         (row, col),
         (row, col + 1),
@@ -79,11 +91,11 @@ fn corners(renderer: &Raytracer<EuclideanSpace>, row: i64, col: i64) -> [RaySamp
     })
 }
 
-fn tube(samples: &[RaySample; 4]) -> SampleTube<'_> {
+fn tube(samples: &[RaySample<CartesianChart>; 4]) -> SampleTube<'_, CartesianChart> {
     SampleTube::from_buffer(samples, 0, 0, 2).unwrap()
 }
 
-fn sky_area(tube: &SampleTube) -> f64 {
+fn sky_area(tube: &SampleTube<CartesianChart>) -> f64 {
     let escaped =
         [tube.a, tube.b, tube.c, tube.d].map(|sample| sample.ray_class.escaped().unwrap());
     compute_traced_tube_solid_angle(&escaped[0], &escaped[1], &escaped[2], &escaped[3]).unwrap()
@@ -154,7 +166,7 @@ fn tube_subdivision_traces_fractional_positions_and_shares_boundaries() {
     assert!(std::ptr::eq(children[1].d, children[3].b));
     assert!(std::ptr::eq(children[2].d, children[3].c));
     assert!(children.iter().all(|child| sky_area(child) > 0.0));
-    let screen_area = |tube: &SampleTube| {
+    let screen_area = |tube: &SampleTube<CartesianChart>| {
         (tube.screen_bounds.bottom - tube.screen_bounds.top)
             * (tube.screen_bounds.right - tube.screen_bounds.left)
     };
@@ -192,7 +204,7 @@ fn tube_subdivision_preserves_flat_space_star_flux() {
         bp_mag: 0.0,
         rp_mag: 0.0,
         bp_rp: 0.0,
-        direction: ray.momentum.get_cartesian_vector(&ray.position).normalize(),
+        direction: ray.momentum.to_cartesian().get_spatial_vector().normalize(),
         temperature: 5772.0,
         emission_xyz: CIETristimulus::new(2.0, 1.0, 0.5, 1.0),
     };
@@ -249,7 +261,8 @@ fn star_magnification_and_foreground_transmittance_are_applied_once() {
             bp_rp: 0.0,
             direction: star_ray
                 .momentum
-                .get_cartesian_vector(&star_ray.position)
+                .to_cartesian()
+                .get_spatial_vector()
                 .normalize(),
             temperature: 5772.0,
             emission_xyz: CIETristimulus::new(2.0, 1.0, 0.5, 1.0),
@@ -419,6 +432,6 @@ fn tube_bounds_reject_unrepresentable_refinement() {
             Err(RaytracerError::InvalidStarTube(_))
         ));
     }
-    assert!(SampleTube::from_buffer(&[], 0, 0, 0).is_none());
+    assert!(SampleTube::<CartesianChart>::from_buffer(&[], 0, 0, 0).is_none());
     assert!(SampleTube::from_buffer(&samples[..1], 0, 0, 1).is_none());
 }

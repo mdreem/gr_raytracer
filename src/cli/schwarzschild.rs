@@ -1,8 +1,10 @@
 use crate::cli::cli::GlobalOpts;
 use crate::cli::shared::{
-    assert_future_directed, create_scene, integrate_and_save_ray, render, resolve_camera_velocity,
+    assert_future_directed, create_scene, in_best_chart, integrate_and_save_ray, render,
+    resolve_camera_velocity,
 };
 use crate::configuration::RenderConfig;
+use crate::geometry::coordinates::euclidean::CartesianChart;
 use crate::geometry::four_vector::FourVector;
 use crate::geometry::geometry::{Geometry, RenderableGeometry};
 use crate::geometry::point::Point;
@@ -19,13 +21,9 @@ fn create_scene_internal<'a>(
     geometry: &'a Schwarzschild,
     opts: GlobalOpts,
     config: &RenderConfig,
-    camera_position: Point,
+    camera_position: Point<CartesianChart>,
 ) -> Result<Scene<'a, Schwarzschild>, RaytracerError> {
-    // Steer the spherical coordinate pole off the field of view (0 = identity).
-    // Must run before the first `cartesian_to_spherical`, which otherwise locks
-    // the frame-rotation `OnceLock` to 0 and silently discards the flag.
-    crate::geometry::spherical_coordinates_helper::set_frame_rotation_deg(opts.pole_rotation_deg);
-    let camera_position_spherical = cartesian_to_spherical(&camera_position);
+    let camera_position_spherical = in_best_chart(&cartesian_to_spherical(&camera_position));
     let momentum = resolve_camera_velocity(
         geometry,
         &camera_position_spherical,
@@ -51,7 +49,7 @@ impl RenderableGeometry for Schwarzschild {
         &self,
         opts: GlobalOpts,
         config: RenderConfig,
-        camera_position: Point,
+        camera_position: Point<CartesianChart>,
         filename: String,
         from_row: Option<u32>,
         from_col: Option<u32>,
@@ -80,7 +78,7 @@ impl RenderableGeometry for Schwarzschild {
         col: i64,
         opts: GlobalOpts,
         config: RenderConfig,
-        camera_position: Point,
+        camera_position: Point<CartesianChart>,
         write: &mut dyn Write,
     ) -> Result<(), RaytracerError> {
         let scene = create_scene_internal(self, opts, &config, camera_position)?;
@@ -94,8 +92,8 @@ impl RenderableGeometry for Schwarzschild {
 
     fn render_ray_at(
         &self,
-        position: Point,
-        direction: FourVector,
+        position: Point<CartesianChart>,
+        direction: FourVector<CartesianChart>,
         opts: GlobalOpts,
         write: &mut dyn Write,
     ) -> Result<(), RaytracerError> {
@@ -139,7 +137,7 @@ mod tests {
     #[test]
     fn test_render_schwarzschild_ray_at() {
         let position = Point::new_cartesian(0.0, 0.0, 4.0, -18.0);
-        let direction = FourVector::new_cartesian(0.0, 0.0, 1.0, 0.0);
+        let direction = FourVector::new(0.0, 0.0, 1.0, 0.0, position);
         let radius = 1.0;
         let horizon_epsilon = 1e-5;
         let opts = GlobalOpts {
@@ -158,7 +156,6 @@ mod tests {
             show_sampling_mask: false,
             sampling_mask_color: crate::rendering::color::Color::new(255, 0, 255, 255),
             curved_star_membership: false,
-            pole_rotation_deg: 0.0,
         };
         let geometry = Schwarzschild::new(radius, horizon_epsilon);
         let mut output_buffer = BufWriter::new(Vec::new());

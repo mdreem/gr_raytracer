@@ -1,10 +1,10 @@
 use crate::geometry::circular_orbit::OrbitKillingDecomposition;
+use crate::geometry::coordinates::euclidean::CartesianChart;
 use crate::geometry::four_vector::FourVector;
 use crate::geometry::geometry::{
-    GeodesicSolver, Geometry, HasCoordinateSystem, InnerProduct, Signature, SupportQuantities,
+    GeodesicSolver, Geometry, HasChart, InnerProduct, Signature, SupportQuantities,
 };
-use crate::geometry::point::CoordinateSystem::Cartesian;
-use crate::geometry::point::{CoordinateSystem, Point};
+use crate::geometry::point::Point;
 use crate::geometry::tetrad::Tetrad;
 use crate::rendering::ray::Ray;
 use crate::rendering::raytracer::RaytracerError;
@@ -14,7 +14,9 @@ use crate::rendering::temperature::{ConstantTemperatureComputer, TemperatureComp
 use log::trace;
 use nalgebra::{Const, Matrix4, OVector};
 
-struct EuclideanSpacedSolver {}
+struct EuclideanSpacedSolver {
+    chart: CartesianChart,
+}
 
 #[derive(Clone)]
 pub struct EuclideanSpace {}
@@ -37,13 +39,13 @@ impl OdeFunction<Const<8>> for EuclideanSpacedSolver {
     }
 }
 
-impl HasCoordinateSystem for EuclideanSpacedSolver {
-    fn coordinate_system(&self) -> CoordinateSystem {
-        Cartesian
-    }
-}
-
 impl GeodesicSolver for EuclideanSpacedSolver {
+    type Chart = CartesianChart;
+
+    fn chart(&self) -> Self::Chart {
+        self.chart
+    }
+
     fn geodesic(&self, _: f64, y_state: &EquationOfMotionState) -> EquationOfMotionState {
         trace!("y_state = {:?}", y_state);
         EquationOfMotionState::from_column_slice(&[
@@ -52,14 +54,13 @@ impl GeodesicSolver for EuclideanSpacedSolver {
     }
 }
 
-impl HasCoordinateSystem for EuclideanSpace {
-    fn coordinate_system(&self) -> CoordinateSystem {
-        Cartesian
-    }
-}
-
 impl InnerProduct for EuclideanSpace {
-    fn inner_product(&self, _position: &Point, v: &FourVector, w: &FourVector) -> f64 {
+    fn inner_product(
+        &self,
+        _position: &Point<CartesianChart>,
+        v: &FourVector<CartesianChart>,
+        w: &FourVector<CartesianChart>,
+    ) -> f64 {
         1.0 * v.vector[0] * w.vector[0]
             + -v.vector[1] * w.vector[1]
             + -v.vector[2] * w.vector[2]
@@ -73,6 +74,10 @@ impl Signature for EuclideanSpace {
     }
 }
 
+impl HasChart for EuclideanSpace {
+    type Chart = CartesianChart;
+}
+
 impl Geometry for EuclideanSpace {
     /// Returns a local tetrad (orthonormal basis) at the given position.
     ///
@@ -83,35 +88,41 @@ impl Geometry for EuclideanSpace {
     ///
     /// This mapping (x = eφ, y = −eθ, z = −er) should match the one used in the Schwarzschild geometry.
     /// The time-like basis vector is e_t.
-    fn get_tetrad_at(&self, position: &Point) -> Tetrad {
+    fn get_tetrad_at(&self, position: &Point<Self::Chart>) -> Tetrad<Self::Chart> {
         let point_in_spherical = position.get_as_spherical();
 
         let _r = point_in_spherical.x;
         let theta = point_in_spherical.y;
         let phi = point_in_spherical.z;
 
-        let e_t = FourVector::new_cartesian(1.0, 0.0, 0.0, 0.0);
-        let e_r = FourVector::new_cartesian(
+        let e_t = FourVector::new(1.0, 0.0, 0.0, 0.0, *position);
+        let e_r = FourVector::new(
             0.0,
             theta.sin() * phi.cos(),
             theta.sin() * phi.sin(),
             theta.cos(),
+            *position,
         );
-        let e_theta = FourVector::new_cartesian(
+        let e_theta = FourVector::new(
             0.0,
             theta.cos() * phi.cos(),
             theta.cos() * phi.sin(),
             -theta.sin(),
+            *position,
         );
-        let e_phi = FourVector::new_cartesian(0.0, -phi.sin(), phi.cos(), 0.0);
+        let e_phi = FourVector::new(0.0, -phi.sin(), phi.cos(), 0.0, *position);
 
         Tetrad::new(*position, e_t, e_phi, -e_theta, -e_r)
     }
 
-    fn lorentz_transformation(&self, position: &Point, t_velocity: &FourVector) -> Matrix4<f64> {
-        let t_tetrad = self.get_tetrad_at(position).t.get_as_vector();
+    fn lorentz_transformation(
+        &self,
+        position: &Point<CartesianChart>,
+        t_velocity: &FourVector<CartesianChart>,
+    ) -> Matrix4<f64> {
+        let t_tetrad = self.get_tetrad_at(position).t.vector;
 
-        let velocity = t_velocity.get_as_vector(); // TODO: add indexing to FourVector.
+        let velocity = t_velocity.vector; // TODO: add indexing to FourVector.
         let gamma = t_tetrad[0] * velocity[0]
             - t_tetrad[1] * velocity[1]
             - t_tetrad[2] * velocity[2]
@@ -141,26 +152,36 @@ impl Geometry for EuclideanSpace {
         matrix
     }
 
-    fn inside_horizon(&self, _position: &Point) -> bool {
+    fn inside_horizon(&self, _position: &Point<CartesianChart>) -> bool {
         false
     }
 
-    fn closed_orbit(&self, _position: &Point, _step_index: usize, _max_steps: usize) -> bool {
+    fn closed_orbit(
+        &self,
+        _position: &Point<CartesianChart>,
+        _step_index: usize,
+        _max_steps: usize,
+    ) -> bool {
         false
     }
 
-    fn get_geodesic_solver(&self, _ray: &Ray) -> Box<dyn GeodesicSolver> {
-        Box::new(EuclideanSpacedSolver {})
+    fn get_geodesic_solver(
+        &self,
+        _momentum: &FourVector<Self::Chart>,
+    ) -> Box<dyn GeodesicSolver<Chart = Self::Chart>> {
+        Box::new(EuclideanSpacedSolver {
+            chart: CartesianChart::Cartesian,
+        })
     }
 
-    fn get_radial_coordinate(&self, position: &Point) -> f64 {
+    fn get_radial_coordinate(&self, position: &Point<CartesianChart>) -> f64 {
         position.get_as_spherical()[0]
     }
 
     fn get_constants_of_motion(
         &self,
-        position: &Point,
-        momentum: &FourVector,
+        position: &Point<CartesianChart>,
+        momentum: &FourVector<CartesianChart>,
     ) -> crate::geometry::geometry::ConstantsOfMotion {
         let mut constants = crate::geometry::geometry::ConstantsOfMotion::default();
 
@@ -183,30 +204,33 @@ impl Geometry for EuclideanSpace {
 }
 
 impl SupportQuantities for EuclideanSpace {
-    fn get_stationary_velocity_at(&self, _position: &Point) -> FourVector {
-        FourVector::new_cartesian(1.0, 0.0, 0.0, 0.0)
+    fn get_stationary_velocity_at(
+        &self,
+        _position: &Point<CartesianChart>,
+    ) -> FourVector<CartesianChart> {
+        FourVector::new(1.0, 0.0, 0.0, 0.0, *_position)
     }
 
-    fn get_zamo_velocity_at(&self, position: &Point) -> FourVector {
+    fn get_zamo_velocity_at(&self, position: &Point<CartesianChart>) -> FourVector<CartesianChart> {
         // No frame dragging: the ZAMO is the static observer.
         self.get_stationary_velocity_at(position)
     }
 
     fn get_circular_orbit_velocity_at(
         &self,
-        _position: &Point,
-    ) -> Result<FourVector, RaytracerError> {
-        Ok(FourVector::new_cartesian(1.0, 0.0, 0.0, 0.0))
+        _position: &Point<CartesianChart>,
+    ) -> Result<FourVector<CartesianChart>, RaytracerError> {
+        Ok(FourVector::new(1.0, 0.0, 0.0, 0.0, *_position))
         // TODO: implement proper circular orbit velocity in Euclidean space.
     }
 
-    fn axial_killing_vector(&self, position: &Point) -> FourVector {
-        FourVector::new_cartesian(0.0, -position[2], position[1], 0.0)
+    fn axial_killing_vector(&self, position: &Point<CartesianChart>) -> FourVector<CartesianChart> {
+        FourVector::new(0.0, -position[2], position[1], 0.0, *position)
     }
 
     fn circular_orbit_killing_coefficients(
         &self,
-        _position: &Point,
+        _position: &Point<CartesianChart>,
     ) -> Result<OrbitKillingDecomposition, RaytracerError> {
         // Emitters are at rest in flat space (matches
         // get_circular_orbit_velocity_at above).
@@ -243,7 +267,7 @@ mod tests {
 
         let position = Point::new_cartesian(0.0, 0.0, 0.0, -10.0);
         let geometry = EuclideanSpace::new();
-        let velocity = FourVector::new_cartesian(1.0, 0.0, 0.0, 0.0);
+        let velocity = FourVector::new(1.0, 0.0, 0.0, 0.0, position);
         let camera = Camera::new(
             position,
             velocity,

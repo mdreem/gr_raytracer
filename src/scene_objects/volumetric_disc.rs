@@ -1,3 +1,5 @@
+use crate::geometry::coordinates::atlas::{CartesianConvertible, GeometryChart};
+use crate::geometry::coordinates::euclidean::CartesianChart;
 use crate::geometry::geometry::Geometry;
 use crate::geometry::point::Point;
 use crate::rendering::integrator::Step;
@@ -7,7 +9,6 @@ use crate::rendering::redshift::RayFrequencyData;
 use crate::rendering::temperature::TemperatureComputer;
 use crate::rendering::texture::{TextureMapHandle, UVCoordinates};
 use crate::scene_objects::hittable::{ColorComputationData, Hittable, Intersection};
-use crate::scene_objects::objects::SceneObject;
 use crate::scene_objects::volumetric_disc::CylinderIntersection::{
     NoIntersection, OneIntersection, Parallel, TwoIntersections,
 };
@@ -240,11 +241,11 @@ impl VolumetricDisc {
         UVCoordinates { u, v }
     }
 
-    fn raymarch(
+    fn raymarch<C: GeometryChart>(
         &self,
-        geometry: &dyn Geometry,
+        geometry: &dyn Geometry<Chart = C>,
         frequency: &RayFrequencyData,
-        remaining_steps: &[Step],
+        remaining_steps: &[Step<C>],
     ) -> Result<Radiance, RaytracerError> {
         let first = remaining_steps
             .first()
@@ -296,6 +297,7 @@ impl VolumetricDisc {
                 0.0
             };
 
+            let chart = steps[0].x.chart;
             let result = self.raymarch_segment(
                 from,
                 to,
@@ -303,6 +305,7 @@ impl VolumetricDisc {
                 frequency,
                 affine_per_length,
                 &mut segment_state,
+                chart,
             )?;
 
             if result == RaymarchResult::AlreadyOpaque {
@@ -323,13 +326,14 @@ impl VolumetricDisc {
         Ok(segment_state.radiance)
     }
 
-    fn march_constant_step(
+    fn march_constant_step<C: GeometryChart>(
         &self,
         p: &Vector3<f64>,
-        geometry: &dyn Geometry,
+        geometry: &dyn Geometry<Chart = C>,
         frequency: &RayFrequencyData,
         affine_per_length: f64,
         segment_state: &mut SegmentState,
+        chart: C,
     ) -> Result<(), RaytracerError> {
         let sigma_a = self.absorption;
         let sigma_s = self.scattering;
@@ -349,7 +353,8 @@ impl VolumetricDisc {
             // Where no timelike circular orbit exists the gas is
             // unphysical anyway: it still attenuates (below) but emits
             // nothing.
-            let sample_position = Point::new_cartesian(0.0, p[0], p[1], p[2]);
+            let sample_position =
+                C::point_from_cartesian(chart, &Point::new_cartesian(0.0, p[0], p[1], p[2]));
             if let Ok(coefficients) = geometry.circular_orbit_killing_coefficients(&sample_position)
             {
                 let emitter_energy =
@@ -411,14 +416,15 @@ impl VolumetricDisc {
     // step sizes do not align with the segment boundaries, so the sampling
     // phase (distance_accumulated) carries across segments to keep one
     // uniform comb along the whole episode.
-    fn raymarch_segment(
+    fn raymarch_segment<C: GeometryChart>(
         &self,
         from: &Vector3<f64>,
         to: &Vector3<f64>,
-        geometry: &dyn Geometry,
+        geometry: &dyn Geometry<Chart = C>,
         frequency: &RayFrequencyData,
         affine_per_length: f64,
         segment_state: &mut SegmentState,
+        chart: C,
     ) -> Result<RaymarchResult, RaytracerError> {
         let segment = to - from;
         let segment_length = segment.norm();
@@ -430,7 +436,14 @@ impl VolumetricDisc {
         while dist < segment_length {
             let p = from + direction * dist;
 
-            self.march_constant_step(&p, geometry, frequency, affine_per_length, segment_state)?;
+            self.march_constant_step(
+                &p,
+                geometry,
+                frequency,
+                affine_per_length,
+                segment_state,
+                chart,
+            )?;
 
             if segment_state.radiance.transmittance <= TRANSPARENCY_EARLY_EXIT {
                 return Ok(RaymarchResult::AlreadyOpaque);
@@ -631,7 +644,11 @@ pub enum CylinderIntersection {
 impl VolumetricDisc {
     // The volume boundary is deliberately a Cartesian cylinder (the disc is a
     // stylized visual model); it does not need the metric radial coordinate.
-    fn intersects_internal(&self, y_start: &Point, y_end: &Point) -> Option<Intersection> {
+    fn intersects_internal<C: CartesianConvertible>(
+        &self,
+        y_start: &Point<C>,
+        y_end: &Point<C>,
+    ) -> Option<Intersection<CartesianChart>> {
         let y_start_spatial = y_start.get_spatial_vector_cartesian();
         let y_end_spatial = y_end.get_spatial_vector_cartesian();
 
@@ -705,20 +722,20 @@ impl VolumetricDisc {
     }
 }
 
-impl Hittable for VolumetricDisc {
+impl<C: GeometryChart> Hittable<C> for VolumetricDisc {
     fn intersects(
         &self,
-        y_start: &Step,
-        y_end: &Step,
-        _geometry: &dyn Geometry,
-    ) -> Option<Intersection> {
+        y_start: &Step<C>,
+        y_end: &Step<C>,
+        _geometry: &dyn Geometry<Chart = C>,
+    ) -> Option<Intersection<CartesianChart>> {
         self.intersects_internal(&y_start.x, &y_end.x)
     }
 
     fn color_at_uv(
         &self,
-        color_computation_data: &ColorComputationData,
-        geometry: &dyn Geometry,
+        color_computation_data: &ColorComputationData<C>,
+        geometry: &dyn Geometry<Chart = C>,
     ) -> Result<Radiance, RaytracerError> {
         self.raymarch(
             geometry,
@@ -736,22 +753,20 @@ impl Hittable for VolumetricDisc {
     // wall, aborting whole pixels for values nobody consumes.
     fn energy_of_emitter(
         &self,
-        _geometry: &dyn Geometry,
-        _step: &Step,
+        _geometry: &dyn Geometry<Chart = C>,
+        _step: &Step<C>,
     ) -> Result<f64, RaytracerError> {
         Ok(1.0)
     }
 
     fn temperature_of_emitter(
         &self,
-        _point: &Point,
-        _geometry: &dyn Geometry,
+        _point: &Point<C>,
+        _geometry: &dyn Geometry<Chart = C>,
     ) -> Result<f64, RaytracerError> {
         Ok(1.0)
     }
 }
-
-impl SceneObject for VolumetricDisc {}
 
 #[cfg(test)]
 mod tests {
@@ -889,8 +904,15 @@ mod tests {
                     radiance: Radiance::TRANSPARENT,
                 };
                 for _ in 0..cells {
-                    disc.march_constant_step(&p, &geometry, &unit_frequency(), 1.0, &mut state)
-                        .unwrap();
+                    disc.march_constant_step(
+                        &p,
+                        &geometry,
+                        &unit_frequency(),
+                        1.0,
+                        &mut state,
+                        CartesianChart::Cartesian,
+                    )
+                    .unwrap();
                 }
                 let tau = disc.compute_density(&p) * disc.absorption * mask;
                 let expected_light = Vector3::new(2.0, 1.0, 0.5) * -(-tau).exp_m1();
@@ -965,10 +987,16 @@ mod tests {
 
     /// Two-point straight step slice mimicking a fired entry window: starts
     /// outside the bounding cylinder (inner hole) and crosses the gas.
-    fn straight_steps(from: Vector3<f64>, to: Vector3<f64>) -> Vec<Step> {
+    fn straight_steps(from: Vector3<f64>, to: Vector3<f64>) -> Vec<Step<CartesianChart>> {
         let mk = |v: &Vector3<f64>| Step {
             x: Point::new_cartesian(0.0, v[0], v[1], v[2]),
-            p: FourVector::new_cartesian(1.0, 1.0, 0.0, 0.0),
+            p: FourVector::new(
+                1.0,
+                1.0,
+                0.0,
+                0.0,
+                Point::new_cartesian(0.0, v[0], v[1], v[2]),
+            ),
             t: 0.0,
             step: 0,
         };
@@ -1093,11 +1121,11 @@ mod tests {
         // entry crossing (as a fired window would), later cuts fall inside
         // the gas and one straddles the outer wall.
         let xs = [0.2, 1.35, 2.1, 2.8005, 3.4, 5.0];
-        let many: Vec<Step> = xs
+        let many: Vec<Step<CartesianChart>> = xs
             .iter()
             .map(|x| Step {
                 x: Point::new_cartesian(0.0, *x, 0.0, 0.0),
-                p: FourVector::new_cartesian(1.0, 1.0, 0.0, 0.0),
+                p: FourVector::new(1.0, 1.0, 0.0, 0.0, Point::new_cartesian(0.0, *x, 0.0, 0.0)),
                 t: 0.0,
                 step: 0,
             })
@@ -1145,18 +1173,19 @@ mod tests {
         let disc = create_disc();
         let mk = |x: f64| Step {
             x: Point::new_cartesian(0.0, x, 0.5, 0.0),
-            p: FourVector::new_cartesian(1.0, 1.0, 0.0, 0.0),
+            p: FourVector::new(1.0, 1.0, 0.0, 0.0, Point::new_cartesian(0.0, x, 0.5, 0.0)),
             t: 0.0,
             step: 0,
         };
         // Chord at y = 0.5: gas episodes at |x| in ~(0.866, 2.958); the
         // window (-0.5 -> 0.5) lies wholly in the inner hole.
-        let full: Vec<Step> = [-5.0, -2.0, -0.5, 0.5, 2.0, 5.0]
+        let full: Vec<Step<CartesianChart>> = [-5.0, -2.0, -0.5, 0.5, 2.0, 5.0]
             .map(mk)
             .into_iter()
             .collect();
-        let episode1: Vec<Step> = [-5.0, -2.0, -0.5, 0.5].map(mk).into_iter().collect();
-        let episode2: Vec<Step> = [0.5, 2.0, 5.0].map(mk).into_iter().collect();
+        let episode1: Vec<Step<CartesianChart>> =
+            [-5.0, -2.0, -0.5, 0.5].map(mk).into_iter().collect();
+        let episode2: Vec<Step<CartesianChart>> = [0.5, 2.0, 5.0].map(mk).into_iter().collect();
 
         let geometry = EuclideanSpace::new();
         let a = disc
@@ -1187,19 +1216,20 @@ mod tests {
         let disc = create_disc();
         let mk = |x: f64| Step {
             x: Point::new_cartesian(0.0, x, 0.5, 0.0),
-            p: FourVector::new_cartesian(1.0, 1.0, 0.0, 0.0),
+            p: FourVector::new(1.0, 1.0, 0.0, 0.0, Point::new_cartesian(0.0, x, 0.5, 0.0)),
             t: 0.0,
             step: 0,
         };
         // Chord at y = 0.5: gas at |x| in ~(0.866, 2.958). The cut at -0.7
         // (r ~ 0.86) is the only point in the hole; the window (-0.7 -> 0.9)
         // crosses back INTO gas, so no window is fully outside.
-        let full: Vec<Step> = [-5.0, -2.0, -0.7, 0.9, 2.0, 5.0]
+        let full: Vec<Step<CartesianChart>> = [-5.0, -2.0, -0.7, 0.9, 2.0, 5.0]
             .map(mk)
             .into_iter()
             .collect();
-        let episode1: Vec<Step> = [-5.0, -2.0, -0.7].map(mk).into_iter().collect();
-        let reentry: Vec<Step> = [-0.7, 0.9, 2.0, 5.0].map(mk).into_iter().collect();
+        let episode1: Vec<Step<CartesianChart>> = [-5.0, -2.0, -0.7].map(mk).into_iter().collect();
+        let reentry: Vec<Step<CartesianChart>> =
+            [-0.7, 0.9, 2.0, 5.0].map(mk).into_iter().collect();
 
         let geometry = EuclideanSpace::new();
         let a = disc

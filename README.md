@@ -133,13 +133,9 @@ load, so nothing downstream needs to know about it. It leaves the roll about
 that axis free; set `--psi` if a particular orientation is wanted. An exactly
 antipodal pair is rejected, since it leaves the rotation axis undetermined.
 
-Two CLI flags override or complement the scene:
+A CLI flag complements the scene:
 
 - `--curved-star-membership` forces curved membership on regardless of the config.
-- `--pole-rotation-deg <deg>` rotates the spherical coordinate frame (default `0`,
-  a no-op) so the polar-axis coordinate singularity is steered off the field of
-  view. Schwarzschild-family scenes only; keep it `0` for scenes with a flat disc
-  (its plane test is not rotated).
 
 ## Scripts
 

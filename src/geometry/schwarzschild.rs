@@ -1,11 +1,11 @@
 use crate::geometry::circular_orbit::{self, OrbitKillingDecomposition};
+use crate::geometry::coordinates::spherical::SphericalChart;
 use crate::geometry::four_vector::FourVector;
 use crate::geometry::geometry::{
-    GeodesicSolver, Geometry, HasCoordinateSystem, InnerProduct, Signature, SupportQuantities,
+    GeodesicSolver, Geometry, HasChart, InnerProduct, Signature, SupportQuantities,
     TRAPPED_ORBIT_RADIUS_FACTOR,
 };
-use crate::geometry::point::CoordinateSystem::Spherical;
-use crate::geometry::point::{CoordinateSystem, Point};
+use crate::geometry::point::Point;
 use crate::geometry::tetrad::Tetrad;
 use crate::rendering::ray::Ray;
 use crate::rendering::raytracer::RaytracerError;
@@ -22,6 +22,7 @@ pub struct Schwarzschild {
 }
 
 struct SchwarzschildSolver {
+    chart: SphericalChart,
     radius: f64,
 }
 
@@ -41,13 +42,13 @@ impl OdeFunction<Const<8>> for SchwarzschildSolver {
     }
 }
 
-impl HasCoordinateSystem for SchwarzschildSolver {
-    fn coordinate_system(&self) -> CoordinateSystem {
-        CoordinateSystem::Spherical
-    }
-}
-
 impl GeodesicSolver for SchwarzschildSolver {
+    type Chart = SphericalChart;
+
+    fn chart(&self) -> Self::Chart {
+        self.chart
+    }
+
     /// Geodesic equations for Schwarzschild metric in spherical coordinates (t, r, θ, φ).
     ///
     /// The signature used is (+, -, -, -).
@@ -80,15 +81,13 @@ impl GeodesicSolver for SchwarzschildSolver {
     }
 }
 
-impl HasCoordinateSystem for Schwarzschild {
-    fn coordinate_system(&self) -> CoordinateSystem {
-        Spherical
-    }
-}
-
 impl InnerProduct for Schwarzschild {
-    fn inner_product(&self, position: &Point, v: &FourVector, w: &FourVector) -> f64 {
-        debug_assert_eq!(position.coordinate_system, Spherical);
+    fn inner_product(
+        &self,
+        position: &Point<SphericalChart>,
+        v: &FourVector<SphericalChart>,
+        w: &FourVector<SphericalChart>,
+    ) -> f64 {
         let r = position[1];
         let theta = position[2];
         let _phi = position[3];
@@ -108,13 +107,16 @@ impl Signature for Schwarzschild {
     }
 }
 
+impl HasChart for Schwarzschild {
+    type Chart = SphericalChart;
+}
+
 impl Geometry for Schwarzschild {
     /// Computes orthonormal tetrad for an observer at position.
     ///
     /// Note: The timelike basis vector e_t corresponds to a freely falling observer.
     /// See https://arxiv.org/abs/1511.06025 for details.
-    fn get_tetrad_at(&self, position: &Point) -> Tetrad {
-        assert_eq!(position.coordinate_system, Spherical);
+    fn get_tetrad_at(&self, position: &Point<SphericalChart>) -> Tetrad<Self::Chart> {
         let r = position[1];
         let theta = position[2];
         let _phi = position[3];
@@ -124,15 +126,18 @@ impl Geometry for Schwarzschild {
 
         Tetrad::new(
             *position,
-            FourVector::new_spherical(1.0 / a, -rr0.sqrt(), 0.0, 0.0),
-            FourVector::new_spherical(0.0, 0.0, 0.0, 1.0 / (r * theta.sin())), // Phi
-            FourVector::new_spherical(0.0, 0.0, 1.0 / r, 0.0),                 // Theta
-            FourVector::new_spherical(-rr0.sqrt() / a, 1.0, 0.0, 0.0),         // R
+            FourVector::new(1.0 / a, -rr0.sqrt(), 0.0, 0.0, *position),
+            FourVector::new(0.0, 0.0, 0.0, 1.0 / (r * theta.sin()), *position), // Phi
+            FourVector::new(0.0, 0.0, 1.0 / r, 0.0, *position),                 // Theta
+            FourVector::new(-rr0.sqrt() / a, 1.0, 0.0, 0.0, *position),         // R
         )
     }
 
-    fn lorentz_transformation(&self, position: &Point, velocity: &FourVector) -> Matrix4<f64> {
-        assert_eq!(position.coordinate_system, Spherical);
+    fn lorentz_transformation(
+        &self,
+        position: &Point<SphericalChart>,
+        velocity: &FourVector<SphericalChart>,
+    ) -> Matrix4<f64> {
         let mut matrix = Matrix4::zeros();
         let tetrad_t = self.get_tetrad_at(position).t;
 
@@ -178,11 +183,16 @@ impl Geometry for Schwarzschild {
         matrix
     }
 
-    fn inside_horizon(&self, position: &Point) -> bool {
+    fn inside_horizon(&self, position: &Point<SphericalChart>) -> bool {
         position[1] <= self.radius + self.horizon_epsilon
     }
 
-    fn closed_orbit(&self, position: &Point, step_index: usize, max_steps: usize) -> bool {
+    fn closed_orbit(
+        &self,
+        position: &Point<SphericalChart>,
+        step_index: usize,
+        max_steps: usize,
+    ) -> bool {
         // If the integrator has used its full step budget without the ray
         // either crossing the horizon or escaping to the celestial sphere,
         // and r is still in the strong-field region, treat it as a trapped
@@ -192,28 +202,24 @@ impl Geometry for Schwarzschild {
         step_index == max_steps - 1 && position[1] < TRAPPED_ORBIT_RADIUS_FACTOR * self.radius
     }
 
-    fn get_geodesic_solver(&self, _ray: &Ray) -> Box<dyn GeodesicSolver> {
+    fn get_geodesic_solver(
+        &self,
+        momentum: &FourVector<Self::Chart>,
+    ) -> Box<dyn GeodesicSolver<Chart = Self::Chart>> {
         Box::new(SchwarzschildSolver {
+            chart: momentum.at.chart,
             radius: self.radius,
         })
     }
 
-    fn get_radial_coordinate(&self, position: &Point) -> f64 {
-        match position.coordinate_system {
-            CoordinateSystem::Cartesian => position.get_as_spherical()[0],
-            CoordinateSystem::Spherical => position[1],
-            // BL with a=0 reduces to Schwarzschild spherical; position[1] is r in both.
-            CoordinateSystem::BoyerLindquist { a } => {
-                debug_assert_eq!(a, 0.0, "Schwarzschild only accepts BL coordinates with a=0");
-                position[1]
-            }
-        }
+    fn get_radial_coordinate(&self, position: &Point<SphericalChart>) -> f64 {
+        position[1]
     }
 
     fn get_constants_of_motion(
         &self,
-        position: &Point,
-        momentum: &FourVector,
+        position: &Point<SphericalChart>,
+        momentum: &FourVector<SphericalChart>,
     ) -> crate::geometry::geometry::ConstantsOfMotion {
         let mut constants = crate::geometry::geometry::ConstantsOfMotion::default();
 
@@ -234,32 +240,36 @@ impl Geometry for Schwarzschild {
 }
 
 impl SupportQuantities for Schwarzschild {
-    fn get_stationary_velocity_at(&self, position: &Point) -> FourVector {
+    fn get_stationary_velocity_at(
+        &self,
+        position: &Point<SphericalChart>,
+    ) -> FourVector<SphericalChart> {
         let a = 1.0 - self.radius / position[1];
-        FourVector::new_spherical(a.sqrt().recip(), 0.0, 0.0, 0.0)
+        FourVector::new(a.sqrt().recip(), 0.0, 0.0, 0.0, *position)
     }
 
     // This is based on assume stable circular orbits in the equatorial plane.
-    fn get_zamo_velocity_at(&self, position: &Point) -> FourVector {
+    fn get_zamo_velocity_at(&self, position: &Point<SphericalChart>) -> FourVector<SphericalChart> {
         // No frame dragging: the ZAMO is the static observer.
         self.get_stationary_velocity_at(position)
     }
 
     fn get_circular_orbit_velocity_at(
         &self,
-        position: &Point,
-    ) -> Result<FourVector, RaytracerError> {
+        position: &Point<SphericalChart>,
+    ) -> Result<FourVector<SphericalChart>, RaytracerError> {
         let c = self.circular_orbit_killing_coefficients(position)?;
-        Ok(FourVector::new_spherical(c.u_t, 0.0, 0.0, c.u_phi))
+        let axial = self.axial_killing_vector(position);
+        Ok(FourVector::new(c.u_t, 0.0, 0.0, 0.0, *position) + c.u_phi * axial)
     }
 
-    fn axial_killing_vector(&self, _position: &Point) -> FourVector {
-        FourVector::new_spherical(0.0, 0.0, 0.0, 1.0)
+    fn axial_killing_vector(&self, position: &Point<SphericalChart>) -> FourVector<SphericalChart> {
+        SphericalChart::physical_axial_vector(position)
     }
 
     fn circular_orbit_killing_coefficients(
         &self,
-        position: &Point,
+        position: &Point<SphericalChart>,
     ) -> Result<OrbitKillingDecomposition, RaytracerError> {
         circular_orbit::killing_coefficients(self.radius, 0.0, self.get_radial_coordinate(position))
     }
@@ -281,6 +291,7 @@ impl SupportQuantities for Schwarzschild {
 
 #[cfg(test)]
 mod test_schwarzschild {
+    use crate::geometry::coordinates::spherical::SphericalChart;
     use crate::geometry::four_vector::FourVector;
     use crate::geometry::point::Point;
     use crate::geometry::schwarzschild::Schwarzschild;
@@ -290,8 +301,8 @@ mod test_schwarzschild {
     use nalgebra::{Const, OVector, Vector2};
 
     pub fn get_angular_momentum_from_phi(
-        position: &Point,
-        momentum: &FourVector,
+        position: &Point<SphericalChart>,
+        momentum: &FourVector<SphericalChart>,
         _geometry: &Schwarzschild,
     ) -> f64 {
         let r = position[1];
@@ -300,8 +311,8 @@ mod test_schwarzschild {
     }
 
     pub fn get_energy_from_r(
-        position: &Point,
-        momentum: &FourVector,
+        position: &Point<SphericalChart>,
+        momentum: &FourVector<SphericalChart>,
         geometry: &Schwarzschild,
     ) -> f64 {
         let l = get_angular_momentum_from_phi(position, momentum, geometry);
@@ -314,8 +325,8 @@ mod test_schwarzschild {
     }
 
     pub fn get_energy_from_t(
-        position: &Point,
-        momentum: &FourVector,
+        position: &Point<SphericalChart>,
+        momentum: &FourVector<SphericalChart>,
         geometry: &Schwarzschild,
     ) -> f64 {
         let r = position[1];
@@ -380,6 +391,7 @@ mod test_schwarzschild {
 
 #[cfg(test)]
 mod tests {
+    use crate::geometry::coordinates::spherical::SphericalChart;
     use crate::geometry::four_vector::FourVector;
     use crate::geometry::geometry::{Geometry, InnerProduct};
     use crate::geometry::point::Point;
@@ -450,7 +462,7 @@ mod tests {
 
         let geometry = Schwarzschild::new(radius, SCHWARZSCHILD_RADIUS_EPSILON);
 
-        let velocity = FourVector::new_spherical(1.0 / a, -(radius / r).sqrt(), 0.0, 0.0); // we have a freely falling observer here.
+        let velocity = FourVector::new(1.0 / a, -(radius / r).sqrt(), 0.0, 0.0, position); // we have a freely falling observer here.
 
         let original_tetrad = geometry.get_tetrad_at(&position);
         let tetrad = crate::rendering::camera::lorentz_transform_tetrad(
@@ -464,11 +476,7 @@ mod tests {
         let s = geometry.inner_product(&position, &k, &k);
         assert_abs_diff_eq!(s, 0.0, epsilon = 1e-10);
 
-        assert_abs_diff_eq!(
-            tetrad.t.get_as_vector(),
-            velocity.get_as_vector(),
-            epsilon = 1e-6
-        );
+        assert_abs_diff_eq!(tetrad.t.vector, velocity.vector, epsilon = 1e-6);
 
         assert_abs_diff_eq!(geometry.inner_product(&position, &tetrad.t, &tetrad.x), 0.0);
         assert_abs_diff_eq!(geometry.inner_product(&position, &tetrad.t, &tetrad.y), 0.0);
@@ -491,7 +499,7 @@ mod tests {
         let geometry = Schwarzschild::new(radius, 1e-4);
         let r = position[1];
         let a = 1.0 - radius / r;
-        let velocity = FourVector::new_spherical(1.0 / a, -(radius / r).sqrt(), 0.0, 0.0); // we have a freely falling observer here.
+        let velocity = FourVector::new(1.0 / a, -(radius / r).sqrt(), 0.0, 0.0, position); // we have a freely falling observer here.
         let camera = Camera::new(
             position,
             velocity,
@@ -515,7 +523,7 @@ mod tests {
         let geometry = Schwarzschild::new(radius, 1e-4);
         let r = position[1];
         let a = 1.0 - radius / r;
-        let velocity = FourVector::new_spherical(1.0 / a, -(radius / r).sqrt(), 0.0, 0.0); // we have a freely falling observer here.
+        let velocity = FourVector::new(1.0 / a, -(radius / r).sqrt(), 0.0, 0.0, position); // we have a freely falling observer here.
         let camera = Camera::new(
             position,
             velocity,
@@ -537,10 +545,16 @@ mod tests {
         );
     }
 
-    fn create_camera(position: Point, radius: f64, phi: f64, theta: f64, psi: f64) -> Camera {
+    fn create_camera(
+        position: Point<SphericalChart>,
+        radius: f64,
+        phi: f64,
+        theta: f64,
+        psi: f64,
+    ) -> Camera<SphericalChart> {
         let r = position[1];
         let a = 1.0 - radius / r;
-        let velocity = FourVector::new_spherical(1.0 / a, -(radius / r).sqrt(), 0.0, 0.0); // we have a freely falling observer here.
+        let velocity = FourVector::new(1.0 / a, -(radius / r).sqrt(), 0.0, 0.0, position); // we have a freely falling observer here.
         let camera = Camera::new(
             position,
             velocity,
@@ -732,7 +746,7 @@ mod tests {
 
     struct ComputeComparedTrajectoriesResult {
         pub matching: Vec<MatchedPoint>,
-        pub result_geodesic_equation: IntegratedRay,
+        pub result_geodesic_equation: IntegratedRay<SphericalChart>,
         pub result_r_phi_equation: Vec<test_schwarzschild::Step>,
         pub stop_reason: Option<StopReason>,
     }
@@ -748,18 +762,19 @@ mod tests {
         let r = position[1];
         let a = 1.0 - radius / r;
 
-        let velocity = FourVector::new_spherical(a.sqrt().recip(), 0.0, 0.0, 0.0);
+        let velocity = FourVector::new(a.sqrt().recip(), 0.0, 0.0, 0.0, position);
         let geometry = Schwarzschild::new(radius, 1e-4);
 
         let scene: Box<Scene<Schwarzschild>> = Box::new(
             scene::test_scene::create_scene(1.0, 2.0, 7.0, &geometry, position, velocity).unwrap(),
         );
 
-        let momentum = FourVector::new_spherical(
+        let momentum = FourVector::new(
             e / a,
             -(e * e - a * (l * l / (r * r))).sqrt(),
             0.0,
             l / (r * r),
+            position,
         );
 
         let ray = Ray::new(0, 0, position, momentum);
@@ -802,7 +817,7 @@ mod tests {
         info!("Finished writing trajectory to {}.", filename);
     }
 
-    fn collect_points_step(steps: &IntegratedRay) -> Vec<MatchedPoint> {
+    fn collect_points_step(steps: &IntegratedRay<SphericalChart>) -> Vec<MatchedPoint> {
         steps
             .iter()
             .map(|step| MatchedPoint {
@@ -891,7 +906,7 @@ mod tests {
         let a = 1.0 - radius / r0;
         let position = Point::new_spherical(0.0, r0, std::f64::consts::FRAC_PI_2, 0.0);
         // Outward radial null photon: p_t = 1, p_r = a (from -a*p_t^2 + p_r^2/a = 0).
-        let momentum = FourVector::new_spherical(1.0, a, 0.0, 0.0);
+        let momentum = FourVector::new(1.0, a, 0.0, 0.0, position);
         let ray = Ray::new(0, 0, position, momentum);
 
         let (_, stop_reason) = integrator.integrate(&ray).unwrap();
@@ -931,7 +946,7 @@ mod tests {
         let p_t = e / a0;
         let p_r_sq = e * e - a0 * (l * l) / (r0 * r0);
         let p_r = -p_r_sq.max(0.0).sqrt(); // ingoing initially
-        let momentum = FourVector::new_spherical(p_t, p_r, 0.0, l / (r0 * r0));
+        let momentum = FourVector::new(p_t, p_r, 0.0, l / (r0 * r0), position);
         let ray = Ray::new(0, 0, position, momentum);
 
         let (_, stop_reason) = integrator.integrate(&ray).unwrap();

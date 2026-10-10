@@ -9,9 +9,9 @@ use std::io::Write;
 pub fn save_rays_to_file<G: Geometry>(
     rows: i64,
     cols: i64,
-    position: &Point,
+    position: &Point<G::Chart>,
     geometry: G,
-    camera: Camera,
+    camera: Camera<G::Chart>,
 ) {
     let mut file = File::create("rays.csv").expect("Unable to create file");
     file.write_all(b"row,col,m_x0,m_x1,m_x2,m_x3,m_sc\n")
@@ -20,7 +20,7 @@ pub fn save_rays_to_file<G: Geometry>(
     for i in 1..rows {
         for j in 1..cols {
             let ray = camera.get_ray_for(i, j);
-            let momentum = ray.momentum.get_as_vector();
+            let momentum = ray.momentum.vector;
             file.write_all(
                 format!(
                     "{},{},{},{},{},{},{}\n",

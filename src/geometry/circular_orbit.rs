@@ -147,11 +147,12 @@ pub fn r_isco(r_s: f64, a: f64) -> f64 {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::geometry::coordinates::boyer_lindquist::KerrChart;
     use crate::geometry::four_vector::FourVector;
     use crate::geometry::geometry::{Geometry, SupportQuantities};
     use crate::geometry::kerr::Kerr;
     use crate::geometry::kerr_bl::KerrBL;
-    use crate::geometry::point::{CoordinateSystem, Point};
+    use crate::geometry::point::Point;
     use crate::geometry::schwarzschild::Schwarzschild;
     use approx::assert_abs_diff_eq;
     use std::f64::consts::PI;
@@ -216,27 +217,21 @@ mod tests {
 
         // Same physical point: equatorial, BL r = 5, phi = 0
         // (x = st(r cp - a sp) etc. with theta = pi/2).
-        let pos_bl = Point::new(
-            0.0,
-            5.0,
-            PI / 2.0,
-            0.0,
-            CoordinateSystem::BoyerLindquist { a },
-        );
-        let pos_ks = Point::new_cartesian(0.0, 5.0, a, 0.0);
+        let pos_bl = Point::new_boyer_lindquist(a, r_s, 0.0, 5.0, PI / 2.0, 0.0);
+        let pos_ks = Point::new(0.0, 5.0, a, 0.0, kerr.kerr_schild_chart());
 
         for (zamo, axial, pos, geom_ip) in [
             (
                 kerr.get_zamo_velocity_at(&pos_ks),
                 kerr.axial_killing_vector(&pos_ks),
                 &pos_ks,
-                &kerr as &dyn Geometry,
+                &kerr as &dyn Geometry<Chart = KerrChart>,
             ),
             (
                 kerr_bl.get_zamo_velocity_at(&pos_bl),
                 kerr_bl.axial_killing_vector(&pos_bl),
                 &pos_bl,
-                &kerr_bl as &dyn Geometry,
+                &kerr_bl as &dyn Geometry<Chart = KerrChart>,
             ),
         ] {
             assert_abs_diff_eq!(
@@ -278,16 +273,15 @@ mod tests {
     fn test_killing_decomposition_identities_across_geometries() {
         fn check<G: Geometry>(
             geometry: &G,
-            position: &Point,
-            probe_momenta: &[FourVector],
+            position: &Point<G::Chart>,
+            probe_momenta: &[FourVector<G::Chart>],
             time_sign: f64, // signature()[0]: u.u == time_sign
         ) {
             let u_vec = geometry.get_circular_orbit_velocity_at(position).unwrap();
             let c = geometry
                 .circular_orbit_killing_coefficients(position)
                 .unwrap();
-            let cs = u_vec.coordinate_system;
-            let e_t = FourVector::new(1.0, 0.0, 0.0, 0.0, cs);
+            let e_t = FourVector::new(1.0, 0.0, 0.0, 0.0, u_vec.at);
             let axial = geometry.axial_killing_vector(position);
 
             // Assembly identity.
@@ -316,33 +310,27 @@ mod tests {
         let schwarzschild = Schwarzschild::new(1.0, 1e-4);
         let pos_s = Point::new_spherical(0.0, 6.0, PI / 2.0, 1.1);
         let probes_s = [
-            FourVector::new_spherical(1.0, -0.4, 0.02, 0.05),
-            FourVector::new_spherical(-1.3, 0.2, 0.0, -0.08),
+            FourVector::new(1.0, -0.4, 0.02, 0.05, pos_s),
+            FourVector::new(-1.3, 0.2, 0.0, -0.08, pos_s),
         ];
         check(&schwarzschild, &pos_s, &probes_s, 1.0);
 
         // Kerr (Kerr-Schild Cartesian chart, -+++ signature).
         let kerr = Kerr::new(1.0, 0.499, 1e-4);
-        let pos_k = Point::new_cartesian(0.0, 3.0, -4.0, 0.0);
+        let pos_k = Point::new(0.0, 3.0, -4.0, 0.0, kerr.kerr_schild_chart());
         let probes_k = [
-            FourVector::new_cartesian(1.0, 0.3, -0.2, 0.1),
-            FourVector::new_cartesian(-0.8, -0.5, 0.4, 0.0),
+            FourVector::new(1.0, 0.3, -0.2, 0.1, pos_k),
+            FourVector::new(-0.8, -0.5, 0.4, 0.0, pos_k),
         ];
         check(&kerr, &pos_k, &probes_k, -1.0);
 
         // KerrBL (Boyer-Lindquist chart, -+++ signature).
         let a = 0.3;
         let kerr_bl = KerrBL::new(1.0, a, 1e-4);
-        let pos_bl = Point::new(
-            0.0,
-            5.0,
-            PI / 2.0,
-            0.7,
-            CoordinateSystem::BoyerLindquist { a },
-        );
+        let pos_bl = Point::new_boyer_lindquist(a, 1.0, 0.0, 5.0, PI / 2.0, 0.7);
         let probes_bl = [
-            FourVector::new_boyer_lindquist(a, 1.0, -0.4, 0.02, 0.05),
-            FourVector::new_boyer_lindquist(a, -1.2, 0.1, -0.03, 0.09),
+            FourVector::new(1.0, -0.4, 0.02, 0.05, pos_bl),
+            FourVector::new(-1.2, 0.1, -0.03, 0.09, pos_bl),
         ];
         check(&kerr_bl, &pos_bl, &probes_bl, -1.0);
     }

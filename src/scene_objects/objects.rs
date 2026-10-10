@@ -1,3 +1,4 @@
+use crate::geometry::coordinates::atlas::CartesianConvertible;
 use crate::geometry::four_vector::FourVector;
 use crate::geometry::geometry::Geometry;
 use crate::geometry::point::Point;
@@ -24,30 +25,34 @@ use crate::scene_objects::hittable::{ColorComputationData, Hittable};
 /// `energy_of_emitter`'s inner products and velocity fields assume. Convert
 /// the intersection point into `y_start`/`y_end`'s coordinate system (the
 /// geometry's native one) before using it as the step's position.
-fn step_at_intersection(y_start: &Step, y_end: &Step, intersection_point: Point, t: f64) -> Step {
-    debug_assert_eq!(y_start.x.coordinate_system, y_end.x.coordinate_system);
-    debug_assert_eq!(y_start.p.coordinate_system, y_end.p.coordinate_system);
-    let cs = y_start.p.coordinate_system;
+fn step_at_intersection<C: CartesianConvertible>(
+    y_start: &Step<C>,
+    y_end: &Step<C>,
+    intersection_point: Point<C>,
+    t: f64,
+) -> Step<C> {
+    // Ensure all the chart enums align.
+    debug_assert_eq!(y_start.x.chart, y_end.x.chart);
+    debug_assert_eq!(y_start.p.at.chart, y_end.p.at.chart);
+    debug_assert_eq!(y_start.x.chart, intersection_point.chart);
     let s = 1.0 - t;
     Step {
         t: s * y_start.t + t * y_end.t,
         step: y_start.step,
-        x: intersection_point.to_coordinate_system(y_start.x.coordinate_system),
+        x: intersection_point,
         p: FourVector::new(
             s * y_start.p[0] + t * y_end.p[0],
             s * y_start.p[1] + t * y_end.p[1],
             s * y_start.p[2] + t * y_end.p[2],
             s * y_start.p[3] + t * y_end.p[3],
-            cs,
+            intersection_point,
         ),
     }
 }
 
-pub trait SceneObject: Hittable {}
-
 pub struct Objects<'a, G: Geometry> {
     geometry: &'a G,
-    objects: Vec<Box<dyn SceneObject>>,
+    objects: Vec<Box<dyn Hittable<G::Chart>>>,
 }
 
 impl<'a, G: Geometry> Objects<'a, G> {
@@ -58,17 +63,27 @@ impl<'a, G: Geometry> Objects<'a, G> {
         }
     }
 
-    pub fn add_object(&mut self, hittable: Box<dyn SceneObject>) {
+    pub fn add_object(&mut self, hittable: Box<dyn Hittable<G::Chart>>) {
         self.objects.push(hittable);
     }
 
     pub fn intersects(
         &self,
-        y_start: &Step,
-        y_end: &Step,
+        y_start: &Step<G::Chart>,
+        y_end: &Step<G::Chart>,
         frequency: &RayFrequencyData,
-        remaining_steps: &[Step],
+        remaining_steps: &[Step<G::Chart>],
     ) -> Result<Option<Radiance>, RaytracerError> {
+        // Right after a chart switch the two ends of a segment are in different charts. Express
+        // the start in the end's chart, so that objects interpolate within one chart.
+        let aligned_start;
+        let y_start = if y_start.x.chart != y_end.x.chart {
+            aligned_start = y_start.in_chart(y_end.x.chart);
+            &aligned_start
+        } else {
+            y_start
+        };
+
         let redshift_computer = RedshiftComputer::new(self.geometry);
         let mut resulting_color = None;
         let mut shortest_distance = f64::MAX;
@@ -85,20 +100,22 @@ impl<'a, G: Geometry> Objects<'a, G> {
                 let distance = (intersection_point - y_start_cartesian).norm();
                 if distance < shortest_distance {
                     shortest_distance = distance;
+                    let intersection_point = G::Chart::point_from_cartesian(
+                        y_start.x.chart,
+                        &intersection_data.intersection_point,
+                    );
                     let intersection_step = step_at_intersection(
                         y_start,
                         y_end,
-                        intersection_data.intersection_point,
+                        intersection_point,
                         intersection_data.t,
                     );
                     let emitter_energy =
                         hittable.energy_of_emitter(self.geometry, &intersection_step)?;
                     let redshift = redshift_computer
                         .compute_redshift_from_energies(emitter_energy, frequency.observer_energy);
-                    let temperature = hittable.temperature_of_emitter(
-                        &intersection_data.intersection_point,
-                        self.geometry,
-                    )?;
+                    let temperature =
+                        hittable.temperature_of_emitter(&intersection_point, self.geometry)?;
 
                     let color_computation_data = ColorComputationData {
                         uv: intersection_data.uv,
@@ -121,6 +138,7 @@ impl<'a, G: Geometry> Objects<'a, G> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::geometry::coordinates::euclidean::CartesianChart;
     use crate::geometry::euclidean::EuclideanSpace;
     use crate::geometry::four_vector::FourVector;
     use crate::geometry::point::Point;
@@ -140,7 +158,13 @@ mod tests {
         }
     }
 
-    fn create_sphere_at(x: f64, y: f64, z: f64, radius: f64, color: u8) -> Box<dyn SceneObject> {
+    fn create_sphere_at(
+        x: f64,
+        y: f64,
+        z: f64,
+        radius: f64,
+        color: u8,
+    ) -> Box<dyn Hittable<CartesianChart>> {
         Box::new(Sphere::new(
             radius,
             Arc::new(CheckerMapper::new(
@@ -168,13 +192,19 @@ mod tests {
             t: 0.0,
             step: 0,
             x: Point::new_cartesian(0.0, 0.0, 0.0, -3.0),
-            p: FourVector::new_cartesian(1.0, 0.0, 0.0, 0.0),
+            p: FourVector::new(
+                1.0,
+                0.0,
+                0.0,
+                0.0,
+                Point::new_cartesian(0.0, 0.0, 0.0, -3.0),
+            ),
         };
         let step_end = Step {
             t: 100.0,
             step: 1000,
             x: Point::new_cartesian(0.0, 0.0, 0.0, 3.0),
-            p: FourVector::new_cartesian(1.0, 0.0, 0.0, 0.0),
+            p: FourVector::new(1.0, 0.0, 0.0, 0.0, Point::new_cartesian(0.0, 0.0, 0.0, 3.0)),
         };
 
         let result = objects
@@ -189,13 +219,19 @@ mod tests {
             t: 0.0,
             step: 0,
             x: Point::new_cartesian(0.0, 0.0, 0.0, -3.0),
-            p: FourVector::new_cartesian(1.0, 0.0, 0.0, 0.0),
+            p: FourVector::new(
+                1.0,
+                0.0,
+                0.0,
+                0.0,
+                Point::new_cartesian(0.0, 0.0, 0.0, -3.0),
+            ),
         };
         let step_end = Step {
             t: 100.0,
             step: 1000,
             x: Point::new_cartesian(0.0, 0.0, 0.0, 0.0),
-            p: FourVector::new_cartesian(1.0, 0.0, 0.0, 0.0),
+            p: FourVector::new(1.0, 0.0, 0.0, 0.0, Point::new_cartesian(0.0, 0.0, 0.0, 0.0)),
         };
 
         let geometry = EuclideanSpace::new();
@@ -258,18 +294,43 @@ mod tests {
             t: 0.0,
             step: 0,
             x: Point::new_spherical(0.0, 6.0, std::f64::consts::FRAC_PI_2 - 0.3, 0.0),
-            p: FourVector::new_spherical(1.0, 0.0, 0.1, 0.0),
+            p: FourVector::new(
+                1.0,
+                0.0,
+                0.1,
+                0.0,
+                Point::new_spherical(0.0, 6.0, std::f64::consts::FRAC_PI_2 - 0.3, 0.0),
+            ),
         };
         let step_end = Step {
             t: 1.0,
             step: 1,
             x: Point::new_spherical(0.0, 6.0, std::f64::consts::FRAC_PI_2 + 0.3, 0.0),
-            p: FourVector::new_spherical(1.0, 0.0, 0.1, 0.0),
+            p: FourVector::new(
+                1.0,
+                0.0,
+                0.1,
+                0.0,
+                Point::new_spherical(0.0, 6.0, std::f64::consts::FRAC_PI_2 + 0.3, 0.0),
+            ),
         };
 
         let result = objects
             .intersects(&step_start, &step_end, &unit_frequency(), &[])
             .unwrap();
         assert!(result.is_some());
+
+        // The same segment right after a chart switch: the end in the rotated chart.
+        use crate::geometry::coordinates::spherical::{RotatedSpherical, SphericalChart};
+        let rotated = SphericalChart::Rotated(RotatedSpherical { rotation: 90.0 });
+        let step_end_rotated = step_end.in_chart(rotated);
+        assert_ne!(step_start.x.chart, step_end_rotated.x.chart);
+        let switched = objects
+            .intersects(&step_start, &step_end_rotated, &unit_frequency(), &[])
+            .unwrap();
+        let (expected, switched) = (result.unwrap(), switched.unwrap());
+        assert_abs_diff_eq!(switched.x, expected.x, epsilon = 1e-9);
+        assert_abs_diff_eq!(switched.y, expected.y, epsilon = 1e-9);
+        assert_abs_diff_eq!(switched.z, expected.z, epsilon = 1e-9);
     }
 }

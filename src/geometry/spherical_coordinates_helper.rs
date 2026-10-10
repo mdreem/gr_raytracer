@@ -1,24 +1,6 @@
-use crate::geometry::point::{CoordinateSystem, Point};
+use crate::geometry::coordinates;
+use crate::geometry::point::Point;
 use log::trace;
-use std::sync::OnceLock;
-
-static FRAME_ROTATION_DEG: OnceLock<f64> = OnceLock::new();
-
-/// Set the coordinate-frame rotation (degrees, about the x-axis) once, before
-/// rendering, from the `--pole-rotation-deg` CLI flag. A later call is ignored.
-pub fn set_frame_rotation_deg(deg: f64) {
-    let _ = FRAME_ROTATION_DEG.set(deg);
-}
-
-/// Fixed rotation (degrees, about the x-axis) inserted between physical
-/// Cartesian space and the integration's spherical frame, so the coordinate
-/// pole (theta = 0/pi, where 1/sin(theta) blows up) can be steered off the
-/// field of view. 0 (the default) is the identity and leaves every render
-/// byte-identical. Schwarzschild is spherically symmetric, so this cannot
-/// change the physics, only where the coordinate singularity sits.
-pub fn frame_rotation_deg() -> f64 {
-    *FRAME_ROTATION_DEG.get_or_init(|| 0.0)
-}
 
 /// Rotate the spatial vector `(x, y, z)` about the x-axis by `deg` degrees.
 pub fn rotate_about_x(x: f64, y: f64, z: f64, deg: f64) -> (f64, f64, f64) {
@@ -30,19 +12,15 @@ pub fn rotate_about_x(x: f64, y: f64, z: f64, deg: f64) -> (f64, f64, f64) {
 }
 
 // The order of the components is: (r, theta, phi)
-pub fn cartesian_to_spherical(cartesian: &Point) -> Point {
+pub fn cartesian_to_spherical(
+    cartesian: &Point<coordinates::euclidean::CartesianChart>,
+) -> Point<coordinates::spherical::SphericalChart> {
     let t = cartesian[0];
-    // Physical -> coordinate frame: rotate so the pole moves off the field.
-    let (x, y, z) = rotate_about_x(
-        cartesian[1],
-        cartesian[2],
-        cartesian[3],
-        frame_rotation_deg(),
-    );
+    let (x, y, z) = (cartesian[1], cartesian[2], cartesian[3]);
 
     let r = (x * x + y * y + z * z).sqrt();
     if r == 0.0 {
-        return Point::new(t, 0.0, 0.0, 0.0, CoordinateSystem::Spherical);
+        return Point::new_spherical(t, 0.0, 0.0, 0.0);
     }
 
     let theta = (z / r).acos();
@@ -54,10 +32,13 @@ pub fn cartesian_to_spherical(cartesian: &Point) -> Point {
         "  Spherical: t={}, r={}, theta={}, phi={}",
         t, r, theta, phi
     );
-    Point::new(t, r, theta, phi, CoordinateSystem::Spherical)
+    Point::new_spherical(t, r, theta, phi)
 }
 
-pub fn spherical_to_cartesian(spherical: &Point) -> Point {
+/// Physical Cartesian position of a point given in a (possibly rotated) spherical chart.
+pub fn spherical_to_cartesian(
+    spherical: &Point<coordinates::spherical::SphericalChart>,
+) -> Point<coordinates::euclidean::CartesianChart> {
     let t = spherical[0];
     let r = spherical[1];
     let theta = spherical[2];
@@ -67,36 +48,14 @@ pub fn spherical_to_cartesian(spherical: &Point) -> Point {
     let y = r * theta.sin() * phi.sin();
     let z = r * theta.cos();
 
-    // Coordinate -> physical frame: undo the pole rotation.
-    let (x, y, z) = rotate_about_x(x, y, z, -frame_rotation_deg());
-    Point::new(t, x, y, z, CoordinateSystem::Cartesian)
-}
-
-/// Convert a Cartesian point to Boyer-Lindquist (t, r, θ, φ) coordinates for
-/// spin parameter `a`, using the Kerr-Schild embedding documented on
-/// `CoordinateSystem::BoyerLindquist`.
-pub fn cartesian_to_boyer_lindquist(a: f64, cartesian: &Point) -> Point {
-    let t = cartesian[0];
-    let x = cartesian[1];
-    let y = cartesian[2];
-    let z = cartesian[3];
-
-    let rho_sqr = x * x + y * y + z * z;
-    let r_sqr = 0.5 * (rho_sqr - a * a + ((rho_sqr - a * a).powi(2) + 4.0 * a * a * z * z).sqrt());
-    let r = r_sqr.sqrt();
-    let theta = if r == 0.0 {
-        0.0
-    } else {
-        (z / r).clamp(-1.0, 1.0).acos()
-    };
-    let phi = (r * y - a * x).atan2(r * x + a * y);
-
-    Point::new(t, r, theta, phi, CoordinateSystem::BoyerLindquist { a })
+    // Coordinate -> physical frame: undo the chart's rotation.
+    let (x, y, z) = rotate_about_x(x, y, z, -spherical.chart.rotation());
+    Point::new_cartesian(t, x, y, z)
 }
 
 #[cfg(test)]
 mod tests {
-    use crate::geometry::point::{CoordinateSystem, Point};
+    use crate::geometry::point::Point;
     use crate::geometry::spherical_coordinates_helper::{
         cartesian_to_spherical, spherical_to_cartesian,
     };
@@ -104,7 +63,7 @@ mod tests {
 
     #[test]
     fn test_cartesian_to_spherical() {
-        let cartesian = Point::new(0.0, 1.0, 2.0, 3.0, CoordinateSystem::Cartesian);
+        let cartesian = Point::new_cartesian(0.0, 1.0, 2.0, 3.0);
         let spherical = cartesian_to_spherical(&cartesian);
         let back_to_cartesian = spherical_to_cartesian(&spherical);
 

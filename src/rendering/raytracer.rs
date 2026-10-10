@@ -1,7 +1,7 @@
 use crate::configuration::AdaptiveSamplingConfig;
+use crate::geometry::coordinates::atlas::Chart;
 use crate::geometry::four_vector::FourVector;
 use crate::geometry::geometry::Geometry;
-use crate::geometry::point::Point;
 use crate::rendering::camera::CameraError;
 use crate::rendering::color::{
     CIETristimulus, ToneMappingMethod, linear_srgb_to_srgb_buffer, xyz_to_linear_srgb,
@@ -16,16 +16,16 @@ use crate::rendering::texture::TextureError;
 use crate::rendering::tubetracer::SampleTube;
 use image::{ImageBuffer, ImageError, ImageFormat, Rgb};
 use indicatif::style::TemplateError;
+use indicatif::{ProgressBar, ProgressDrawTarget, ProgressStyle};
 use log::{debug, error, info, warn};
 use nalgebra::Vector3;
 use rayon::iter::IndexedParallelIterator;
 use rayon::iter::IntoParallelRefMutIterator;
 use rayon::iter::ParallelIterator;
 use std::io;
-use std::ops::{Add, Mul};
 use std::io::IsTerminal;
+use std::ops::{Add, Mul};
 use std::sync::atomic::{AtomicU64, AtomicUsize, Ordering};
-use indicatif::{ProgressBar, ProgressDrawTarget, ProgressStyle};
 
 #[derive(Debug, thiserror::Error)]
 pub enum RaytracerError {
@@ -133,7 +133,10 @@ impl Progress {
                 .compare_exchange(prev, percent, Ordering::SeqCst, Ordering::Relaxed)
                 .is_ok()
         {
-            eprintln!("progress: {} {}% ({}/{})", self.label, percent, done, self.total);
+            eprintln!(
+                "progress: {} {}% ({}/{})",
+                self.label, percent, done, self.total
+            );
         }
     }
 
@@ -141,7 +144,10 @@ impl Progress {
         if self.is_tty {
             self.bar.finish();
         } else {
-            eprintln!("progress: {} 100% ({}/{})", self.label, self.total, self.total);
+            eprintln!(
+                "progress: {} 100% ({}/{})",
+                self.label, self.total, self.total
+            );
         }
     }
 }
@@ -193,9 +199,9 @@ fn visible(p: &Radiance, q: &Radiance, minimum_luminance: f64) -> bool {
     p.y.max(q.y) > minimum_luminance
 }
 
-fn should_supersample_pair(
-    pixel: &RaySample,
-    neighbor: &RaySample,
+fn should_supersample_pair<C: Chart>(
+    pixel: &RaySample<C>,
+    neighbor: &RaySample<C>,
     config: &AdaptiveSamplingConfig,
     minimum_luminance: f64,
 ) -> bool {
@@ -220,7 +226,10 @@ const RELATIVE_MINIMUM_LUMINANCE_FRACTION: f64 = 1e-3;
 /// scene-relative one. The relative floor is a small fraction of the
 /// 99th-percentile luminance, which tracks the disc brightness while ignoring
 /// firefly outliers (using `max` would be dominated by them).
-fn resolve_minimum_luminance(config: &AdaptiveSamplingConfig, buffer: &[RaySample]) -> f64 {
+fn resolve_minimum_luminance<C: Chart>(
+    config: &AdaptiveSamplingConfig,
+    buffer: &[RaySample<C>],
+) -> f64 {
     if let Some(value) = config.minimum_luminance {
         return value;
     }
@@ -387,7 +396,7 @@ impl<'a, G: Geometry> Raytracer<'a, G> {
     /// configured maximum of one permits exactly one split.
     fn subdivide(
         &self,
-        sample_tube: &SampleTube,
+        sample_tube: &SampleTube<G::Chart>,
         depth: usize,
     ) -> Result<Option<Vector3<f64>>, RaytracerError> {
         if depth >= self.scene.max_subdivision_depth {
@@ -405,8 +414,8 @@ impl<'a, G: Geometry> Raytracer<'a, G> {
 
     fn trace_subdivision(
         &self,
-        sample_tube: &SampleTube,
-    ) -> Result<[RaySample; 5], RaytracerError> {
+        sample_tube: &SampleTube<G::Chart>,
+    ) -> Result<[RaySample<G::Chart>; 5], RaytracerError> {
         let points = sample_tube
             .subdivision_points()
             .ok_or(RaytracerError::InvalidStarTube(
@@ -437,7 +446,7 @@ impl<'a, G: Geometry> Raytracer<'a, G> {
 
     fn compute_color(
         &self,
-        sample_tube: &SampleTube,
+        sample_tube: &SampleTube<G::Chart>,
         depth: usize,
     ) -> Result<Vector3<f64>, RaytracerError> {
         let color = match (
@@ -473,30 +482,43 @@ impl<'a, G: Geometry> Raytracer<'a, G> {
                     .a
                     .ray
                     .momentum
-                    .get_cartesian_vector(&sample_tube.a.ray.position)
+                    .to_cartesian()
+                    .get_spatial_vector()
                     .normalize();
                 let o_b = sample_tube
                     .b
                     .ray
                     .momentum
-                    .get_cartesian_vector(&sample_tube.b.ray.position)
+                    .to_cartesian()
+                    .get_spatial_vector()
                     .normalize();
                 let o_c = sample_tube
                     .c
                     .ray
                     .momentum
-                    .get_cartesian_vector(&sample_tube.c.ray.position)
+                    .to_cartesian()
+                    .get_spatial_vector()
                     .normalize();
                 let o_d = sample_tube
                     .d
                     .ray
                     .momentum
-                    .get_cartesian_vector(&sample_tube.d.ray.position)
+                    .to_cartesian()
+                    .get_spatial_vector()
                     .normalize();
 
                 if self.scene.curved_star_membership {
                     return finite_tube_flux(self.gather_curved(
-                        sample_tube, &a, &b, &c, &d, &o_a, &o_b, &o_c, &o_d, depth,
+                        sample_tube,
+                        &a,
+                        &b,
+                        &c,
+                        &d,
+                        &o_a,
+                        &o_b,
+                        &o_c,
+                        &o_d,
+                        depth,
                     )?);
                 }
 
@@ -527,7 +549,8 @@ impl<'a, G: Geometry> Raytracer<'a, G> {
                     || matches!(sample_tube.c.ray_class, RayClass::Escaped(_))
                     || matches!(sample_tube.d.ray_class, RayClass::Escaped(_));
                 if any_escaped {
-                    self.subdivide(sample_tube, depth)?.unwrap_or(Vector3::zeros())
+                    self.subdivide(sample_tube, depth)?
+                        .unwrap_or(Vector3::zeros())
                 } else {
                     Vector3::zeros()
                 }
@@ -596,7 +619,7 @@ impl<'a, G: Geometry> Raytracer<'a, G> {
     #[allow(clippy::too_many_arguments)]
     fn gather_curved(
         &self,
-        tube: &SampleTube,
+        tube: &SampleTube<G::Chart>,
         a: &EscapeInfo,
         b: &EscapeInfo,
         c: &EscapeInfo,
@@ -622,7 +645,11 @@ impl<'a, G: Geometry> Raytracer<'a, G> {
                 && let Some(color) = self.subdivide(tube, depth)?
             {
                 let flat = self.flat_gather(a, b, c, d, original_angle)?;
-                return Ok(if color.norm() >= flat.norm() { color } else { flat });
+                return Ok(if color.norm() >= flat.norm() {
+                    color
+                } else {
+                    flat
+                });
             }
             // Could not split (depth cap): the curved polygon would
             // self-intersect and its fan gather can drop stars, so use flat.
@@ -650,7 +677,13 @@ impl<'a, G: Geometry> Raytracer<'a, G> {
     }
 
     /// Trace a single screen point of the owning pixel; Some(dir) if it escapes.
-    fn trace_escape(&self, pixel_row: i64, pixel_col: i64, row: f64, col: f64) -> Option<Vector3<f64>> {
+    fn trace_escape(
+        &self,
+        pixel_row: i64,
+        pixel_col: i64,
+        row: f64,
+        col: f64,
+    ) -> Option<Vector3<f64>> {
         let ray = self.scene.camera.get_ray_for_offset(
             pixel_row,
             pixel_col,
@@ -694,7 +727,7 @@ impl<'a, G: Geometry> Raytracer<'a, G> {
     /// `va, vb, vd, vc`), each edge a polyline hugging the true sky arc.
     fn tube_boundary(
         &self,
-        tube: &SampleTube,
+        tube: &SampleTube<G::Chart>,
         va: &Vector3<f64>,
         vb: &Vector3<f64>,
         vd: &Vector3<f64>,
@@ -747,7 +780,9 @@ impl<'a, G: Geometry> Raytracer<'a, G> {
                     signed_area += area;
                 }
                 stars.clear();
-                catalog.stars.gather_triangle(&[centroid, p0, p1], &mut stars);
+                catalog
+                    .stars
+                    .gather_triangle(&[centroid, p0, p1], &mut stars);
                 for star in &stars {
                     if seen.insert(star.source_id) {
                         let emission = self.redshifted_star_emission(star, redshift);
@@ -807,13 +842,16 @@ impl<'a, G: Geometry> Raytracer<'a, G> {
         )
     }
 
-    fn handle_tube(&self, sample_tube: &SampleTube) -> Result<Vector3<f64>, RaytracerError> {
+    fn handle_tube(
+        &self,
+        sample_tube: &SampleTube<G::Chart>,
+    ) -> Result<Vector3<f64>, RaytracerError> {
         self.compute_color(sample_tube, 0)
     }
 
     fn add_star_layer(
         &self,
-        buffer: &[RaySample],
+        buffer: &[RaySample<G::Chart>],
         width: usize,
         _height: usize,
         colors: &mut [Radiance],
@@ -834,13 +872,17 @@ impl<'a, G: Geometry> Raytracer<'a, G> {
         // the critical curve would otherwise pin one core.
         let tubes = AtomicUsize::new(0);
         let skipped = AtomicUsize::new(0);
+        let gathered = AtomicUsize::new(0);
+        let progress = Progress::new(colors.len() as u64, "stars")?;
         colors.par_iter_mut().enumerate().for_each(|(idx, color)| {
+            progress.set(gathered.fetch_add(1, Ordering::Relaxed) as u64 + 1);
             let (row, col) = (idx / width, idx % width);
             // The base tube spans (row, col)..(row+1, col+1); on the last row or
             // column `from_buffer` clamps the stencil inward so the boundary
             // pixel still gets its inward neighbour's footprint instead of being
             // skipped (which would drop border stars and leave section seams).
-            if let Some(tube) = SampleTube::from_buffer(buffer, row as u32, col as u32, width as u32)
+            if let Some(tube) =
+                SampleTube::from_buffer(buffer, row as u32, col as u32, width as u32)
             {
                 tubes.fetch_add(1, Ordering::Relaxed);
                 // Skip a tube whose gather fails rather than aborting the whole
@@ -858,6 +900,7 @@ impl<'a, G: Geometry> Raytracer<'a, G> {
                 }
             }
         });
+        progress.finish();
         let tubes = tubes.into_inner();
         let skipped = skipped.into_inner();
         if skipped > 0 {
@@ -901,11 +944,11 @@ impl<'a, G: Geometry> Raytracer<'a, G> {
         from_col: u32,
         to_row: u32,
         to_col: u32,
-    ) -> Result<Vec<RaySample>, RaytracerError> {
+    ) -> Result<Vec<RaySample<G::Chart>>, RaytracerError> {
         let count = AtomicUsize::new(0);
         let max_count = (to_row - from_row) * (to_col - from_col);
         // Create some dummy rays. They will be replaced with the actual rays in the parallel loop below.
-        let mut buffer: Vec<RaySample> = vec![
+        let mut buffer: Vec<RaySample<G::Chart>> = vec![
             RaySample {
                 color: Radiance::BLACK,
                 ray_class: RayClass::Escaped(EscapeInfo {
@@ -918,14 +961,8 @@ impl<'a, G: Geometry> Raytracer<'a, G> {
                 ray: Ray::new(
                     0,
                     0,
-                    Point::new(
-                        0.0,
-                        0.0,
-                        0.0,
-                        0.0,
-                        crate::geometry::point::CoordinateSystem::Cartesian,
-                    ),
-                    FourVector::new_cartesian(0.0, 0.0, 1.0, 0.0),
+                    self.scene.camera.position,
+                    FourVector::new(0.0, 0.0, 1.0, 0.0, self.scene.camera.position),
                 ),
             };
             max_count as usize
@@ -978,7 +1015,7 @@ impl<'a, G: Geometry> Raytracer<'a, G> {
         from_col: u32,
         to_row: u32,
         to_col: u32,
-        buffer: &[RaySample],
+        buffer: &[RaySample<G::Chart>],
     ) -> Result<Vec<Radiance>, RaytracerError> {
         info!(
             "Rendering section from ({}, {}) to ({}, {}) with supersampling",
@@ -1101,7 +1138,7 @@ impl<'a, G: Geometry> Raytracer<'a, G> {
         from_col: u32,
         to_row: u32,
         to_col: u32,
-        buffer: &[RaySample],
+        buffer: &[RaySample<G::Chart>],
         minimum_luminance: f64,
     ) -> Vec<PixelToSample> {
         let mut pixels_to_sample: Vec<PixelToSample> = Vec::new();
@@ -1184,9 +1221,7 @@ impl<'a, G: Geometry> Raytracer<'a, G> {
             let buffer: Vec<f32> = raw_cie
                 .into_iter()
                 .map(|c| xyz_to_linear_srgb(&c.to_xyz_over_black()))
-                .flat_map(|c| {
-                    [flush_to_hdr(c.x), flush_to_hdr(c.y), flush_to_hdr(c.z)]
-                })
+                .flat_map(|c| [flush_to_hdr(c.x), flush_to_hdr(c.y), flush_to_hdr(c.z)])
                 .collect();
             let imgbuf_hdr: ImageBuffer<Rgb<f32>, Vec<f32>> =
                 image::ImageBuffer::from_vec(to_col - from_col, to_row - from_row, buffer)
@@ -1223,7 +1258,7 @@ impl<'a, G: Geometry> Raytracer<'a, G> {
         &self,
         row: i64,
         col: i64,
-    ) -> Result<(IntegratedRay, Option<StopReason>), RaytracerError> {
+    ) -> Result<(IntegratedRay<G::Chart>, Option<StopReason>), RaytracerError> {
         let ray = self.scene.camera.get_ray_for(row, col);
         info!("ray for {}-{} is: {:?}", row, col, ray);
         self.scene.integrate_ray(&ray)
@@ -1246,6 +1281,7 @@ mod tests {
         stratified_sample_offset,
     };
     use crate::configuration::AdaptiveSamplingConfig;
+    use crate::geometry::coordinates::euclidean::CartesianChart;
     use crate::geometry::four_vector::FourVector;
     use crate::geometry::point::Point;
     use crate::rendering::radiance::Radiance;
@@ -1264,7 +1300,7 @@ mod tests {
         assert_eq!(flush_to_hdr(50_000.0), 50_000.0_f32);
     }
 
-    fn sample(y: f64, alpha: f64, ray_class: RayClass) -> RaySample {
+    fn sample(y: f64, alpha: f64, ray_class: RayClass) -> RaySample<CartesianChart> {
         RaySample {
             color: Radiance::new(0.0, y, 0.0, 1.0 - alpha),
             ray_class,
@@ -1272,14 +1308,8 @@ mod tests {
             ray: Ray::new(
                 0,
                 0,
-                Point::new(
-                    0.0,
-                    0.0,
-                    0.0,
-                    0.0,
-                    crate::geometry::point::CoordinateSystem::Cartesian,
-                ),
-                FourVector::new_cartesian(0.0, 0.0, 1.0, 0.0),
+                Point::new_cartesian(0.0, 0.0, 0.0, 0.0),
+                FourVector::new(0.0, 0.0, 1.0, 0.0, Point::new_cartesian(0.0, 0.0, 0.0, 0.0)),
             ),
         }
     }

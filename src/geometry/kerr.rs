@@ -1,12 +1,12 @@
 use crate::geometry::circular_orbit::{self, OrbitKillingDecomposition};
+use crate::geometry::coordinates::boyer_lindquist::{KerrChart, KerrSchildData};
 use crate::geometry::four_vector::FourVector;
 use crate::geometry::geometry::{
-    GeodesicSolver, Geometry, HasCoordinateSystem, InnerProduct, Signature, SupportQuantities,
+    GeodesicSolver, Geometry, HasChart, InnerProduct, Signature, SupportQuantities,
     TRAPPED_ORBIT_RADIUS_FACTOR,
 };
 use crate::geometry::gram_schmidt::gram_schmidt;
-use crate::geometry::point::CoordinateSystem::Cartesian;
-use crate::geometry::point::{CoordinateSystem, Point};
+use crate::geometry::point::Point;
 use crate::geometry::tetrad::Tetrad;
 use crate::rendering::ray::Ray;
 use crate::rendering::raytracer::RaytracerError;
@@ -24,6 +24,7 @@ pub struct Kerr {
 }
 
 struct KerrSolver {
+    chart: KerrChart,
     radius: f64,
     a: f64,
 }
@@ -118,6 +119,13 @@ pub mod test_helpers {
 }
 
 impl Kerr {
+    pub fn kerr_schild_chart(&self) -> KerrChart {
+        KerrChart::KerrSchild(KerrSchildData {
+            a: self.a,
+            r_s: self.radius,
+        })
+    }
+
     pub fn new(radius: f64, a: f64, horizon_epsilon: f64) -> Self {
         if a.abs() > radius / 2.0 {
             warn!(
@@ -196,13 +204,13 @@ impl KerrSolver {
     }
 }
 
-impl HasCoordinateSystem for KerrSolver {
-    fn coordinate_system(&self) -> CoordinateSystem {
-        Cartesian
-    }
-}
-
 impl GeodesicSolver for KerrSolver {
+    type Chart = KerrChart;
+
+    fn chart(&self) -> Self::Chart {
+        self.chart
+    }
+
     /// Hamiltonian geodesics
     /// H(x, p) = 0.5 * g^{\mu\nu} p_\mu p_\nu
     /// d x^\mu / d\lambda = \partial H / \partial p_\mu = g^{\mu\nu} p_\nu
@@ -252,18 +260,18 @@ impl GeodesicSolver for KerrSolver {
         EquationOfMotionState::from_column_slice(&[dt, dx, dy, dz, a_t, a_x, a_y, a_z])
     }
 
-    fn create_initial_state(&self, ray: &Ray) -> EquationOfMotionState {
-        let (x, y, z) = (ray.position[1], ray.position[2], ray.position[3]);
+    fn create_initial_state(&self, momentum: &FourVector<Self::Chart>) -> EquationOfMotionState {
+        let (x, y, z) = (momentum.at[1], momentum.at[2], momentum.at[3]);
         let covariant_metric = metric(self.radius, self.a, x, y, z);
         trace!("covariant_metric = {:?}", covariant_metric);
 
-        let momentum_covariant = covariant_metric * ray.momentum.vector;
+        let momentum_covariant = covariant_metric * momentum.vector;
 
         EquationOfMotionState::from_column_slice(&[
-            ray.position[0],
-            ray.position[1],
-            ray.position[2],
-            ray.position[3],
+            momentum.at[0],
+            momentum.at[1],
+            momentum.at[2],
+            momentum.at[3],
             momentum_covariant[0],
             momentum_covariant[1],
             momentum_covariant[2],
@@ -271,29 +279,29 @@ impl GeodesicSolver for KerrSolver {
         ])
     }
 
-    fn momentum_from_state(&self, y: &EquationOfMotionState) -> FourVector {
+    fn momentum_from_state(&self, y: &EquationOfMotionState) -> FourVector<KerrChart> {
         let contravariant_metric = metric_contravariant(self.radius, self.a, y[1], y[2], y[3]);
         let covariant = Vector4::new(y[4], y[5], y[6], y[7]);
         let contravariant = contravariant_metric * covariant;
 
-        FourVector::new_cartesian(
+        FourVector::new(
             contravariant[0],
             contravariant[1],
             contravariant[2],
             contravariant[3],
+            Point::new(y[0], y[1], y[2], y[3], self.chart),
         )
     }
 }
 
-impl HasCoordinateSystem for Kerr {
-    fn coordinate_system(&self) -> CoordinateSystem {
-        Cartesian
-    }
-}
-
 impl InnerProduct for Kerr {
-    fn inner_product(&self, position: &Point, v: &FourVector, w: &FourVector) -> f64 {
-        assert_eq!(v.coordinate_system, w.coordinate_system);
+    fn inner_product(
+        &self,
+        position: &Point<KerrChart>,
+        v: &FourVector<KerrChart>,
+        w: &FourVector<KerrChart>,
+    ) -> f64 {
+        assert_eq!(v.at.chart, w.at.chart);
         let metric = metric(self.radius, self.a, position[1], position[2], position[3]);
         (v.vector.transpose() * metric * w.vector).x
     }
@@ -305,8 +313,12 @@ impl Signature for Kerr {
     }
 }
 
+impl HasChart for Kerr {
+    type Chart = KerrChart;
+}
+
 impl Geometry for Kerr {
-    fn get_tetrad_at(&self, position: &Point) -> Tetrad {
+    fn get_tetrad_at(&self, position: &Point<KerrChart>) -> Tetrad<KerrChart> {
         let x = position[1];
         let y = position[2];
         let z = position[3];
@@ -325,15 +337,16 @@ impl Geometry for Kerr {
         let beta = Vector3::new(bfac * k_x, bfac * k_y, bfac * k_z);
 
         debug!("alpha = {:?}, beta = {:?}", alpha, beta);
-        let e_t = FourVector::new_cartesian(
+        let e_t = FourVector::new(
             1.0 / alpha,
             -beta[0] / alpha,
             -beta[1] / alpha,
             -beta[2] / alpha,
+            *position,
         );
-        let e_1 = FourVector::new_cartesian(0.0, 1.0, 0.0, 0.0);
-        let e_2 = FourVector::new_cartesian(0.0, 0.0, 1.0, 0.0);
-        let e_3 = FourVector::new_cartesian(0.0, 0.0, 0.0, 1.0);
+        let e_1 = FourVector::new(0.0, 1.0, 0.0, 0.0, *position);
+        let e_2 = FourVector::new(0.0, 0.0, 1.0, 0.0, *position);
+        let e_3 = FourVector::new(0.0, 0.0, 0.0, 1.0, *position);
 
         let basis = gram_schmidt(self, position, &[e_t, e_1, e_2, e_3]);
 
@@ -342,7 +355,11 @@ impl Geometry for Kerr {
         Tetrad::new(*position, basis[0], basis[1], basis[2], basis[3])
     }
 
-    fn lorentz_transformation(&self, position: &Point, velocity: &FourVector) -> Matrix4<f64> {
+    fn lorentz_transformation(
+        &self,
+        position: &Point<KerrChart>,
+        velocity: &FourVector<KerrChart>,
+    ) -> Matrix4<f64> {
         debug!(
             "Lorentz transformation at position {:?} with velocity {:?}",
             position, velocity
@@ -391,7 +408,14 @@ impl Geometry for Kerr {
         matrix
     }
 
-    fn inside_horizon(&self, position: &Point) -> bool {
+    // TODO: Let the solver dispatch on the chart (Boyer-Lindquist away from the axis), then
+    // drop this override.
+    /// The solver integrates in Kerr-Schild coordinates only.
+    fn integration_chart(&self, _position: &Point<KerrChart>) -> KerrChart {
+        self.kerr_schild_chart()
+    }
+
+    fn inside_horizon(&self, position: &Point<KerrChart>) -> bool {
         let (x, y, z) = (position[1], position[2], position[3]);
         if self.a.abs() > self.radius / 2.0 {
             // Without mass the metric function vanishes: the geometry is
@@ -413,7 +437,12 @@ impl Geometry for Kerr {
         r <= rp + self.horizon_epsilon
     }
 
-    fn closed_orbit(&self, position: &Point, step_index: usize, max_steps: usize) -> bool {
+    fn closed_orbit(
+        &self,
+        position: &Point<KerrChart>,
+        step_index: usize,
+        max_steps: usize,
+    ) -> bool {
         // The ray ran out of step budget without escaping or being absorbed.
         // If it's still in the strong-field region (within ~5·r_s of the
         // origin), classify it as trapped so the renderer paints it dark
@@ -426,22 +455,26 @@ impl Geometry for Kerr {
         step_index == max_steps - 1 && r < TRAPPED_ORBIT_RADIUS_FACTOR * self.radius
     }
 
-    fn get_geodesic_solver(&self, _ray: &Ray) -> Box<dyn GeodesicSolver> {
+    fn get_geodesic_solver(
+        &self,
+        _momentum: &FourVector<Self::Chart>,
+    ) -> Box<dyn GeodesicSolver<Chart = Self::Chart>> {
         Box::new(KerrSolver {
+            chart: self.kerr_schild_chart(),
             radius: self.radius,
             a: self.a,
         })
     }
 
-    fn get_radial_coordinate(&self, position: &Point) -> f64 {
+    fn get_radial_coordinate(&self, position: &Point<KerrChart>) -> f64 {
         let rho_sqr = compute_r_sqr(self.a, position[1], position[2], position[3]);
         rho_sqr.sqrt()
     }
 
     fn get_constants_of_motion(
         &self,
-        position: &Point,
-        momentum: &FourVector,
+        position: &Point<KerrChart>,
+        momentum: &FourVector<KerrChart>,
     ) -> crate::geometry::geometry::ConstantsOfMotion {
         let mut constants = crate::geometry::geometry::ConstantsOfMotion::default();
 
@@ -466,15 +499,15 @@ impl Geometry for Kerr {
 }
 
 impl SupportQuantities for Kerr {
-    fn get_stationary_velocity_at(&self, position: &Point) -> FourVector {
+    fn get_stationary_velocity_at(&self, position: &Point<KerrChart>) -> FourVector<KerrChart> {
         let (x, y, z) = (position[1], position[2], position[3]);
         let r_sqr = compute_r_sqr(self.a, x, y, z);
         let r = r_sqr.sqrt();
         let f = (r * r * r * self.radius) / (r * r * r * r + self.a * self.a * z * z);
-        FourVector::new_cartesian((1.0 - f).sqrt().recip(), 0.0, 0.0, 0.0)
+        FourVector::new((1.0 - f).sqrt().recip(), 0.0, 0.0, 0.0, *position)
     }
 
-    fn get_zamo_velocity_at(&self, position: &Point) -> FourVector {
+    fn get_zamo_velocity_at(&self, position: &Point<KerrChart>) -> FourVector<KerrChart> {
         let (x, y, z) = (position[1], position[2], position[3]);
         let r = compute_r_sqr(self.a, x, y, z).sqrt();
         let theta = if r == 0.0 {
@@ -483,7 +516,7 @@ impl SupportQuantities for Kerr {
             (z / r).clamp(-1.0, 1.0).acos()
         };
         let c = circular_orbit::zamo_killing_coefficients(self.radius, self.a, r, theta);
-        c.u_t * FourVector::new_cartesian(1.0, 0.0, 0.0, 0.0)
+        c.u_t * FourVector::new(1.0, 0.0, 0.0, 0.0, *position)
             + c.u_phi * self.axial_killing_vector(position)
     }
 
@@ -492,21 +525,21 @@ impl SupportQuantities for Kerr {
     // approximation for near-circular orbits not too close to the black hole.
     fn get_circular_orbit_velocity_at(
         &self,
-        position: &Point,
-    ) -> Result<FourVector, RaytracerError> {
+        position: &Point<KerrChart>,
+    ) -> Result<FourVector<KerrChart>, RaytracerError> {
         let c = self.circular_orbit_killing_coefficients(position)?;
-        Ok(c.u_t * FourVector::new_cartesian(1.0, 0.0, 0.0, 0.0)
+        Ok(c.u_t * FourVector::new(1.0, 0.0, 0.0, 0.0, *position)
             + c.u_phi * self.axial_killing_vector(position))
     }
 
-    fn axial_killing_vector(&self, position: &Point) -> FourVector {
+    fn axial_killing_vector(&self, position: &Point<KerrChart>) -> FourVector<KerrChart> {
         // d_phi = x d_y - y d_x in the Kerr-Schild Cartesian chart.
-        FourVector::new_cartesian(0.0, -position[2], position[1], 0.0)
+        FourVector::new(0.0, -position[2], position[1], 0.0, *position)
     }
 
     fn circular_orbit_killing_coefficients(
         &self,
-        position: &Point,
+        position: &Point<KerrChart>,
     ) -> Result<OrbitKillingDecomposition, RaytracerError> {
         circular_orbit::killing_coefficients(
             self.radius,
@@ -533,6 +566,7 @@ impl SupportQuantities for Kerr {
 #[cfg(test)]
 mod tests {
     use super::{metric, metric_contravariant};
+    use crate::geometry::coordinates::boyer_lindquist::KerrChart;
     use crate::geometry::four_vector::FourVector;
     use crate::geometry::geometry::{Geometry, InnerProduct, SupportQuantities};
     use crate::geometry::kerr::Kerr;
@@ -542,7 +576,12 @@ mod tests {
     use crate::rendering::scene;
     use crate::rendering::scene::Scene;
     use approx::assert_abs_diff_eq;
+    use nalgebra::Vector4;
     use std::f64::consts::PI;
+
+    fn ks(geometry: &Kerr, t: f64, x: f64, y: f64, z: f64) -> Point<KerrChart> {
+        Point::new_from_vector(Vector4::new(t, x, y, z), geometry.kerr_schild_chart())
+    }
 
     #[test]
     fn test_metric_contravariant_matches_inverse() {
@@ -574,7 +613,7 @@ mod tests {
         let geometry = Kerr::new(radius, a, 1e-4);
 
         for rho in [m * 0.5, 1.0, 5.0, 50.0] {
-            let point = Point::new_cartesian(0.0, 0.0, 0.0, rho);
+            let point = ks(&geometry, 0.0, 0.0, 0.0, rho);
             assert!(
                 !geometry.inside_horizon(&point),
                 "z = {rho} should be outside"
@@ -588,9 +627,9 @@ mod tests {
         // singularity, and the r = 0 disc must not swallow rays.
         let geometry = Kerr::new(0.0, 0.55, 1e-4);
 
-        let on_the_disc = Point::new_cartesian(0.0, 0.3, 0.0, 0.0);
+        let on_the_disc = ks(&geometry, 0.0, 0.3, 0.0, 0.0);
         assert!(!geometry.inside_horizon(&on_the_disc));
-        let at_the_origin = Point::new_cartesian(0.0, 0.0, 0.0, 0.0);
+        let at_the_origin = ks(&geometry, 0.0, 0.0, 0.0, 0.0);
         assert!(!geometry.inside_horizon(&at_the_origin));
     }
 
@@ -603,19 +642,19 @@ mod tests {
         let a = -2.0 * (radius / 2.0);
         let geometry = Kerr::new(radius, a, 1e-4);
 
-        let on_the_disc = Point::new_cartesian(0.0, 0.5 * a.abs(), 0.0, 0.0);
+        let on_the_disc = ks(&geometry, 0.0, 0.5 * a.abs(), 0.0, 0.0);
         assert!(geometry.inside_horizon(&on_the_disc));
 
         // Off the disc, at the same distance from the axis, r > 0 and the ray
         // carries on.
-        let off_the_disc = Point::new_cartesian(0.0, 0.5 * a.abs(), 0.0, 1.0);
+        let off_the_disc = ks(&geometry, 0.0, 0.5 * a.abs(), 0.0, 1.0);
         assert!(!geometry.inside_horizon(&off_the_disc));
     }
 
     #[test]
     fn test_tetrad_orthonormal() {
-        let position = Point::new_cartesian(2.0, 3.0, 4.0, 5.0);
         let geometry = Kerr::new(2.0, NO_ANGULAR_MOMENTUM, 1e-4);
+        let position = ks(&geometry, 2.0, 3.0, 4.0, 5.0);
 
         let tetrad = geometry.get_tetrad_at(&position);
 
@@ -646,13 +685,13 @@ mod tests {
 
     #[test]
     fn test_lorentz_transformed_tetrad_orthonormal() {
-        let position = Point::new_cartesian(2.0, 3.0, 4.0, 5.0);
         let radius = 2.0;
         let geometry = Kerr::new(radius, NO_ANGULAR_MOMENTUM, KERR_RADIUS_EPSILON);
+        let position = ks(&geometry, 2.0, 3.0, 4.0, 5.0);
         let r = geometry.get_radial_coordinate(&position);
         let a = 1.0 - radius / r;
 
-        let velocity = FourVector::new_cartesian(1.0 / a.sqrt(), 0.0, 0.0, 0.0);
+        let velocity = FourVector::new(1.0 / a.sqrt(), 0.0, 0.0, 0.0, position);
 
         let original_tetrad = geometry.get_tetrad_at(&position);
         let tetrad = crate::rendering::camera::lorentz_transform_tetrad(
@@ -666,11 +705,7 @@ mod tests {
         let s = geometry.inner_product(&position, &k, &k);
         assert_abs_diff_eq!(s, 0.0, epsilon = 1e-8);
 
-        assert_abs_diff_eq!(
-            tetrad.t.get_as_vector(),
-            velocity.get_as_vector(),
-            epsilon = 1e-6
-        );
+        assert_abs_diff_eq!(tetrad.t.vector, velocity.vector, epsilon = 1e-6);
 
         assert_abs_diff_eq!(geometry.inner_product(&position, &tetrad.t, &tetrad.x), 0.0);
         assert_abs_diff_eq!(geometry.inner_product(&position, &tetrad.t, &tetrad.y), 0.0);
@@ -688,10 +723,10 @@ mod tests {
         let rows = 30;
         let cols = 30;
 
-        let position = Point::new_cartesian(0.0, 0.0, 0.0, -10.0);
         let radius = 2.0;
         let geometry = Kerr::new(radius, NO_ANGULAR_MOMENTUM, 1e-4);
-        let velocity = FourVector::new_cartesian(1.0, 0.0, 0.0, 0.0);
+        let position = ks(&geometry, 0.0, 0.0, 0.0, -10.0);
+        let velocity = FourVector::new(1.0, 0.0, 0.0, 0.0, position);
         let camera = Camera::new(
             position,
             velocity,
@@ -710,12 +745,12 @@ mod tests {
 
     #[test]
     fn test_kerr_ray() {
-        let position = Point::new_cartesian(2.0, 3.0, 4.0, 5.0);
         let radius = 2.0;
         let geometry = Kerr::new(radius, NO_ANGULAR_MOMENTUM, 1e-4);
+        let position = ks(&geometry, 2.0, 3.0, 4.0, 5.0);
         let r = geometry.get_radial_coordinate(&position);
         let a = 1.0 - radius / r;
-        let velocity = FourVector::new_cartesian(1.0 / a.sqrt(), 0.0, 0.0, 0.0);
+        let velocity = FourVector::new(1.0 / a.sqrt(), 0.0, 0.0, 0.0, position);
         let camera = Camera::new(
             position,
             velocity,
@@ -737,11 +772,11 @@ mod tests {
         );
     }
 
-    fn create_camera(position: Point, radius: f64) -> Camera {
+    fn create_camera(position: Point<KerrChart>, radius: f64) -> Camera<KerrChart> {
         let geometry = Kerr::new(radius, NO_ANGULAR_MOMENTUM, 1e-4);
         let r = geometry.get_radial_coordinate(&position);
         let a = 1.0 - radius / r;
-        let momentum = FourVector::new_cartesian(1.0 / a.sqrt(), 0.0, 0.0, 0.0);
+        let momentum = FourVector::new(1.0 / a.sqrt(), 0.0, 0.0, 0.0, position);
         let camera = Camera::new(
             position,
             momentum,
@@ -759,9 +794,9 @@ mod tests {
 
     #[test]
     fn test_ray_null_condition_momentum() {
-        let position = Point::new_cartesian(2.0, 5.0, 0.0, 0.0);
         let radius = 2.0;
         let geometry = Kerr::new(radius, NO_ANGULAR_MOMENTUM, 1e-4);
+        let position = ks(&geometry, 2.0, 5.0, 0.0, 0.0);
         let camera = create_camera(position, radius);
 
         let m_s = geometry.inner_product(&position, &camera.velocity, &camera.velocity);
@@ -781,9 +816,9 @@ mod tests {
 
     #[test]
     fn test_trajectories_equal_with_rotated_momentum() {
-        let position = Point::new_cartesian(2.0, 1.0, 0.0, 0.0);
         let radius = 0.0;
         let geometry = Kerr::new(radius, NO_ANGULAR_MOMENTUM, 1e-4);
+        let position = ks(&geometry, 2.0, 1.0, 0.0, 0.0);
         let camera = create_camera(position, radius);
         let scene: Scene<Kerr> =
             scene::test_scene::create_scene_with_camera(1.0, 2.0, 7.0, &geometry, camera, 1e-5)
@@ -824,7 +859,7 @@ mod tests {
         let radius = 1.0;
         let geometry = Kerr::new(radius, NO_ANGULAR_MOMENTUM, 1e-4);
 
-        let position = Point::new_cartesian(0.0, 0.0, 3.0, 0.0);
+        let position = ks(&geometry, 0.0, 0.0, 3.0, 0.0);
         let velocity = geometry.get_circular_orbit_velocity_at(&position).unwrap();
 
         assert_abs_diff_eq!(velocity[0], 1.414213562373095, epsilon = 1e-8);

@@ -1,3 +1,4 @@
+use crate::geometry::coordinates::atlas::{CartesianConvertible, Chart};
 use crate::geometry::four_vector::FourVector;
 use crate::geometry::point::Point;
 use crate::rendering::integrator::Step;
@@ -6,14 +7,14 @@ use std::io::Write;
 use std::ops::Index;
 
 #[derive(Debug, Clone, Copy, PartialEq)]
-pub struct Ray {
-    pub position: Point,
-    pub momentum: FourVector,
+pub struct Ray<C: Chart> {
+    pub position: Point<C>,
+    pub momentum: FourVector<C>,
     pub row: i64,
     pub col: i64,
 }
-impl Ray {
-    pub fn new(row: i64, col: i64, position: Point, momentum: FourVector) -> Self {
+impl<C: Chart> Ray<C> {
+    pub fn new(row: i64, col: i64, position: Point<C>, momentum: FourVector<C>) -> Self {
         Self {
             row,
             col,
@@ -23,12 +24,12 @@ impl Ray {
     }
 }
 
-pub struct IntegratedRay {
-    pub steps: Vec<Step>,
+pub struct IntegratedRay<C: CartesianConvertible> {
+    pub steps: Vec<Step<C>>,
 }
 
-impl IntegratedRay {
-    pub fn new(steps: Vec<Step>) -> Self {
+impl<C: CartesianConvertible> IntegratedRay<C> {
+    pub fn new(steps: Vec<Step<C>>) -> Self {
         Self { steps }
     }
 
@@ -58,29 +59,29 @@ impl IntegratedRay {
     }
 }
 
-impl Index<usize> for IntegratedRay {
-    type Output = Step;
+impl<C: CartesianConvertible> Index<usize> for IntegratedRay<C> {
+    type Output = Step<C>;
 
     fn index(&self, index: usize) -> &Self::Output {
         &self.steps[index]
     }
 }
 
-impl<'a> IntoIterator for &'a IntegratedRay {
-    type Item = &'a Step;
-    type IntoIter = std::slice::Iter<'a, Step>;
+impl<'a, C: CartesianConvertible> IntoIterator for &'a IntegratedRay<C> {
+    type Item = &'a Step<C>;
+    type IntoIter = std::slice::Iter<'a, Step<C>>;
 
     fn into_iter(self) -> Self::IntoIter {
         self.steps.iter()
     }
 }
 
-impl IntegratedRay {
-    pub fn iter(&self) -> std::slice::Iter<'_, Step> {
+impl<C: CartesianConvertible> IntegratedRay<C> {
+    pub fn iter(&self) -> std::slice::Iter<'_, Step<C>> {
         self.steps.iter()
     }
 
-    pub fn last(&self) -> Option<&Step> {
+    pub fn last(&self) -> Option<&Step<C>> {
         self.steps.last()
     }
 }

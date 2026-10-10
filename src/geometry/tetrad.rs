@@ -1,3 +1,4 @@
+use crate::geometry::coordinates::atlas::Chart;
 use crate::geometry::four_vector::FourVector;
 use crate::geometry::geometry::Geometry;
 use crate::geometry::point::Point;
@@ -6,21 +7,21 @@ use log::debug;
 use std::fmt::{Display, Formatter};
 
 #[derive(Debug, Clone)]
-pub struct Tetrad {
-    position: Point,
-    pub t: FourVector,
-    pub x: FourVector, // vertical wrt. the camera.
-    pub y: FourVector, // horizontal wrt. the camera.
-    pub z: FourVector, // away from the camera.
+pub struct Tetrad<C: Chart> {
+    position: Point<C>,
+    pub t: FourVector<C>,
+    pub x: FourVector<C>, // vertical wrt. the camera.
+    pub y: FourVector<C>, // horizontal wrt. the camera.
+    pub z: FourVector<C>, // away from the camera.
 }
 
-impl Tetrad {
+impl<C: Chart> Tetrad<C> {
     pub fn new(
-        position: Point,
-        t: FourVector,
-        x: FourVector,
-        y: FourVector,
-        z: FourVector,
+        position: Point<C>,
+        t: FourVector<C>,
+        x: FourVector<C>,
+        y: FourVector<C>,
+        z: FourVector<C>,
     ) -> Self {
         Tetrad {
             position,
@@ -32,7 +33,7 @@ impl Tetrad {
     }
 }
 
-impl Display for Tetrad {
+impl<C: Chart> Display for Tetrad<C> {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         writeln!(f, "Tetrad")?;
         writeln!(f, "  position: {:?}", self.position)?;
@@ -57,7 +58,7 @@ impl<'a, G: Geometry> TetradValidator<'a, G> {
         TetradValidator { geometry }
     }
 
-    pub fn validate(&self, tetrad: &Tetrad) -> Result<(), CameraError> {
+    pub fn validate(&self, tetrad: &Tetrad<G::Chart>) -> Result<(), CameraError> {
         let t_t = self
             .geometry
             .inner_product(&tetrad.position, &tetrad.t, &tetrad.t);
