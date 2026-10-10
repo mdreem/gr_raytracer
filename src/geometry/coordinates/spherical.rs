@@ -29,6 +29,29 @@ impl SphericalChart {
         let SphericalChart::Rotated(RotatedSpherical { rotation }) = self;
         *rotation
     }
+
+    /// The generator of rotations about the physical z-axis (the physical d_phi) at `position`,
+    /// in the components of the position's chart. In a rotated chart the chart's own d_phi
+    /// rotates about a different axis.
+    pub fn physical_axial_vector(position: &Point<Self>) -> FourVector<Self> {
+        let rotation = position.chart.rotation();
+        if rotation == 0.0 {
+            return FourVector::new(0.0, 0.0, 0.0, 1.0, *position);
+        }
+        let (r, theta, phi) = (position[1], position[2], position[3]);
+        let physical = rotate(spherical_to_frame(r, theta, phi), -rotation);
+        let d = rotate(Vector3::new(-physical[1], physical[0], 0.0), rotation);
+
+        let (st, ct) = theta.sin_cos();
+        let (sp, cp) = phi.sin_cos();
+        FourVector::new(
+            0.0,
+            st * cp * d[0] + st * sp * d[1] + ct * d[2],
+            (ct * cp * d[0] + ct * sp * d[1] - st * d[2]) / r,
+            (-sp * d[0] + cp * d[1]) / (r * st),
+            *position,
+        )
+    }
 }
 
 fn spherical_to_frame(r: f64, theta: f64, phi: f64) -> Vector3<f64> {
@@ -163,6 +186,20 @@ mod tests {
             near_pole_of_last.chart.best_chart(&near_pole_of_last),
             rotated(0.0)
         );
+    }
+
+    /// The physical d_phi is the same vector in every chart: the transition of the unrotated
+    /// chart's (0, 0, 0, 1).
+    #[test]
+    fn physical_axial_vector_agrees_across_rotations() {
+        let p = Point::new(0.0, 5.0, 1.1, 0.7, rotated(0.0));
+        let axial = SphericalChart::physical_axial_vector(&p);
+        assert_eq!(axial.vector, FourVector::new(0.0, 0.0, 0.0, 1.0, p).vector);
+        for rotation in [30.0, 90.0, 180.0, 270.0] {
+            let expected = p.chart.transition_four_vector(&axial, rotated(rotation));
+            let actual = SphericalChart::physical_axial_vector(&expected.at);
+            assert_abs_diff_eq!(actual.vector, expected.vector, epsilon = 1e-12);
+        }
     }
 
     #[test]

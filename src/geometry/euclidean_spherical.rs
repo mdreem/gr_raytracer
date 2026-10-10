@@ -197,11 +197,8 @@ impl SupportQuantities for EuclideanSpaceSpherical {
         // TODO: implement proper circular orbit velocity in Euclidean space.
     }
 
-    fn axial_killing_vector(
-        &self,
-        _position: &Point<SphericalChart>,
-    ) -> FourVector<SphericalChart> {
-        FourVector::new(0.0, 0.0, 0.0, 1.0, *_position)
+    fn axial_killing_vector(&self, position: &Point<SphericalChart>) -> FourVector<SphericalChart> {
+        SphericalChart::physical_axial_vector(position)
     }
 
     fn circular_orbit_killing_coefficients(

@@ -167,7 +167,12 @@ impl SphericalConvertible for coordinates::euclidean::CartesianChart {
 }
 
 impl SphericalConvertible for coordinates::spherical::SphericalChart {
+    /// Angles in the physical frame, also for rotated charts.
     fn point_as_spherical(point: &Point<Self>) -> Vector3<f64> {
+        if point.chart.rotation() != 0.0 {
+            let v = cartesian_to_spherical(&spherical_to_cartesian(point));
+            return Vector3::new(v[1], v[2], v[3]);
+        }
         Vector3::new(
             point.vector[1],
             wrap_theta(point.vector[2]),
@@ -388,6 +393,22 @@ mod tests {
             v_q.to_cartesian().vector,
             epsilon = 1e-12
         );
+    }
+
+    #[test]
+    fn test_rotated_spherical_chart_reports_physical_angles() {
+        use crate::geometry::coordinates::spherical::{RotatedSpherical, SphericalChart};
+
+        let physical = Point::new_cartesian(0.0, 3.0, -2.0, 4.0);
+        let expected = cartesian_to_spherical(&physical);
+        for rotation in [0.0, 90.0, 180.0, 270.0] {
+            let chart = SphericalChart::Rotated(RotatedSpherical { rotation });
+            let p = SphericalChart::point_from_cartesian(chart, &physical);
+            let spherical = p.get_as_spherical();
+            assert_abs_diff_eq!(spherical[0], expected[1], epsilon = 1e-12);
+            assert_abs_diff_eq!(spherical[1], expected[2], epsilon = 1e-12);
+            assert_abs_diff_eq!(spherical[2], expected[3], epsilon = 1e-12);
+        }
     }
 
     #[test]
