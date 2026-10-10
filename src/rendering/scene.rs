@@ -556,7 +556,10 @@ mod tests {
 
     #[test]
     fn test_color_of_ray_hits_sphere_spherical() {
-        let position = cartesian_to_spherical(&Point::new_cartesian(0.0, 0.0, 0.0, -10.0));
+        // Slightly off the polar axis: exactly on it the camera tetrad is degenerate (the image
+        // orientation flips with the sign of rounding errors) and the center ray hits the
+        // sphere's texture pole, where the checker cell is undefined.
+        let position = cartesian_to_spherical(&Point::new_cartesian(0.0, 0.0, 0.5, -10.0));
         let camera = Camera::new(
             position,
             FourVector::new(1.0, 0.0, 0.0, 0.0, position),
