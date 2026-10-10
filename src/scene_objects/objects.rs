@@ -74,6 +74,16 @@ impl<'a, G: Geometry> Objects<'a, G> {
         frequency: &RayFrequencyData,
         remaining_steps: &[Step<G::Chart>],
     ) -> Result<Option<Radiance>, RaytracerError> {
+        // Right after a chart switch the two ends of a segment are in different charts. Express
+        // the start in the end's chart, so that objects interpolate within one chart.
+        let aligned_start;
+        let y_start = if y_start.x.chart != y_end.x.chart {
+            aligned_start = y_start.in_chart(y_end.x.chart);
+            &aligned_start
+        } else {
+            y_start
+        };
+
         let redshift_computer = RedshiftComputer::new(self.geometry);
         let mut resulting_color = None;
         let mut shortest_distance = f64::MAX;
@@ -309,5 +319,18 @@ mod tests {
             .intersects(&step_start, &step_end, &unit_frequency(), &[])
             .unwrap();
         assert!(result.is_some());
+
+        // The same segment right after a chart switch: the end in the rotated chart.
+        use crate::geometry::coordinates::spherical::{RotatedSpherical, SphericalChart};
+        let rotated = SphericalChart::Rotated(RotatedSpherical { rotation: 90.0 });
+        let step_end_rotated = step_end.in_chart(rotated);
+        assert_ne!(step_start.x.chart, step_end_rotated.x.chart);
+        let switched = objects
+            .intersects(&step_start, &step_end_rotated, &unit_frequency(), &[])
+            .unwrap();
+        let (expected, switched) = (result.unwrap(), switched.unwrap());
+        assert_abs_diff_eq!(switched.x, expected.x, epsilon = 1e-9);
+        assert_abs_diff_eq!(switched.y, expected.y, epsilon = 1e-9);
+        assert_abs_diff_eq!(switched.z, expected.z, epsilon = 1e-9);
     }
 }

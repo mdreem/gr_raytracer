@@ -1,4 +1,4 @@
-use crate::geometry::coordinates::atlas::{Atlas, CartesianConvertible};
+use crate::geometry::coordinates::atlas::{Atlas, CartesianConvertible, GeometryChart};
 use crate::geometry::four_vector::FourVector;
 use crate::geometry::geometry::Geometry;
 use crate::geometry::point::Point;
@@ -17,6 +17,18 @@ pub struct Step<C: CartesianConvertible> {
     pub p: FourVector<C>,
     pub t: f64,
     pub step: usize,
+}
+
+impl<C: GeometryChart> Step<C> {
+    /// The same step expressed in `chart`.
+    pub fn in_chart(&self, chart: C) -> Step<C> {
+        Step {
+            x: self.x.chart.transition_point(&self.x, chart),
+            p: self.p.at.chart.transition_four_vector(&self.p, chart),
+            t: self.t,
+            step: self.step,
+        }
+    }
 }
 
 #[derive(Debug, PartialEq)]
