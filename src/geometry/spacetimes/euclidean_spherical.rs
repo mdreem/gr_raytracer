@@ -225,7 +225,7 @@ impl SupportQuantities for EuclideanSpaceSpherical {
 
 #[cfg(test)]
 mod tests {
-    use crate::geometry::euclidean_spherical::EuclideanSpaceSpherical;
+    use crate::geometry::spacetimes::euclidean_spherical::EuclideanSpaceSpherical;
     use crate::geometry::four_vector::FourVector;
     use crate::geometry::point::Point;
     use crate::geometry::spherical_coordinates_helper::cartesian_to_spherical;

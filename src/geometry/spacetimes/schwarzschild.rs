@@ -294,8 +294,8 @@ mod test_schwarzschild {
     use crate::geometry::coordinates::spherical::SphericalChart;
     use crate::geometry::four_vector::FourVector;
     use crate::geometry::point::Point;
-    use crate::geometry::schwarzschild::Schwarzschild;
-    use crate::geometry::schwarzschild::tests::rk4;
+    use crate::geometry::spacetimes::schwarzschild::Schwarzschild;
+    use crate::geometry::spacetimes::schwarzschild::tests::rk4;
     use crate::rendering::runge_kutta::OdeFunction;
     use crate::rendering::scene::test_scene::CELESTIAL_SPHERE_RADIUS;
     use nalgebra::{Const, OVector, Vector2};
@@ -395,10 +395,10 @@ mod tests {
     use crate::geometry::four_vector::FourVector;
     use crate::geometry::geometry::{Geometry, InnerProduct};
     use crate::geometry::point::Point;
-    use crate::geometry::schwarzschild::test_schwarzschild::{
+    use crate::geometry::spacetimes::schwarzschild::test_schwarzschild::{
         TestSchwarzschild, get_energy_from_r, get_energy_from_t,
     };
-    use crate::geometry::schwarzschild::{Schwarzschild, test_schwarzschild};
+    use crate::geometry::spacetimes::schwarzschild::{Schwarzschild, test_schwarzschild};
     use crate::geometry::spherical_coordinates_helper::cartesian_to_spherical;
     use crate::rendering::camera::Camera;
     use crate::rendering::debug::save_rays_to_file;

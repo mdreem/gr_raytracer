@@ -297,7 +297,7 @@ impl<G: Geometry> Integrator<'_, G> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::geometry::schwarzschild::Schwarzschild;
+    use crate::geometry::spacetimes::schwarzschild::Schwarzschild;
 
     #[test]
     fn test_should_stop_prefers_celestial_sphere_over_nonfinite_momentum() {

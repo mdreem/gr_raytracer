@@ -1,6 +1,6 @@
 //! Boyer-Lindquist Kerr geometry using separated geodesic equations (complete integrability).
 //!
-//! Unlike the Kerr-Schild Cartesian implementation in `geometry/kerr.rs`, this module works
+//! Unlike the Kerr-Schild Cartesian implementation in `geometry/spacetimes/kerr.rs`, this module works
 //! in Boyer-Lindquist coordinates (t, r, θ, φ) and exploits the Carter constant to decouple
 //! the r and θ equations of motion.
 
@@ -551,7 +551,7 @@ mod tests {
         // transformation: J^T g_KS J = g_BL. This pins the time and azimuth
         // twist terms (dt_KS/dr = r_s r / Δ, dφ_KS/dr = a / Δ); without them
         // the error is O(1).
-        use crate::geometry::kerr::test_helpers::metric_cartesian;
+        use crate::geometry::spacetimes::kerr::test_helpers::metric_cartesian;
 
         let r_s = 1.0_f64;
         let a = 0.5_f64;
@@ -783,7 +783,7 @@ mod tests {
         let kerr_bl = KerrBL::new(radius, a, 1e-4);
 
         // Use the existing Kerr geometry to create a valid null ray
-        let kerr = crate::geometry::kerr::Kerr::new(radius, a, 1e-4);
+        let kerr = crate::geometry::spacetimes::kerr::Kerr::new(radius, a, 1e-4);
         let position = KerrChart::point_from_cartesian(
             kerr.kerr_schild_chart(),
             &Point::new_cartesian(0.0, -10.0, 0.0, 2.0),
@@ -823,7 +823,7 @@ mod tests {
     #[ignore = "needs KS -> BL atlas transition"]
     fn test_e_lz_consistency_between_ks_and_bl() {
         use crate::geometry::geometry::{Geometry, SupportQuantities};
-        use crate::geometry::kerr::Kerr;
+        use crate::geometry::spacetimes::kerr::Kerr;
         use crate::rendering::camera::Camera;
 
         let radius = 1.0;
@@ -1028,7 +1028,7 @@ mod tests {
     #[ignore = "needs KS -> BL atlas transition"]
     fn test_trajectory_agreement_with_kerr() {
         use crate::geometry::geometry::SupportQuantities;
-        use crate::geometry::kerr::Kerr;
+        use crate::geometry::spacetimes::kerr::Kerr;
         use crate::rendering::camera::Camera;
         use crate::rendering::scene;
         use crate::rendering::scene::Scene;
@@ -1120,7 +1120,7 @@ mod tests {
     #[test]
     #[ignore = "needs KS -> BL atlas transition"]
     fn test_constants_of_motion_conservation() {
-        use crate::geometry::kerr::Kerr;
+        use crate::geometry::spacetimes::kerr::Kerr;
         use crate::rendering::camera::Camera;
         use crate::rendering::scene;
 
@@ -1210,7 +1210,7 @@ mod tests {
     #[test]
     #[ignore = "needs KS -> BL atlas transition"]
     fn test_null_condition_preserved() {
-        use crate::geometry::kerr::Kerr;
+        use crate::geometry::spacetimes::kerr::Kerr;
         use crate::rendering::camera::Camera;
         use crate::rendering::scene;
 
@@ -1259,8 +1259,8 @@ mod tests {
     #[test]
     #[ignore = "needs KS -> BL atlas transition"]
     fn test_schwarzschild_limit() {
-        use crate::geometry::kerr::Kerr;
-        use crate::geometry::schwarzschild::Schwarzschild;
+        use crate::geometry::spacetimes::kerr::Kerr;
+        use crate::geometry::spacetimes::schwarzschild::Schwarzschild;
         use crate::rendering::camera::Camera;
         use crate::rendering::ray::Ray;
         use crate::rendering::scene;
@@ -1374,8 +1374,8 @@ mod tests {
         // (emitter energy / observer energy) agrees between the two geometries for
         // a ray that hits the disc. This validates momentum_from_state and the
         // full rendering pipeline end-to-end.
-        use crate::geometry::kerr::Kerr;
-        use crate::geometry::schwarzschild::Schwarzschild;
+        use crate::geometry::spacetimes::kerr::Kerr;
+        use crate::geometry::spacetimes::schwarzschild::Schwarzschild;
         use crate::geometry::spherical_coordinates_helper::cartesian_to_spherical;
         use crate::rendering::camera::Camera;
         use crate::rendering::redshift::RedshiftComputer;

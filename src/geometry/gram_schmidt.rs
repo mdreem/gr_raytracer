@@ -40,12 +40,12 @@ pub fn gram_schmidt<G: Geometry>(
 
 #[cfg(test)]
 mod tests {
-    use crate::geometry::euclidean::EuclideanSpace;
+    use crate::geometry::spacetimes::euclidean::EuclideanSpace;
     use crate::geometry::four_vector::FourVector;
     use crate::geometry::geometry::InnerProduct;
     use crate::geometry::gram_schmidt::gram_schmidt;
     use crate::geometry::point::Point;
-    use crate::geometry::schwarzschild::Schwarzschild;
+    use crate::geometry::spacetimes::schwarzschild::Schwarzschild;
     use crate::geometry::spherical_coordinates_helper::cartesian_to_spherical;
     use approx::assert_abs_diff_eq;
 

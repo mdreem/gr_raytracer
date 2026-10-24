@@ -158,7 +158,7 @@ impl<C: GeometryChart> Hittable<C> for Sphere {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::geometry::euclidean::EuclideanSpace;
+    use crate::geometry::spacetimes::euclidean::EuclideanSpace;
     use crate::geometry::four_vector::FourVector;
     use crate::geometry::point::Point;
     use crate::rendering::color::Color;

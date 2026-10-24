@@ -4,7 +4,7 @@ use crate::cli::shared::{
 };
 use crate::configuration::RenderConfig;
 use crate::geometry::coordinates::euclidean::CartesianChart;
-use crate::geometry::euclidean::EuclideanSpace;
+use crate::geometry::spacetimes::euclidean::EuclideanSpace;
 use crate::geometry::four_vector::FourVector;
 use crate::geometry::geometry::RenderableGeometry;
 use crate::geometry::point::Point;

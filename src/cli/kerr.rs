@@ -8,7 +8,7 @@ use crate::geometry::coordinates::boyer_lindquist::KerrChart;
 use crate::geometry::coordinates::euclidean::CartesianChart;
 use crate::geometry::four_vector::FourVector;
 use crate::geometry::geometry::{Geometry, InnerProduct, RenderableGeometry};
-use crate::geometry::kerr::Kerr;
+use crate::geometry::spacetimes::kerr::Kerr;
 use crate::geometry::point::Point;
 use crate::rendering::color::ToneMappingMethod;
 use crate::rendering::raytracer;

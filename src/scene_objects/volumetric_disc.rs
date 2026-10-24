@@ -771,7 +771,7 @@ impl<C: GeometryChart> Hittable<C> for VolumetricDisc {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::geometry::euclidean::EuclideanSpace;
+    use crate::geometry::spacetimes::euclidean::EuclideanSpace;
     use crate::geometry::four_vector::FourVector;
     use crate::rendering::color::{CIETristimulus, Color};
     use crate::rendering::texture::{CheckerMapper, TemperatureData, TextureMap};

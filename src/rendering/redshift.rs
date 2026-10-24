@@ -81,11 +81,11 @@ impl<'a, G: Geometry> RedshiftComputer<'a, G> {
 mod tests {
     use super::*;
     use crate::geometry::coordinates::euclidean::CartesianChart;
-    use crate::geometry::euclidean::EuclideanSpace;
+    use crate::geometry::spacetimes::euclidean::EuclideanSpace;
     use crate::geometry::four_vector::FourVector;
     use crate::geometry::geometry::{InnerProduct, SupportQuantities};
     use crate::geometry::point::Point;
-    use crate::geometry::schwarzschild::Schwarzschild;
+    use crate::geometry::spacetimes::schwarzschild::Schwarzschild;
     use crate::rendering::camera::Camera;
     use crate::rendering::integrator::{IntegrationConfiguration, Integrator};
     use approx::assert_abs_diff_eq;

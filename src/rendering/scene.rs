@@ -472,11 +472,11 @@ pub mod test_scene {
 
 #[cfg(test)]
 mod tests {
-    use crate::geometry::euclidean::EuclideanSpace;
-    use crate::geometry::euclidean_spherical::EuclideanSpaceSpherical;
+    use crate::geometry::spacetimes::euclidean::EuclideanSpace;
+    use crate::geometry::spacetimes::euclidean_spherical::EuclideanSpaceSpherical;
     use crate::geometry::four_vector::FourVector;
     use crate::geometry::point::Point;
-    use crate::geometry::schwarzschild::Schwarzschild;
+    use crate::geometry::spacetimes::schwarzschild::Schwarzschild;
     use crate::geometry::spherical_coordinates_helper::cartesian_to_spherical;
     use crate::rendering::camera::Camera;
     use crate::rendering::color::CIETristimulus;

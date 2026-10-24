@@ -252,7 +252,7 @@ impl SupportQuantities for EuclideanSpace {
 
 #[cfg(test)]
 mod tests {
-    use crate::geometry::euclidean::EuclideanSpace;
+    use crate::geometry::spacetimes::euclidean::EuclideanSpace;
     use crate::geometry::four_vector::FourVector;
     use crate::geometry::point::Point;
     use crate::rendering::camera::Camera;

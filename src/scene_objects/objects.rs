@@ -139,7 +139,7 @@ impl<'a, G: Geometry> Objects<'a, G> {
 mod tests {
     use super::*;
     use crate::geometry::coordinates::euclidean::CartesianChart;
-    use crate::geometry::euclidean::EuclideanSpace;
+    use crate::geometry::spacetimes::euclidean::EuclideanSpace;
     use crate::geometry::four_vector::FourVector;
     use crate::geometry::point::Point;
     use crate::rendering::color::Color;
@@ -268,7 +268,7 @@ mod tests {
         // intersection point Cartesian. An inclined (non-equatorial) ray
         // that crosses the disc plane must not panic or silently misread
         // the mismatched coordinate tags when building the emitter step.
-        use crate::geometry::schwarzschild::Schwarzschild;
+        use crate::geometry::spacetimes::schwarzschild::Schwarzschild;
         use crate::rendering::temperature::ConstantTemperatureComputer;
         use crate::scene_objects::disc::Disc;
 

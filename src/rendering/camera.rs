@@ -193,13 +193,13 @@ impl<C: CartesianConvertible> Camera<C> {
 mod tests {
     use crate::geometry::coordinates::atlas::CartesianConvertible;
     use crate::geometry::coordinates::boyer_lindquist::KerrChart;
-    use crate::geometry::euclidean::EuclideanSpace;
-    use crate::geometry::euclidean_spherical::EuclideanSpaceSpherical;
+    use crate::geometry::spacetimes::euclidean::EuclideanSpace;
+    use crate::geometry::spacetimes::euclidean_spherical::EuclideanSpaceSpherical;
     use crate::geometry::four_vector::FourVector;
     use crate::geometry::geometry::{InnerProduct, Signature};
-    use crate::geometry::kerr::Kerr;
+    use crate::geometry::spacetimes::kerr::Kerr;
     use crate::geometry::point::Point;
-    use crate::geometry::schwarzschild::Schwarzschild;
+    use crate::geometry::spacetimes::schwarzschild::Schwarzschild;
     use crate::geometry::spherical_coordinates_helper::{
         cartesian_to_spherical, spherical_to_cartesian,
     };
@@ -471,7 +471,7 @@ mod tests {
     fn handedness_fallback_matches_the_measured_tetrad_handedness() {
         use crate::geometry::coordinates::atlas::Chart;
         use crate::geometry::coordinates::spherical::{RotatedSpherical, SphericalChart};
-        use crate::geometry::kerr_bl::KerrBL;
+        use crate::geometry::spacetimes::kerr_bl::KerrBL;
 
         let spherical_points = [(12.0, 1.1, 0.4), (7.0, 2.5, -2.0), (30.0, 0.3, 3.0)];
 

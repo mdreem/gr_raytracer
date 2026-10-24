@@ -261,9 +261,9 @@ impl<C: GeometryChart> Hittable<C> for Disc {
 mod tests {
     use super::*;
     use crate::geometry::coordinates::atlas::CartesianConvertible;
-    use crate::geometry::euclidean::EuclideanSpace;
+    use crate::geometry::spacetimes::euclidean::EuclideanSpace;
     use crate::geometry::four_vector::FourVector;
-    use crate::geometry::kerr::Kerr;
+    use crate::geometry::spacetimes::kerr::Kerr;
     use crate::rendering::color::Color;
     use crate::rendering::temperature::ConstantTemperatureComputer;
     use crate::rendering::texture::CheckerMapper;

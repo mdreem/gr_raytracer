@@ -1,6 +1,6 @@
 use super::*;
 use crate::geometry::coordinates::euclidean::CartesianChart;
-use crate::geometry::euclidean::EuclideanSpace;
+use crate::geometry::spacetimes::euclidean::EuclideanSpace;
 use crate::geometry::point::Point;
 use crate::rendering::camera::Camera;
 use crate::rendering::integrator::IntegrationConfiguration;

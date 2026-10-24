@@ -13,7 +13,7 @@
 use super::*;
 use crate::geometry::geometry::SupportQuantities;
 use crate::geometry::point::Point;
-use crate::geometry::schwarzschild::Schwarzschild;
+use crate::geometry::spacetimes::schwarzschild::Schwarzschild;
 use crate::geometry::spherical_coordinates_helper::cartesian_to_spherical;
 use crate::rendering::camera::Camera;
 use crate::rendering::color::CIETristimulus;

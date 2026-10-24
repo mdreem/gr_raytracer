@@ -6,7 +6,7 @@ use crate::configuration::RenderConfig;
 use crate::geometry::coordinates::euclidean::CartesianChart;
 use crate::geometry::four_vector::FourVector;
 use crate::geometry::geometry::{Geometry, InnerProduct, RenderableGeometry};
-use crate::geometry::kerr_bl::KerrBL;
+use crate::geometry::spacetimes::kerr_bl::KerrBL;
 use crate::geometry::point::Point;
 use crate::rendering::color::ToneMappingMethod;
 use crate::rendering::raytracer;
