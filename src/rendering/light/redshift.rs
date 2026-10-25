@@ -80,7 +80,7 @@ impl<'a, G: Geometry> RedshiftComputer<'a, G> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::geometry::coordinates::euclidean::CartesianChart;
+    use crate::geometry::coordinates::cartesian::CartesianChart;
     use crate::geometry::spacetimes::euclidean::EuclideanSpace;
     use crate::geometry::four_vector::FourVector;
     use crate::geometry::geometry::{InnerProduct, SupportQuantities};

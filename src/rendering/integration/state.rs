@@ -1,6 +1,6 @@
 //! Position and momentum state used by geodesic integration.
 
-use crate::geometry::coordinates::atlas::Chart;
+use crate::geometry::coordinates::chart::Chart;
 use crate::geometry::point::Point;
 use nalgebra::{Const, OVector};
 

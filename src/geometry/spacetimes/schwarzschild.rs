@@ -1,5 +1,5 @@
+use crate::geometry::atlases::spherical::SphericalChart;
 use crate::geometry::circular_orbit::{self, OrbitKillingDecomposition};
-use crate::geometry::coordinates::spherical::SphericalChart;
 use crate::geometry::four_vector::FourVector;
 use crate::geometry::geometry::{
     GeodesicSolver, Geometry, HasChart, InnerProduct, Signature, SupportQuantities,
@@ -290,7 +290,7 @@ impl SupportQuantities for Schwarzschild {
 
 #[cfg(test)]
 mod test_schwarzschild {
-    use crate::geometry::coordinates::spherical::SphericalChart;
+    use crate::geometry::atlases::spherical::SphericalChart;
     use crate::geometry::four_vector::FourVector;
     use crate::geometry::point::Point;
     use crate::geometry::spacetimes::schwarzschild::Schwarzschild;
@@ -390,7 +390,7 @@ mod test_schwarzschild {
 
 #[cfg(test)]
 mod tests {
-    use crate::geometry::coordinates::spherical::SphericalChart;
+    use crate::geometry::atlases::spherical::SphericalChart;
     use crate::geometry::four_vector::FourVector;
     use crate::geometry::geometry::{Geometry, InnerProduct};
     use crate::geometry::point::Point;

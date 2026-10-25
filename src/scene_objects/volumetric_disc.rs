@@ -1,10 +1,11 @@
-use crate::geometry::coordinates::atlas::{CartesianConvertible, GeometryChart};
-use crate::geometry::coordinates::euclidean::CartesianChart;
+use crate::geometry::coordinates::cartesian::CartesianChart;
+use crate::geometry::coordinates::chart::GeometryChart;
+use crate::geometry::coordinates::conversion::CartesianConvertible;
 use crate::geometry::geometry::Geometry;
 use crate::geometry::point::Point;
+use crate::rendering::error::RaytracerError;
 use crate::rendering::integration::integrator::Step;
 use crate::rendering::light::radiance::Radiance;
-use crate::rendering::error::RaytracerError;
 use crate::rendering::light::redshift::RayFrequencyData;
 use crate::rendering::light::temperature::TemperatureComputer;
 use crate::rendering::texture::{TextureMapHandle, UVCoordinates};

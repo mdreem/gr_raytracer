@@ -1,5 +1,6 @@
+use crate::geometry::atlases::kerr::KerrChart;
 use crate::geometry::circular_orbit::{self, OrbitKillingDecomposition};
-use crate::geometry::coordinates::boyer_lindquist::{KerrChart, KerrSchildData};
+use crate::geometry::coordinates::kerr_schild::KerrSchildData;
 use crate::geometry::four_vector::FourVector;
 use crate::geometry::geometry::{
     GeodesicSolver, Geometry, HasChart, InnerProduct, Signature, SupportQuantities,
@@ -565,7 +566,7 @@ impl SupportQuantities for Kerr {
 #[cfg(test)]
 mod tests {
     use super::{metric, metric_contravariant};
-    use crate::geometry::coordinates::boyer_lindquist::KerrChart;
+    use crate::geometry::atlases::kerr::KerrChart;
     use crate::geometry::four_vector::FourVector;
     use crate::geometry::geometry::{Geometry, InnerProduct, SupportQuantities};
     use crate::geometry::spacetimes::kerr::Kerr;

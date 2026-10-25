@@ -1,6 +1,6 @@
 pub mod debug;
-
-use crate::geometry::coordinates::atlas::{CartesianConvertible, Chart};
+use crate::geometry::coordinates::conversion::CartesianConvertible;
+use crate::geometry::coordinates::chart::Chart;
 use crate::geometry::four_vector::FourVector;
 use crate::geometry::geometry::Geometry;
 use crate::geometry::point::Point;
@@ -193,8 +193,8 @@ impl<C: CartesianConvertible> Camera<C> {
 
 #[cfg(test)]
 mod tests {
-    use crate::geometry::coordinates::atlas::CartesianConvertible;
-    use crate::geometry::coordinates::boyer_lindquist::KerrChart;
+    use crate::geometry::coordinates::conversion::CartesianConvertible;
+    use crate::geometry::atlases::kerr::KerrChart;
     use crate::geometry::spacetimes::euclidean::EuclideanSpace;
     use crate::geometry::spacetimes::euclidean_spherical::EuclideanSpaceSpherical;
     use crate::geometry::four_vector::FourVector;
@@ -471,8 +471,9 @@ mod tests {
     /// everywhere else; otherwise the image would be mirrored at those points.
     #[test]
     fn handedness_fallback_matches_the_measured_tetrad_handedness() {
-        use crate::geometry::coordinates::atlas::Chart;
-        use crate::geometry::coordinates::spherical::{RotatedSpherical, SphericalChart};
+        use crate::geometry::coordinates::chart::Chart;
+        use crate::geometry::coordinates::spherical::RotatedSpherical;
+        use crate::geometry::atlases::spherical::SphericalChart;
         use crate::geometry::spacetimes::kerr_bl::KerrBL;
 
         let spherical_points = [(12.0, 1.1, 0.4), (7.0, 2.5, -2.0), (30.0, 0.3, 3.0)];

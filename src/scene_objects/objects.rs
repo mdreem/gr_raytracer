@@ -1,10 +1,10 @@
-use crate::geometry::coordinates::atlas::CartesianConvertible;
+use crate::geometry::coordinates::conversion::CartesianConvertible;
 use crate::geometry::four_vector::FourVector;
 use crate::geometry::geometry::Geometry;
 use crate::geometry::point::Point;
+use crate::rendering::error::RaytracerError;
 use crate::rendering::integration::integrator::Step;
 use crate::rendering::light::radiance::Radiance;
-use crate::rendering::error::RaytracerError;
 use crate::rendering::light::redshift::{RayFrequencyData, RedshiftComputer};
 use crate::rendering::texture::TemperatureData;
 use crate::scene_objects::hittable::{ColorComputationData, Hittable};
@@ -138,7 +138,7 @@ impl<'a, G: Geometry> Objects<'a, G> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::geometry::coordinates::euclidean::CartesianChart;
+    use crate::geometry::coordinates::cartesian::CartesianChart;
     use crate::geometry::spacetimes::euclidean::EuclideanSpace;
     use crate::geometry::four_vector::FourVector;
     use crate::geometry::point::Point;
@@ -321,7 +321,8 @@ mod tests {
         assert!(result.is_some());
 
         // The same segment right after a chart switch: the end in the rotated chart.
-        use crate::geometry::coordinates::spherical::{RotatedSpherical, SphericalChart};
+        use crate::geometry::coordinates::spherical::RotatedSpherical;
+        use crate::geometry::atlases::spherical::SphericalChart;
         let rotated = SphericalChart::Rotated(RotatedSpherical { rotation: 90.0 });
         let step_end_rotated = step_end.in_chart(rotated);
         assert_ne!(step_start.x.chart, step_end_rotated.x.chart);

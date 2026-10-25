@@ -1,8 +1,9 @@
 use crate::cli::cli::GlobalOpts;
 use crate::configuration::RenderConfig;
+use crate::geometry::atlases::Atlas;
 use crate::geometry::circular_orbit::OrbitKillingDecomposition;
-use crate::geometry::coordinates::atlas::{Atlas, Chart, GeometryChart};
-use crate::geometry::coordinates::euclidean::CartesianChart;
+use crate::geometry::coordinates::cartesian::CartesianChart;
+use crate::geometry::coordinates::chart::{Chart, GeometryChart};
 use crate::geometry::four_vector::FourVector;
 use crate::geometry::point::Point;
 use crate::geometry::tetrad::Tetrad;

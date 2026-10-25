@@ -1,17 +1,9 @@
-use crate::geometry::coordinates::atlas::{Atlas, Chart};
+//! Identity transitions for the single Cartesian chart.
+
+use super::Atlas;
+use crate::geometry::coordinates::cartesian::CartesianChart;
 use crate::geometry::four_vector::FourVector;
 use crate::geometry::point::Point;
-
-#[derive(Copy, Clone, PartialEq, Debug)]
-pub enum CartesianChart {
-    Cartesian,
-}
-
-impl Chart for CartesianChart {
-    fn tetrad_handedness_fallback(&self) -> f64 {
-        -1.0
-    }
-}
 
 impl Atlas for CartesianChart {
     fn best_chart(&self, position: &Point<Self>) -> Self {

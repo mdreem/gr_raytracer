@@ -1,5 +1,5 @@
 use crate::geometry::circular_orbit::OrbitKillingDecomposition;
-use crate::geometry::coordinates::euclidean::CartesianChart;
+use crate::geometry::coordinates::cartesian::CartesianChart;
 use crate::geometry::four_vector::FourVector;
 use crate::geometry::geometry::{
     GeodesicSolver, Geometry, HasChart, InnerProduct, Signature, SupportQuantities,

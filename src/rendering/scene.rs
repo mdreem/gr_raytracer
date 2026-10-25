@@ -1,14 +1,19 @@
 use crate::configuration::AdaptiveSamplingConfig;
-use crate::geometry::coordinates::atlas::{CartesianConvertible, Chart};
+use crate::geometry::coordinates::chart::Chart;
+use crate::geometry::coordinates::conversion::CartesianConvertible;
 use crate::geometry::geometry::Geometry;
 use crate::rendering::camera::Camera;
-use crate::rendering::light::color::CIETristimulus;
-use crate::rendering::integration::integrator::StopReason::{CelestialSphereReached, HorizonReached};
-use crate::rendering::integration::integrator::{IntegrationConfiguration, Integrator, Step, StopReason};
-use crate::rendering::light::radiance::Radiance;
-use crate::rendering::ray::{IntegratedRay, Ray};
 use crate::rendering::error::RaytracerError;
+use crate::rendering::integration::integrator::StopReason::{
+    CelestialSphereReached, HorizonReached,
+};
+use crate::rendering::integration::integrator::{
+    IntegrationConfiguration, Integrator, Step, StopReason,
+};
+use crate::rendering::light::color::CIETristimulus;
+use crate::rendering::light::radiance::Radiance;
 use crate::rendering::light::redshift::RedshiftComputer;
+use crate::rendering::ray::{IntegratedRay, Ray};
 use crate::rendering::stars::star_catalog::StarCatalog;
 use crate::rendering::texture::{BlackBodyMapper, TemperatureData, TextureData, UVCoordinates};
 use crate::scene_objects::objects::Objects;

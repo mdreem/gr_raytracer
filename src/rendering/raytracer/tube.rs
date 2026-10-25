@@ -1,4 +1,4 @@
-use crate::geometry::coordinates::atlas::Chart;
+use crate::geometry::coordinates::chart::Chart;
 use crate::rendering::scene::RaySample;
 
 /// A single ray tube's rectangular footprint on the camera screen.

@@ -3,7 +3,7 @@
 use super::progress::Progress;
 use super::Raytracer;
 use crate::configuration::AdaptiveSamplingConfig;
-use crate::geometry::coordinates::atlas::Chart;
+use crate::geometry::coordinates::chart::Chart;
 use crate::geometry::four_vector::FourVector;
 use crate::geometry::geometry::Geometry;
 use crate::rendering::error::RaytracerError;
@@ -419,7 +419,7 @@ mod tests {
         stratified_sample_offset,
     };
     use crate::configuration::AdaptiveSamplingConfig;
-    use crate::geometry::coordinates::euclidean::CartesianChart;
+    use crate::geometry::coordinates::cartesian::CartesianChart;
     use crate::geometry::four_vector::FourVector;
     use crate::geometry::point::Point;
     use crate::rendering::light::radiance::Radiance;

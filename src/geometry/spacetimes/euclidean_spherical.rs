@@ -1,5 +1,5 @@
+use crate::geometry::atlases::spherical::SphericalChart;
 use crate::geometry::circular_orbit::OrbitKillingDecomposition;
-use crate::geometry::coordinates::spherical::SphericalChart;
 use crate::geometry::four_vector::FourVector;
 use crate::geometry::geometry::{
     GeodesicSolver, Geometry, HasChart, InnerProduct, Signature, SupportQuantities,

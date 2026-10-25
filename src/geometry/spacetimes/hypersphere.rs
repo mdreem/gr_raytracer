@@ -1,5 +1,5 @@
+use crate::geometry::atlases::stereographic::StereographicChart;
 use crate::geometry::circular_orbit::OrbitKillingDecomposition;
-use crate::geometry::coordinates::stereographic::StereographicChart;
 use crate::geometry::four_vector::FourVector;
 use crate::geometry::geometry::{
     ConstantsOfMotion, GeodesicSolver, Geometry, HasChart, InnerProduct, Signature,
@@ -232,7 +232,7 @@ impl SupportQuantities for HyperSphere {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::geometry::coordinates::atlas::Atlas;
+    use crate::geometry::atlases::Atlas;
     use crate::rendering::integration::integrator::{IntegrationConfiguration, Integrator};
     use crate::rendering::ray::Ray;
     use nalgebra::Vector4;

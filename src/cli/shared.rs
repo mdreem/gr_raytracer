@@ -1,17 +1,17 @@
 use crate::cli::cli::GlobalOpts;
 use crate::configuration::{RenderConfig, TextureConfig};
-use crate::geometry::coordinates::atlas::Atlas;
+use crate::geometry::atlases::Atlas;
 use crate::geometry::four_vector::FourVector;
 use crate::geometry::geometry::Geometry;
 use crate::geometry::point::Point;
 use crate::rendering::camera::Camera;
-use crate::rendering::light::color::{CIETristimulus, Color, ToneMappingMethod};
-use crate::rendering::integration::integrator::IntegrationConfiguration;
-use crate::rendering::raytracer;
 use crate::rendering::error::RaytracerError;
+use crate::rendering::integration::integrator::IntegrationConfiguration;
+use crate::rendering::light::color::{CIETristimulus, Color, ToneMappingMethod};
+use crate::rendering::light::temperature::{ConstantTemperatureComputer, TemperatureComputer};
+use crate::rendering::raytracer;
 use crate::rendering::scene::Scene;
 use crate::rendering::stars::star_catalog::StarCatalog;
-use crate::rendering::light::temperature::{ConstantTemperatureComputer, TemperatureComputer};
 use crate::rendering::texture::{
     BlackBodyMapper, CheckerMapper, TextureData, TextureMapHandle, TextureMapperFactory,
 };
