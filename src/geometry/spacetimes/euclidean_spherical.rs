@@ -6,10 +6,10 @@ use crate::geometry::geometry::{
 };
 use crate::geometry::point::Point;
 use crate::geometry::tetrad::Tetrad;
-use crate::rendering::raytracer::RaytracerError;
-use crate::rendering::runge_kutta::OdeFunction;
-use crate::rendering::scene::EquationOfMotionState;
-use crate::rendering::temperature::{ConstantTemperatureComputer, TemperatureComputer};
+use crate::rendering::error::RaytracerError;
+use crate::rendering::integration::runge_kutta::OdeFunction;
+use crate::rendering::integration::state::EquationOfMotionState;
+use crate::rendering::light::temperature::{ConstantTemperatureComputer, TemperatureComputer};
 use nalgebra::{Const, Matrix4, OVector};
 
 pub struct EuclideanSpaceSphericalSolver {
@@ -225,12 +225,12 @@ impl SupportQuantities for EuclideanSpaceSpherical {
 
 #[cfg(test)]
 mod tests {
-    use crate::geometry::euclidean_spherical::EuclideanSpaceSpherical;
+    use crate::geometry::spacetimes::euclidean_spherical::EuclideanSpaceSpherical;
     use crate::geometry::four_vector::FourVector;
     use crate::geometry::point::Point;
     use crate::geometry::spherical_coordinates_helper::cartesian_to_spherical;
     use crate::rendering::camera::Camera;
-    use crate::rendering::debug::save_rays_to_file;
+    use crate::rendering::camera::debug::save_rays_to_file;
     use std::f64::consts::PI;
 
     #[ignore]

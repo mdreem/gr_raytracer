@@ -10,19 +10,23 @@
 //!
 //! Set CURVED_MEMBERSHIP=1 to exercise the curved-boundary gather.
 
-use super::*;
+use crate::rendering::light::color::ToneMappingMethod;
+use super::Raytracer;
+use crate::rendering::error::RaytracerError;
+use crate::rendering::light::color::CIETristimulus;
+use crate::rendering::light::radiance::Radiance;
+use crate::rendering::scene::Scene;
+use nalgebra::Vector3;
 use crate::geometry::geometry::SupportQuantities;
 use crate::geometry::point::Point;
-use crate::geometry::schwarzschild::Schwarzschild;
+use crate::geometry::spacetimes::schwarzschild::Schwarzschild;
 use crate::geometry::spherical_coordinates_helper::cartesian_to_spherical;
 use crate::rendering::camera::Camera;
-use crate::rendering::color::CIETristimulus;
-use crate::rendering::integrator::IntegrationConfiguration;
-use crate::rendering::octree::Octree;
-use crate::rendering::star_catalog::{Star, StarCatalog};
+use crate::rendering::integration::integrator::IntegrationConfiguration;
+use crate::rendering::stars::octree::Octree;
+use crate::rendering::stars::star_catalog::{Star, StarCatalog};
 use crate::rendering::texture::{TemperatureData, TextureData, TextureMap, UVCoordinates};
 use crate::scene_objects::objects::Objects;
-use nalgebra::Vector3;
 use std::f64::consts::PI;
 use std::sync::Arc;
 
@@ -45,12 +49,7 @@ impl TextureMap for BlackSky {
 fn star_directly_behind() -> Star {
     Star {
         source_id: 1,
-        ra_deg: 90.0,
-        dec_deg: 0.0,
         g_mag: 0.0,
-        bp_mag: 0.0,
-        rp_mag: 0.0,
-        bp_rp: 0.0,
         direction: Vector3::new(0.0, 1.0, 0.0),
         temperature: 5772.0,
         // Y carries the flux; hue is irrelevant for the ring geometry.

@@ -2,13 +2,13 @@ use crate::geometry::coordinates::atlas::{Atlas, CartesianConvertible, GeometryC
 use crate::geometry::four_vector::FourVector;
 use crate::geometry::geometry::Geometry;
 use crate::geometry::point::Point;
-use crate::rendering::integrator::StopReason::{
+use crate::rendering::integration::integrator::StopReason::{
     CelestialSphereReached, CoordinateIsNan, HorizonReached,
 };
 use crate::rendering::ray::{IntegratedRay, Ray};
-use crate::rendering::raytracer::RaytracerError;
-use crate::rendering::runge_kutta::rkf45;
-use crate::rendering::scene::{EquationOfMotionState, get_position};
+use crate::rendering::error::RaytracerError;
+use crate::rendering::integration::runge_kutta::rkf45;
+use crate::rendering::integration::state::{EquationOfMotionState, get_position};
 use log::debug;
 
 #[derive(Debug)]
@@ -297,7 +297,7 @@ impl<G: Geometry> Integrator<'_, G> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::geometry::schwarzschild::Schwarzschild;
+    use crate::geometry::spacetimes::schwarzschild::Schwarzschild;
 
     #[test]
     fn test_should_stop_prefers_celestial_sphere_over_nonfinite_momentum() {

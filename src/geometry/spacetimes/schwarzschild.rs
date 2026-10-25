@@ -7,11 +7,10 @@ use crate::geometry::geometry::{
 };
 use crate::geometry::point::Point;
 use crate::geometry::tetrad::Tetrad;
-use crate::rendering::ray::Ray;
-use crate::rendering::raytracer::RaytracerError;
-use crate::rendering::runge_kutta::OdeFunction;
-use crate::rendering::scene::EquationOfMotionState;
-use crate::rendering::temperature::{KerrTemperatureComputer, TemperatureComputer};
+use crate::rendering::error::RaytracerError;
+use crate::rendering::integration::runge_kutta::OdeFunction;
+use crate::rendering::integration::state::EquationOfMotionState;
+use crate::rendering::light::temperature::{KerrTemperatureComputer, TemperatureComputer};
 use log::debug;
 use nalgebra::{Const, Matrix4, OVector};
 
@@ -294,9 +293,9 @@ mod test_schwarzschild {
     use crate::geometry::coordinates::spherical::SphericalChart;
     use crate::geometry::four_vector::FourVector;
     use crate::geometry::point::Point;
-    use crate::geometry::schwarzschild::Schwarzschild;
-    use crate::geometry::schwarzschild::tests::rk4;
-    use crate::rendering::runge_kutta::OdeFunction;
+    use crate::geometry::spacetimes::schwarzschild::Schwarzschild;
+    use crate::geometry::spacetimes::schwarzschild::tests::rk4;
+    use crate::rendering::integration::runge_kutta::OdeFunction;
     use crate::rendering::scene::test_scene::CELESTIAL_SPHERE_RADIUS;
     use nalgebra::{Const, OVector, Vector2};
 
@@ -395,16 +394,16 @@ mod tests {
     use crate::geometry::four_vector::FourVector;
     use crate::geometry::geometry::{Geometry, InnerProduct};
     use crate::geometry::point::Point;
-    use crate::geometry::schwarzschild::test_schwarzschild::{
+    use crate::geometry::spacetimes::schwarzschild::test_schwarzschild::{
         TestSchwarzschild, get_energy_from_r, get_energy_from_t,
     };
-    use crate::geometry::schwarzschild::{Schwarzschild, test_schwarzschild};
+    use crate::geometry::spacetimes::schwarzschild::{Schwarzschild, test_schwarzschild};
     use crate::geometry::spherical_coordinates_helper::cartesian_to_spherical;
     use crate::rendering::camera::Camera;
-    use crate::rendering::debug::save_rays_to_file;
-    use crate::rendering::integrator::StopReason;
+    use crate::rendering::camera::debug::save_rays_to_file;
+    use crate::rendering::integration::integrator::StopReason;
     use crate::rendering::ray::{IntegratedRay, Ray};
-    use crate::rendering::runge_kutta::OdeFunction;
+    use crate::rendering::integration::runge_kutta::OdeFunction;
     use crate::rendering::scene;
     use crate::rendering::scene::Scene;
     use crate::rendering::scene::test_scene::CELESTIAL_SPHERE_RADIUS;
@@ -893,7 +892,7 @@ mod tests {
         // outward background ray must actually reach the celestial sphere
         // within the step budget rather than exhausting it first and coming
         // back with stop_reason = None (rendered as a miss).
-        use crate::rendering::integrator::{IntegrationConfiguration, Integrator};
+        use crate::rendering::integration::integrator::{IntegrationConfiguration, Integrator};
         use crate::rendering::ray::Ray;
 
         let radius = 2.0; // r_s, M = 1
@@ -920,7 +919,7 @@ mod tests {
         // — the worst realistic case for step budget, since it spends steps
         // both swinging past the black hole and then crossing to the
         // celestial sphere.
-        use crate::rendering::integrator::{IntegrationConfiguration, Integrator};
+        use crate::rendering::integration::integrator::{IntegrationConfiguration, Integrator};
         use crate::rendering::ray::Ray;
 
         let radius = 2.0; // r_s, M = 1

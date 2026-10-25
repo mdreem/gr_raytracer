@@ -258,12 +258,12 @@ pub enum GeometryType {
     },
 }
 
-use crate::geometry::euclidean::EuclideanSpace;
-use crate::geometry::euclidean_spherical::EuclideanSpaceSpherical;
+use crate::geometry::spacetimes::euclidean::EuclideanSpace;
+use crate::geometry::spacetimes::euclidean_spherical::EuclideanSpaceSpherical;
 use crate::geometry::geometry::RenderableGeometry;
-use crate::geometry::kerr::Kerr;
-use crate::geometry::kerr_bl::KerrBL;
-use crate::geometry::schwarzschild::Schwarzschild;
+use crate::geometry::spacetimes::kerr::Kerr;
+use crate::geometry::spacetimes::kerr_bl::KerrBL;
+use crate::geometry::spacetimes::schwarzschild::Schwarzschild;
 
 impl GeometryType {
     pub fn get_renderable_geometry(&self) -> Box<dyn RenderableGeometry> {

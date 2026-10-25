@@ -3,9 +3,9 @@ use crate::geometry::coordinates::euclidean::CartesianChart;
 use crate::geometry::geometry::Geometry;
 use crate::geometry::point::Point;
 use crate::geometry::spherical_coordinates_helper::cartesian_to_spherical;
-use crate::rendering::integrator::Step;
-use crate::rendering::radiance::Radiance;
-use crate::rendering::raytracer::RaytracerError;
+use crate::rendering::integration::integrator::Step;
+use crate::rendering::light::radiance::Radiance;
+use crate::rendering::error::RaytracerError;
 use crate::rendering::texture::{TextureMapHandle, UVCoordinates};
 use crate::scene_objects::hittable::{ColorComputationData, Hittable, Intersection};
 use nalgebra::Vector3;
@@ -158,10 +158,10 @@ impl<C: GeometryChart> Hittable<C> for Sphere {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::geometry::euclidean::EuclideanSpace;
+    use crate::geometry::spacetimes::euclidean::EuclideanSpace;
     use crate::geometry::four_vector::FourVector;
     use crate::geometry::point::Point;
-    use crate::rendering::color::Color;
+    use crate::rendering::light::color::Color;
     use crate::rendering::texture::CheckerMapper;
     use crate::scene_objects::hittable::Hittable;
     use approx::assert_abs_diff_eq;

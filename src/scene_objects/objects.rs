@@ -2,10 +2,10 @@ use crate::geometry::coordinates::atlas::CartesianConvertible;
 use crate::geometry::four_vector::FourVector;
 use crate::geometry::geometry::Geometry;
 use crate::geometry::point::Point;
-use crate::rendering::integrator::Step;
-use crate::rendering::radiance::Radiance;
-use crate::rendering::raytracer::RaytracerError;
-use crate::rendering::redshift::{RayFrequencyData, RedshiftComputer};
+use crate::rendering::integration::integrator::Step;
+use crate::rendering::light::radiance::Radiance;
+use crate::rendering::error::RaytracerError;
+use crate::rendering::light::redshift::{RayFrequencyData, RedshiftComputer};
 use crate::rendering::texture::TemperatureData;
 use crate::scene_objects::hittable::{ColorComputationData, Hittable};
 
@@ -139,10 +139,10 @@ impl<'a, G: Geometry> Objects<'a, G> {
 mod tests {
     use super::*;
     use crate::geometry::coordinates::euclidean::CartesianChart;
-    use crate::geometry::euclidean::EuclideanSpace;
+    use crate::geometry::spacetimes::euclidean::EuclideanSpace;
     use crate::geometry::four_vector::FourVector;
     use crate::geometry::point::Point;
-    use crate::rendering::color::Color;
+    use crate::rendering::light::color::Color;
     use crate::rendering::texture::CheckerMapper;
     use crate::scene_objects::sphere::Sphere;
     use approx::assert_abs_diff_eq;
@@ -268,8 +268,8 @@ mod tests {
         // intersection point Cartesian. An inclined (non-equatorial) ray
         // that crosses the disc plane must not panic or silently misread
         // the mismatched coordinate tags when building the emitter step.
-        use crate::geometry::schwarzschild::Schwarzschild;
-        use crate::rendering::temperature::ConstantTemperatureComputer;
+        use crate::geometry::spacetimes::schwarzschild::Schwarzschild;
+        use crate::rendering::light::temperature::ConstantTemperatureComputer;
         use crate::scene_objects::disc::Disc;
 
         let geometry = Schwarzschild::new(2.0, 1e-4);

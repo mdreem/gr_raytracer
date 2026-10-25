@@ -7,10 +7,10 @@ use crate::geometry::geometry::{
 };
 use crate::geometry::point::Point;
 use crate::geometry::tetrad::Tetrad;
-use crate::rendering::raytracer::RaytracerError;
-use crate::rendering::runge_kutta::OdeFunction;
-use crate::rendering::scene::EquationOfMotionState;
-use crate::rendering::temperature::{ConstantTemperatureComputer, TemperatureComputer};
+use crate::rendering::error::RaytracerError;
+use crate::rendering::integration::runge_kutta::OdeFunction;
+use crate::rendering::integration::state::EquationOfMotionState;
+use crate::rendering::light::temperature::{ConstantTemperatureComputer, TemperatureComputer};
 use nalgebra::{Const, Matrix4, OVector, Vector3};
 use std::f64::consts::PI;
 
@@ -22,12 +22,6 @@ use std::f64::consts::PI;
 #[derive(Clone, Debug)]
 pub struct HyperSphere {
     pub radius: f64,
-}
-
-impl HyperSphere {
-    pub fn new(radius: f64) -> Self {
-        Self { radius }
-    }
 }
 
 /// Conformal factor Omega of the unit 3-sphere in stereographic coordinates.
@@ -239,7 +233,7 @@ impl SupportQuantities for HyperSphere {
 mod tests {
     use super::*;
     use crate::geometry::coordinates::atlas::Atlas;
-    use crate::rendering::integrator::{IntegrationConfiguration, Integrator};
+    use crate::rendering::integration::integrator::{IntegrationConfiguration, Integrator};
     use crate::rendering::ray::Ray;
     use nalgebra::Vector4;
 
@@ -262,7 +256,7 @@ mod tests {
         u: Vector3<f64>,
         direction: Vector3<f64>,
     ) -> (Ray<StereographicChart>, Vector4<f64>, Vector4<f64>) {
-        let geometry = HyperSphere::new(RADIUS);
+        let geometry = HyperSphere { radius: RADIUS };
         let p = Point::new(0.0, u[0], u[1], u[2], NORTH);
         let v = direction.normalize() / (RADIUS * conformal_factor(&p));
         let momentum = FourVector::new(-1.0, v[0], v[1], v[2], p);
@@ -289,7 +283,7 @@ mod tests {
 
     #[test]
     fn tetrad_is_orthonormal_in_both_charts() {
-        let geometry = HyperSphere::new(RADIUS);
+        let geometry = HyperSphere { radius: RADIUS };
         for p in [
             Point::new(0.0, 0.3, 0.1, -0.2, NORTH),
             Point::new(0.0, -1.5, 0.4, 0.9, SOUTH),
@@ -315,7 +309,7 @@ mod tests {
     #[test]
     fn proper_speed_is_conserved_by_the_equation_of_motion() {
         let (ray, _, _) = ray(Vector3::new(0.3, 0.1, -0.2), Vector3::new(0.2, 0.5, 0.1));
-        let solver = HyperSphere::new(RADIUS).get_geodesic_solver(&ray.momentum);
+        let solver = HyperSphere { radius: RADIUS }.get_geodesic_solver(&ray.momentum);
         let y = solver.create_initial_state(&ray.momentum);
         let dy = solver.geodesic(0.0, &y);
         // d/dlambda (Omega^2 |v|^2) = 2 Omega^2 (v . a + |v|^2 v . grad ln Omega)
@@ -331,7 +325,7 @@ mod tests {
     /// to the south chart and back, and the ray stays on the exact great circle and null.
     #[test]
     fn rays_follow_great_circles_across_chart_switches() {
-        let geometry = HyperSphere::new(RADIUS);
+        let geometry = HyperSphere { radius: RADIUS };
         let (ray, start, tangent) = ray(Vector3::new(0.3, 0.1, -0.2), Vector3::new(0.2, 0.5, 0.1));
         let integrator = Integrator::new(
             &geometry,
@@ -364,7 +358,7 @@ mod tests {
 
     #[test]
     fn radial_coordinate_is_the_distance_from_the_north_pole_in_both_charts() {
-        let geometry = HyperSphere::new(RADIUS);
+        let geometry = HyperSphere { radius: RADIUS };
         let p = Point::new(0.0, 1.3, -0.4, 2.1, NORTH);
         let q = NORTH.transition_point(&p, SOUTH);
         let chi = embedding(&p)[0].acos();

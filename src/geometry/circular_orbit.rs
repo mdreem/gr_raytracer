@@ -11,7 +11,7 @@
 //! Off-equatorial callers use these values as the standard near-equatorial
 //! approximation, matching the previous per-geometry implementations.
 
-use crate::rendering::raytracer::RaytracerError;
+use crate::rendering::error::RaytracerError;
 use log::debug;
 
 /// A circular-orbit four-velocity decomposed on the Killing basis:
@@ -150,10 +150,10 @@ mod tests {
     use crate::geometry::coordinates::boyer_lindquist::KerrChart;
     use crate::geometry::four_vector::FourVector;
     use crate::geometry::geometry::{Geometry, SupportQuantities};
-    use crate::geometry::kerr::Kerr;
-    use crate::geometry::kerr_bl::KerrBL;
+    use crate::geometry::spacetimes::kerr::Kerr;
+    use crate::geometry::spacetimes::kerr_bl::KerrBL;
     use crate::geometry::point::Point;
-    use crate::geometry::schwarzschild::Schwarzschild;
+    use crate::geometry::spacetimes::schwarzschild::Schwarzschild;
     use approx::assert_abs_diff_eq;
     use std::f64::consts::PI;
 

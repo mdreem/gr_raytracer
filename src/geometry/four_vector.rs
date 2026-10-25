@@ -136,7 +136,7 @@ impl<C: CartesianConvertible> FourVector<C> {
 #[cfg(test)]
 mod tests {
     use crate::geometry::coordinates::atlas::CartesianConvertible;
-    use crate::geometry::euclidean::EuclideanSpace;
+    use crate::geometry::spacetimes::euclidean::EuclideanSpace;
     use crate::geometry::four_vector::FourVector;
     use crate::geometry::geometry::InnerProduct;
     use crate::geometry::point::Point;

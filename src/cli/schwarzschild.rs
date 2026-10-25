@@ -8,11 +8,11 @@ use crate::geometry::coordinates::euclidean::CartesianChart;
 use crate::geometry::four_vector::FourVector;
 use crate::geometry::geometry::{Geometry, RenderableGeometry};
 use crate::geometry::point::Point;
-use crate::geometry::schwarzschild::Schwarzschild;
+use crate::geometry::spacetimes::schwarzschild::Schwarzschild;
 use crate::geometry::spherical_coordinates_helper::cartesian_to_spherical;
-use crate::rendering::color::ToneMappingMethod;
+use crate::rendering::light::color::ToneMappingMethod;
 use crate::rendering::raytracer;
-use crate::rendering::raytracer::RaytracerError;
+use crate::rendering::error::RaytracerError;
 use crate::rendering::scene::Scene;
 use log::info;
 use std::io::Write;
@@ -131,7 +131,7 @@ mod tests {
     use crate::cli::cli::GlobalOpts;
     use crate::geometry::four_vector::FourVector;
     use crate::geometry::point::Point;
-    use crate::rendering::color::ToneMappingMethod;
+    use crate::rendering::light::color::ToneMappingMethod;
     use std::io::BufWriter;
 
     #[test]
@@ -154,7 +154,7 @@ mod tests {
             camera_position: vec![],
             tone_mapping: ToneMappingMethod::Reinhard,
             show_sampling_mask: false,
-            sampling_mask_color: crate::rendering::color::Color::new(255, 0, 255, 255),
+            sampling_mask_color: crate::rendering::light::color::Color::new(255, 0, 255, 255),
             curved_star_membership: false,
         };
         let geometry = Schwarzschild::new(radius, horizon_epsilon);

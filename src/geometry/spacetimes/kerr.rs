@@ -8,11 +8,10 @@ use crate::geometry::geometry::{
 use crate::geometry::gram_schmidt::gram_schmidt;
 use crate::geometry::point::Point;
 use crate::geometry::tetrad::Tetrad;
-use crate::rendering::ray::Ray;
-use crate::rendering::raytracer::RaytracerError;
-use crate::rendering::runge_kutta::OdeFunction;
-use crate::rendering::scene::EquationOfMotionState;
-use crate::rendering::temperature::{KerrTemperatureComputer, TemperatureComputer};
+use crate::rendering::error::RaytracerError;
+use crate::rendering::integration::runge_kutta::OdeFunction;
+use crate::rendering::integration::state::EquationOfMotionState;
+use crate::rendering::light::temperature::{KerrTemperatureComputer, TemperatureComputer};
 use log::{debug, trace, warn};
 use nalgebra::{Const, Matrix4, OVector, Vector3, Vector4};
 
@@ -569,10 +568,10 @@ mod tests {
     use crate::geometry::coordinates::boyer_lindquist::KerrChart;
     use crate::geometry::four_vector::FourVector;
     use crate::geometry::geometry::{Geometry, InnerProduct, SupportQuantities};
-    use crate::geometry::kerr::Kerr;
+    use crate::geometry::spacetimes::kerr::Kerr;
     use crate::geometry::point::Point;
     use crate::rendering::camera::Camera;
-    use crate::rendering::debug::save_rays_to_file;
+    use crate::rendering::camera::debug::save_rays_to_file;
     use crate::rendering::scene;
     use crate::rendering::scene::Scene;
     use approx::assert_abs_diff_eq;

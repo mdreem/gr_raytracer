@@ -1,20 +1,19 @@
 use crate::configuration::AdaptiveSamplingConfig;
 use crate::geometry::coordinates::atlas::{CartesianConvertible, Chart};
 use crate::geometry::geometry::Geometry;
-use crate::geometry::point::Point;
 use crate::rendering::camera::Camera;
-use crate::rendering::color::CIETristimulus;
-use crate::rendering::integrator::StopReason::{CelestialSphereReached, HorizonReached};
-use crate::rendering::integrator::{IntegrationConfiguration, Integrator, Step, StopReason};
-use crate::rendering::radiance::Radiance;
+use crate::rendering::light::color::CIETristimulus;
+use crate::rendering::integration::integrator::StopReason::{CelestialSphereReached, HorizonReached};
+use crate::rendering::integration::integrator::{IntegrationConfiguration, Integrator, Step, StopReason};
+use crate::rendering::light::radiance::Radiance;
 use crate::rendering::ray::{IntegratedRay, Ray};
-use crate::rendering::raytracer::RaytracerError;
-use crate::rendering::redshift::RedshiftComputer;
-use crate::rendering::star_catalog::StarCatalog;
+use crate::rendering::error::RaytracerError;
+use crate::rendering::light::redshift::RedshiftComputer;
+use crate::rendering::stars::star_catalog::StarCatalog;
 use crate::rendering::texture::{BlackBodyMapper, TemperatureData, TextureData, UVCoordinates};
 use crate::scene_objects::objects::Objects;
 use log::{error, trace};
-use nalgebra::{Const, OVector, Vector3};
+use nalgebra::Vector3;
 use std::f64::consts::PI;
 use std::fs::File;
 
@@ -52,6 +51,7 @@ pub enum RayClass {
     Hit,
 }
 
+#[cfg(test)]
 impl RayClass {
     pub fn escaped(self) -> Option<EscapeInfo> {
         match self {
@@ -91,13 +91,6 @@ pub struct Scene<'a, G: Geometry> {
     /// Blackbody colour LUT for re-tinting stars at their redshifted
     /// temperature `g * T` in the gather. Present iff a star catalogue is.
     pub star_blackbody: Option<BlackBodyMapper>,
-}
-
-pub type EquationOfMotionState = OVector<f64, Const<8>>;
-
-// TODO: replace this with a more natural function, that does not need to use cartesian coordinates.
-pub fn get_position<C: Chart>(y: &EquationOfMotionState, chart: C) -> Point<C> {
-    Point::new(y[0], y[1], y[2], y[3], chart)
 }
 
 fn compute_accumulated_angular_distance<C: CartesianConvertible>(steps: &[Step<C>]) -> f64 {
@@ -229,7 +222,7 @@ impl<'a, G: Geometry> Scene<'a, G> {
             }
         }
         let last_step = steps.steps.last().ok_or(RaytracerError::IntegrationError(
-            crate::rendering::integrator::IntegrationError::NoStepsProduced,
+            crate::rendering::integration::integrator::IntegrationError::NoStepsProduced,
         ))?;
 
         let mut ray_class;
@@ -337,8 +330,8 @@ pub mod test_scene {
     use crate::geometry::geometry::Geometry;
     use crate::geometry::point::Point;
     use crate::rendering::camera::Camera;
-    use crate::rendering::color::{Color, srgb_to_xyz};
-    use crate::rendering::raytracer::RaytracerError;
+    use crate::rendering::light::color::{Color, srgb_to_xyz};
+    use crate::rendering::error::RaytracerError;
     use crate::rendering::scene::{IntegrationConfiguration, Scene, TextureData};
     use crate::rendering::texture::CheckerMapper;
     use crate::scene_objects;
@@ -472,24 +465,17 @@ pub mod test_scene {
 
 #[cfg(test)]
 mod tests {
-    use crate::geometry::euclidean::EuclideanSpace;
-    use crate::geometry::euclidean_spherical::EuclideanSpaceSpherical;
+    use crate::geometry::spacetimes::euclidean::EuclideanSpace;
+    use crate::geometry::spacetimes::euclidean_spherical::EuclideanSpaceSpherical;
     use crate::geometry::four_vector::FourVector;
     use crate::geometry::point::Point;
-    use crate::geometry::schwarzschild::Schwarzschild;
+    use crate::geometry::spacetimes::schwarzschild::Schwarzschild;
     use crate::geometry::spherical_coordinates_helper::cartesian_to_spherical;
     use crate::rendering::camera::Camera;
-    use crate::rendering::color::CIETristimulus;
+    use crate::rendering::light::color::CIETristimulus;
     use crate::rendering::scene::test_scene::create_scene_with_camera;
     use crate::rendering::scene::{RayClass, Scene};
     use std::f64::consts::PI;
-
-    const CELESTIAL_SPHERE_COLOR_1: CIETristimulus = CIETristimulus {
-        x: 0.04556866876322511,
-        y: 0.09113733752645022,
-        z: 0.015189552006485689,
-        alpha: 1.0,
-    };
 
     const CELESTIAL_SPHERE_COLOR_2: CIETristimulus = CIETristimulus {
         x: 0.3575761,
@@ -747,7 +733,7 @@ mod tests {
         let sample = scene.color_of_ray(&ray).unwrap();
 
         assert_eq!(sample.ray_class, RayClass::Captured);
-        assert_eq!(sample.color, crate::rendering::radiance::Radiance::BLACK);
+        assert_eq!(sample.color, crate::rendering::light::radiance::Radiance::BLACK);
     }
 
     #[test]

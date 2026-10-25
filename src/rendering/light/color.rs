@@ -1,4 +1,4 @@
-use crate::rendering::raytracer::RaytracerError;
+use crate::rendering::error::RaytracerError;
 use clap::ValueEnum;
 use image::Rgba;
 use nalgebra::{Matrix3, Vector3};

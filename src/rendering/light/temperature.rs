@@ -1,5 +1,5 @@
 use crate::geometry::circular_orbit;
-use crate::rendering::raytracer::RaytracerError;
+use crate::rendering::error::RaytracerError;
 use log::{error, info};
 use std::f64::consts::PI;
 

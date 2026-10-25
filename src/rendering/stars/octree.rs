@@ -1,4 +1,4 @@
-use crate::rendering::star_catalog::Star;
+use crate::rendering::stars::star_catalog::Star;
 use nalgebra::Vector3;
 
 /// Inward-facing normals of a spherical triangle's three edge planes (each
@@ -230,19 +230,14 @@ impl AABB {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::rendering::color::CIETristimulus;
+    use crate::rendering::light::color::CIETristimulus;
 
     /// A star at `direction`; every other field is a placeholder, since the
     /// octree only ever looks at `direction`.
     fn star_at(direction: Vector3<f64>) -> Star {
         Star {
             source_id: 0,
-            ra_deg: 0.0,
-            dec_deg: 0.0,
             g_mag: 0.0,
-            bp_mag: 0.0,
-            rp_mag: 0.0,
-            bp_rp: 0.0,
             direction,
             temperature: 5000.0,
             emission_xyz: CIETristimulus::new(0.0, 0.0, 0.0, 1.0),

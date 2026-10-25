@@ -1,13 +1,24 @@
-use super::*;
+use super::tube::SampleTube;
+use crate::rendering::stars::star_catalog::Star;
+use crate::geometry::four_vector::FourVector;
+use crate::rendering::light::color::ToneMappingMethod;
+use super::star_gather::{compute_traced_tube_solid_angle, finite_tube_flux};
+use super::Raytracer;
+use crate::rendering::error::RaytracerError;
+use crate::rendering::light::color::CIETristimulus;
+use crate::rendering::light::radiance::Radiance;
+use crate::rendering::scene::{EscapeInfo, RayClass, RaySample, Scene};
+use nalgebra::Vector3;
+use std::sync::atomic::{AtomicUsize, Ordering};
 use crate::geometry::coordinates::euclidean::CartesianChart;
-use crate::geometry::euclidean::EuclideanSpace;
+use crate::geometry::spacetimes::euclidean::EuclideanSpace;
 use crate::geometry::point::Point;
 use crate::rendering::camera::Camera;
-use crate::rendering::integrator::IntegrationConfiguration;
-use crate::rendering::octree::Octree;
-use crate::rendering::star_catalog::StarCatalog;
+use crate::rendering::integration::integrator::IntegrationConfiguration;
+use crate::rendering::stars::octree::Octree;
+use crate::rendering::stars::star_catalog::StarCatalog;
 use crate::rendering::texture::{TemperatureData, TextureData, TextureMap, UVCoordinates};
-use crate::rendering::tubetracer::TubeScreenBounds;
+use crate::rendering::raytracer::tube::TubeScreenBounds;
 use crate::scene_objects::objects::Objects;
 use approx::assert_abs_diff_eq;
 use std::sync::Arc;
@@ -198,12 +209,7 @@ fn tube_subdivision_preserves_flat_space_star_flux() {
     let ray = renderer.scene.camera.get_ray_for_offset(10, 20, 0.67, 0.73);
     let star = Star {
         source_id: 1,
-        ra_deg: 0.0,
-        dec_deg: 0.0,
         g_mag: 0.0,
-        bp_mag: 0.0,
-        rp_mag: 0.0,
-        bp_rp: 0.0,
         direction: ray.momentum.to_cartesian().get_spatial_vector().normalize(),
         temperature: 5772.0,
         emission_xyz: CIETristimulus::new(2.0, 1.0, 0.5, 1.0),
@@ -253,12 +259,7 @@ fn star_magnification_and_foreground_transmittance_are_applied_once() {
     renderer.scene.star_catalog = Some(StarCatalog {
         stars: Octree::new(vec![Star {
             source_id: 1,
-            ra_deg: 0.0,
-            dec_deg: 0.0,
             g_mag: 0.0,
-            bp_mag: 0.0,
-            rp_mag: 0.0,
-            bp_rp: 0.0,
             direction: star_ray
                 .momentum
                 .to_cartesian()

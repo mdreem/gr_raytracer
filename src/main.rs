@@ -9,7 +9,7 @@ use crate::configuration::RenderConfig;
 use crate::geometry::coordinates::euclidean::CartesianChart;
 use crate::geometry::four_vector::FourVector;
 use crate::geometry::point::Point;
-use crate::rendering::raytracer::RaytracerError;
+use crate::rendering::error::RaytracerError;
 use clap::Parser;
 use log::info;
 use nalgebra::Vector4;

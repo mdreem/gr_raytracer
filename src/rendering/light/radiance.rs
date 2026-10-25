@@ -1,4 +1,4 @@
-use crate::rendering::color::CIETristimulus;
+use crate::rendering::light::color::CIETristimulus;
 use nalgebra::Vector3;
 
 /// Integrated linear XYZ light and the fraction of background light transmitted.

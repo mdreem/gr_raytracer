@@ -6,11 +6,11 @@ use crate::configuration::RenderConfig;
 use crate::geometry::coordinates::euclidean::CartesianChart;
 use crate::geometry::four_vector::FourVector;
 use crate::geometry::geometry::{Geometry, InnerProduct, RenderableGeometry};
-use crate::geometry::kerr_bl::KerrBL;
+use crate::geometry::spacetimes::kerr_bl::KerrBL;
 use crate::geometry::point::Point;
-use crate::rendering::color::ToneMappingMethod;
+use crate::rendering::light::color::ToneMappingMethod;
 use crate::rendering::raytracer;
-use crate::rendering::raytracer::RaytracerError;
+use crate::rendering::error::RaytracerError;
 use crate::rendering::scene::Scene;
 use log::info;
 use std::io::Write;
@@ -116,7 +116,7 @@ mod tests {
     use crate::cli::cli::GlobalOpts;
     use crate::geometry::four_vector::FourVector;
     use crate::geometry::point::Point;
-    use crate::rendering::color::ToneMappingMethod;
+    use crate::rendering::light::color::ToneMappingMethod;
     use std::f64::consts::PI;
     use std::io::BufWriter;
 
@@ -147,7 +147,7 @@ mod tests {
             camera_position: vec![],
             tone_mapping: ToneMappingMethod::Reinhard,
             show_sampling_mask: false,
-            sampling_mask_color: crate::rendering::color::Color::new(255, 0, 255, 255),
+            sampling_mask_color: crate::rendering::light::color::Color::new(255, 0, 255, 255),
             curved_star_membership: false,
         };
 

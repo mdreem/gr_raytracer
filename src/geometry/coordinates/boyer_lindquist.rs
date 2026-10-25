@@ -11,7 +11,7 @@ const KS_TO_BL_MIN_R_FACTOR: f64 = 3.0;
 /// Boyer-Lindquist coordinates (t, r, θ, φ) for the Kerr metric.
 ///
 /// The Cartesian embedding used is the null-tetrad convention consistent with
-/// the Kerr-Schild form used in `geometry/kerr.rs`:
+/// the Kerr-Schild form used in `geometry/spacetimes/kerr.rs`:
 ///   x = (r cosφ − a sinφ) sinθ
 ///   y = (r sinφ + a cosφ) sinθ
 ///   z = r cosθ
@@ -262,8 +262,8 @@ impl Atlas for KerrChart {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::geometry::kerr::test_helpers::metric_cartesian;
-    use crate::geometry::kerr_bl::metric_bl;
+    use crate::geometry::spacetimes::kerr::test_helpers::metric_cartesian;
+    use crate::geometry::spacetimes::kerr_bl::metric_bl;
     use approx::assert_abs_diff_eq;
 
     const R_S: f64 = 1.0;

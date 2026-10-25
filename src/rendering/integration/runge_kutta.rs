@@ -1,5 +1,5 @@
-use crate::rendering::integrator::IntegrationError;
-use crate::rendering::raytracer::RaytracerError;
+use crate::rendering::integration::integrator::IntegrationError;
+use crate::rendering::error::RaytracerError;
 use nalgebra::OVector;
 use nalgebra::allocator::Allocator;
 use nalgebra::{DefaultAllocator, Dim};
@@ -183,7 +183,7 @@ where
 
 #[cfg(test)]
 mod tests {
-    use crate::rendering::runge_kutta::{OdeFunction, rkf45};
+    use crate::rendering::integration::runge_kutta::{OdeFunction, rkf45};
     use approx::assert_abs_diff_eq;
     use nalgebra::{Const, OVector, Vector2};
 

@@ -1,4 +1,4 @@
-use crate::rendering::color::{Color, ToneMappingMethod};
+use crate::rendering::light::color::{Color, ToneMappingMethod};
 use clap::{Args, Parser, Subcommand};
 
 #[derive(Debug, Args, Clone)]
@@ -125,7 +125,7 @@ pub enum Action {
 #[cfg(test)]
 mod tests {
     use super::App;
-    use crate::rendering::color::Color;
+    use crate::rendering::light::color::Color;
     use clap::Parser;
 
     #[test]
