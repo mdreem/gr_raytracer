@@ -51,6 +51,7 @@ pub enum RayClass {
     Hit,
 }
 
+#[cfg(test)]
 impl RayClass {
     pub fn escaped(self) -> Option<EscapeInfo> {
         match self {
@@ -475,13 +476,6 @@ mod tests {
     use crate::rendering::scene::test_scene::create_scene_with_camera;
     use crate::rendering::scene::{RayClass, Scene};
     use std::f64::consts::PI;
-
-    const CELESTIAL_SPHERE_COLOR_1: CIETristimulus = CIETristimulus {
-        x: 0.04556866876322511,
-        y: 0.09113733752645022,
-        z: 0.015189552006485689,
-        alpha: 1.0,
-    };
 
     const CELESTIAL_SPHERE_COLOR_2: CIETristimulus = CIETristimulus {
         x: 0.3575761,

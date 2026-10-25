@@ -230,7 +230,7 @@ mod tests {
     use crate::geometry::point::Point;
     use crate::geometry::spherical_coordinates_helper::cartesian_to_spherical;
     use crate::rendering::camera::Camera;
-    use crate::rendering::debug::save_rays_to_file;
+    use crate::rendering::camera::debug::save_rays_to_file;
     use std::f64::consts::PI;
 
     #[ignore]

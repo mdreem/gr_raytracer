@@ -1,7 +1,6 @@
 //! Scene rendering, light transport, and image generation.
 
 pub mod camera;
-pub mod debug;
 pub mod error;
 pub mod integration;
 pub mod light;

@@ -237,12 +237,7 @@ mod tests {
     fn star_at(direction: Vector3<f64>) -> Star {
         Star {
             source_id: 0,
-            ra_deg: 0.0,
-            dec_deg: 0.0,
             g_mag: 0.0,
-            bp_mag: 0.0,
-            rp_mag: 0.0,
-            bp_rp: 0.0,
             direction,
             temperature: 5000.0,
             emission_xyz: CIETristimulus::new(0.0, 0.0, 0.0, 1.0),

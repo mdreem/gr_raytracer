@@ -6,7 +6,6 @@ use crate::geometry::coordinates::euclidean::CartesianChart;
 use crate::geometry::four_vector::FourVector;
 use crate::geometry::point::Point;
 use crate::geometry::tetrad::Tetrad;
-use crate::rendering::ray::Ray;
 use crate::rendering::error::RaytracerError;
 use crate::rendering::integration::runge_kutta::OdeFunction;
 use crate::rendering::integration::state::EquationOfMotionState;

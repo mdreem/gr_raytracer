@@ -209,12 +209,7 @@ fn tube_subdivision_preserves_flat_space_star_flux() {
     let ray = renderer.scene.camera.get_ray_for_offset(10, 20, 0.67, 0.73);
     let star = Star {
         source_id: 1,
-        ra_deg: 0.0,
-        dec_deg: 0.0,
         g_mag: 0.0,
-        bp_mag: 0.0,
-        rp_mag: 0.0,
-        bp_rp: 0.0,
         direction: ray.momentum.to_cartesian().get_spatial_vector().normalize(),
         temperature: 5772.0,
         emission_xyz: CIETristimulus::new(2.0, 1.0, 0.5, 1.0),
@@ -264,12 +259,7 @@ fn star_magnification_and_foreground_transmittance_are_applied_once() {
     renderer.scene.star_catalog = Some(StarCatalog {
         stars: Octree::new(vec![Star {
             source_id: 1,
-            ra_deg: 0.0,
-            dec_deg: 0.0,
             g_mag: 0.0,
-            bp_mag: 0.0,
-            rp_mag: 0.0,
-            bp_rp: 0.0,
             direction: star_ray
                 .momentum
                 .to_cartesian()

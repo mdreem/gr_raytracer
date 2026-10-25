@@ -8,7 +8,6 @@ use crate::geometry::geometry::{
 use crate::geometry::gram_schmidt::gram_schmidt;
 use crate::geometry::point::Point;
 use crate::geometry::tetrad::Tetrad;
-use crate::rendering::ray::Ray;
 use crate::rendering::error::RaytracerError;
 use crate::rendering::integration::runge_kutta::OdeFunction;
 use crate::rendering::integration::state::EquationOfMotionState;
@@ -572,7 +571,7 @@ mod tests {
     use crate::geometry::spacetimes::kerr::Kerr;
     use crate::geometry::point::Point;
     use crate::rendering::camera::Camera;
-    use crate::rendering::debug::save_rays_to_file;
+    use crate::rendering::camera::debug::save_rays_to_file;
     use crate::rendering::scene;
     use crate::rendering::scene::Scene;
     use approx::assert_abs_diff_eq;

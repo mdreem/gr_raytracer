@@ -1,3 +1,5 @@
+pub mod debug;
+
 use crate::geometry::coordinates::atlas::{CartesianConvertible, Chart};
 use crate::geometry::four_vector::FourVector;
 use crate::geometry::geometry::Geometry;

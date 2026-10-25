@@ -35,12 +35,7 @@ pub enum StarCatalogError {
 #[derive(Debug, Clone)]
 pub struct Star {
     pub source_id: i64,
-    pub ra_deg: f64,
-    pub dec_deg: f64,
     pub g_mag: f64,
-    pub bp_mag: f64,
-    pub rp_mag: f64,
-    pub bp_rp: f64,
     /// Unit direction on the celestial sphere (ICRS), precomputed from ra/dec.
     pub direction: Vector3<f64>,
     /// Colour temperature (K) derived from `bp_rp` (see
@@ -114,6 +109,7 @@ pub struct StarCatalog {
 
 impl StarCatalog {
     /// Load a catalogue from a Parquet file on disk (e.g. `data/gaia_dr3.parquet`).
+    #[cfg(test)]
     pub fn load_parquet(path: impl AsRef<Path>) -> Result<Self, StarCatalogError> {
         Self::load_parquet_rotated(path, None)
     }
@@ -126,11 +122,6 @@ impl StarCatalog {
         rotation: Option<Rotation3<f64>>,
     ) -> Result<Self, StarCatalogError> {
         Self::from_reader_rotated(File::open(path)?, rotation)
-    }
-
-    /// Load from any Parquet source (a file, or in-memory bytes for tests).
-    pub fn from_reader<R: ChunkReader + 'static>(reader: R) -> Result<Self, StarCatalogError> {
-        Self::from_reader_rotated(reader, None)
     }
 
     /// Load from any Parquet source, rotating every star direction by
@@ -153,8 +144,6 @@ impl StarCatalog {
             let ra = float64_column(&batch, "ra")?;
             let dec = float64_column(&batch, "dec")?;
             let g = float32_column(&batch, "phot_g_mean_mag")?;
-            let bp = float32_column(&batch, "phot_bp_mean_mag")?;
-            let rp = float32_column(&batch, "phot_rp_mean_mag")?;
             let bp_rp = float32_column(&batch, "bp_rp")?;
 
             stars_vec.reserve(batch.num_rows());
@@ -166,12 +155,7 @@ impl StarCatalog {
                 let temperature = colour_temperature_from_bp_rp(bp_rp_value);
                 stars_vec.push(Star {
                     source_id: source_id.value(i),
-                    ra_deg,
-                    dec_deg,
                     g_mag,
-                    bp_mag: bp.value(i) as f64,
-                    rp_mag: rp.value(i) as f64,
-                    bp_rp: bp_rp_value,
                     direction: match &rotation {
                         Some(rotation) => rotation * radec_to_unit_vector(ra_deg, dec_deg),
                         None => radec_to_unit_vector(ra_deg, dec_deg),
@@ -329,12 +313,7 @@ mod tests {
     fn relative_flux_is_pogson() {
         let star = Star {
             source_id: 1,
-            ra_deg: 0.0,
-            dec_deg: 0.0,
             g_mag: 5.0,
-            bp_mag: 5.0,
-            rp_mag: 5.0,
-            bp_rp: 0.0,
             direction: Vector3::new(1.0, 0.0, 0.0),
             temperature: 5772.0,
             emission_xyz: CIETristimulus::new(0.0, 0.0, 0.0, 1.0),

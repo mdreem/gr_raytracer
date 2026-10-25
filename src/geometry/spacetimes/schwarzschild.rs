@@ -7,7 +7,6 @@ use crate::geometry::geometry::{
 };
 use crate::geometry::point::Point;
 use crate::geometry::tetrad::Tetrad;
-use crate::rendering::ray::Ray;
 use crate::rendering::error::RaytracerError;
 use crate::rendering::integration::runge_kutta::OdeFunction;
 use crate::rendering::integration::state::EquationOfMotionState;
@@ -401,7 +400,7 @@ mod tests {
     use crate::geometry::spacetimes::schwarzschild::{Schwarzschild, test_schwarzschild};
     use crate::geometry::spherical_coordinates_helper::cartesian_to_spherical;
     use crate::rendering::camera::Camera;
-    use crate::rendering::debug::save_rays_to_file;
+    use crate::rendering::camera::debug::save_rays_to_file;
     use crate::rendering::integration::integrator::StopReason;
     use crate::rendering::ray::{IntegratedRay, Ray};
     use crate::rendering::integration::runge_kutta::OdeFunction;

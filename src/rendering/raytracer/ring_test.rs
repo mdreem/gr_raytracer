@@ -49,12 +49,7 @@ impl TextureMap for BlackSky {
 fn star_directly_behind() -> Star {
     Star {
         source_id: 1,
-        ra_deg: 90.0,
-        dec_deg: 0.0,
         g_mag: 0.0,
-        bp_mag: 0.0,
-        rp_mag: 0.0,
-        bp_rp: 0.0,
         direction: Vector3::new(0.0, 1.0, 0.0),
         temperature: 5772.0,
         // Y carries the flux; hue is irrelevant for the ring geometry.

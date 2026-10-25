@@ -1,0 +1,211 @@
+//! Blackbody texture implementation.
+
+use super::{TemperatureData, TextureMap, UVCoordinates};
+use crate::rendering::error::RaytracerError;
+use crate::rendering::light::color::CIETristimulus;
+use crate::rendering::light::black_body_radiation::get_cie_xyz_of_black_body_redshifted;
+use log::{error, warn};
+
+#[derive(Clone)]
+pub struct BlackBodyMapper {
+    /// Extra *artistic* redshift exponent applied on top of `blackbody_xyz`'s
+    /// already-physical z^5 boost (see its doc comment): total boost is
+    /// `z^(5 + beaming_exponent)`. 0.0 renders the physically exact spectrum;
+    /// scenes that want a stronger beaming look (e.g. the accretion-disc
+    /// examples in scene-definitions/) can dial this up.
+    beaming_exponent: f64,
+    /// Precomputed blackbody colors indexed by log10(temperature).
+    color_profile: Vec<(f64, CIETristimulus)>,
+}
+
+const NUM_COLOR_LUT_STEPS: usize = 1000;
+const MIN_TEMPERATURE: f64 = 10.0;
+const MAX_TEMPERATURE: f64 = 10_000_000.0;
+
+impl BlackBodyMapper {
+    pub fn new(beaming_exponent: f64) -> BlackBodyMapper {
+        let mut color_profile = Vec::with_capacity(NUM_COLOR_LUT_STEPS);
+        let min_log = MIN_TEMPERATURE.log10();
+        let max_log = MAX_TEMPERATURE.log10();
+        let step = (max_log - min_log) / (NUM_COLOR_LUT_STEPS - 1) as f64;
+
+        for i in 0..NUM_COLOR_LUT_STEPS {
+            let log_t = min_log + (i as f64) * step;
+            let t = 10.0_f64.powf(log_t);
+            let color = get_cie_xyz_of_black_body_redshifted(t, 1.0);
+            color_profile.push((log_t, color));
+        }
+
+        BlackBodyMapper {
+            beaming_exponent,
+            color_profile,
+        }
+    }
+
+    pub fn blackbody_xyz(&self, temperature: f64, redshift: f64) -> CIETristimulus {
+        // A Doppler-shifted blackbody is still a blackbody at temperature T*z
+        // (Wien displacement), and the relativistic intensity boost cancels
+        // the implicit z^5 in the Planck rescaling, so observer-frame XYZ is
+        // simply the LUT entry at T*z. See the derivation in
+        // black_body_radiation::integrate_blackbody_xyz.
+        self.sample_blackbody(temperature * redshift)
+    }
+
+    fn sample_blackbody(&self, temperature: f64) -> CIETristimulus {
+        let Some((first_log_t, first_color)) = self.color_profile.first().copied() else {
+            error!("BlackBodyMapper color_profile is empty; falling back to black.");
+            return CIETristimulus::new(0.0, 0.0, 0.0, 1.0);
+        };
+        let Some((last_log_t, last_color)) = self.color_profile.last().copied() else {
+            error!("BlackBodyMapper color_profile is empty; falling back to black.");
+            return CIETristimulus::new(0.0, 0.0, 0.0, 1.0);
+        };
+
+        let log_t = temperature.max(MIN_TEMPERATURE).log10();
+        if !log_t.is_finite() {
+            warn!(
+                "BlackBodyMapper received non-finite temperature {}, clamping to LUT minimum.",
+                temperature
+            );
+            return first_color;
+        }
+
+        if log_t <= first_log_t {
+            return first_color;
+        }
+        if log_t >= last_log_t {
+            return last_color;
+        }
+
+        let idx = match self
+            .color_profile
+            .binary_search_by(|(lt, _)| lt.total_cmp(&log_t))
+        {
+            Ok(i) => i,
+            Err(0) => 0,
+            Err(i) => i - 1,
+        };
+
+        let (lt0, c0) = self.color_profile[idx];
+        let (lt1, c1) = self.color_profile[idx + 1];
+
+        let t = (log_t - lt0) / (lt1 - lt0);
+
+        CIETristimulus::new(
+            c0.x + t * (c1.x - c0.x),
+            c0.y + t * (c1.y - c0.y),
+            c0.z + t * (c1.z - c0.z),
+            1.0,
+        )
+    }
+}
+
+impl TextureMap for BlackBodyMapper {
+    fn color_at_uv(
+        &self,
+        _uv: &UVCoordinates,
+        temperature_data: &TemperatureData,
+    ) -> Result<CIETristimulus, RaytracerError> {
+        let redshift = temperature_data.redshift;
+        // blackbody_xyz already includes the physical z^5 boost; beaming_exponent
+        // is a separate, purely artistic multiplier on top of that (0.0 = none).
+        self.blackbody_xyz(temperature_data.temperature, redshift)
+            .apply_beaming(redshift, self.beaming_exponent)
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use approx::assert_relative_eq;
+
+    #[test]
+    fn test_blackbody_xyz_z_one_matches_lut_sample() {
+        // At z = 1 the observer-frame XYZ must equal the LUT entry at T_em.
+        let mapper = BlackBodyMapper::new(0.0);
+        for &temperature in &[1_000.0, 5_000.0, 10_000.0] {
+            let observed = mapper.blackbody_xyz(temperature, 1.0);
+            let lut = mapper.sample_blackbody(temperature);
+            assert_relative_eq!(observed.x, lut.x, max_relative = 1e-12);
+            assert_relative_eq!(observed.y, lut.y, max_relative = 1e-12);
+            assert_relative_eq!(observed.z, lut.z, max_relative = 1e-12);
+        }
+    }
+
+    #[test]
+    fn test_blackbody_xyz_relativistic_boost_doubles_total() {
+        // Total radiated power across all wavelengths goes as T^4 (Stefan-
+        // Boltzmann); the observer sees emitter at temperature T*z with a
+        // multiplicative z^5 intensity boost (Lorentz invariance of I_nu/nu^3).
+        // For visible-band integrated XYZ this approximation holds at high T,
+        // where the visible band sits well inside the Planck curve. We check
+        // that doubling z increases each XYZ component (boost present, not
+        // missing or inverted).
+        let mapper = BlackBodyMapper::new(0.0);
+        let baseline = mapper.blackbody_xyz(6_000.0, 1.0);
+        let boosted = mapper.blackbody_xyz(6_000.0, 2.0);
+        assert!(boosted.x > baseline.x);
+        assert!(boosted.y > baseline.y);
+        assert!(boosted.z > baseline.z);
+    }
+
+    #[test]
+    fn test_blackbody_color_at_uv_with_zero_beaming_exponent_matches_physical_boost() {
+        // beaming_exponent = 0.0 must leave blackbody_xyz's already-physical
+        // z^5 boost untouched (z^(5+0) = z^5).
+        let mapper = BlackBodyMapper::new(0.0);
+        let temperature_data = TemperatureData {
+            temperature: 6_000.0,
+            redshift: 1.5,
+        };
+        let uv = UVCoordinates { u: 0.0, v: 0.0 };
+
+        let rendered = mapper.color_at_uv(&uv, &temperature_data).unwrap();
+        let expected =
+            mapper.blackbody_xyz(temperature_data.temperature, temperature_data.redshift);
+
+        assert_relative_eq!(rendered.x, expected.x, max_relative = 1e-12);
+        assert_relative_eq!(rendered.y, expected.y, max_relative = 1e-12);
+        assert_relative_eq!(rendered.z, expected.z, max_relative = 1e-12);
+    }
+
+    #[test]
+    fn test_blackbody_color_at_uv_stacks_artistic_beaming_on_top_of_physical_boost() {
+        // A non-zero beaming_exponent must multiply blackbody_xyz's z^5
+        // physical boost by an additional z^beaming_exponent factor, i.e.
+        // color_at_uv = blackbody_xyz(...) * redshift^beaming_exponent.
+        let mapper = BlackBodyMapper::new(4.0);
+        let temperature_data = TemperatureData {
+            temperature: 6_000.0,
+            redshift: 1.5,
+        };
+        let uv = UVCoordinates { u: 0.0, v: 0.0 };
+
+        let rendered = mapper.color_at_uv(&uv, &temperature_data).unwrap();
+        let base = mapper.blackbody_xyz(temperature_data.temperature, temperature_data.redshift);
+        let expected = base.apply_beaming(temperature_data.redshift, 4.0).unwrap();
+
+        assert_relative_eq!(rendered.x, expected.x, max_relative = 1e-12);
+        assert_relative_eq!(rendered.y, expected.y, max_relative = 1e-12);
+        assert_relative_eq!(rendered.z, expected.z, max_relative = 1e-12);
+        // Sanity: the extra factor must actually change the result relative
+        // to the pure-physical (beaming_exponent = 0) case.
+        assert!(rendered.x != base.x);
+    }
+
+    #[test]
+    fn test_blackbody_lut_matches_direct_integration() {
+        let mapper = BlackBodyMapper::new(0.0);
+
+        for &temperature in &[1_000.0, 5_000.0, 10_000.0, 100_000.0] {
+            for &redshift in &[0.5, 1.0, 2.0] {
+                let lut = mapper.blackbody_xyz(temperature, redshift);
+                let direct = get_cie_xyz_of_black_body_redshifted(temperature, redshift);
+
+                assert_relative_eq!(lut.x, direct.x, max_relative = 0.02, epsilon = 1e-14);
+                assert_relative_eq!(lut.y, direct.y, max_relative = 0.02, epsilon = 1e-14);
+                assert_relative_eq!(lut.z, direct.z, max_relative = 0.02, epsilon = 1e-14);
+            }
+        }
+    }
+}

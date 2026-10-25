@@ -17,7 +17,6 @@ use crate::geometry::geometry::{
 };
 use crate::geometry::point::Point;
 use crate::geometry::tetrad::Tetrad;
-use crate::rendering::ray::Ray;
 use crate::rendering::error::RaytracerError;
 use crate::rendering::integration::runge_kutta::OdeFunction;
 use crate::rendering::integration::state::EquationOfMotionState;
@@ -538,6 +537,7 @@ impl Geometry for KerrBL {
 
 #[cfg(test)]
 mod tests {
+    use crate::rendering::ray::Ray;
     use super::*;
     use crate::geometry::coordinates::atlas::CartesianConvertible;
     use approx::assert_abs_diff_eq;
