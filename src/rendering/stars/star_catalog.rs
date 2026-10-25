@@ -7,9 +7,9 @@
 //! gather free of the (theta, phi) coordinate singularities (pole and phi-seam):
 //! every membership / solid-angle test is then a plain dot / cross product.
 
-use crate::rendering::black_body_radiation::get_cie_xyz_of_black_body_redshifted;
-use crate::rendering::color::CIETristimulus;
-use crate::rendering::octree::Octree;
+use crate::rendering::light::black_body_radiation::get_cie_xyz_of_black_body_redshifted;
+use crate::rendering::light::color::CIETristimulus;
+use crate::rendering::stars::octree::Octree;
 use arrow::array::{Float32Array, Float64Array, Int64Array};
 use nalgebra::{Rotation3, Vector3};
 use parquet::arrow::arrow_reader::ParquetRecordBatchReaderBuilder;

@@ -1,8 +1,8 @@
 use crate::geometry::coordinates::atlas::{CartesianConvertible, Chart};
 use crate::geometry::four_vector::FourVector;
 use crate::geometry::point::Point;
-use crate::rendering::integrator::Step;
-use crate::rendering::raytracer::RaytracerError;
+use crate::rendering::integration::integrator::Step;
+use crate::rendering::error::RaytracerError;
 use std::io::Write;
 use std::ops::Index;
 

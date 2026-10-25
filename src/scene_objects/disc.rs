@@ -2,10 +2,10 @@ use crate::geometry::coordinates::atlas::GeometryChart;
 use crate::geometry::coordinates::euclidean::CartesianChart;
 use crate::geometry::geometry::Geometry;
 use crate::geometry::point::Point;
-use crate::rendering::integrator::Step;
-use crate::rendering::radiance::Radiance;
-use crate::rendering::raytracer::RaytracerError;
-use crate::rendering::temperature::TemperatureComputer;
+use crate::rendering::integration::integrator::Step;
+use crate::rendering::light::radiance::Radiance;
+use crate::rendering::error::RaytracerError;
+use crate::rendering::light::temperature::TemperatureComputer;
 use crate::rendering::texture::{TextureMapHandle, UVCoordinates};
 use crate::scene_objects::hittable::{ColorComputationData, Hittable, Intersection};
 use nalgebra::Vector3;
@@ -264,8 +264,8 @@ mod tests {
     use crate::geometry::spacetimes::euclidean::EuclideanSpace;
     use crate::geometry::four_vector::FourVector;
     use crate::geometry::spacetimes::kerr::Kerr;
-    use crate::rendering::color::Color;
-    use crate::rendering::temperature::ConstantTemperatureComputer;
+    use crate::rendering::light::color::Color;
+    use crate::rendering::light::temperature::ConstantTemperatureComputer;
     use crate::rendering::texture::CheckerMapper;
     use std::sync::Arc;
 

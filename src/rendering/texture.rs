@@ -1,7 +1,7 @@
-use crate::rendering::black_body_radiation::get_cie_xyz_of_black_body_redshifted;
-use crate::rendering::color::{CIETristimulus, Color};
-use crate::rendering::radiance::{Radiance, RadianceMean};
-use crate::rendering::raytracer::RaytracerError;
+use crate::rendering::light::black_body_radiation::get_cie_xyz_of_black_body_redshifted;
+use crate::rendering::light::color::{CIETristimulus, Color};
+use crate::rendering::light::radiance::{Radiance, RadianceMean};
+use crate::rendering::error::RaytracerError;
 use crate::rendering::texture::TextureError::DecodeError;
 use image::{DynamicImage, GenericImageView, ImageReader};
 use log::{error, warn};
@@ -312,8 +312,8 @@ impl TextureMapperFactory {
 
 #[cfg(test)]
 mod tests {
-    use crate::rendering::black_body_radiation::get_cie_xyz_of_black_body_redshifted;
-    use crate::rendering::color::CIETristimulus;
+    use crate::rendering::light::black_body_radiation::get_cie_xyz_of_black_body_redshifted;
+    use crate::rendering::light::color::CIETristimulus;
     use crate::rendering::texture::{
         BlackBodyMapper, TemperatureData, TextureMap, TextureMapper, UVCoordinates,
     };
@@ -558,8 +558,8 @@ mod tests {
             0.0,
             1.0,
             1.0,
-            crate::rendering::color::Color::new(255, 0, 0, 64),
-            crate::rendering::color::Color::new(0, 0, 255, 0),
+            crate::rendering::light::color::Color::new(255, 0, 0, 64),
+            crate::rendering::light::color::Color::new(0, 0, 255, 0),
         );
         let data = TemperatureData {
             temperature: 0.0,

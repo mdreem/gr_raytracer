@@ -1,5 +1,5 @@
-use crate::rendering::black_body_radiation::get_cie_xyz_of_black_body_redshifted;
-use crate::rendering::color::{
+use crate::rendering::light::black_body_radiation::get_cie_xyz_of_black_body_redshifted;
+use crate::rendering::light::color::{
     CIETristimulus, ToneMappingMethod, linear_srgb_to_srgb_buffer, xyz_to_linear_srgb_buffer,
     xyz_to_srgb,
 };

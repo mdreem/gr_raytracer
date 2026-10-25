@@ -1,16 +1,12 @@
-pub mod black_body_radiation;
+//! Scene rendering, light transport, and image generation.
+
 pub mod camera;
-pub mod color;
 pub mod debug;
-pub mod integrator;
-mod octree;
-pub mod radiance;
+pub mod error;
+pub mod integration;
+pub mod light;
 pub mod ray;
 pub mod raytracer;
-pub mod redshift;
-pub mod runge_kutta;
 pub mod scene;
-pub mod star_catalog;
-pub mod temperature;
+pub mod stars;
 pub mod texture;
-mod tubetracer;

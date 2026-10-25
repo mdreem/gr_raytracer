@@ -7,10 +7,10 @@ use crate::geometry::geometry::{
 };
 use crate::geometry::point::Point;
 use crate::geometry::tetrad::Tetrad;
-use crate::rendering::raytracer::RaytracerError;
-use crate::rendering::runge_kutta::OdeFunction;
-use crate::rendering::scene::EquationOfMotionState;
-use crate::rendering::temperature::{ConstantTemperatureComputer, TemperatureComputer};
+use crate::rendering::error::RaytracerError;
+use crate::rendering::integration::runge_kutta::OdeFunction;
+use crate::rendering::integration::state::EquationOfMotionState;
+use crate::rendering::light::temperature::{ConstantTemperatureComputer, TemperatureComputer};
 use nalgebra::{Const, Matrix4, OVector, Vector3};
 use std::f64::consts::PI;
 
@@ -239,7 +239,7 @@ impl SupportQuantities for HyperSphere {
 mod tests {
     use super::*;
     use crate::geometry::coordinates::atlas::Atlas;
-    use crate::rendering::integrator::{IntegrationConfiguration, Integrator};
+    use crate::rendering::integration::integrator::{IntegrationConfiguration, Integrator};
     use crate::rendering::ray::Ray;
     use nalgebra::Vector4;
 

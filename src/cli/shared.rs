@@ -5,13 +5,13 @@ use crate::geometry::four_vector::FourVector;
 use crate::geometry::geometry::Geometry;
 use crate::geometry::point::Point;
 use crate::rendering::camera::Camera;
-use crate::rendering::color::{CIETristimulus, Color, ToneMappingMethod};
-use crate::rendering::integrator::IntegrationConfiguration;
+use crate::rendering::light::color::{CIETristimulus, Color, ToneMappingMethod};
+use crate::rendering::integration::integrator::IntegrationConfiguration;
 use crate::rendering::raytracer;
-use crate::rendering::raytracer::RaytracerError;
+use crate::rendering::error::RaytracerError;
 use crate::rendering::scene::Scene;
-use crate::rendering::star_catalog::StarCatalog;
-use crate::rendering::temperature::{ConstantTemperatureComputer, TemperatureComputer};
+use crate::rendering::stars::star_catalog::StarCatalog;
+use crate::rendering::light::temperature::{ConstantTemperatureComputer, TemperatureComputer};
 use crate::rendering::texture::{
     BlackBodyMapper, CheckerMapper, TextureData, TextureMapHandle, TextureMapperFactory,
 };
@@ -137,7 +137,7 @@ pub fn integrate_and_save_ray<G: Geometry>(
         opts.epsilon,
     );
     let integrator =
-        crate::rendering::integrator::Integrator::new(geometry, integration_configuration);
+        crate::rendering::integration::integrator::Integrator::new(geometry, integration_configuration);
 
     let (integrated_ray, stop_reason) = integrator.integrate(&ray)?;
     log::info!("Stop reason: {:?}", stop_reason);

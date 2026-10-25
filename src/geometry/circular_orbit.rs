@@ -11,7 +11,7 @@
 //! Off-equatorial callers use these values as the standard near-equatorial
 //! approximation, matching the previous per-geometry implementations.
 
-use crate::rendering::raytracer::RaytracerError;
+use crate::rendering::error::RaytracerError;
 use log::debug;
 
 /// A circular-orbit four-velocity decomposed on the Killing basis:

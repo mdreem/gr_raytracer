@@ -18,10 +18,10 @@ use crate::geometry::geometry::{
 use crate::geometry::point::Point;
 use crate::geometry::tetrad::Tetrad;
 use crate::rendering::ray::Ray;
-use crate::rendering::raytracer::RaytracerError;
-use crate::rendering::runge_kutta::OdeFunction;
-use crate::rendering::scene::EquationOfMotionState;
-use crate::rendering::temperature::{KerrTemperatureComputer, TemperatureComputer};
+use crate::rendering::error::RaytracerError;
+use crate::rendering::integration::runge_kutta::OdeFunction;
+use crate::rendering::integration::state::EquationOfMotionState;
+use crate::rendering::light::temperature::{KerrTemperatureComputer, TemperatureComputer};
 use log::warn;
 
 /// Floor for sin²θ used when computing L_z²/sin²θ in the Carter constant Q.
@@ -1378,7 +1378,7 @@ mod tests {
         use crate::geometry::spacetimes::schwarzschild::Schwarzschild;
         use crate::geometry::spherical_coordinates_helper::cartesian_to_spherical;
         use crate::rendering::camera::Camera;
-        use crate::rendering::redshift::RedshiftComputer;
+        use crate::rendering::light::redshift::RedshiftComputer;
         use crate::rendering::scene;
 
         let radius = 1.0;

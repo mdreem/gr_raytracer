@@ -7,10 +7,10 @@ use crate::geometry::geometry::{
 use crate::geometry::point::Point;
 use crate::geometry::tetrad::Tetrad;
 use crate::rendering::ray::Ray;
-use crate::rendering::raytracer::RaytracerError;
-use crate::rendering::runge_kutta::OdeFunction;
-use crate::rendering::scene::EquationOfMotionState;
-use crate::rendering::temperature::{ConstantTemperatureComputer, TemperatureComputer};
+use crate::rendering::error::RaytracerError;
+use crate::rendering::integration::runge_kutta::OdeFunction;
+use crate::rendering::integration::state::EquationOfMotionState;
+use crate::rendering::light::temperature::{ConstantTemperatureComputer, TemperatureComputer};
 use log::trace;
 use nalgebra::{Const, Matrix4, OVector};
 

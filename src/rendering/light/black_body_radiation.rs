@@ -1,4 +1,4 @@
-use crate::rendering::color::{CIETristimulus, x_bar, y_bar, z_bar};
+use crate::rendering::light::color::{CIETristimulus, x_bar, y_bar, z_bar};
 
 const PLANCK_CONSTANT: f64 = 6.626_070_15e-34;
 const SPEED_OF_LIGHT: f64 = 299_792_458.0;
@@ -47,7 +47,7 @@ pub fn get_cie_xyz_of_black_body_redshifted(temperature: f64, redshift: f64) -> 
 #[cfg(test)]
 mod tests {
     use super::integrate_blackbody_xyz;
-    use crate::rendering::color::{Color, xyz_to_linear_srgb, xyz_to_srgb};
+    use crate::rendering::light::color::{Color, xyz_to_linear_srgb, xyz_to_srgb};
     use image::{ImageFormat, Rgb};
 
     fn get_srgb_of_black_body(temperature: f64) -> Color {

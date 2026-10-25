@@ -1,6 +1,6 @@
 use crate::geometry::four_vector::FourVector;
 use crate::geometry::geometry::Geometry;
-use crate::rendering::integrator::Step;
+use crate::rendering::integration::integrator::Step;
 use crate::rendering::ray::Ray;
 
 /// Per-ray frequency data: the observer energy plus the photon's conserved
@@ -87,7 +87,7 @@ mod tests {
     use crate::geometry::point::Point;
     use crate::geometry::spacetimes::schwarzschild::Schwarzschild;
     use crate::rendering::camera::Camera;
-    use crate::rendering::integrator::{IntegrationConfiguration, Integrator};
+    use crate::rendering::integration::integrator::{IntegrationConfiguration, Integrator};
     use approx::assert_abs_diff_eq;
     use std::f64::consts::PI;
 

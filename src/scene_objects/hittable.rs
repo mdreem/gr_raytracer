@@ -2,10 +2,10 @@ use crate::geometry::coordinates::atlas::{CartesianConvertible, Chart, GeometryC
 use crate::geometry::coordinates::euclidean::CartesianChart;
 use crate::geometry::geometry::Geometry;
 use crate::geometry::point::Point;
-use crate::rendering::integrator::Step;
-use crate::rendering::radiance::Radiance;
-use crate::rendering::raytracer::RaytracerError;
-use crate::rendering::redshift::RayFrequencyData;
+use crate::rendering::integration::integrator::Step;
+use crate::rendering::light::radiance::Radiance;
+use crate::rendering::error::RaytracerError;
+use crate::rendering::light::redshift::RayFrequencyData;
 use crate::rendering::texture::{TemperatureData, UVCoordinates};
 
 pub struct Intersection<C: Chart> {
