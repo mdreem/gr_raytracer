@@ -7,9 +7,10 @@
 use nalgebra::{Const, Matrix4};
 
 use crate::geometry::circular_orbit::{self, OrbitKillingDecomposition};
-use crate::geometry::coordinates::atlas::CartesianConvertible;
-use crate::geometry::coordinates::boyer_lindquist::{BoyerLindquistData, KerrChart};
-use crate::geometry::coordinates::euclidean::CartesianChart;
+use crate::geometry::coordinates::conversion::CartesianConvertible;
+use crate::geometry::coordinates::boyer_lindquist::BoyerLindquistData;
+use crate::geometry::atlases::kerr::KerrChart;
+use crate::geometry::coordinates::cartesian::CartesianChart;
 use crate::geometry::four_vector::FourVector;
 use crate::geometry::geometry::{
     ConstantsOfMotion, GeodesicSolver, Geometry, HasChart, InnerProduct, Signature,
@@ -539,14 +540,14 @@ impl Geometry for KerrBL {
 mod tests {
     use crate::rendering::ray::Ray;
     use super::*;
-    use crate::geometry::coordinates::atlas::CartesianConvertible;
+    use crate::geometry::coordinates::conversion::CartesianConvertible;
     use approx::assert_abs_diff_eq;
 
     /// Converts a Kerr-Schild ray into Boyer-Lindquist the way `KerrBLSolver` used to for
     /// Cartesian input: untwisted position embedding and the inverse BL Jacobian.
     #[test]
     fn test_bl_jacobian_transforms_metric_exactly() {
-        use crate::geometry::coordinates::boyer_lindquist::jacobian_bl_to_cartesian;
+        use crate::geometry::atlases::kerr::jacobian_bl_to_cartesian;
         // The BL->KS-Cartesian Jacobian must be the exact chart
         // transformation: J^T g_KS J = g_BL. This pins the time and azimuth
         // twist terms (dt_KS/dr = r_s r / Δ, dφ_KS/dr = a / Δ); without them

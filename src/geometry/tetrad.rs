@@ -1,4 +1,4 @@
-use crate::geometry::coordinates::atlas::Chart;
+use crate::geometry::coordinates::chart::Chart;
 use crate::geometry::four_vector::FourVector;
 use crate::geometry::geometry::Geometry;
 use crate::geometry::point::Point;

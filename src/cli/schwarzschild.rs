@@ -4,15 +4,15 @@ use crate::cli::shared::{
     resolve_camera_velocity,
 };
 use crate::configuration::RenderConfig;
-use crate::geometry::coordinates::euclidean::CartesianChart;
+use crate::geometry::coordinates::cartesian::CartesianChart;
 use crate::geometry::four_vector::FourVector;
 use crate::geometry::geometry::{Geometry, RenderableGeometry};
 use crate::geometry::point::Point;
 use crate::geometry::spacetimes::schwarzschild::Schwarzschild;
 use crate::geometry::spherical_coordinates_helper::cartesian_to_spherical;
+use crate::rendering::error::RaytracerError;
 use crate::rendering::light::color::ToneMappingMethod;
 use crate::rendering::raytracer;
-use crate::rendering::error::RaytracerError;
 use crate::rendering::scene::Scene;
 use log::info;
 use std::io::Write;

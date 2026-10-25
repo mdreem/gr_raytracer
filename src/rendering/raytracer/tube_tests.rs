@@ -1,27 +1,27 @@
-use super::tube::SampleTube;
-use crate::rendering::stars::star_catalog::Star;
-use crate::geometry::four_vector::FourVector;
-use crate::rendering::light::color::ToneMappingMethod;
-use super::star_gather::{compute_traced_tube_solid_angle, finite_tube_flux};
 use super::Raytracer;
-use crate::rendering::error::RaytracerError;
-use crate::rendering::light::color::CIETristimulus;
-use crate::rendering::light::radiance::Radiance;
-use crate::rendering::scene::{EscapeInfo, RayClass, RaySample, Scene};
-use nalgebra::Vector3;
-use std::sync::atomic::{AtomicUsize, Ordering};
-use crate::geometry::coordinates::euclidean::CartesianChart;
-use crate::geometry::spacetimes::euclidean::EuclideanSpace;
+use super::star_gather::{compute_traced_tube_solid_angle, finite_tube_flux};
+use super::tube::SampleTube;
+use crate::geometry::coordinates::cartesian::CartesianChart;
+use crate::geometry::four_vector::FourVector;
 use crate::geometry::point::Point;
+use crate::geometry::spacetimes::euclidean::EuclideanSpace;
 use crate::rendering::camera::Camera;
+use crate::rendering::error::RaytracerError;
 use crate::rendering::integration::integrator::IntegrationConfiguration;
+use crate::rendering::light::color::CIETristimulus;
+use crate::rendering::light::color::ToneMappingMethod;
+use crate::rendering::light::radiance::Radiance;
+use crate::rendering::raytracer::tube::TubeScreenBounds;
+use crate::rendering::scene::{EscapeInfo, RayClass, RaySample, Scene};
 use crate::rendering::stars::octree::Octree;
+use crate::rendering::stars::star_catalog::Star;
 use crate::rendering::stars::star_catalog::StarCatalog;
 use crate::rendering::texture::{TemperatureData, TextureData, TextureMap, UVCoordinates};
-use crate::rendering::raytracer::tube::TubeScreenBounds;
 use crate::scene_objects::objects::Objects;
 use approx::assert_abs_diff_eq;
+use nalgebra::Vector3;
 use std::sync::Arc;
+use std::sync::atomic::{AtomicUsize, Ordering};
 
 struct CountingTexture {
     calls: Arc<AtomicUsize>,

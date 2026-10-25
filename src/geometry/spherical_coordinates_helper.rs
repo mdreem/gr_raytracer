@@ -1,3 +1,4 @@
+use crate::geometry::atlases;
 use crate::geometry::coordinates;
 use crate::geometry::point::Point;
 use log::trace;
@@ -13,8 +14,8 @@ pub fn rotate_about_x(x: f64, y: f64, z: f64, deg: f64) -> (f64, f64, f64) {
 
 // The order of the components is: (r, theta, phi)
 pub fn cartesian_to_spherical(
-    cartesian: &Point<coordinates::euclidean::CartesianChart>,
-) -> Point<coordinates::spherical::SphericalChart> {
+    cartesian: &Point<coordinates::cartesian::CartesianChart>,
+) -> Point<atlases::spherical::SphericalChart> {
     let t = cartesian[0];
     let (x, y, z) = (cartesian[1], cartesian[2], cartesian[3]);
 
@@ -37,8 +38,8 @@ pub fn cartesian_to_spherical(
 
 /// Physical Cartesian position of a point given in a (possibly rotated) spherical chart.
 pub fn spherical_to_cartesian(
-    spherical: &Point<coordinates::spherical::SphericalChart>,
-) -> Point<coordinates::euclidean::CartesianChart> {
+    spherical: &Point<atlases::spherical::SphericalChart>,
+) -> Point<coordinates::cartesian::CartesianChart> {
     let t = spherical[0];
     let r = spherical[1];
     let theta = spherical[2];

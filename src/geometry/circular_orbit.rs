@@ -147,7 +147,7 @@ pub fn r_isco(r_s: f64, a: f64) -> f64 {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::geometry::coordinates::boyer_lindquist::KerrChart;
+    use crate::geometry::atlases::kerr::KerrChart;
     use crate::geometry::four_vector::FourVector;
     use crate::geometry::geometry::{Geometry, SupportQuantities};
     use crate::geometry::spacetimes::kerr::Kerr;

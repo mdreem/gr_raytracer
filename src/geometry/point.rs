@@ -1,9 +1,11 @@
+use crate::geometry::atlases;
+use crate::geometry::atlases::Atlas;
+use crate::geometry::atlases::kerr::{bl_to_ks, ks_to_bl};
 use crate::geometry::coordinates;
-use crate::geometry::coordinates::atlas::Atlas;
-use crate::geometry::coordinates::atlas::{CartesianConvertible, Chart, SphericalConvertible};
-use crate::geometry::coordinates::boyer_lindquist::{
-    BoyerLindquistData, KerrSchildData, bl_to_ks, ks_to_bl,
-};
+use crate::geometry::coordinates::boyer_lindquist::BoyerLindquistData;
+use crate::geometry::coordinates::chart::Chart;
+use crate::geometry::coordinates::conversion::{CartesianConvertible, SphericalConvertible};
+use crate::geometry::coordinates::kerr_schild::KerrSchildData;
 use crate::geometry::coordinates::spherical::RotatedSpherical;
 use crate::geometry::four_vector::FourVector;
 use crate::geometry::spherical_coordinates_helper::{
@@ -20,7 +22,7 @@ pub struct Point<C: Chart> {
     pub vector: Vector4<f64>,
 }
 
-impl Neg for Point<coordinates::euclidean::CartesianChart> {
+impl Neg for Point<coordinates::cartesian::CartesianChart> {
     type Output = Self;
 
     fn neg(self) -> Self::Output {
@@ -63,29 +65,29 @@ fn wrap_phi(phi: f64) -> f64 {
     (phi + PI).rem_euclid(2.0 * PI) - PI
 }
 
-impl Point<coordinates::euclidean::CartesianChart> {
+impl Point<coordinates::cartesian::CartesianChart> {
     pub fn new_cartesian(
         x0: f64,
         x1: f64,
         x2: f64,
         x3: f64,
-    ) -> Point<coordinates::euclidean::CartesianChart> {
+    ) -> Point<coordinates::cartesian::CartesianChart> {
         Point {
-            chart: coordinates::euclidean::CartesianChart::Cartesian,
+            chart: coordinates::cartesian::CartesianChart::Cartesian,
             vector: Vector4::new(x0, x1, x2, x3),
         }
     }
 }
 
-impl Point<coordinates::spherical::SphericalChart> {
+impl Point<atlases::spherical::SphericalChart> {
     pub fn new_spherical(
         t: f64,
         r: f64,
         theta: f64,
         phi: f64,
-    ) -> Point<coordinates::spherical::SphericalChart> {
+    ) -> Point<atlases::spherical::SphericalChart> {
         Point {
-            chart: coordinates::spherical::SphericalChart::Rotated(RotatedSpherical {
+            chart: atlases::spherical::SphericalChart::Rotated(RotatedSpherical {
                 rotation: 0.0,
             }),
             vector: Vector4::new(t, r, theta, phi),
@@ -93,7 +95,7 @@ impl Point<coordinates::spherical::SphericalChart> {
     }
 }
 
-impl Point<coordinates::boyer_lindquist::KerrChart> {
+impl Point<atlases::kerr::KerrChart> {
     pub fn new_boyer_lindquist(
         a: f64,
         r_s: f64,
@@ -101,9 +103,9 @@ impl Point<coordinates::boyer_lindquist::KerrChart> {
         r: f64,
         theta: f64,
         phi: f64,
-    ) -> Point<coordinates::boyer_lindquist::KerrChart> {
+    ) -> Point<atlases::kerr::KerrChart> {
         Point {
-            chart: coordinates::boyer_lindquist::KerrChart::BoyerLindquist(BoyerLindquistData {
+            chart: atlases::kerr::KerrChart::BoyerLindquist(BoyerLindquistData {
                 a,
                 r_s,
             }),
@@ -142,7 +144,7 @@ impl<C: SphericalConvertible> Point<C> {
 }
 
 impl<C: CartesianConvertible> Point<C> {
-    pub fn to_cartesian(&self) -> Point<coordinates::euclidean::CartesianChart> {
+    pub fn to_cartesian(&self) -> Point<coordinates::cartesian::CartesianChart> {
         C::point_to_cartesian(self)
     }
 
@@ -157,7 +159,7 @@ impl<C: CartesianConvertible> Point<C> {
     }
 }
 
-impl SphericalConvertible for coordinates::euclidean::CartesianChart {
+impl SphericalConvertible for coordinates::cartesian::CartesianChart {
     fn point_as_spherical(point: &Point<Self>) -> Vector3<f64> {
         let v = cartesian_to_spherical(point);
         Vector3::new(v[1], v[2], v[3])
@@ -169,7 +171,7 @@ impl SphericalConvertible for coordinates::euclidean::CartesianChart {
     }
 }
 
-impl SphericalConvertible for coordinates::spherical::SphericalChart {
+impl SphericalConvertible for atlases::spherical::SphericalChart {
     /// Angles in the physical frame, also for rotated charts.
     fn point_as_spherical(point: &Point<Self>) -> Vector3<f64> {
         if point.chart.rotation() != 0.0 {
@@ -191,25 +193,25 @@ impl SphericalConvertible for coordinates::spherical::SphericalChart {
 }
 
 fn kerr_schild_as_cartesian(
-    point: &Point<coordinates::boyer_lindquist::KerrChart>,
-) -> Point<coordinates::euclidean::CartesianChart> {
+    point: &Point<atlases::kerr::KerrChart>,
+) -> Point<coordinates::cartesian::CartesianChart> {
     Point::new_from_vector(
         point.vector,
-        coordinates::euclidean::CartesianChart::Cartesian,
+        coordinates::cartesian::CartesianChart::Cartesian,
     )
 }
 
 // TODO: Rethink once the atlas exists: untwisted BL embedding vs. Kerr-Schild; to_cartesian must agree across KerrChart variants.
-impl SphericalConvertible for coordinates::boyer_lindquist::KerrChart {
+impl SphericalConvertible for atlases::kerr::KerrChart {
     fn point_as_spherical(point: &Point<Self>) -> Vector3<f64> {
         match point.chart {
-            coordinates::boyer_lindquist::KerrChart::BoyerLindquist(_) => Vector3::new(
+            atlases::kerr::KerrChart::BoyerLindquist(_) => Vector3::new(
                 point.vector[1],
                 wrap_theta(point.vector[2]),
                 wrap_phi(point.vector[3]),
             ),
-            coordinates::boyer_lindquist::KerrChart::KerrSchild(_) => {
-                coordinates::euclidean::CartesianChart::point_as_spherical(
+            atlases::kerr::KerrChart::KerrSchild(_) => {
+                coordinates::cartesian::CartesianChart::point_as_spherical(
                     &kerr_schild_as_cartesian(point),
                 )
             }
@@ -218,11 +220,11 @@ impl SphericalConvertible for coordinates::boyer_lindquist::KerrChart {
 
     fn radial_distance_spatial_part_squared(point: &Point<Self>) -> f64 {
         match point.chart {
-            coordinates::boyer_lindquist::KerrChart::BoyerLindquist(_) => {
+            atlases::kerr::KerrChart::BoyerLindquist(_) => {
                 point.vector[1] * point.vector[1]
             }
-            coordinates::boyer_lindquist::KerrChart::KerrSchild(_) => {
-                coordinates::euclidean::CartesianChart::radial_distance_spatial_part_squared(
+            atlases::kerr::KerrChart::KerrSchild(_) => {
+                coordinates::cartesian::CartesianChart::radial_distance_spatial_part_squared(
                     &kerr_schild_as_cartesian(point),
                 )
             }
@@ -230,33 +232,33 @@ impl SphericalConvertible for coordinates::boyer_lindquist::KerrChart {
     }
 }
 
-impl CartesianConvertible for coordinates::euclidean::CartesianChart {
-    fn point_to_cartesian(point: &Point<Self>) -> Point<coordinates::euclidean::CartesianChart> {
+impl CartesianConvertible for coordinates::cartesian::CartesianChart {
+    fn point_to_cartesian(point: &Point<Self>) -> Point<coordinates::cartesian::CartesianChart> {
         *point
     }
 
     fn point_from_cartesian(
         _chart: Self,
-        point: &Point<coordinates::euclidean::CartesianChart>,
+        point: &Point<coordinates::cartesian::CartesianChart>,
     ) -> Point<Self> {
         *point
     }
 
     fn vector_to_cartesian(
         vector: &FourVector<Self>,
-    ) -> FourVector<coordinates::euclidean::CartesianChart> {
+    ) -> FourVector<coordinates::cartesian::CartesianChart> {
         *vector
     }
 }
 
-impl CartesianConvertible for coordinates::spherical::SphericalChart {
-    fn point_to_cartesian(point: &Point<Self>) -> Point<coordinates::euclidean::CartesianChart> {
+impl CartesianConvertible for atlases::spherical::SphericalChart {
+    fn point_to_cartesian(point: &Point<Self>) -> Point<coordinates::cartesian::CartesianChart> {
         spherical_to_cartesian(point)
     }
 
     fn point_from_cartesian(
         chart: Self,
-        point: &Point<coordinates::euclidean::CartesianChart>,
+        point: &Point<coordinates::cartesian::CartesianChart>,
     ) -> Point<Self> {
         // Physical -> coordinate frame: apply the chart's rotation.
         let (x, y, z) = rotate_about_x(point[1], point[2], point[3], chart.rotation());
@@ -266,7 +268,7 @@ impl CartesianConvertible for coordinates::spherical::SphericalChart {
 
     fn vector_to_cartesian(
         vector: &FourVector<Self>,
-    ) -> FourVector<coordinates::euclidean::CartesianChart> {
+    ) -> FourVector<coordinates::cartesian::CartesianChart> {
         let at = vector.at.to_cartesian();
         let (r, theta, phi) = (vector.at[1], vector.at[2], vector.at[3]);
         let (st, ct) = theta.sin_cos();
@@ -286,17 +288,17 @@ impl CartesianConvertible for coordinates::spherical::SphericalChart {
 /// The Cartesian view of both Kerr charts is the Kerr-Schild one: Boyer-Lindquist points and
 /// vectors go through the same (twisted) map as the atlas transition, so the view does not
 /// depend on the chart a step happens to be in.
-impl CartesianConvertible for coordinates::boyer_lindquist::KerrChart {
-    fn point_to_cartesian(point: &Point<Self>) -> Point<coordinates::euclidean::CartesianChart> {
+impl CartesianConvertible for atlases::kerr::KerrChart {
+    fn point_to_cartesian(point: &Point<Self>) -> Point<coordinates::cartesian::CartesianChart> {
         match point.chart {
-            coordinates::boyer_lindquist::KerrChart::BoyerLindquist(BoyerLindquistData {
+            atlases::kerr::KerrChart::BoyerLindquist(BoyerLindquistData {
                 a,
                 r_s,
             }) => Point::new_from_vector(
                 bl_to_ks(a, r_s, &point.vector),
-                coordinates::euclidean::CartesianChart::Cartesian,
+                coordinates::cartesian::CartesianChart::Cartesian,
             ),
-            coordinates::boyer_lindquist::KerrChart::KerrSchild(_) => {
+            atlases::kerr::KerrChart::KerrSchild(_) => {
                 kerr_schild_as_cartesian(point)
             }
         }
@@ -304,14 +306,14 @@ impl CartesianConvertible for coordinates::boyer_lindquist::KerrChart {
 
     fn point_from_cartesian(
         chart: Self,
-        point: &Point<coordinates::euclidean::CartesianChart>,
+        point: &Point<coordinates::cartesian::CartesianChart>,
     ) -> Point<Self> {
         match chart {
-            coordinates::boyer_lindquist::KerrChart::BoyerLindquist(BoyerLindquistData {
+            atlases::kerr::KerrChart::BoyerLindquist(BoyerLindquistData {
                 a,
                 r_s,
             }) => Point::new_from_vector(ks_to_bl(a, r_s, &point.vector).0, chart),
-            coordinates::boyer_lindquist::KerrChart::KerrSchild(_) => {
+            atlases::kerr::KerrChart::KerrSchild(_) => {
                 Point::new_from_vector(point.vector, chart)
             }
         }
@@ -319,16 +321,16 @@ impl CartesianConvertible for coordinates::boyer_lindquist::KerrChart {
 
     fn vector_to_cartesian(
         vector: &FourVector<Self>,
-    ) -> FourVector<coordinates::euclidean::CartesianChart> {
+    ) -> FourVector<coordinates::cartesian::CartesianChart> {
         let in_kerr_schild = match vector.at.chart {
-            coordinates::boyer_lindquist::KerrChart::BoyerLindquist(BoyerLindquistData {
+            atlases::kerr::KerrChart::BoyerLindquist(BoyerLindquistData {
                 a,
                 r_s,
             }) => vector.at.chart.transition_four_vector(
                 vector,
-                coordinates::boyer_lindquist::KerrChart::KerrSchild(KerrSchildData { a, r_s }),
+                atlases::kerr::KerrChart::KerrSchild(KerrSchildData { a, r_s }),
             ),
-            coordinates::boyer_lindquist::KerrChart::KerrSchild(_) => *vector,
+            atlases::kerr::KerrChart::KerrSchild(_) => *vector,
         };
         FourVector::new(
             in_kerr_schild[0],
@@ -355,8 +357,9 @@ mod tests {
 
     #[test]
     fn test_rotated_spherical_chart_round_trips_through_cartesian() {
-        use crate::geometry::coordinates::atlas::Atlas;
-        use crate::geometry::coordinates::spherical::{RotatedSpherical, SphericalChart};
+        use crate::geometry::atlases::Atlas;
+        use crate::geometry::coordinates::spherical::RotatedSpherical;
+        use crate::geometry::atlases::spherical::SphericalChart;
         use crate::geometry::four_vector::FourVector;
 
         let physical = Point::new_cartesian(1.0, 3.0, -2.0, 4.0);
@@ -381,7 +384,8 @@ mod tests {
 
     #[test]
     fn test_rotated_spherical_chart_reports_physical_angles() {
-        use crate::geometry::coordinates::spherical::{RotatedSpherical, SphericalChart};
+        use crate::geometry::coordinates::spherical::RotatedSpherical;
+        use crate::geometry::atlases::spherical::SphericalChart;
 
         let physical = Point::new_cartesian(0.0, 3.0, -2.0, 4.0);
         let expected = cartesian_to_spherical(&physical);
@@ -411,7 +415,7 @@ mod tests {
     /// chart, so it does not jump when a ray switches charts, and it round-trips.
     #[test]
     fn test_boyer_lindquist_cartesian_view_agrees_with_kerr_schild() {
-        use crate::geometry::coordinates::boyer_lindquist::KerrChart;
+        use crate::geometry::atlases::kerr::KerrChart;
 
         for a in [0.5, -0.3, 0.7] {
             let bl_chart = KerrChart::BoyerLindquist(BoyerLindquistData { a, r_s: 1.0 });

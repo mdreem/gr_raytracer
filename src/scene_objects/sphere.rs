@@ -1,11 +1,11 @@
-use crate::geometry::coordinates::atlas::GeometryChart;
-use crate::geometry::coordinates::euclidean::CartesianChart;
+use crate::geometry::coordinates::cartesian::CartesianChart;
+use crate::geometry::coordinates::chart::GeometryChart;
 use crate::geometry::geometry::Geometry;
 use crate::geometry::point::Point;
 use crate::geometry::spherical_coordinates_helper::cartesian_to_spherical;
+use crate::rendering::error::RaytracerError;
 use crate::rendering::integration::integrator::Step;
 use crate::rendering::light::radiance::Radiance;
-use crate::rendering::error::RaytracerError;
 use crate::rendering::texture::{TextureMapHandle, UVCoordinates};
 use crate::scene_objects::hittable::{ColorComputationData, Hittable, Intersection};
 use nalgebra::Vector3;

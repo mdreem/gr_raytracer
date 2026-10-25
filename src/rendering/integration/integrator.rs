@@ -1,14 +1,16 @@
-use crate::geometry::coordinates::atlas::{Atlas, CartesianConvertible, GeometryChart};
+use crate::geometry::atlases::Atlas;
+use crate::geometry::coordinates::chart::GeometryChart;
+use crate::geometry::coordinates::conversion::CartesianConvertible;
 use crate::geometry::four_vector::FourVector;
 use crate::geometry::geometry::Geometry;
 use crate::geometry::point::Point;
+use crate::rendering::error::RaytracerError;
 use crate::rendering::integration::integrator::StopReason::{
     CelestialSphereReached, CoordinateIsNan, HorizonReached,
 };
-use crate::rendering::ray::{IntegratedRay, Ray};
-use crate::rendering::error::RaytracerError;
 use crate::rendering::integration::runge_kutta::rkf45;
 use crate::rendering::integration::state::{EquationOfMotionState, get_position};
+use crate::rendering::ray::{IntegratedRay, Ray};
 use log::debug;
 
 #[derive(Debug)]

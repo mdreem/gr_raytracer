@@ -3,14 +3,14 @@ use crate::cli::shared::{
     assert_future_directed, create_scene, integrate_and_save_ray, render, resolve_camera_velocity,
 };
 use crate::configuration::RenderConfig;
-use crate::geometry::coordinates::euclidean::CartesianChart;
-use crate::geometry::spacetimes::euclidean::EuclideanSpace;
+use crate::geometry::coordinates::cartesian::CartesianChart;
 use crate::geometry::four_vector::FourVector;
 use crate::geometry::geometry::RenderableGeometry;
 use crate::geometry::point::Point;
+use crate::geometry::spacetimes::euclidean::EuclideanSpace;
+use crate::rendering::error::RaytracerError;
 use crate::rendering::light::color::ToneMappingMethod;
 use crate::rendering::raytracer;
-use crate::rendering::error::RaytracerError;
 use log::debug;
 use std::io::Write;
 

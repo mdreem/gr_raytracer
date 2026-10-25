@@ -1,5 +1,6 @@
-use crate::geometry::coordinates::atlas::{CartesianConvertible, Chart};
-use crate::geometry::coordinates::euclidean::CartesianChart;
+use crate::geometry::coordinates::cartesian::CartesianChart;
+use crate::geometry::coordinates::chart::Chart;
+use crate::geometry::coordinates::conversion::CartesianConvertible;
 use crate::geometry::point::Point;
 use nalgebra::{Matrix4, Vector3, Vector4};
 use std::marker::PhantomData;
@@ -135,7 +136,7 @@ impl<C: CartesianConvertible> FourVector<C> {
 
 #[cfg(test)]
 mod tests {
-    use crate::geometry::coordinates::atlas::CartesianConvertible;
+    use crate::geometry::coordinates::conversion::CartesianConvertible;
     use crate::geometry::spacetimes::euclidean::EuclideanSpace;
     use crate::geometry::four_vector::FourVector;
     use crate::geometry::geometry::InnerProduct;
