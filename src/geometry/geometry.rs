@@ -169,7 +169,7 @@ pub trait RenderableGeometry {
         from_col: Option<u32>,
         to_row: Option<u32>,
         to_col: Option<u32>,
-    ) -> Result<(), RaytracerError>;
+    ) -> Result<crate::cli::shared::RenderReport, RaytracerError>;
 
     fn render_ray(
         &self,

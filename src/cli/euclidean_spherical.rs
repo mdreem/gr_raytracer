@@ -27,7 +27,7 @@ impl RenderableGeometry for EuclideanSpaceSpherical {
         from_col: Option<u32>,
         to_row: Option<u32>,
         to_col: Option<u32>,
-    ) -> Result<(), RaytracerError> {
+    ) -> Result<crate::cli::shared::RenderReport, RaytracerError> {
         let camera_position = in_best_chart(&cartesian_to_spherical(&camera_position));
         let momentum = resolve_camera_velocity(self, &camera_position, &config.camera_velocity)?;
         assert_future_directed(
@@ -38,6 +38,7 @@ impl RenderableGeometry for EuclideanSpaceSpherical {
         )?;
         let tone_mapping = opts.tone_mapping;
         let exposure = opts.exposure;
+        let verify_accuracy = opts.verify_accuracy;
         let scene = create_scene(self, camera_position, momentum, opts, config.clone())?;
 
         render(
@@ -45,6 +46,7 @@ impl RenderableGeometry for EuclideanSpaceSpherical {
             filename,
             tone_mapping,
             exposure,
+            verify_accuracy,
             from_row,
             from_col,
             to_row,

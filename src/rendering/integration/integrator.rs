@@ -33,7 +33,7 @@ impl<C: GeometryChart> Step<C> {
     }
 }
 
-#[derive(Debug, PartialEq)]
+#[derive(Debug, PartialEq, Clone, Copy)]
 pub enum StopReason {
     HorizonReached,
     CelestialSphereReached,
@@ -56,8 +56,31 @@ impl<'a, G: Geometry> Integrator<'a, G> {
             geometry,
         }
     }
+
+    /// The same integrator with a different error tolerance and step budget,
+    /// e.g. a tighter reference for checking that a render is converged (a
+    /// tighter tolerance takes more steps per ray).
+    pub fn with_accuracy(&self, epsilon: f64, max_steps: usize) -> Integrator<'a, G> {
+        Integrator {
+            integration_configuration: IntegrationConfiguration {
+                epsilon,
+                max_steps,
+                ..self.integration_configuration.clone()
+            },
+            geometry: self.geometry,
+        }
+    }
+
+    pub fn max_steps(&self) -> usize {
+        self.integration_configuration.max_steps
+    }
+
+    pub fn epsilon(&self) -> f64 {
+        self.integration_configuration.epsilon
+    }
 }
 
+#[derive(Debug, Clone)]
 pub struct IntegrationConfiguration {
     max_steps: usize,
     max_radius_sq: f64,

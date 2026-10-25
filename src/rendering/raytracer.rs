@@ -1,5 +1,6 @@
 //! Render orchestration and focused sampling, star gathering, and output modules.
 
+pub mod accuracy;
 mod output;
 mod progress;
 mod sampling;

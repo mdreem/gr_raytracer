@@ -101,16 +101,19 @@ fn run() -> Result<(), RaytracerError> {
             info!("Using geometry: {:?}", config.geometry_type);
             let position = Point::new_cartesian(position[0], position[1], position[2], position[3]);
 
-            geometry.render(
+            let opts = args.global_opts.clone();
+            let report = geometry.render(
                 args.global_opts,
-                config,
+                config.clone(),
                 position,
-                filename,
+                filename.clone(),
                 from_row,
                 from_col,
                 to_row,
                 to_col,
             )?;
+            let section = [from_row, from_col, to_row, to_col];
+            write_render_report(&filename, &opts, section, &config, &report)?;
         }
         Action::RenderRay { row, col, filename } => {
             if args.global_opts.camera_position.len() != 3 {
@@ -178,5 +181,81 @@ fn run() -> Result<(), RaytracerError> {
 
     let duration = start.elapsed();
     info!("Elapsed time: {:.2?}", duration);
+    Ok(())
+}
+
+/// How an output was rendered, written next to it as `<filename>.render.toml`:
+/// the command line, the integrator and camera settings, the accuracy check
+/// if one ran, and the full scene. A `.hdr` cannot carry text metadata, so the
+/// report travels beside the image instead.
+#[derive(serde::Serialize)]
+struct RenderInfo<'a> {
+    version: &'static str,
+    command: String,
+    settings: RenderSettings,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    accuracy_check: Option<&'a crate::rendering::raytracer::accuracy::AccuracyReport>,
+    scene: &'a RenderConfig,
+}
+
+#[derive(serde::Serialize)]
+struct RenderSettings {
+    width: i64,
+    height: i64,
+    epsilon: f64,
+    max_steps: usize,
+    max_radius: f64,
+    step_size: f64,
+    camera_position: Vec<f64>,
+    theta: f64,
+    phi: f64,
+    psi: f64,
+    exposure: f64,
+    tone_mapping: String,
+    curved_star_membership: bool,
+    /// from_row, from_col, to_row, to_col; omitted bounds are the full frame.
+    section: Vec<i64>,
+}
+
+fn write_render_report(
+    filename: &str,
+    opts: &crate::cli::cli::GlobalOpts,
+    section: [Option<u32>; 4],
+    config: &RenderConfig,
+    report: &crate::cli::shared::RenderReport,
+) -> Result<(), RaytracerError> {
+    let full = [0, 0, opts.height, opts.width];
+    let info = RenderInfo {
+        version: env!("CARGO_PKG_VERSION"),
+        command: std::env::args().collect::<Vec<_>>().join(" "),
+        settings: RenderSettings {
+            width: opts.width,
+            height: opts.height,
+            epsilon: opts.epsilon,
+            max_steps: opts.max_steps,
+            max_radius: opts.max_radius,
+            step_size: opts.step_size,
+            camera_position: opts.camera_position.clone(),
+            theta: opts.theta,
+            phi: opts.phi,
+            psi: opts.psi,
+            exposure: opts.exposure,
+            tone_mapping: format!("{:?}", opts.tone_mapping),
+            curved_star_membership: opts.curved_star_membership,
+            section: section
+                .iter()
+                .zip(full)
+                .map(|(bound, default)| bound.map_or(default, i64::from))
+                .collect(),
+        },
+        accuracy_check: report.accuracy.as_ref(),
+        scene: config,
+    };
+    let text = toml::to_string(&info).map_err(|e| {
+        RaytracerError::InvalidConfiguration(format!("could not serialise the render report: {e}"))
+    })?;
+    let path = format!("{filename}.render.toml");
+    fs::write(&path, text).map_err(RaytracerError::IoError)?;
+    info!("wrote render report to {}", path);
     Ok(())
 }
