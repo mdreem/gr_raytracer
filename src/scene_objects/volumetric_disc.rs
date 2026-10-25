@@ -61,6 +61,26 @@ fn opacity_frame_factor_for(emitter_energy: f64, affine_per_length: f64) -> f64 
     }
 }
 
+/// d(lambda)/ds over one step window: the affine parameter the photon covers
+/// per unit of the coordinate length the march walks. `Step::t` is the
+/// solver's own integration parameter, which is not the affine parameter on
+/// every geometry (KerrBL integrates in Mino time, where dlambda = Sigma dMino),
+/// so it is rescaled by `step_parameter_scale`, averaged over the window's ends.
+fn affine_per_length<C: GeometryChart>(
+    geometry: &dyn Geometry<Chart = C>,
+    from: &Step<C>,
+    to: &Step<C>,
+) -> f64 {
+    let segment_length =
+        (to.x.get_spatial_vector_cartesian() - from.x.get_spatial_vector_cartesian()).norm();
+    if segment_length <= 0.0 {
+        return 0.0;
+    }
+    let scale =
+        0.5 * (geometry.step_parameter_scale(&from.x) + geometry.step_parameter_scale(&to.x));
+    (to.t - from.t).abs() * scale / segment_length
+}
+
 pub struct VolumetricDisc {
     center_disk_inner_radius: f64,
     center_disk_outer_radius: f64,
@@ -286,16 +306,10 @@ impl VolumetricDisc {
                 break;
             }
 
-            // dlambda/ds for this segment: the integrator's affine parameter
-            // over the coordinate length the march walks. Pairing it with the
-            // gas-frame frequency keeps the optical depth invariant, so a
-            // moving camera cannot change how opaque static gas looks.
-            let segment_length = (to - from).norm();
-            let affine_per_length = if segment_length > 0.0 {
-                (steps[1].t - steps[0].t).abs() / segment_length
-            } else {
-                0.0
-            };
+            // Pairing dlambda/ds with the gas-frame frequency keeps the optical
+            // depth invariant, so a moving camera cannot change how opaque
+            // static gas looks.
+            let affine_per_length = affine_per_length(geometry, &steps[0], &steps[1]);
 
             let chart = steps[0].x.chart;
             let result = self.raymarch_segment(
@@ -812,6 +826,49 @@ mod tests {
         ] {
             assert_abs_diff_eq!(opacity_frame_factor_for(nu, dl), 1.0, epsilon = 1e-12);
         }
+    }
+
+    #[test]
+    fn affine_per_length_converts_mino_time_to_the_affine_parameter() {
+        use crate::geometry::spacetimes::kerr_bl::KerrBL;
+        // KerrBL's Step::t is Mino time, so a step of dMino covers
+        // dlambda = Sigma * dMino of affine parameter. Without the rescale the
+        // optical depth would shrink by 1/Sigma, about 1/r^2 in the disc plane,
+        // turning the outer disc nearly transparent.
+        let (a, r_s) = (0.499, 1.0);
+        let geometry = KerrBL::new(r_s, a, 1e-4);
+        let theta = std::f64::consts::FRAC_PI_2;
+        let mk = |r: f64, t: f64| {
+            let x = Point::new_boyer_lindquist(a, r_s, 0.0, r, theta, 0.0);
+            Step {
+                x,
+                p: FourVector::new(1.0, 1.0, 0.0, 0.0, x),
+                t,
+                step: 0,
+            }
+        };
+        let (from, to) = (mk(10.0, 0.0), mk(10.5, 0.003));
+        let length =
+            (to.x.get_spatial_vector_cartesian() - from.x.get_spatial_vector_cartesian()).norm();
+        let mean_sigma = 0.5 * (10.0_f64.powi(2) + 10.5_f64.powi(2));
+
+        assert_abs_diff_eq!(
+            affine_per_length(&geometry, &from, &to),
+            0.003 * mean_sigma / length,
+            epsilon = 1e-12
+        );
+    }
+
+    #[test]
+    fn affine_per_length_is_plain_ratio_for_affine_solvers() {
+        let geometry = EuclideanSpace::new();
+        let mut steps = straight_steps(Vector3::new(1.0, 0.0, 0.0), Vector3::new(3.0, 0.0, 0.0));
+        steps[1].t = 0.5;
+        assert_abs_diff_eq!(
+            affine_per_length(&geometry, &steps[0], &steps[1]),
+            0.25,
+            epsilon = 1e-12
+        );
     }
 
     fn unit_frequency() -> RayFrequencyData {
