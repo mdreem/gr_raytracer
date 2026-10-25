@@ -10,19 +10,23 @@
 //!
 //! Set CURVED_MEMBERSHIP=1 to exercise the curved-boundary gather.
 
-use super::*;
+use crate::rendering::light::color::ToneMappingMethod;
+use super::Raytracer;
+use crate::rendering::error::RaytracerError;
+use crate::rendering::light::color::CIETristimulus;
+use crate::rendering::light::radiance::Radiance;
+use crate::rendering::scene::Scene;
+use nalgebra::Vector3;
 use crate::geometry::geometry::SupportQuantities;
 use crate::geometry::point::Point;
 use crate::geometry::spacetimes::schwarzschild::Schwarzschild;
 use crate::geometry::spherical_coordinates_helper::cartesian_to_spherical;
 use crate::rendering::camera::Camera;
-use crate::rendering::light::color::CIETristimulus;
 use crate::rendering::integration::integrator::IntegrationConfiguration;
 use crate::rendering::stars::octree::Octree;
 use crate::rendering::stars::star_catalog::{Star, StarCatalog};
 use crate::rendering::texture::{TemperatureData, TextureData, TextureMap, UVCoordinates};
 use crate::scene_objects::objects::Objects;
-use nalgebra::Vector3;
 use std::f64::consts::PI;
 use std::sync::Arc;
 
