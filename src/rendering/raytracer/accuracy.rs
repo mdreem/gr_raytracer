@@ -43,8 +43,8 @@ pub const COLOUR_WARN_FRACTION: f64 = 0.05;
 /// Relative luminance difference at which a lit sample counts as changed.
 pub const COLOUR_TOLERANCE: f64 = 0.25;
 
-/// Samples dimmer than this fraction of the brightest reference sample are
-/// left out of the colour comparison (black sky, deep shadow).
+/// Samples dimmer than this fraction of the brightest sample in either trace
+/// are left out of the colour comparison (black sky, deep shadow).
 const LIT_FLOOR: f64 = 1e-3;
 
 #[derive(Debug, Clone, Serialize)]
@@ -61,7 +61,7 @@ pub struct AccuracyReport {
     pub changed_fraction: f64,
     /// Largest escape-direction difference among rays that escape both times.
     pub max_deviation_rad: f64,
-    /// Samples bright enough to compare colours (see LIT_FLOOR).
+    /// Samples bright in the render or the reference (see LIT_FLOOR).
     pub lit_samples: usize,
     /// Lit samples whose luminance differs by more than COLOUR_TOLERANCE.
     pub colour_changed: usize,
@@ -134,8 +134,9 @@ fn sample_pixels(
         .collect();
     let wanted = samples - pixels.len();
     if width > 0 && !lit.is_empty() && wanted > 0 {
-        let stride = lit.len() as f64 / wanted as f64;
-        for k in 0..wanted.min(lit.len()) {
+        let count = wanted.min(lit.len());
+        let stride = lit.len() as f64 / count as f64;
+        for k in 0..count {
             let i = lit[((k as f64 + 0.5) * stride) as usize];
             pixels.push((
                 from_row as i64 + (i / width) as i64,
@@ -146,6 +147,27 @@ fn sample_pixels(
     pixels.sort_unstable();
     pixels.dedup();
     pixels
+}
+
+/// Compare the luminance of each sample, `(render, reference)`: returns how
+/// many are lit in either trace and how many of those changed by more than
+/// COLOUR_TOLERANCE. A sample that is bright only in the render (spurious
+/// emission) counts as changed, as does one that is bright only in the
+/// reference.
+fn compare_colours(luminance: &[(f64, f64)]) -> (usize, usize) {
+    let brightest = luminance
+        .iter()
+        .map(|&(y, y_ref)| y.max(y_ref))
+        .fold(0.0, f64::max);
+    let lit: Vec<_> = luminance
+        .iter()
+        .filter(|&&(y, y_ref)| y.max(y_ref) > LIT_FLOOR * brightest)
+        .collect();
+    let changed = lit
+        .iter()
+        .filter(|&&&(y, y_ref)| (y - y_ref).abs() > COLOUR_TOLERANCE * y.max(y_ref))
+        .count();
+    (lit.len(), changed)
 }
 
 impl<G: Geometry> Raytracer<'_, G> {
@@ -200,15 +222,8 @@ impl<G: Geometry> Raytracer<'_, G> {
 
         let changed = results.iter().filter(|r| r.0).count();
         let max_deviation_rad = results.iter().filter_map(|r| r.1).fold(0.0, f64::max);
-        let brightest = results.iter().map(|r| r.3).fold(0.0, f64::max);
-        let lit: Vec<_> = results
-            .iter()
-            .filter(|r| r.3 > LIT_FLOOR * brightest)
-            .collect();
-        let colour_changed = lit
-            .iter()
-            .filter(|r| (r.2 - r.3).abs() > COLOUR_TOLERANCE * r.3)
-            .count();
+        let luminance: Vec<_> = results.iter().map(|r| (r.2, r.3)).collect();
+        let (lit_samples, colour_changed) = compare_colours(&luminance);
         let report = AccuracyReport {
             samples: results.len(),
             epsilon,
@@ -221,12 +236,12 @@ impl<G: Geometry> Raytracer<'_, G> {
                 changed as f64 / results.len() as f64
             },
             max_deviation_rad,
-            lit_samples: lit.len(),
+            lit_samples,
             colour_changed,
-            colour_changed_fraction: if lit.is_empty() {
+            colour_changed_fraction: if lit_samples == 0 {
                 0.0
             } else {
-                colour_changed as f64 / lit.len() as f64
+                colour_changed as f64 / lit_samples as f64
             },
         };
 
@@ -258,7 +273,31 @@ impl<G: Geometry> Raytracer<'_, G> {
 
 #[cfg(test)]
 mod tests {
-    use super::{sample_grid, sample_pixels};
+    use super::{compare_colours, sample_grid, sample_pixels};
+
+    #[test]
+    fn sample_pixels_covers_sparse_lit_pixels() {
+        // Four lit pixels spread over a 10x10 section and a budget far above
+        // that: every one of them must be sampled, not just the first.
+        let mut luminance = vec![0.0; 100];
+        for i in [3, 27, 58, 91] {
+            luminance[i] = 1.0;
+        }
+        let pixels = sample_pixels(0, 0, 10, 10, &luminance, 1000);
+        for i in [3, 27, 58, 91] {
+            assert!(pixels.contains(&((i / 10) as i64, (i % 10) as i64)), "{i}");
+        }
+    }
+
+    #[test]
+    fn compare_colours_counts_emission_missing_from_the_reference() {
+        // The render is bright where the reference is black, and vice versa.
+        let (lit, changed) = compare_colours(&[(1.0, 0.0), (0.0, 0.0), (0.0, 0.5)]);
+        assert_eq!((lit, changed), (2, 2));
+        // Within tolerance of each other: lit, unchanged.
+        let (lit, changed) = compare_colours(&[(1.0, 0.9), (0.0, 0.0)]);
+        assert_eq!((lit, changed), (1, 0));
+    }
 
     #[test]
     fn sample_pixels_puts_half_on_lit_pixels() {
