@@ -186,6 +186,16 @@ impl<'a, G: Geometry> Scene<'a, G> {
     }
 
     pub fn color_of_ray(&self, ray: &Ray<G::Chart>) -> Result<RaySample<G::Chart>, RaytracerError> {
+        self.color_of_ray_with(&self.integrator, ray)
+    }
+
+    /// `color_of_ray` with the geodesic traced by `integrator` instead of the
+    /// scene's own, e.g. a tighter-tolerance reference.
+    pub fn color_of_ray_with(
+        &self,
+        integrator: &Integrator<'a, G>,
+        ray: &Ray<G::Chart>,
+    ) -> Result<RaySample<G::Chart>, RaytracerError> {
         trace!("Tracing ray at ({}|{})", ray.row, ray.col);
         let m_s = self
             .geometry
@@ -197,7 +207,7 @@ impl<'a, G: Geometry> Scene<'a, G> {
             );
         }
 
-        let (steps, stop_reason) = self.integrate_ray(ray)?;
+        let (steps, stop_reason) = integrator.integrate(ray)?;
 
         if self.save_ray_data {
             let mut file = File::create(format!("ray-{}-{}.csv", ray.row, ray.col))

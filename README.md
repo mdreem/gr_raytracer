@@ -68,6 +68,26 @@ cargo run --release -- --width=1500 --height=1500 --camera-position=-16.0,0.0,3.
 - `render`: full image render command.
 - `--filename`: output image path.
 
+Each render also writes `<filename>.render.toml` next to the image. It records
+the command line, the integrator and camera settings and the full scene, so the
+image can be reproduced. A `.hdr` cannot carry this as metadata.
+
+### Accuracy
+
+`--epsilon` is the integrator's error tolerance per step and defaults to `1e-9`.
+Near the photon orbit a ray's deviation grows several hundredfold per loop
+around the hole, so a looser tolerance changes how many loops a ray makes and
+where it crosses the disc. At `1e-5`, the old default, this painted false
+nested arcs into photon-ring close-ups.
+
+To check a render, add `--verify-accuracy=1000`. After rendering, it re-traces
+1000 pixels at a 100x tighter tolerance: half spread evenly, half on lit
+pixels. It reports how many rays end differently and how many lit pixels
+change brightness by more than 25%, logs a warning if either share is too
+high, and adds the result to the `.render.toml` report. Lower `--epsilon` if
+it warns. Pixel-exact accuracy for extreme close-ups of the photon ring can
+need around `1e-11`.
+
 ## How Rendering Works
 
 Predefined scenes live in [`scene-definitions`](./scene-definitions) as TOML files.  

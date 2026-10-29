@@ -168,6 +168,13 @@ impl<C: CartesianConvertible> Camera<C> {
         -self.tetrad.z + 2.0 * w / (self.spatial_signature * w_squared)
     }
 
+    /// Angle one pixel spans at the image centre (alpha is the vertical field
+    /// of view). An approximation away from the centre, good enough as a
+    /// "different pixel" threshold.
+    pub fn pixel_angle(&self) -> f64 {
+        self.alpha / self.rows as f64
+    }
+
     pub fn get_ray_for(&self, row: i64, column: i64) -> Ray<C> {
         let direction = self.get_direction_for(row as f64, column as f64);
         trace!("direction ({}|{}): {:?}", row, column, direction);

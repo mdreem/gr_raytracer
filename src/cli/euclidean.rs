@@ -25,7 +25,7 @@ impl RenderableGeometry for EuclideanSpace {
         from_col: Option<u32>,
         to_row: Option<u32>,
         to_col: Option<u32>,
-    ) -> Result<(), RaytracerError> {
+    ) -> Result<crate::cli::shared::RenderReport, RaytracerError> {
         let momentum = resolve_camera_velocity(self, &camera_position, &config.camera_velocity)?;
         assert_future_directed(
             "Euclidean camera four-velocity",
@@ -35,6 +35,7 @@ impl RenderableGeometry for EuclideanSpace {
         )?;
         let tone_mapping = opts.tone_mapping;
         let exposure = opts.exposure;
+        let verify_accuracy = opts.verify_accuracy;
         let scene = create_scene(self, camera_position, momentum, opts, config.clone())?;
 
         render(
@@ -42,6 +43,7 @@ impl RenderableGeometry for EuclideanSpace {
             filename,
             tone_mapping,
             exposure,
+            verify_accuracy,
             from_row,
             from_col,
             to_row,

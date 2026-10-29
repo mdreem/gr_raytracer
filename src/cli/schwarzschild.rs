@@ -55,9 +55,10 @@ impl RenderableGeometry for Schwarzschild {
         from_col: Option<u32>,
         to_row: Option<u32>,
         to_col: Option<u32>,
-    ) -> Result<(), RaytracerError> {
+    ) -> Result<crate::cli::shared::RenderReport, RaytracerError> {
         let tone_mapping = opts.tone_mapping;
         let exposure = opts.exposure;
+        let verify_accuracy = opts.verify_accuracy;
         let scene = create_scene_internal(self, opts, &config, camera_position)?;
 
         render(
@@ -65,6 +66,7 @@ impl RenderableGeometry for Schwarzschild {
             filename,
             tone_mapping,
             exposure,
+            verify_accuracy,
             from_row,
             from_col,
             to_row,
@@ -156,6 +158,7 @@ mod tests {
             show_sampling_mask: false,
             sampling_mask_color: crate::rendering::light::color::Color::new(255, 0, 255, 255),
             curved_star_membership: false,
+            verify_accuracy: 0,
         };
         let geometry = Schwarzschild::new(radius, horizon_epsilon);
         let mut output_buffer = BufWriter::new(Vec::new());

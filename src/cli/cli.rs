@@ -1,6 +1,19 @@
 use crate::rendering::light::color::{Color, ToneMappingMethod};
 use clap::{Args, Parser, Subcommand};
 
+/// Default integrator error tolerance.
+///
+/// Near the photon orbit a ray's deviation grows several hundredfold per loop
+/// around the hole, so a loose tolerance, not the ray's initial direction,
+/// decides how many loops it makes and where it crosses the disc. At the old
+/// default of 1e-5 that painted false nested arcs into photon-ring close-ups.
+/// One such ray converges to 3.03 loops from 1e-8 on, but makes 2.08 loops at
+/// 1e-5 and 1.33 at 1e-4 (see `photon_ring_ray_converges_at_default_epsilon`).
+/// On the README hero scene (KerrBL, 640x360, no stars) against a 1e-11
+/// reference, 1e-5 leaves 9.6% of lit pixels more than 50% off and 1e-9 leaves
+/// 0.08%, at the same render time (17 s vs 15 s); 1e-11 takes 3.6x as long.
+pub const DEFAULT_EPSILON: f64 = 1e-9;
+
 #[derive(Debug, Args, Clone)]
 pub struct GlobalOpts {
     #[arg(long, default_value = "500")]
@@ -16,8 +29,15 @@ pub struct GlobalOpts {
     pub max_steps: usize,
     #[arg(long, default_value = "15000")]
     pub max_radius: f64,
-    #[arg(long, default_value = "0.00001")]
+    /// Integrator error tolerance per step. See DEFAULT_EPSILON for why it is this tight.
+    #[arg(long, default_value_t = DEFAULT_EPSILON)]
     pub epsilon: f64,
+    /// After rendering, re-trace this many pixels, spread evenly over the
+    /// rendered section, at a 100x tighter tolerance and report how many leave
+    /// in a different direction or stop for a different reason. The result is
+    /// logged and written to the `<filename>.render.toml` report. 0 disables.
+    #[arg(long, default_value = "0")]
+    pub verify_accuracy: usize,
     #[arg(long, value_delimiter = ',', default_value = "18.0,0.0,0.8")]
     pub camera_position: Vec<f64>,
     /// Camera pre-roll (radians): rotates the image-plane axes about the

@@ -10,6 +10,7 @@ use crate::rendering::integration::integrator::IntegrationConfiguration;
 use crate::rendering::light::color::{CIETristimulus, Color, ToneMappingMethod};
 use crate::rendering::light::temperature::{ConstantTemperatureComputer, TemperatureComputer};
 use crate::rendering::raytracer;
+use crate::rendering::raytracer::accuracy::AccuracyReport;
 use crate::rendering::scene::Scene;
 use crate::rendering::stars::star_catalog::StarCatalog;
 use crate::rendering::texture::{
@@ -88,29 +89,46 @@ pub fn assert_future_directed<G: Geometry>(
     assert_directed(context, geometry, position, four_vector, 1.0)
 }
 
+/// What a render produced besides the image, for the `<filename>.render.toml` report.
+#[derive(Debug, Clone, Default)]
+pub struct RenderReport {
+    pub accuracy: Option<AccuracyReport>,
+}
+
 pub fn render<G: Geometry>(
     scene: Scene<G>,
     filename: String,
     tone_mapping: ToneMappingMethod,
     exposure: f64,
+    verify_accuracy: usize,
     from_row: Option<u32>,
     from_col: Option<u32>,
     to_row: Option<u32>,
     to_col: Option<u32>,
-) -> Result<(), RaytracerError> {
+) -> Result<RenderReport, RaytracerError> {
     if !(exposure.is_finite() && exposure > 0.0) {
         return Err(RaytracerError::InvalidConfiguration(format!(
             "exposure must be a positive finite number, got {exposure}"
         )));
     }
     let raytracer = raytracer::Raytracer::new(scene, tone_mapping, exposure);
-    raytracer.render_section(
-        from_row.unwrap_or(0),
-        from_col.unwrap_or(0),
-        to_row.unwrap_or(raytracer.scene.camera.rows as u32),
-        to_col.unwrap_or(raytracer.scene.camera.columns as u32),
-        filename,
-    )
+    let (from_row, from_col) = (from_row.unwrap_or(0), from_col.unwrap_or(0));
+    let to_row = to_row.unwrap_or(raytracer.scene.camera.rows as u32);
+    let to_col = to_col.unwrap_or(raytracer.scene.camera.columns as u32);
+    let luminance = raytracer.render_section(from_row, from_col, to_row, to_col, filename)?;
+    let accuracy = (verify_accuracy > 0)
+        .then(|| {
+            raytracer.check_accuracy(
+                from_row,
+                from_col,
+                to_row,
+                to_col,
+                &luminance,
+                verify_accuracy,
+            )
+        })
+        .transpose()?;
+    Ok(RenderReport { accuracy })
 }
 
 /// The same point in the chart of its atlas best suited there, so that e.g. a camera on a

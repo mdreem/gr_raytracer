@@ -26,6 +26,8 @@ fn flush_to_hdr(value: f64) -> f32 {
 }
 
 impl<'a, G: Geometry> Raytracer<'a, G> {
+    /// Render the section to `filename` and return its luminance (CIE Y) per
+    /// pixel, row-major, for follow-up checks such as `check_accuracy`.
     pub fn render_section(
         &self,
         from_row: u32,
@@ -33,11 +35,13 @@ impl<'a, G: Geometry> Raytracer<'a, G> {
         to_row: u32,
         to_col: u32,
         filename: String,
-    ) -> Result<(), RaytracerError> {
+    ) -> Result<Vec<f64>, RaytracerError> {
+        let luminance: Vec<f64>;
         if filename.ends_with(".hdr") {
             info!("Creating HDR image");
             let raw_cie =
                 self.render_section_to_radiance_buffer(from_row, from_col, to_row, to_col)?;
+            luminance = raw_cie.iter().map(|c| c.y).collect();
             let buffer: Vec<f32> = raw_cie
                 .into_iter()
                 .map(|c| xyz_to_linear_srgb(&c.to_xyz_over_black()))
@@ -57,6 +61,7 @@ impl<'a, G: Geometry> Raytracer<'a, G> {
             );
             let cie_pixels =
                 self.render_section_to_radiance_buffer(from_row, from_col, to_row, to_col)?;
+            luminance = cie_pixels.iter().map(|c| c.y).collect();
             let cie_pixels = cie_pixels
                 .into_iter()
                 .map(Radiance::to_xyz_over_black)
@@ -71,7 +76,7 @@ impl<'a, G: Geometry> Raytracer<'a, G> {
         }
 
         info!("saved image to {}", filename);
-        Ok(())
+        Ok(luminance)
     }
 }
 
