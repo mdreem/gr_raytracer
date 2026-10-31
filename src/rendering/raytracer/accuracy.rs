@@ -27,8 +27,14 @@ pub const REFERENCE_FACTOR: f64 = 100.0;
 /// runs out of steps instead of getting more accurate.
 pub const MIN_REFERENCE_EPSILON: f64 = 1e-12;
 
-/// The reference gets this many times the render's step budget.
+/// The reference gets this many times the render's step budget, but no more
+/// than MAX_REFERENCE_STEPS unless the render's own budget is larger.
 pub const REFERENCE_STEP_FACTOR: usize = 100;
+
+/// Each step is kept in memory, so an unbounded reference budget lets one
+/// stalled ray exhaust the machine: with --max-steps=2000000 the 100x budget
+/// killed a 16 GiB job.
+pub const MAX_REFERENCE_STEPS: usize = 20_000_000;
 
 /// Share of rays ending differently above which the check warns.
 pub const WARN_FRACTION: f64 = 0.01;
@@ -189,7 +195,10 @@ impl<G: Geometry> Raytracer<'_, G> {
         let reference_epsilon = (epsilon / REFERENCE_FACTOR).max(MIN_REFERENCE_EPSILON);
         let reference = integrator.with_accuracy(
             reference_epsilon,
-            integrator.max_steps().saturating_mul(REFERENCE_STEP_FACTOR),
+            integrator
+                .max_steps()
+                .saturating_mul(REFERENCE_STEP_FACTOR)
+                .min(MAX_REFERENCE_STEPS.max(integrator.max_steps())),
         );
         let threshold_rad = self.scene.camera.pixel_angle();
         let pixels = sample_pixels(from_row, from_col, to_row, to_col, luminance, samples);
