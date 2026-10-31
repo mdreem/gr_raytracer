@@ -88,6 +88,20 @@ high, and adds the result to the `.render.toml` report. Lower `--epsilon` if
 it warns. Pixel-exact accuracy for extreme close-ups of the photon ring can
 need around `1e-11`.
 
+Every render also checks its shadow against the exact solution. For Kerr and
+Schwarzschild, whether a ray falls into the hole or escapes follows from the
+roots of its radial potential, without integrating anything. After rendering,
+each pixel's central ray is classified this way and compared with where the
+integrated ray ended. Pixels next to the edge of the shadow are left out,
+since there the answer changes within the pixel. The `.render.toml` report
+gets a `shadow_check` section with the number of disagreeing pixels and how
+far from the edge the worst one lies, and the render logs a warning if any
+disagree. At `1e-5` rays escaped from up to 32 pixels inside the shadow of
+the photon-ring close-up; at `1e-9` none do. The check needs a horizon, so it
+is skipped for naked singularities (`|a| > M`) and flat space, and it only
+covers where rays end, not where they cross the disc or which catalogue stars
+they gather.
+
 ## How Rendering Works
 
 Predefined scenes live in [`scene-definitions`](./scene-definitions) as TOML files.  
