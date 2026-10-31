@@ -7,6 +7,7 @@ use crate::geometry::coordinates::chart::Chart;
 use crate::geometry::four_vector::FourVector;
 use crate::geometry::geometry::Geometry;
 use crate::rendering::error::RaytracerError;
+use crate::rendering::integration::integrator::StopReason;
 use crate::rendering::light::radiance::{Radiance, RadianceMean};
 use crate::rendering::ray::Ray;
 use crate::rendering::scene::{EscapeInfo, RayClass, RaySample};
@@ -120,27 +121,31 @@ fn stratified_sample_offset(
 }
 
 impl<'a, G: Geometry> Raytracer<'a, G> {
+    /// The section's pixel colours, row-major, and why each pixel's primary
+    /// (centre) ray stopped.
     pub(super) fn render_section_to_radiance_buffer(
         &self,
         from_row: u32,
         from_col: u32,
         to_row: u32,
         to_col: u32,
-    ) -> Result<Vec<Radiance>, RaytracerError> {
+    ) -> Result<(Vec<Radiance>, Vec<Option<StopReason>>), RaytracerError> {
         let buffer =
             self.render_section_to_radiance_buffer_raw(from_row, from_col, to_row, to_col)?;
-        if self.scene.adaptive_sampling.enabled || self.scene.sampling_mask_color.is_some() {
-            self.render_section_to_radiance_buffer_supersampled(
-                from_row, from_col, to_row, to_col, &buffer,
-            )
-        } else {
-            let width = (to_col - from_col) as usize;
-            let height = (to_row - from_row) as usize;
-            let mut colors: Vec<Radiance> = buffer.iter().map(|s| s.color).collect();
-            self.add_star_layer(&buffer, width, height, &mut colors)?;
-
-            Ok(colors)
-        }
+        let stop_reasons = buffer.iter().map(|s| s.stop_reason).collect();
+        let colors =
+            if self.scene.adaptive_sampling.enabled || self.scene.sampling_mask_color.is_some() {
+                self.render_section_to_radiance_buffer_supersampled(
+                    from_row, from_col, to_row, to_col, &buffer,
+                )?
+            } else {
+                let width = (to_col - from_col) as usize;
+                let height = (to_row - from_row) as usize;
+                let mut colors: Vec<Radiance> = buffer.iter().map(|s| s.color).collect();
+                self.add_star_layer(&buffer, width, height, &mut colors)?;
+                colors
+            };
+        Ok((colors, stop_reasons))
     }
 
     pub(super) fn render_section_to_radiance_buffer_raw(
@@ -162,6 +167,7 @@ impl<'a, G: Geometry> Raytracer<'a, G> {
                     z: 0.0,
                     redshift: 1.0,
                 }),
+                stop_reason: None,
                 accumulated_angular_distance: 0.0,
                 ray: Ray::new(
                     0,
@@ -430,6 +436,7 @@ mod tests {
         RaySample {
             color: Radiance::new(0.0, y, 0.0, 1.0 - alpha),
             ray_class,
+            stop_reason: None,
             accumulated_angular_distance: 0.0,
             ray: Ray::new(
                 0,

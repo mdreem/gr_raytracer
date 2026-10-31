@@ -11,6 +11,7 @@ use crate::rendering::light::color::{CIETristimulus, Color, ToneMappingMethod};
 use crate::rendering::light::temperature::{ConstantTemperatureComputer, TemperatureComputer};
 use crate::rendering::raytracer;
 use crate::rendering::raytracer::accuracy::AccuracyReport;
+use crate::rendering::raytracer::shadow_check::ShadowCheckReport;
 use crate::rendering::scene::Scene;
 use crate::rendering::stars::star_catalog::StarCatalog;
 use crate::rendering::texture::{
@@ -93,6 +94,7 @@ pub fn assert_future_directed<G: Geometry>(
 #[derive(Debug, Clone, Default)]
 pub struct RenderReport {
     pub accuracy: Option<AccuracyReport>,
+    pub shadow: Option<ShadowCheckReport>,
 }
 
 pub fn render<G: Geometry>(
@@ -115,7 +117,8 @@ pub fn render<G: Geometry>(
     let (from_row, from_col) = (from_row.unwrap_or(0), from_col.unwrap_or(0));
     let to_row = to_row.unwrap_or(raytracer.scene.camera.rows as u32);
     let to_col = to_col.unwrap_or(raytracer.scene.camera.columns as u32);
-    let luminance = raytracer.render_section(from_row, from_col, to_row, to_col, filename)?;
+    let outcome = raytracer.render_section(from_row, from_col, to_row, to_col, filename)?;
+    let shadow = raytracer.check_shadow(from_row, from_col, to_row, to_col, &outcome.stop_reasons);
     let accuracy = (verify_accuracy > 0)
         .then(|| {
             raytracer.check_accuracy(
@@ -123,12 +126,12 @@ pub fn render<G: Geometry>(
                 from_col,
                 to_row,
                 to_col,
-                &luminance,
+                &outcome.luminance,
                 verify_accuracy,
             )
         })
         .transpose()?;
-    Ok(RenderReport { accuracy })
+    Ok(RenderReport { accuracy, shadow })
 }
 
 /// The same point in the chart of its atlas best suited there, so that e.g. a camera on a

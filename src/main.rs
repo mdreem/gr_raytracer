@@ -185,8 +185,8 @@ fn run() -> Result<(), RaytracerError> {
 }
 
 /// How an output was rendered, written next to it as `<filename>.render.toml`:
-/// the command line, the integrator and camera settings, the accuracy check
-/// if one ran, and the full scene. A `.hdr` cannot carry text metadata, so the
+/// the command line, the integrator and camera settings, the exact shadow
+/// check, the accuracy check if one ran, and the full scene. A `.hdr` cannot carry text metadata, so the
 /// report travels beside the image instead.
 #[derive(serde::Serialize)]
 struct RenderInfo<'a> {
@@ -195,6 +195,8 @@ struct RenderInfo<'a> {
     settings: RenderSettings,
     #[serde(skip_serializing_if = "Option::is_none")]
     accuracy_check: Option<&'a crate::rendering::raytracer::accuracy::AccuracyReport>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    shadow_check: Option<&'a crate::rendering::raytracer::shadow_check::ShadowCheckReport>,
     scene: &'a RenderConfig,
 }
 
@@ -249,6 +251,7 @@ fn write_render_report(
                 .collect(),
         },
         accuracy_check: report.accuracy.as_ref(),
+        shadow_check: report.shadow.as_ref(),
         scene: config,
     };
     let text = toml::to_string(&info).map_err(|e| {
