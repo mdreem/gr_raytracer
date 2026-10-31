@@ -500,6 +500,14 @@ impl Geometry for KerrBL {
         position[1]
     }
 
+    fn analytic_capture(
+        &self,
+        _position: &Point<KerrChart>,
+        momentum: &FourVector<KerrChart>,
+    ) -> Option<bool> {
+        crate::geometry::capture::kerr_capture(self.radius, self.a, momentum)
+    }
+
     fn step_parameter_scale(&self, position: &Point<KerrChart>) -> f64 {
         sigma(position[1], self.a, position[2])
     }

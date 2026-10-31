@@ -5,6 +5,7 @@
 //! [`spacetimes`] defines the physical geometries independently of that organization.
 
 pub mod atlases;
+pub mod capture;
 pub mod circular_orbit;
 pub mod coordinates;
 pub mod four_vector;
