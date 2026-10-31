@@ -9,3 +9,6 @@ pub mod raytracer;
 pub mod scene;
 pub mod stars;
 pub mod texture;
+
+#[cfg(test)]
+mod known_answer_tests;
