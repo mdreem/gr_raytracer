@@ -41,6 +41,9 @@ pub enum StopReason {
     ClosedOrbitDetected,
 }
 
+/// Steps reserved up front for a ray's path.
+const INITIAL_STEP_CAPACITY: usize = 4096;
+
 pub struct Integrator<'a, G: Geometry> {
     integration_configuration: IntegrationConfiguration,
     geometry: &'a G,
@@ -123,8 +126,14 @@ impl<G: Geometry> Integrator<'_, G> {
         let mut y = geodesic_solver.create_initial_state(&ray.momentum);
 
         let initial_chart = ray.position.chart;
-        let mut result: Vec<Step<G::Chart>> =
-            Vec::with_capacity(self.integration_configuration.max_steps);
+        // Grow as needed rather than reserving max_steps: most rays stop far
+        // short of it, and a large budget (the accuracy check's reference uses
+        // 100x) would otherwise reserve gigabytes per ray.
+        let mut result: Vec<Step<G::Chart>> = Vec::with_capacity(
+            self.integration_configuration
+                .max_steps
+                .min(INITIAL_STEP_CAPACITY),
+        );
         let x = Point::new(y[0], y[1], y[2], y[3], initial_chart);
         let p = geodesic_solver.momentum_from_state(&y);
         result.push(Step { x, p, t, step: 0 });

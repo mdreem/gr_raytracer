@@ -143,7 +143,8 @@ fn single_star_directly_behind_forms_einstein_ring() {
 
     let buffer = renderer
         .render_section_to_radiance_buffer(0, 0, height as u32, width as u32)
-        .expect("render");
+        .expect("render")
+        .0;
 
     write_pgm(&buffer, width, height, "target/single_star_ring.pgm");
 

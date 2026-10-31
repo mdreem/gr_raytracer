@@ -3,6 +3,7 @@
 use super::Raytracer;
 use crate::geometry::geometry::Geometry;
 use crate::rendering::error::RaytracerError;
+use crate::rendering::integration::integrator::StopReason;
 use crate::rendering::light::color::{
     linear_srgb_to_srgb_buffer, xyz_to_linear_srgb, xyz_to_linear_srgb_buffer,
 };
@@ -25,9 +26,17 @@ fn flush_to_hdr(value: f64) -> f32 {
     }
 }
 
+/// Per-pixel results of a rendered section, row-major, for follow-up checks.
+pub struct SectionOutcome {
+    /// Luminance (CIE Y) of each pixel, for `check_accuracy`.
+    pub luminance: Vec<f64>,
+    /// Why each pixel's primary ray stopped, for `check_shadow`.
+    pub stop_reasons: Vec<Option<StopReason>>,
+}
+
 impl<'a, G: Geometry> Raytracer<'a, G> {
-    /// Render the section to `filename` and return its luminance (CIE Y) per
-    /// pixel, row-major, for follow-up checks such as `check_accuracy`.
+    /// Render the section to `filename` and return per-pixel results for
+    /// follow-up checks such as `check_accuracy` and `check_shadow`.
     pub fn render_section(
         &self,
         from_row: u32,
@@ -35,11 +44,13 @@ impl<'a, G: Geometry> Raytracer<'a, G> {
         to_row: u32,
         to_col: u32,
         filename: String,
-    ) -> Result<Vec<f64>, RaytracerError> {
+    ) -> Result<SectionOutcome, RaytracerError> {
         let luminance: Vec<f64>;
+        let stop_reasons;
         if filename.ends_with(".hdr") {
             info!("Creating HDR image");
-            let raw_cie =
+            let raw_cie;
+            (raw_cie, stop_reasons) =
                 self.render_section_to_radiance_buffer(from_row, from_col, to_row, to_col)?;
             luminance = raw_cie.iter().map(|c| c.y).collect();
             let buffer: Vec<f32> = raw_cie
@@ -59,7 +70,8 @@ impl<'a, G: Geometry> Raytracer<'a, G> {
                 "Tone mapping method: {:?}, exposure: {}",
                 self.tone_mapping, self.exposure
             );
-            let cie_pixels =
+            let cie_pixels;
+            (cie_pixels, stop_reasons) =
                 self.render_section_to_radiance_buffer(from_row, from_col, to_row, to_col)?;
             luminance = cie_pixels.iter().map(|c| c.y).collect();
             let cie_pixels = cie_pixels
@@ -76,7 +88,10 @@ impl<'a, G: Geometry> Raytracer<'a, G> {
         }
 
         info!("saved image to {}", filename);
-        Ok(luminance)
+        Ok(SectionOutcome {
+            luminance,
+            stop_reasons,
+        })
     }
 }
 

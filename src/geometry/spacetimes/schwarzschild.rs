@@ -215,6 +215,29 @@ impl Geometry for Schwarzschild {
         position[1]
     }
 
+    fn analytic_capture(
+        &self,
+        position: &Point<SphericalChart>,
+        momentum: &FourVector<SphericalChart>,
+    ) -> Option<bool> {
+        // Only b² = L²/E² matters for a = 0, so pass it as η with λ = 0. Both
+        // are invariant under the chart's rotation.
+        let (r, theta) = (position[1], position[2]);
+        let e = (1.0 - self.radius / r) * momentum[0];
+        let l_sqr = r.powi(4) * (momentum[2].powi(2) + (theta.sin() * momentum[3]).powi(2));
+        if e == 0.0 || !e.is_finite() {
+            return None;
+        }
+        crate::geometry::capture::photon_captured(
+            self.radius,
+            0.0,
+            0.0,
+            l_sqr / (e * e),
+            r,
+            momentum[1] > 0.0,
+        )
+    }
+
     fn get_constants_of_motion(
         &self,
         position: &Point<SphericalChart>,

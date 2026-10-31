@@ -238,6 +238,61 @@ mod tests {
         assert!(old_escape.dot(&ref_escape).clamp(-1.0, 1.0).acos() > 0.5);
     }
 
+    /// The shadow check of rows `rows` and columns `cols` of the photon-ring
+    /// framing, traced at `epsilon`.
+    fn photon_ring_shadow_check(
+        epsilon: f64,
+        rows: std::ops::Range<u32>,
+        cols: std::ops::Range<u32>,
+    ) -> crate::rendering::raytracer::shadow_check::ShadowCheckReport {
+        let geometry = KerrBL::new(1.0, 0.499, 1e-4);
+        let config = RenderConfig {
+            geometry_type: crate::configuration::GeometryType::KerrBL {
+                radius: 1.0,
+                a: 0.499,
+                horizon_epsilon: 1e-4,
+            },
+            ..Default::default()
+        };
+        let camera = Point::new_cartesian(0.0, -17.0, 0.0, 1.5);
+        let scene = create_scene_internal(&geometry, photon_ring_opts(epsilon), &config, camera)
+            .expect("scene");
+        let raytracer = raytracer::Raytracer::new(scene, ToneMappingMethod::default(), 1.0);
+        let stops: Vec<_> = rows
+            .clone()
+            .flat_map(|row| cols.clone().map(move |col| (row, col)))
+            .map(|(row, col)| {
+                let ray = raytracer.scene.camera.get_ray_for(row as i64, col as i64);
+                raytracer.scene.integrate_ray(&ray).expect("ray").1
+            })
+            .collect();
+        raytracer
+            .check_shadow(rows.start, cols.start, rows.end, cols.end, &stops)
+            .expect("KerrBL has an exact shadow")
+    }
+
+    /// The exact shadow check on a row across the shadow's edge in the
+    /// photon-ring framing (7680x4320). At the default tolerance every pixel
+    /// off the critical curve ends where the exact solution says; at the old
+    /// 1e-5 the rays of 32 pixels inside the shadow escape (the false arcs of
+    /// the windings close-up), and the check reports them.
+    #[test]
+    fn shadow_check_finds_rays_escaping_from_inside_the_shadow() {
+        let (rows, cols) = (2160..2161, 3660..3720);
+        let report =
+            photon_ring_shadow_check(crate::cli::cli::DEFAULT_EPSILON, rows.clone(), cols.clone());
+        assert!(
+            report.inside_shadow > 30 && report.compared > 55,
+            "{report:?}"
+        );
+        assert_eq!(report.disagreements, 0, "{report:?}");
+
+        let report = photon_ring_shadow_check(1e-5, rows, cols);
+        assert!(report.escaped_inside_shadow >= 30, "{report:?}");
+        assert_eq!(report.captured_outside_shadow, 0, "{report:?}");
+        assert!(report.max_depth_px >= Some(25), "{report:?}");
+    }
+
     #[test]
     fn test_render_kerr_bl_ray_at() {
         let a = 0.5;

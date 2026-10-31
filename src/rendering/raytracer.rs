@@ -4,6 +4,7 @@ pub mod accuracy;
 mod output;
 mod progress;
 mod sampling;
+pub mod shadow_check;
 mod star_gather;
 pub(super) mod tube;
 

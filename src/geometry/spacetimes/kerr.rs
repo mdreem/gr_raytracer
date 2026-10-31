@@ -47,7 +47,7 @@ fn k_covector(a: f64, x: f64, y: f64, z: f64) -> Vector4<f64> {
 }
 
 // Ignore negative r for now.
-fn metric(radius: f64, a: f64, x: f64, y: f64, z: f64) -> Matrix4<f64> {
+pub(crate) fn metric(radius: f64, a: f64, x: f64, y: f64, z: f64) -> Matrix4<f64> {
     let r_sqr = compute_r_sqr(a, x, y, z);
     let r = r_sqr.sqrt();
     let f = (r * r * r * radius) / (r * r * r * r + a * a * z * z);
@@ -469,6 +469,14 @@ impl Geometry for Kerr {
     fn get_radial_coordinate(&self, position: &Point<KerrChart>) -> f64 {
         let rho_sqr = compute_r_sqr(self.a, position[1], position[2], position[3]);
         rho_sqr.sqrt()
+    }
+
+    fn analytic_capture(
+        &self,
+        _position: &Point<KerrChart>,
+        momentum: &FourVector<KerrChart>,
+    ) -> Option<bool> {
+        crate::geometry::capture::kerr_capture(self.radius, self.a, momentum)
     }
 
     fn get_constants_of_motion(

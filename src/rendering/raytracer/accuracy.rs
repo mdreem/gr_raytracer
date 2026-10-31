@@ -27,8 +27,17 @@ pub const REFERENCE_FACTOR: f64 = 100.0;
 /// runs out of steps instead of getting more accurate.
 pub const MIN_REFERENCE_EPSILON: f64 = 1e-12;
 
-/// The reference gets this many times the render's step budget.
+/// The reference gets this many times the render's step budget, but no more
+/// than MAX_REFERENCE_STEPS unless the render's own budget is larger.
 pub const REFERENCE_STEP_FACTOR: usize = 100;
+
+/// Each step is kept in memory (~160 bytes), so the reference budget has to be
+/// bounded. Traced backwards in Kerr-Schild coordinates a captured ray creeps
+/// up to the horizon ever more slowly: at 1e-11 one did not arrive in 20
+/// million steps and held 3.2 GB, and a few dozen of them in parallel killed a
+/// 16 GiB job. A ray that runs out of budget there still counts as not
+/// escaping, which is all the comparison needs.
+pub const MAX_REFERENCE_STEPS: usize = 2_000_000;
 
 /// Share of rays ending differently above which the check warns.
 pub const WARN_FRACTION: f64 = 0.01;
@@ -55,8 +64,9 @@ pub struct AccuracyReport {
     /// Escape directions further apart than this count as changed: about one
     /// pixel at the image centre.
     pub threshold_rad: f64,
-    /// Pixels whose ray stops for a different reason (e.g. escapes instead of
-    /// falling in) or escapes more than `threshold_rad` away.
+    /// Pixels whose ray escapes in one trace but not the other, or escapes
+    /// more than `threshold_rad` away. Horizon, NaN, closed orbit and an
+    /// exhausted step budget all count as not escaping, as the image shows them.
     pub changed: usize,
     pub changed_fraction: f64,
     /// Largest escape-direction difference among rays that escape both times.
@@ -84,6 +94,19 @@ fn outcome<C: crate::geometry::coordinates::conversion::CartesianConvertible>(
         _ => None,
     };
     (stop, direction)
+}
+
+/// Whether two traces of a ray end differently: one escapes and the other does
+/// not, or both escape more than `threshold_rad` apart. Why a ray did not
+/// escape does not matter, since every such ray renders the same way.
+fn ends_differently(
+    a: Option<StopReason>,
+    b: Option<StopReason>,
+    deviation: Option<f64>,
+    threshold_rad: f64,
+) -> bool {
+    let escaped = |s| s == Some(StopReason::CelestialSphereReached);
+    escaped(a) != escaped(b) || deviation.is_some_and(|d| d > threshold_rad)
 }
 
 /// `samples` pixel positions spread evenly over the section, row-major.
@@ -189,7 +212,10 @@ impl<G: Geometry> Raytracer<'_, G> {
         let reference_epsilon = (epsilon / REFERENCE_FACTOR).max(MIN_REFERENCE_EPSILON);
         let reference = integrator.with_accuracy(
             reference_epsilon,
-            integrator.max_steps().saturating_mul(REFERENCE_STEP_FACTOR),
+            integrator
+                .max_steps()
+                .saturating_mul(REFERENCE_STEP_FACTOR)
+                .min(MAX_REFERENCE_STEPS.max(integrator.max_steps())),
         );
         let threshold_rad = self.scene.camera.pixel_angle();
         let pixels = sample_pixels(from_row, from_col, to_row, to_col, luminance, samples);
@@ -213,7 +239,7 @@ impl<G: Geometry> Raytracer<'_, G> {
                     (Some(u), Some(v)) => Some(u.dot(&v).clamp(-1.0, 1.0).acos()),
                     _ => None,
                 };
-                let changed = reason_a != reason_b || deviation.is_some_and(|d| d > threshold_rad);
+                let changed = ends_differently(reason_a, reason_b, deviation, threshold_rad);
                 let y = self.scene.color_of_ray_with(integrator, &ray)?.color.y;
                 let y_ref = self.scene.color_of_ray_with(&reference, &ray)?.color.y;
                 Ok((changed, deviation, y, y_ref))
@@ -273,7 +299,40 @@ impl<G: Geometry> Raytracer<'_, G> {
 
 #[cfg(test)]
 mod tests {
-    use super::{compare_colours, sample_grid, sample_pixels};
+    use super::{compare_colours, ends_differently, sample_grid, sample_pixels};
+    use crate::rendering::integration::integrator::StopReason;
+
+    #[test]
+    fn ends_differently_only_distinguishes_escape() {
+        use StopReason::*;
+        // Falling in versus running out of steps near the horizon: same image.
+        assert!(!ends_differently(Some(HorizonReached), None, None, 1e-3));
+        assert!(!ends_differently(
+            Some(HorizonReached),
+            Some(CoordinateIsNan),
+            None,
+            1e-3
+        ));
+        // Escaping versus not, and escaping in different directions.
+        assert!(ends_differently(
+            Some(CelestialSphereReached),
+            Some(HorizonReached),
+            None,
+            1e-3
+        ));
+        assert!(ends_differently(
+            Some(CelestialSphereReached),
+            Some(CelestialSphereReached),
+            Some(2e-3),
+            1e-3
+        ));
+        assert!(!ends_differently(
+            Some(CelestialSphereReached),
+            Some(CelestialSphereReached),
+            Some(5e-4),
+            1e-3
+        ));
+    }
 
     #[test]
     fn sample_pixels_covers_sparse_lit_pixels() {

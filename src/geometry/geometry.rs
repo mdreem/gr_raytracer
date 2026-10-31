@@ -149,6 +149,18 @@ pub trait Geometry: HasChart + InnerProduct + SupportQuantities + Signature + Sy
     fn step_parameter_scale(&self, _position: &Point<Self::Chart>) -> f64 {
         1.0
     }
+    /// Whether the photon with this momentum, traced in the direction it points,
+    /// ends at the horizon (`Some(true)`) or at infinity (`Some(false)`), from
+    /// the exact solution rather than by integrating. `None` where the geometry
+    /// cannot say: no horizon, or a photon on or bound near a photon orbit.
+    /// Used to check the integrated shadow of every render.
+    fn analytic_capture(
+        &self,
+        _position: &Point<Self::Chart>,
+        _momentum: &FourVector<Self::Chart>,
+    ) -> Option<bool> {
+        None
+    }
     /// Return the invariants along a geodesic, e.g. E and L_z.
     #[allow(dead_code)]
     fn get_constants_of_motion(

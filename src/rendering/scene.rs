@@ -26,6 +26,9 @@ use std::fs::File;
 pub struct RaySample<C: Chart> {
     pub color: Radiance,
     pub ray_class: RayClass,
+    /// Why the integration of `ray` stopped, independent of any object it
+    /// crossed (`ray_class` reads `Hit` for those).
+    pub stop_reason: Option<StopReason>,
     pub accumulated_angular_distance: f64,
     pub ray: Ray<C>,
 }
@@ -322,6 +325,7 @@ impl<'a, G: Geometry> Scene<'a, G> {
         Ok(RaySample {
             color: result,
             ray_class,
+            stop_reason,
             accumulated_angular_distance,
             ray: ray.clone(),
         })
